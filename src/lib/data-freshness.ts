@@ -12,7 +12,12 @@ export type DataSourceId =
   | 'reservoir'
   | 'alchemy'
   | 'helius'
-  | 'etherscan';
+  | 'etherscan'
+  | 'cex-binance'
+  | 'cex-bybit'
+  | 'cex-okx'
+  | 'cex-hyperliquid'
+  | 'cex-kraken';
 
 export type FreshnessStatus = 'fresh' | 'stale' | 'very_stale' | 'no_data' | 'disabled' | 'error';
 
@@ -25,7 +30,8 @@ export type SourceCategory =
   | 'Predictions'
   | 'Bitcoin'
   | 'NFT'
-  | 'RPC';
+  | 'RPC'
+  | 'CEX';
 
 export interface DataSourceState {
   id: DataSourceId;
@@ -77,6 +83,11 @@ const SOURCE_METADATA: Record<DataSourceId, SourceMetadata> = {
   alchemy:       { name: 'Alchemy',           category: 'RPC',         requiredForCore: false, enabled: false },
   helius:        { name: 'Helius',            category: 'RPC',         requiredForCore: false, enabled: false },
   etherscan:     { name: 'Etherscan',         category: 'RPC',         requiredForCore: false, enabled: false },
+  'cex-binance': { name: 'Binance CEX',       category: 'CEX',         requiredForCore: true,  enabled: true },
+  'cex-bybit':   { name: 'Bybit CEX',         category: 'CEX',         requiredForCore: true,  enabled: true },
+  'cex-okx':     { name: 'OKX CEX',           category: 'CEX',         requiredForCore: false, enabled: true },
+  'cex-hyperliquid': { name: 'Hyperliquid',   category: 'CEX',         requiredForCore: false, enabled: true },
+  'cex-kraken':  { name: 'Kraken CEX',        category: 'CEX',         requiredForCore: false, enabled: true },
 };
 
 function computeStatus(source: DataSourceState): FreshnessStatus {

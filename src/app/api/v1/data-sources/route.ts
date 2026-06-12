@@ -153,6 +153,36 @@ export async function GET() {
         available: true,
         details: { tier: "free", features: ["forex-rates", "major-pairs"], rateLimit: "1500 req/month" },
       },
+      {
+        name: "CEX - Binance",
+        category: "CEX",
+        available: true,
+        details: { tier: "free", features: ["spot", "futures", "funding-rates", "open-interest"], exchange: "binance", rateLimit: "1200 req/min" },
+      },
+      {
+        name: "CEX - Bybit",
+        category: "CEX",
+        available: true,
+        details: { tier: "free", features: ["spot", "linear-futures", "funding-rates", "liquidations"], exchange: "bybit", rateLimit: "50 req/sec" },
+      },
+      {
+        name: "CEX - OKX",
+        category: "CEX",
+        available: true,
+        details: { tier: "free", features: ["spot", "futures", "funding-rates", "liquidations"], exchange: "okx", rateLimit: "20 req/sec" },
+      },
+      {
+        name: "CEX - Hyperliquid",
+        category: "CEX",
+        available: true,
+        details: { tier: "free", features: ["perps", "funding-rates", "liquidations"], exchange: "hyperliquid", rateLimit: "unlimited" },
+      },
+      {
+        name: "CEX - Kraken",
+        category: "CEX",
+        available: true,
+        details: { tier: "free", features: ["spot", "ticker", "ohlc"], exchange: "kraken", rateLimit: "1 req/sec" },
+      },
     ];
 
     const allSources = [...dynamic, ...staticSources];

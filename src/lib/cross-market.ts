@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────────────────────
 
 import * as coinpaprika from "@/lib/coinpaprika";
+import { cexClient } from "@/lib/cex/client";
+import type { CexPair, CexLiquidation } from "@/lib/cex/types";
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -23,6 +25,16 @@ export interface CommodityPrice {
   change24h?: number;
 }
 
+export interface CexOverview {
+  enabledExchanges: string[];
+  topPairs: CexPair[];
+  whaleLiquidations24h: CexLiquidation[];
+  totalLiquidationValue24hUsd: number;
+  btcFundingRateAvg: number;
+  btcOpenInterestTotalUsd: number;
+  allHealthy: boolean;
+}
+
 export interface MarketOverview {
   forex: ForexPair[];
   commodities: CommodityPrice[];
@@ -33,6 +45,7 @@ export interface MarketOverview {
     btcDominance: number;
     fearGreed: number;
   };
+  cex: CexOverview;
   timestamp: string;
 }
 
@@ -54,6 +67,7 @@ interface FnGResponse {
 
 let forexCache: { data: ForexPair[]; ts: number } | null = null;
 let commodityCache: { data: CommodityPrice[]; ts: number } | null = null;
+let cexCache: { data: CexOverview; ts: number } | null = null;
 let overviewCache: { data: MarketOverview; ts: number } | null = null;
 const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
 
@@ -160,14 +174,67 @@ async function getFearGreed(): Promise<number> {
   return val ? Number(val) : 50;
 }
 
-/** Combined market overview: crypto + forex + commodities */
+/** Fetch CEX market overview */
+export async function getCexOverview(): Promise<CexOverview> {
+  const now = Date.now();
+  if (cexCache && now - cexCache.ts < CACHE_TTL_MS) {
+    return cexCache.data;
+  }
+
+  try {
+    const [status, pairs, liquidations] = await Promise.all([
+      cexClient.getExchangeStatus(),
+      cexClient.getPairs().catch(() => [] as CexPair[]),
+      cexClient.getWhaleLiquidations({ hours: 24 }).catch(() => [] as CexLiquidation[]),
+    ]);
+
+    const enabledExchanges = Object.keys(status);
+    const allHealthy = Object.values(status).every((s) => s.status === "operational");
+    const totalLiqValue = liquidations.reduce((sum, l) => sum + l.estimatedValueUsd, 0);
+
+    // Compute BTC metrics
+    const btcPairs = pairs.filter((p) => p.baseSymbol === "BTC" && p.quoteSymbol === "USDT");
+    const btcOi = btcPairs.reduce((sum, p) => sum + (p.openInterestUsd ?? 0), 0);
+    const btcFundingRates = btcPairs.filter((p) => p.fundingRateLatest !== undefined);
+    const btcFrAvg = btcFundingRates.length > 0
+      ? btcFundingRates.reduce((sum, p) => sum + (p.fundingRateLatest ?? 0), 0) / btcFundingRates.length
+      : 0;
+
+    const overview: CexOverview = {
+      enabledExchanges,
+      topPairs: pairs.slice(0, 10),
+      whaleLiquidations24h: liquidations,
+      totalLiquidationValue24hUsd: totalLiqValue,
+      btcFundingRateAvg: btcFrAvg,
+      btcOpenInterestTotalUsd: btcOi,
+      allHealthy,
+    };
+
+    cexCache = { data: overview, ts: now };
+    return overview;
+  } catch {
+    const fallback: CexOverview = {
+      enabledExchanges: [],
+      topPairs: [],
+      whaleLiquidations24h: [],
+      totalLiquidationValue24hUsd: 0,
+      btcFundingRateAvg: 0,
+      btcOpenInterestTotalUsd: 0,
+      allHealthy: false,
+    };
+    cexCache = { data: fallback, ts: now };
+    return fallback;
+  }
+}
+
+/** Combined market overview: crypto + forex + commodities + cex */
 export async function getMarketOverview(): Promise<MarketOverview> {
   const now = Date.now();
   if (overviewCache && now - overviewCache.ts < CACHE_TTL_MS) {
     return overviewCache.data;
   }
 
-  const [forex, commodities, globalResult, btcResult, ethResult, fearGreed] =
+  const [forex, commodities, globalResult, btcResult, ethResult, fearGreed, cexData] =
     await Promise.all([
       getForexRates().catch(() => [] as ForexPair[]),
       getCommodityPrices().catch(() => [] as CommodityPrice[]),
@@ -175,6 +242,11 @@ export async function getMarketOverview(): Promise<MarketOverview> {
       coinpaprika.getTicker("btc-bitcoin").catch(() => ({ id: "btc-bitcoin", name: "Bitcoin", symbol: "BTC", rank: 1, price: 0, volume24h: 0, marketCap: 0, change1h: 0, change24h: 0, change7d: 0, change30d: 0, change1y: 0, athPrice: 0, athDate: "", athDrop: 0, circulatingSupply: 0, totalSupply: 0, maxSupply: null })),
       coinpaprika.getTicker("eth-ethereum").catch(() => ({ id: "eth-ethereum", name: "Ethereum", symbol: "ETH", rank: 2, price: 0, volume24h: 0, marketCap: 0, change1h: 0, change24h: 0, change7d: 0, change30d: 0, change1y: 0, athPrice: 0, athDate: "", athDrop: 0, circulatingSupply: 0, totalSupply: 0, maxSupply: null })),
       getFearGreed().catch(() => 0),
+      getCexOverview().catch(() => ({
+        enabledExchanges: [], topPairs: [], whaleLiquidations24h: [],
+        totalLiquidationValue24hUsd: 0, btcFundingRateAvg: 0,
+        btcOpenInterestTotalUsd: 0, allHealthy: false,
+      })),
     ]);
 
   const overview: MarketOverview = {
@@ -187,6 +259,7 @@ export async function getMarketOverview(): Promise<MarketOverview> {
       btcDominance: globalResult.bitcoin_dominance_percentage,
       fearGreed,
     },
+    cex: cexData,
     timestamp: new Date().toISOString(),
   };
 

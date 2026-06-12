@@ -30,16 +30,43 @@ interface FredApiResponse {
 // ─── Key FRED Series ──────────────────────────────────────
 
 export const FRED_SERIES: Record<string, { title: string; unit: string; category: string }> = {
+  // ─── Rates ────────────────────────────────────────────
   FEDFUNDS:             { title: "Federal Funds Effective Rate",              unit: "%",       category: "rates" },
+  DFF:                  { title: "Federal Funds Effective Rate (Daily)",      unit: "%",       category: "rates" },
   DGS10:                { title: "10-Year Treasury Constant Maturity Rate",   unit: "%",       category: "rates" },
   DGS2:                 { title: "2-Year Treasury Constant Maturity Rate",    unit: "%",       category: "rates" },
   T10Y2Y:               { title: "10Y-2Y Treasury Spread",                   unit: "%",       category: "rates" },
+
+  // ─── Inflation ────────────────────────────────────────
   CPIAUCSL:             { title: "Consumer Price Index for All Urban Consumers", unit: "Index", category: "inflation" },
+  T10YIE:               { title: "10-Year Breakeven Inflation Rate",          unit: "%",       category: "inflation" },
+  T5YIFR:               { title: "5-Year Forward Inflation Expectation Rate", unit: "%",       category: "inflation" },
+
+  // ─── Employment ───────────────────────────────────────
   UNRATE:               { title: "Unemployment Rate",                         unit: "%",       category: "employment" },
-  GDP:                  { title: "Gross Domestic Product",                    unit: "Billions", category: "growth" },
+  ICSA:                 { title: "Initial Jobless Claims",                    unit: "Thousands", category: "employment" },
+  PAYEMS:               { title: "Total Nonfarm Payrolls",                    unit: "Thousands", category: "employment" },
+
+  // ─── Growth ───────────────────────────────────────────
+  GDP:                  { title: "Gross Domestic Product",                    unit: "$B",      category: "growth" },
+  INDPRO:               { title: "Industrial Production Index",               unit: "Index",   category: "growth" },
+
+  // ─── Real Estate ───────────────────────────────────────
+  HOUST:                { title: "Housing Starts",                            unit: "Thousands", category: "real-estate" },
+  MORTGAGE30US:         { title: "30-Year Fixed Rate Mortgage Average",       unit: "%",       category: "real-estate" },
+
+  // ─── Sentiment ────────────────────────────────────────
+  UMCSENT:              { title: "University of Michigan Consumer Sentiment", unit: "Index",   category: "sentiment" },
+
+  // ─── Monetary ──────────────────────────────────────────
+  M2SL:                 { title: "M2 Money Stock",                            unit: "$B",      category: "monetary" },
+
+  // ─── Cross-Market ────────────────────────────────────
   DTWEXBGS:             { title: "Trade Weighted U.S. Dollar Index",          unit: "Index",   category: "cross-market" },
   DCOILWTICO:           { title: "WTI Crude Oil Price",                       unit: "$/bbl",   category: "cross-market" },
   GOLDAMGBD228NLBM:     { title: "Gold Price (London Fix)",                   unit: "$/oz",    category: "cross-market" },
+  SP500:                { title: "S&P 500 Index",                             unit: "Index",   category: "cross-market" },
+  VIXCLS:               { title: "CBOE Volatility Index (VIX)",               unit: "Index",   category: "cross-market" },
 };
 
 // ─── Client ───────────────────────────────────────────────

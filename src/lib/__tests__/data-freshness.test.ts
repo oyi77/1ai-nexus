@@ -65,26 +65,29 @@ describe('DataFreshnessTracker', () => {
     });
 
     it('returns true when >= 50% core sources are active', () => {
-      // Core sources: defillama, jupiter, coinpaprika (3 total)
+      // Core sources: defillama, jupiter, coinpaprika, cex-binance, cex-bybit (5 total)
       tracker.recordUpdate('defillama', 200, 30);
       tracker.recordUpdate('jupiter', 150, 40);
-      // 2/3 = 66% >= 50%
+      tracker.recordUpdate('coinpaprika', 100, 20);
+      // 3/5 = 60% >= 50%
       expect(tracker.hasSufficientData()).toBe(true);
     });
 
     it('returns false when < 50% core sources are active', () => {
-      // Only 1 of 3 core sources
+      // Only 2 of 5 core sources
       tracker.recordUpdate('defillama', 200, 30);
-      // 1/3 = 33% < 50%
+      tracker.recordUpdate('jupiter', 150, 40);
+      // 2/5 = 40% < 50%
       expect(tracker.hasSufficientData()).toBe(false);
     });
 
     it('returns false when a core source errors', () => {
       tracker.recordUpdate('defillama', 200, 30);
       tracker.recordUpdate('jupiter', 150, 40);
+      tracker.recordUpdate('coinpaprika', 100, 20);
       expect(tracker.hasSufficientData()).toBe(true);
 
-      // Error on one core source — now only 1/3 active
+      // Error on one core source — now only 2/5 active
       tracker.recordError('jupiter', 'down');
       expect(tracker.hasSufficientData()).toBe(false);
     });
@@ -124,18 +127,21 @@ describe('DataFreshnessTracker', () => {
 
   describe('getSummary', () => {
     it('reports sufficient status when enough sources are active', () => {
-      // Activate all 3 core sources
+      // Core sources: defillama, jupiter, coinpaprika, cex-binance, cex-bybit (5 total)
+      // Need >= 3 core active (60%) + coverage >= 50% (need >= 8 of 16 enabled)
       tracker.recordUpdate('defillama', 200, 30);
       tracker.recordUpdate('jupiter', 150, 40);
       tracker.recordUpdate('coinpaprika', 100, 50);
-      // Also activate a few non-core to get coverage >= 50%
+      tracker.recordUpdate('cex-binance', 50, 25);
+      // Activate non-core sources to boost coverage
       tracker.recordUpdate('coingecko', 80, 20);
       tracker.recordUpdate('dexscreener', 60, 15);
       tracker.recordUpdate('blockstream', 40, 25);
+      tracker.recordUpdate('cryptocompare', 30, 10);
 
       const summary = tracker.getSummary();
       expect(summary.overallStatus).toBe('sufficient');
-      expect(summary.activeSources).toBeGreaterThanOrEqual(6);
+      expect(summary.activeSources).toBeGreaterThanOrEqual(8);
     });
 
     it('reports insufficient when no sources are active', () => {
@@ -160,10 +166,10 @@ describe('DataFreshnessTracker', () => {
       tracker.recordUpdate('coingecko', 100, 10);
 
       const summary = tracker.getSummary();
-      // 11 enabled sources total (14 total - 3 disabled)
-      expect(summary.totalSources).toBe(11);
+      // 16 enabled sources total (19 total - 3 disabled)
+      expect(summary.totalSources).toBe(16);
       expect(summary.activeSources).toBe(4);
-      expect(summary.coveragePercent).toBe(Math.round((4 / 11) * 100));
+      expect(summary.coveragePercent).toBe(Math.round((4 / 16) * 100));
     });
   });
 });
