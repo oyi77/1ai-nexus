@@ -7,6 +7,7 @@ import {
   buildConfig,
   logAvailability,
   type IntegrationConfig,
+  cex,
   defillama,
   etherscan,
   alchemy,
@@ -38,6 +39,7 @@ async function main() {
   ]);
 
   // Start background sync jobs (periodic polling)
+  cex.startCexSync(config);
   defillama.startDeFiLlamaSync(config);
   etherscan.startEtherscanPolling(config);
 
@@ -76,6 +78,18 @@ async function buildHealthResponse(config: IntegrationConfig) {
 async function checkIntegrations(config: IntegrationConfig) {
   const results: Array<{ name: string; status: string; details?: string }> = [];
 
+  // CEX (always available)
+  try {
+    const cexHealth = await cex.healthCheck(config);
+    results.push({
+      name: "cex",
+      status: cexHealth.ok && cexHealth.exchangeCount! > 0 ? "ok" : "degraded",
+      details: cexHealth.ok ? `${cexHealth.exchangeCount} exchanges, ${cexHealth.pairCount} pairs` : cexHealth.error,
+    });
+  } catch {
+    results.push({ name: "cex", status: "error" });
+  }
+
   // DeFiLlama (always available)
   try {
     const dlHealth = await defillama.healthCheck(config);
@@ -88,6 +102,7 @@ async function checkIntegrations(config: IntegrationConfig) {
     results.push({ name: "defillama", status: "error" });
   }
 
+ 
   // Jupiter (always available)
   try {
     const jupHealth = await jupiter.healthCheck(config);

@@ -27,7 +27,7 @@ app.get("/health", (_req, res) => {
 });
 
 // Apply auth middleware to all namespaces
-const namespaces = ["/trades", "/alerts", "/prices", "/flows"];
+const namespaces = ["/trades", "/alerts", "/prices", "/flows", "/cex"];
 
 for (const ns of namespaces) {
   const namespace = io.of(ns);

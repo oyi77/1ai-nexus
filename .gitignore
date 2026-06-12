@@ -38,6 +38,9 @@ yarn-error.log*
 # OMC state
 .omc/
 
+# OpenCode session runtime data
+.omo/
+
 # vercel
 .vercel
 

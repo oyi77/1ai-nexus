@@ -75,30 +75,23 @@ model TokenHolding {
 }
 
 model Transaction {
-  id          String   @id @default(cuid())
-  hash        String   @unique
-  fromWallet  String
-  toWallet    String
-  tokenId     String?
-  amountUsd   Float
-  chain       String
-  timestamp   DateTime
-  decodedType String
-  walletId    String
-  wallet      Wallet   @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  id        String @id @default(cuid())
+  walletId  String
+  wallet    Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  txHash    String
+  value     Float
+  timestamp DateTime
 
+  @@unique([walletId, txHash])
   @@index([walletId, timestamp(sort: Desc)])
-  @@index([chain, timestamp(sort: Desc)])
 }
 
 model PredictionMarket {
   id          String   @id @default(cuid())
-  source      String
-  externalId  String   @unique
-  title       String
   category    String
-  yesPrice    Float    @default(0.5)
-  noPrice     Float    @default(0.5)
+  symbol      String
+  resolvedAt  DateTime?
+  outcome     String?
   volume24h   Float    @default(0)
   totalVolume Float    @default(0)
   traderCount Int      @default(0)
@@ -200,4 +193,109 @@ model IndexerCheckpoint {
   lastBlock  BigInt   @default(0)
   lastTxHash String?
   updatedAt  DateTime @updatedAt
+}
+
+model CexExchange {
+  id                 String   @id @default(cuid())
+  name               String   @unique
+  status             String   @default("unknown")
+  makerFee           Float    @default(0)
+  takerFee           Float    @default(0)
+  spotVolumeUsd24h   Float    @default(0)
+  futuresVolumeUsd24h Float   @default(0)
+  serverTime         DateTime?
+  lastUpdate         DateTime @default(now())
+
+  @@index([status])
+}
+
+model CexPair {
+  id                  String   @id @default(cuid())
+  exchange            String
+  symbol              String
+  baseSymbol          String
+  quoteSymbol         String
+  pairType            String
+  priceUsd            Float    @default(0)
+  priceChange24h      Float    @default(0)
+  volumeUsd24h        Float    @default(0)
+  openInterestUsd     Float    @default(0)
+  fundingRate         Float    @default(0)
+  bidAskSpreadBps     Float    @default(0)
+  isActive            Boolean  @default(true)
+  updatedAt           DateTime @updatedAt
+
+  @@unique([exchange, symbol])
+  @@index([exchange])
+  @@index([volumeUsd24h(sort: Desc)])
+  @@index([openInterestUsd(sort: Desc)])
+}
+
+model CexFundingRate {
+  id               String   @id @default(cuid())
+  exchange         String
+  symbol           String
+  fundingRate      Float
+  fundingTime      DateTime
+  nextFundingTime  DateTime?
+  magnitude        String
+  timestamp        DateTime @default(now())
+
+  @@index([exchange, symbol, timestamp(sort: Desc)])
+  @@index([fundingTime(sort: Desc)])
+}
+
+model CexLiquidation {
+  id                String   @id @default(cuid())
+  exchange          String
+  symbol            String
+  side              String
+  quantity          Float
+  liquidationPrice  Float
+  estimatedValueUsd Float
+  isWhale           Boolean  @default(false)
+  whaleTier         String?
+  timestamp         DateTime
+
+  @@index([exchange, timestamp(sort: Desc)])
+  @@index([estimatedValueUsd(sort: Desc)])
+  @@index([isWhale])
+}
+
+model BotSignal {
+  id         String   @id @default(cuid())
+  symbol     String
+  direction  String
+  confidence Float
+  source     String
+  grade      String
+  entryPrice Float?
+  metadata   Json?
+  timestamp  DateTime @default(now())
+
+  @@index([symbol, timestamp(sort: Desc)])
+  @@index([confidence(sort: Desc)])
+}
+
+model BotTrade {
+  id        String   @id @default(cuid())
+  tradeId   String   @unique
+  symbol    String
+  action    String
+  entryPrice Float
+  exitPrice Float?
+  stake     Float
+  outcome   String
+  profitUsd Float   @default(0)
+  pips      Float   @default(0)
+  strategy  String?
+  source    String?
+  openTime  DateTime
+  closeTime DateTime?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([symbol])
+  @@index([outcome])
+  @@index([openTime(sort: Desc)])
 }

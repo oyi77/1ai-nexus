@@ -8,6 +8,7 @@ const CHANNELS = [
   "nexus:alerts",
   "nexus:prices",
   "nexus:flows",
+  "nexus:cex",
 ] as const;
 
 const CHANNEL_TO_NAMESPACE: Record<string, string> = {
@@ -15,6 +16,7 @@ const CHANNEL_TO_NAMESPACE: Record<string, string> = {
   "nexus:alerts": "/alerts",
   "nexus:prices": "/prices",
   "nexus:flows": "/flows",
+  "nexus:cex": "/cex",
 };
 
 export function startSubscriber(io: Server): Redis {

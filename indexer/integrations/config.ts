@@ -87,6 +87,11 @@ export function checkAvailability(config: IntegrationConfig): IntegrationStatus[
       reason: config.helius.apiKey ? "API key configured (enhanced Solana)" : "HELIUS_API_KEY not set (using public RPC)",
     },
     {
+      name: "CEX",
+      available: true,
+      reason: "Free public endpoints via cex client",
+    },
+    {
       name: "DeFiLlama",
       available: true,
       reason: "Free, no auth needed",
