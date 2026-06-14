@@ -1,8 +1,5 @@
 import * as http from "http";
 import { redis } from "./publisher";
-import { startEthereumListener } from "./chains/ethereum";
-import { startSolanaListener } from "./chains/solana";
-import { startBitcoinListener } from "./chains/bitcoin";
 import {
   buildConfig,
   logAvailability,
@@ -13,6 +10,12 @@ import {
   alchemy,
   jupiter,
 } from "./integrations";
+import { startEthereumListener } from "./chains/ethereum";
+import { startSolanaListener } from "./chains/solana";
+import { startBitcoinListener } from "./chains/bitcoin";
+
+// NEW: batch ingestion layer (opt-in via USE_BATCH_INDEXER=1)
+import { startEthereumBatchIndexer } from "./core/evm-batch-indexer";
 
 const HEALTH_PORT = parseInt(process.env.HEALTH_PORT || "4409", 10);
 
@@ -32,11 +35,22 @@ async function main() {
   }
 
   // Start chain listeners (real-time WebSocket subscriptions)
-  await Promise.allSettled([
-    startEthereumListener(),
+  const useBatch = process.env.USE_BATCH_INDEXER === "1";
+
+  const starters = [
     startSolanaListener(),
     startBitcoinListener(),
-  ]);
+  ];
+
+  if (useBatch) {
+    console.log("[indexer] USE_BATCH_INDEXER=1 -> EVM batch indexer enabled");
+    starters.push(startEthereumBatchIndexer());
+  } else {
+    console.log("[indexer] legacy per-wallet EVM indexer active");
+    starters.push(startEthereumListener());
+  }
+
+  await Promise.allSettled(starters);
 
   // Start background sync jobs (periodic polling)
   cex.startCexSync(config);

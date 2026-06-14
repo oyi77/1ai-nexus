@@ -1,0 +1,27 @@
+{
+  "name": "@1ai-tracker/core",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "ioredis": "^5.11.0"
+  },
+  "peerDependencies": {
+    "@prisma/client": ">=6"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "tsx": "^4.22.3"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx --watch src/index.ts"
+  }
+}

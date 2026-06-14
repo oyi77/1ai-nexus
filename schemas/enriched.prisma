@@ -1,0 +1,71 @@
+model Transaction {
+  id        String   @id @default(cuid())
+  walletId  String
+  txHash    String
+  chain     String
+  block     BigInt
+  timestamp DateTime @db.Timestamptz(3)
+
+  from      String
+  to        String
+  method    String?
+
+  token     String?
+  amountRaw String?
+  amountUsd Decimal? @db.Decimal(20,2)
+
+  tokenDecimals Int?
+  tokenSymbol   String?
+  tokenAddress  String?
+
+  dexName    String?
+  dexRouter  String?
+  isMEV      Boolean?  @default(false)
+  mevType    String?
+  approval   String?
+  slippagePct Decimal? @db.Decimal(6,2)
+  feeUsd     Decimal? @db.Decimal(10,2)
+  pathTokens String[]
+
+  @@index([chain, dex])
+  @@index([block])
+  @@index([isMEV])
+  @@index([approval])
+}
+
+model WhaleActivity {
+  id          String    @id @default(cuid())
+  walletId    String
+  chain       String
+  txHash      String    @unique
+  action      String
+  tier        String
+  amountUsd   Decimal   @db.Decimal(20,2)
+  detectedAt  DateTime  @default(now())
+  metadata    Json?
+
+  @@index([chain, detectedAt])
+  @@index([tier, amountUsd])
+}
+
+model SmartMoneyPerf {
+  id             String    @id @default(cuid())
+  walletId       String
+  window         String
+  tradeCount     Int
+  winRate        Decimal   @db.Decimal(5,2)
+  avgRoiPct      Decimal   @db.Decimal(8,2)
+  totalVolumeUsd Decimal   @db.Decimal(20,2)
+  sharpeRatio    Decimal?  @db.Decimal(6,2)
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([walletId, window])
+}
+
+model IndexerCheckpoint {
+  id         String   @id @default(cuid())
+  chain      String   @unique
+  lastBlock  BigInt   @default(0)
+  lastTxHash String?
+  updatedAt  DateTime @updatedAt
+}

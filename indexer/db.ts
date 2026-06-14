@@ -2,7 +2,6 @@
 // Shared Prisma Client Singleton for the indexer sidecar
 // Prevents multiple connection pools across modules
 // ─────────────────────────────────────────────────────────────
-
 import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as { __indexerPrisma?: PrismaClient };

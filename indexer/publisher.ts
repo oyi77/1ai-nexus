@@ -19,5 +19,23 @@ redis.on("error", (err) => {
 });
 
 export async function publishEvent(channel: string, payload: Record<string, unknown>) {
-  await redis.publish(channel, JSON.stringify(payload));
+  const message = JSON.stringify(payload);
+  await redis.publish(channel, message);
+
+  // Write to Redis Streams for durable replay of enriched tx bus events
+  try {
+    await redis.xadd(
+      `stream:${channel}`,
+      "*",
+      "eventId",
+      `${Date.now()}:${Math.random()}`,
+      "schemaVersion",
+      "tx.v2",
+      "payload",
+      message,
+    );
+  } catch (streamErr) {
+    // Best-effort secondary write
+    console.error("[publisher] stream write failed", (streamErr as Error).message);
+  }
 }

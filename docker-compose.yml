@@ -1,10 +1,9 @@
 services:
-  # ── Infrastructure ──────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: nexus
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD env var}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
       POSTGRES_DB: nexus
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -25,22 +24,30 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── DB Init (runs once, then exits) ─────────────────────────────
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.9
+    environment:
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-nexus-ch-pass}
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./db/clickhouse-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   db-init:
     build:
       context: .
       dockerfile: Dockerfile
-      target: builder
-    command: >
-      sh -c "npx prisma db push --skip-generate && npm run db:seed"
+    command: ["sh", "-c", "npx prisma db push --skip-generate && npm run db:seed"]
     environment:
-      - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD env var}@postgres:5432/nexus
+      - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus
     depends_on:
       postgres:
         condition: service_healthy
-    restart: "no"
 
-  # ── Application ─────────────────────────────────────────────────
   web:
     build:
       context: .
@@ -48,19 +55,14 @@ services:
     ports:
       - "4400:4400"
     environment:
-      - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD env var}@postgres:5432/nexus
-      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET env var}
-      - NEXTAUTH_URL=http://localhost:4400
+      - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus
       - REDIS_URL=redis://:${REDIS_PASSWORD:-nexus-redis-pass}@redis:6379
-      - ALCHEMY_API_KEY=${ALCHEMY_API_KEY:-}
-      - HELIUS_API_KEY=${HELIUS_API_KEY:-}
-      - ETHERSCAN_API_KEY=${ETHERSCAN_API_KEY:-}
+      - USE_BATCH_INDEXER=1
     depends_on:
       db-init:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
-    restart: unless-stopped
 
   ws:
     build:
@@ -69,34 +71,34 @@ services:
       - "4401:4401"
     environment:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-nexus-redis-pass}@redis:6379
-      - NEXUS_API_KEYS=${NEXUS_API_KEYS:-nexus-dev-key}
       - WS_PORT=4401
+      - NEXUS_API_KEYS=${NEXUS_API_KEYS:-}
     depends_on:
       redis:
         condition: service_healthy
-    restart: unless-stopped
 
   indexer:
     build:
       context: ./indexer
     environment:
-      - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD env var}@postgres:5432/nexus
+      - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus
       - REDIS_URL=redis://:${REDIS_PASSWORD:-nexus-redis-pass}@redis:6379
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-nexus-ch-pass}
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - HEALTH_PORT=4409
-      - ALCHEMY_API_KEY=${ALCHEMY_API_KEY:-}
-      - HELIUS_API_KEY=${HELIUS_API_KEY:-}
-      - ETHERSCAN_API_KEY=${ETHERSCAN_API_KEY:-}
-      - ARBISCAN_API_KEY=${ARBISCAN_API_KEY:-}
-      - BASESCAN_API_KEY=${BASESCAN_API_KEY:-}
-      - OPTIMISM_ETHERSCAN_API_KEY=${OPTIMISM_ETHERSCAN_API_KEY:-}
+      - USE_BATCH_INDEXER=1
     depends_on:
       db-init:
         condition: service_completed_successfully
       redis:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
     restart: unless-stopped
 
 volumes:
   postgres_data:
   redis_data:
+  clickhouse_data:
