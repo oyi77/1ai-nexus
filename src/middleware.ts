@@ -43,6 +43,7 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/defi/yields",
   "/api/v1/wallets",
   "/api/v1/modules",
+  "/api/v1/modules/fetch",
   "/api/v1/user/api-key",
   "/api/v1/cron",
   "/api/v1/cron/start",
