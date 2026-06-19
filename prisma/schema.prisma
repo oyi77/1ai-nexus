@@ -299,3 +299,93 @@ model BotTrade {
   @@index([outcome])
   @@index([openTime(sort: Desc)])
 }
+
+// ─── NEXUS Module System Models ─────────────────────────────
+
+model NewsArticle {
+  id          String   @id @default(cuid())
+  sourceId    String
+  title       String
+  summary     String?
+  url         String   @unique
+  publishedAt DateTime
+  assets      String[]
+  sentiment   String?
+  category    String
+  createdAt   DateTime @default(now())
+
+  @@index([publishedAt])
+  @@index([assets])
+}
+
+model MacroDataPoint {
+  id       String   @id @default(cuid())
+  seriesId String
+  sourceId String
+  value    Float
+  date     DateTime
+  metadata Json?
+
+  @@unique([seriesId, date])
+  @@index([seriesId])
+}
+
+model MarketSnapshot {
+  id        String   @id @default(cuid())
+  symbol    String
+  sourceId  String
+  price     Float
+  change24h Float?
+  volume24h Float?
+  marketCap Float?
+  timestamp DateTime @default(now())
+
+  @@index([symbol, timestamp])
+}
+
+model ModuleConfig {
+  id        String   @id @default(cuid())
+  userId    String
+  moduleId  String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, moduleId])
+}
+
+model ModuleHealthRecord {
+  id          String   @id @default(cuid())
+  moduleId    String   @unique
+  sourceType  String
+  status      String
+  lastChecked DateTime @default(now())
+  lastSuccess DateTime?
+  failureCount Int     @default(0)
+  notes       String?
+}
+
+model UserApiKey {
+  id        String   @id @default(cuid())
+  userId    String
+  service   String
+  apiKey    String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, service])
+}
+
+model EntityLabel {
+  id         String   @id @default(cuid())
+  address    String
+  chain      String
+  label      String
+  category   String
+  confidence Float    @default(0.5)
+  source     String   @default("seeded")
+  updatedAt  DateTime @updatedAt
+
+  @@unique([address, chain])
+  @@index([chain])
+}

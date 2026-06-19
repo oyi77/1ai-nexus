@@ -1,20 +1,35 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-bg-primary: #0A0B0F;
-  --color-bg-surface: #111318;
-  --color-bg-elevated: #1A1D27;
-  --color-accent-cyan: #00D4FF;
-  --color-accent-green: #00FF88;
-  --color-danger: #FF3D6B;
-  --color-warning: #FFB800;
-  --color-text-primary: #E8EAED;
-  --color-text-muted: #6B7280;
+  /* ── NEXUS Design System v4.1 ──────────────────────────── */
+  --color-bg-deep:       #080b0f;
+  --color-bg-panel:      #0d1117;
+  --color-bg-elevated:   #131920;
+  --color-border-dim:    #1c2430;
+  --color-border-active: #2a3f55;
+  --color-accent-green:  #00ff88;
+  --color-accent-cyan:   #00c8ff;
+  --color-accent-amber:  #ffb800;
+  --color-accent-red:    #ff3060;
+  --color-accent-purple: #9b6dff;
+  --color-text-primary:  #dce8f0;
+  --color-text-dim:      #5a7a94;
+  --color-text-muted:    #2e4055;
+
+  /* Legacy compat */
+  --color-bg-primary:    #080b0f;
+  --color-bg-surface:    #0d1117;
+  --color-danger:        #ff3060;
+  --color-warning:       #ffb800;
+
   --font-sans: "Inter", sans-serif;
   --font-mono: "JetBrains Mono", monospace;
+  --font-head: "Space Grotesk", sans-serif;
+
   --animate-pulse-green: pulse-green 1s ease-in-out;
   --animate-pulse-red: pulse-red 1s ease-in-out;
   --animate-live-dot: live-dot 2s ease-in-out infinite;
+  --animate-ticker: ticker-scroll 30s linear infinite;
 }
 
 @keyframes pulse-green {
@@ -23,7 +38,7 @@
 }
 
 @keyframes pulse-red {
-  0%, 100% { color: var(--color-danger); }
+  0%, 100% { color: var(--color-accent-red); }
   50% { color: transparent; }
 }
 
@@ -32,17 +47,52 @@
   50% { opacity: 0.3; }
 }
 
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
 body {
-  background: var(--color-bg-primary);
+  background: var(--color-bg-deep);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
 }
 
+/* ── Scrollbar ─────────────────────────────────────────── */
 .scrollbar-thin {
   scrollbar-width: thin;
-  scrollbar-color: var(--color-bg-elevated) var(--color-bg-surface);
+  scrollbar-color: var(--color-bg-elevated) var(--color-bg-panel);
+}
+.scrollbar-thin::-webkit-scrollbar { width: 6px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: var(--color-bg-panel); }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-bg-elevated); border-radius: 3px; }
+
+/* ── Live Feed Row Colors ──────────────────────────────── */
+.feed-whale    { color: var(--color-accent-amber); }
+.feed-smart    { color: var(--color-accent-green); }
+.feed-news     { color: var(--color-accent-cyan); }
+.feed-macro    { color: var(--color-accent-amber); }
+.feed-signal   { color: var(--color-accent-purple); }
+
+/* ── Ticker Strip ──────────────────────────────────────── */
+.ticker-strip {
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ticker-content {
+  display: inline-block;
+  animation: ticker-scroll 30s linear infinite;
 }
 
-.scrollbar-thin::-webkit-scrollbar { width: 6px; }
-.scrollbar-thin::-webkit-scrollbar-track { background: var(--color-bg-surface); }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-bg-elevated); border-radius: 3px; }
+/* ── Bloomberg Layout Grid ─────────────────────────────── */
+.bloomberg-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 1px;
+  background: var(--color-border-dim);
+  height: calc(100vh - 80px);
+}
+.bloomberg-grid > * {
+  background: var(--color-bg-panel);
+}

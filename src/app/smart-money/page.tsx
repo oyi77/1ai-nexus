@@ -1,73 +1,56 @@
-'use client';
+"use client"
 
-import { useState, useEffect } from 'react';
-import { PageHeader } from '@/components/domain/page-header';
-import { SmartMoneyFeed } from '@/components/smart-money/SmartMoneyFeed';
-import type { SmartMoneyEvent } from '@/lib/mock-data';
+import { TerminalShell } from "@/components/layout/TerminalShell"
 
 export default function SmartMoneyPage() {
-  const [events, setEvents] = useState<SmartMoneyEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    async function load() {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch('/api/smart-money', { signal: controller.signal });
-        if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-        const json = await res.json();
-        setEvents(json.data ?? []);
-      } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === 'AbortError') return;
-        setError(err instanceof Error ? err.message : 'Failed to load smart money data');
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-    return () => controller.abort();
-  }, []);
-
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
-        <PageHeader
-          title="Smart Money Feed"
-          description="Real-time activity from labeled smart money wallets across all chains"
-        />
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
-          <Stat label="Active Wallets" value="147" />
-          <Stat label="24h Volume" value="$2.4B" />
-          <Stat label="Top Action" value="Accumulated" color="text-accent-green" />
-          <Stat label="Signals Today" value="38" />
+    <TerminalShell>
+      <div className="p-6 space-y-6">
+        <h1 className="text-xl font-bold font-mono text-accent-cyan">SMART MONEY TRACKER</h1>
+
+        {/* Smart Money Flow Board */}
+        <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+          <h2 className="text-xs font-mono text-accent-cyan mb-3">SMART MONEY FLOW — 24H</h2>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {['VC Funds', 'CEX Hot Wallets', 'Known Whales', 'DeFi Protocols', 'DEX Traders'].map(cat => (
+              <div key={cat} className="bg-bg-elevated rounded p-3">
+                <p className="text-[10px] text-text-muted uppercase">{cat}</p>
+                <p className="text-lg font-mono font-bold text-text-primary">—</p>
+                <p className="text-[10px] text-text-dim">net buy/sell</p>
+              </div>
+            ))}
+          </div>
         </div>
-        <div className="mt-6">
-          {error && (
-            <div className="mb-4 rounded-lg border border-danger/20 bg-danger/10 p-4 text-sm text-danger">
-              {error}
-            </div>
-          )}
-          {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent-cyan border-t-transparent" />
-            </div>
-          ) : (
-            <SmartMoneyFeed events={events} />
-          )}
+
+        {/* Wallet Profiler */}
+        <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+          <h2 className="text-xs font-mono text-accent-cyan mb-3">WALLET PROFILER</h2>
+          <p className="text-xs text-text-dim">
+            Enter a wallet address to view entity label, PnL timeline, holdings breakdown, and activity heatmap.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <input
+              type="text"
+              placeholder="0x... or .sol address"
+              className="flex-1 bg-bg-deep border border-border-dim rounded px-3 py-2 text-xs font-mono text-text-primary placeholder:text-text-muted focus:border-accent-cyan focus:outline-none"
+            />
+            <button className="px-4 py-2 bg-accent-cyan/20 text-accent-cyan text-xs font-mono rounded border border-accent-cyan/30 hover:bg-accent-cyan/30 transition-colors">
+              ANALYZE
+            </button>
+          </div>
+        </div>
+
+        {/* Smart Money Scores */}
+        <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+          <h2 className="text-xs font-mono text-accent-cyan mb-3">TOP SMART MONEY WALLETS</h2>
+          <p className="text-xs text-text-dim">
+            Data from NEXUS Smart Money Engine (derived) — combines wallet age, on-chain PnL, DEX trade patterns, and entity labels.
+          </p>
+          <div className="mt-3 text-text-muted text-xs">
+            Wallet data will populate as the indexer processes on-chain transactions.
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="rounded-lg border border-white/5 bg-bg-surface p-4">
-      <span className="text-xs font-medium uppercase tracking-wider text-text-muted">{label}</span>
-      <div className={`mt-1 font-mono text-xl font-semibold ${color || "text-text-primary"}`}>{value}</div>
-    </div>
-  );
+    </TerminalShell>
+  )
 }

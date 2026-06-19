@@ -98,6 +98,35 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    ports:
+      - "4402:4402"
+    environment:
+      - MCP_PORT=4402
+      - NEXUS_API_URL=http://web:4400
+    depends_on:
+      web:
+        condition: service_started
+    restart: unless-stopped
+
+  re-verifier:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["npx", "tsx", "scripts/verify-re-modules.ts"]
+    environment:
+      - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-nexus-redis-pass}@redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
