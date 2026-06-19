@@ -78,7 +78,7 @@ export default function TerminalPage() {
     <TerminalShell>
       <div className="h-full overflow-auto p-2">
         {/* Bloomberg 4-Quadrant Grid */}
-        <div className="grid grid-cols-2 gap-px bg-border-dim h-full" style={{ minHeight: 'calc(100vh - 120px)' }}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-px bg-border-dim" style={{ minHeight: 'calc(100vh - 120px)' }}>
           {/* Top-Left: Market Quotes */}
           <div className="bg-bg-deep p-2 overflow-auto">
             <div className="text-[10px] font-mono text-accent-cyan mb-1 flex items-center gap-1">
