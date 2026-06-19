@@ -1,212 +1,135 @@
-"use client";
+"use client"
 
-import { useState, useEffect, useCallback } from "react";
-import { PageHeader } from "@/components/domain/page-header";
-import { TokenTable } from "@/components/tokens/TokenTable";
-import { cn, formatUsd } from "@/lib/utils";
-import type { TokenData } from "@/lib/mock-data";
+import { useState, useEffect, useCallback } from "react"
+import { TerminalShell } from "@/components/layout/TerminalShell"
+import { TrendingUp, TrendingDown, Search } from "lucide-react"
 
-interface ApiToken {
-  id: string;
-  address: string;
-  chain: string;
-  name: string;
-  symbol: string;
-  price: number;
-  marketCap: number;
-  volume24h: number;
-  holderCount: number;
-  smartMoneyFlow: number;
-}
-
-interface ApiResponse {
-  data: ApiToken[];
-  meta: { page: number; pageSize: number; total: number; hasMore: boolean };
-  error: string | null;
-}
-
-function toTokenData(t: ApiToken): TokenData {
-  return {
-    id: t.id,
-    name: t.name,
-    symbol: t.symbol,
-    price: t.price,
-    priceChange24h: 0,
-    marketCap: t.marketCap,
-    volume24h: t.volume24h,
-    smartMoneyFlow: t.smartMoneyFlow,
-    walletCount: t.holderCount,
-    holderDistribution: { top10: 0, top11to50: 0, top51to100: 0, retail: 0 },
-    chain: t.chain,
-    trending: false,
-    watchlisted: false,
-  };
+interface Token {
+  id: string
+  symbol: string
+  name: string
+  current_price: number
+  market_cap: number
+  total_volume: number
+  price_change_percentage_24h: number
+  market_cap_rank: number
+  image: string
 }
 
 export default function TokensPage() {
-  const [tokens, setTokens] = useState<TokenData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [meta, setMeta] = useState<{ page: number; pageSize: number; total: number; hasMore: boolean } | null>(null);
+  const [tokens, setTokens] = useState<Token[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
 
-  const fetchTokens = useCallback(async (p: number) => {
-    setLoading(true);
-    setError(null);
+  const fetchData = useCallback(async () => {
+    setLoading(true)
     try {
-      const res = await fetch(`/api/tokens?page=${p}&pageSize=20`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json: ApiResponse = await res.json();
-      if (json.error) throw new Error(json.error);
-      setTokens(json.data.map(toTokenData));
-      setMeta(json.meta);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch tokens");
+      const res = await fetch(`/api/v1/modules/fetch?module=coingecko&action=markets&vs_currency=usd&per_page=50&page=${page}`)
+      const data = await res.json()
+      setTokens(data.data ?? [])
+    } catch {
+      // Silent
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, []);
+  }, [page])
 
-  useEffect(() => {
-    fetchTokens(page);
-  }, [page, fetchTokens]);
+  useEffect(() => { fetchData() }, [fetchData])
 
-  const handleToggleWatchlist = (id: string) => {
-    setTokens((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, watchlisted: !t.watchlisted } : t))
-    );
-  };
-
-  const trending = tokens.filter((t) => t.trending);
-  const topFlow = [...tokens].sort((a, b) => b.smartMoneyFlow - a.smartMoneyFlow).slice(0, 5);
+  const filtered = tokens.filter(t =>
+    !search ||
+    t.symbol.toLowerCase().includes(search.toLowerCase()) ||
+    t.name.toLowerCase().includes(search.toLowerCase())
+  )
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
-        <PageHeader
-          title="Token Explorer"
-          description="Search and analyze tokens across all chains with smart money insights"
-        />
+    <TerminalShell>
+      <div className="h-full overflow-auto">
+        <div className="sticky top-0 bg-bg-deep z-10 px-4 py-3 border-b border-border-dim">
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-sm font-mono font-bold text-accent-cyan">TOKEN MARKETS</h1>
+            <span className="text-[10px] text-text-muted">{tokens.length} tokens · CoinGecko</span>
+          </div>
+          <div className="flex gap-2">
+            <div className="relative flex-1 max-w-xs">
+              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search tokens..."
+                className="w-full bg-bg-panel border border-border-dim rounded pl-7 pr-3 py-1 text-xs font-mono text-text-primary placeholder:text-text-muted focus:border-accent-cyan focus:outline-none"
+              />
+            </div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setPage(Math.max(1, page - 1))}
+                disabled={page === 1}
+                className="px-2 py-0.5 rounded text-[10px] border bg-bg-panel border-border-dim text-text-dim disabled:opacity-30"
+              >← PREV</button>
+              <span className="px-2 py-0.5 text-[10px] text-text-dim font-mono">PAGE {page}</span>
+              <button
+                onClick={() => setPage(page + 1)}
+                className="px-2 py-0.5 rounded text-[10px] border bg-bg-panel border-border-dim text-text-dim"
+              >NEXT →</button>
+            </div>
+          </div>
+        </div>
 
-        {/* Trending tokens */}
-        {trending.length > 0 && (
-          <div className="mt-6">
-            <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-text-muted">Trending</h2>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {trending.map((t) => (
-                <div
-                  key={t.id}
-                  className="rounded-lg border border-white/5 bg-bg-surface p-3 transition-colors hover:border-accent-cyan/20"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-bg-elevated text-xs font-bold">
-                        {t.symbol.slice(0, 2)}
-                      </span>
-                      <div>
-                        <div className="text-sm font-medium text-text-primary">{t.symbol}</div>
-                        <div className="text-xs text-text-muted">{t.name}</div>
+        <div className="px-4 py-2">
+          {loading ? (
+            <div className="text-center py-20 text-text-dim text-xs">Loading token markets from CoinGecko...</div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-text-muted text-[10px] uppercase">
+                  <th className="text-left py-2 px-2 font-mono">#</th>
+                  <th className="text-left py-2 px-2 font-mono">TOKEN</th>
+                  <th className="text-right py-2 px-2 font-mono">PRICE</th>
+                  <th className="text-right py-2 px-2 font-mono">24H</th>
+                  <th className="text-right py-2 px-2 font-mono">MARKET CAP</th>
+                  <th className="text-right py-2 px-2 font-mono">VOLUME 24H</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(t => (
+                  <tr key={t.id} className="border-t border-border-dim/30 hover:bg-bg-elevated cursor-pointer transition-colors">
+                    <td className="py-2 px-2 text-text-muted">{t.market_cap_rank}</td>
+                    <td className="py-2 px-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-text-primary font-bold uppercase">{t.symbol}</span>
+                        <span className="text-text-dim text-[10px]">{t.name}</span>
                       </div>
-                    </div>
-                    <span
-                      className={cn(
-                        "font-mono text-xs",
-                        t.priceChange24h >= 0 ? "text-accent-green" : "text-danger"
-                      )}
-                    >
-                      {t.priceChange24h >= 0 ? "+" : ""}
-                      {t.priceChange24h.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-baseline justify-between">
-                    <span className="font-mono text-sm text-text-primary">
-                      ${t.price < 1 ? t.price.toPrecision(3) : t.price.toLocaleString()}
-                    </span>
-                    <span className={cn("font-mono text-xs", t.smartMoneyFlow >= 0 ? "text-accent-green" : "text-danger")}>
-                      SM: {t.smartMoneyFlow >= 0 ? "+" : ""}{formatUsd(t.smartMoneyFlow)}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Top Smart Money Flow */}
-        {topFlow.length > 0 && (
-          <div className="mt-6">
-            <h2 className="mb-3 text-sm font-medium uppercase tracking-wider text-text-muted">Top Smart Money Flow (24h)</h2>
-            <div className="flex gap-2 overflow-x-auto pb-2">
-              {topFlow.map((t) => (
-                <div
-                  key={t.id}
-                  className="flex min-w-[160px] items-center gap-2 rounded-lg border border-white/5 bg-bg-surface px-3 py-2"
-                >
-                  <span className="text-sm font-medium text-text-primary">{t.symbol}</span>
-                  <span className={cn("ml-auto font-mono text-xs", t.smartMoneyFlow >= 0 ? "text-accent-green" : "text-danger")}>
-                    {t.smartMoneyFlow >= 0 ? "+" : ""}{formatUsd(t.smartMoneyFlow)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Loading state */}
-        {loading && (
-          <div className="mt-12 flex items-center justify-center">
-            <svg className="h-6 w-6 animate-spin text-accent-cyan" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-          </div>
-        )}
-
-        {/* Error state */}
-        {error && !loading && (
-          <div className="mt-12 text-center">
-            <p className="text-sm text-danger">{error}</p>
-            <button
-              onClick={() => fetchTokens(page)}
-              className="mt-3 rounded-md bg-bg-surface px-4 py-2 text-sm text-text-primary hover:bg-bg-elevated"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* Full table + pagination */}
-        {!loading && !error && (
-          <div className="mt-6">
-            <TokenTable tokens={tokens} onToggleWatchlist={handleToggleWatchlist} />
-
-            {/* Pagination */}
-            {meta && meta.total > meta.pageSize && (
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-xs text-text-muted">
-                  Page {meta.page} of {Math.ceil(meta.total / meta.pageSize)} ({meta.total} tokens)
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    disabled={meta.page <= 1}
-                    onClick={() => setPage((p) => p - 1)}
-                    className="rounded-md border border-white/10 bg-bg-surface px-3 py-1.5 text-xs text-text-primary hover:bg-bg-elevated disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    disabled={!meta.hasMore}
-                    onClick={() => setPage((p) => p + 1)}
-                    className="rounded-md border border-white/10 bg-bg-surface px-3 py-1.5 text-xs text-text-primary hover:bg-bg-elevated disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+                    </td>
+                    <td className="py-2 px-2 text-right font-mono text-text-primary">
+                      ${t.current_price?.toLocaleString('en-US', { maximumFractionDigits: 2 }) ?? '—'}
+                    </td>
+                    <td className={`py-2 px-2 text-right font-mono flex items-center justify-end gap-0.5 ${t.price_change_percentage_24h >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                      {t.price_change_percentage_24h >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                      {t.price_change_percentage_24h != null ? `${t.price_change_percentage_24h >= 0 ? '+' : ''}${t.price_change_percentage_24h.toFixed(2)}%` : '—'}
+                    </td>
+                    <td className="py-2 px-2 text-right font-mono text-text-dim">
+                      ${formatLargeNumber(t.market_cap)}
+                    </td>
+                    <td className="py-2 px-2 text-right font-mono text-text-dim">
+                      ${formatLargeNumber(t.total_volume)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    </TerminalShell>
+  )
+}
+
+function formatLargeNumber(n: number): string {
+  if (n >= 1e12) return `${(n / 1e12).toFixed(2)}T`
+  if (n >= 1e9) return `${(n / 1e9).toFixed(1)}B`
+  if (n >= 1e6) return `${(n / 1e6).toFixed(0)}M`
+  if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`
+  return n.toLocaleString()
 }

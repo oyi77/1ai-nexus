@@ -1,184 +1,141 @@
-"use client";
+"use client"
 
-import { useState, useEffect, useMemo } from "react";
-import { PageHeader } from "@/components/domain/page-header";
-import { ProtocolCard } from "@/components/defi/ProtocolCard";
-import { cn, formatUsd } from "@/lib/utils";
-import type { DeFiProtocol, DeFiCategory } from "@/lib/mock-data";
+import { useState, useEffect, useCallback } from "react"
+import { TerminalShell } from "@/components/layout/TerminalShell"
+import { Layers, TrendingUp, TrendingDown, Search } from "lucide-react"
 
-const CHAINS = ["Ethereum", "Arbitrum", "Base", "Optimism", "Solana", "Bitcoin"] as const;
-const CATEGORIES: DeFiCategory[] = ["Lending", "DEX", "Yield", "Perpetuals", "Bridge", "Liquid Staking"];
-
-interface ApiProtocol {
-  id: string;
-  name: string;
-  chain: string;
-  category: string;
-  tvl: number;
-  tvlChange24h: number;
-  volume24h: number;
-  uniqueUsers: number;
-  smartMoneyInflow: number;
-  description?: string;
-  riskScore?: number;
-  yieldRate?: number;
+interface Protocol {
+  name: string
+  chain: string
+  tvl: number
+  change_1d: unknown
+  change_7d: unknown
+  category: string
 }
 
 export default function DeFiPage() {
-  const [protocols, setProtocols] = useState<DeFiProtocol[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [chainFilter, setChainFilter] = useState<string>("All");
-  const [categoryFilter, setCategoryFilter] = useState<string>("All");
-  const [search, setSearch] = useState("");
+  const [protocols, setProtocols] = useState<Protocol[]>([])
+  const [loading, setLoading] = useState(true)
+  const [chain, setChain] = useState('')
+  const [search, setSearch] = useState('')
+  const [totalTvl, setTotalTvl] = useState(0)
 
-  useEffect(() => {
-    const controller = new AbortController();
-    async function load() {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await fetch("/api/defi?limit=50&sort=tvl", {
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        const items: DeFiProtocol[] = (json.data as ApiProtocol[]).map((p) => ({
-          id: p.id,
-          name: p.name,
-          chain: p.chain.charAt(0).toUpperCase() + p.chain.slice(1),
-          category: (p.category || "DEX") as DeFiCategory,
-          tvl: p.tvl,
-          tvlChange24h: p.tvlChange24h,
-          volume24h: p.volume24h,
-          uniqueUsers: p.uniqueUsers,
-          smartMoneyInflow: p.smartMoneyInflow,
-          description: p.description ?? "",
-          riskScore: p.riskScore ?? 0,
-          yieldRate: p.yieldRate,
-        }));
-        setProtocols(items);
-      } catch (err: unknown) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-        setError(err instanceof Error ? err.message : "Failed to load protocols");
-      } finally {
-        setLoading(false);
-      }
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ limit: '100' })
+      if (chain) params.set('chain', chain)
+      const res = await fetch(`/api/v1/defi/tvl?${params}`)
+      const data = await res.json()
+      setProtocols(data.protocols ?? [])
+      setTotalTvl(data.totalTvl ?? 0)
+    } catch {
+      // Silent
+    } finally {
+      setLoading(false)
     }
-    load();
-    return () => controller.abort();
-  }, []);
+  }, [chain])
 
-  const filtered = useMemo(() => {
-    return protocols.filter((p) => {
-      if (chainFilter !== "All" && p.chain !== chainFilter) return false;
-      if (categoryFilter !== "All" && p.category !== categoryFilter) return false;
-      if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
-      return true;
-    });
-  }, [protocols, chainFilter, categoryFilter, search]);
+  useEffect(() => { fetchData() }, [fetchData])
 
-  const totalTvl = filtered.reduce((sum, p) => sum + p.tvl, 0);
-  const totalVolume = filtered.reduce((sum, p) => sum + p.volume24h, 0);
-  const totalUsers = filtered.reduce((sum, p) => sum + p.uniqueUsers, 0);
-  const totalSmInflow = filtered.reduce((sum, p) => sum + p.smartMoneyInflow, 0);
+  const filtered = protocols.filter(p =>
+    !search || p.name.toLowerCase().includes(search.toLowerCase())
+  )
 
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">
-        <PageHeader
-          title="DeFi Dashboard"
-          description="Protocol analytics with smart money tracking"
-        />
-
-        {loading && (
-          <div className="mt-12 flex items-center justify-center">
-            <div className="text-sm text-text-muted">Loading protocols…</div>
-          </div>
-        )}
-
-        {error && (
-          <div className="mt-12 flex flex-col items-center gap-3">
-            <div className="text-sm text-danger">{error}</div>
-            <button
-              onClick={() => window.location.reload()}
-              className="rounded-lg border border-white/10 bg-bg-surface px-4 py-1.5 text-sm text-text-primary hover:border-accent-cyan"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {!loading && !error && (
-          <>
-            {/* Summary stats */}
-            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-lg border border-white/5 bg-bg-surface p-4">
-                <span className="text-xs font-medium uppercase tracking-wider text-text-muted">Total TVL</span>
-                <div className="mt-1 font-mono text-xl font-semibold text-text-primary">{formatUsd(totalTvl)}</div>
-              </div>
-              <div className="rounded-lg border border-white/5 bg-bg-surface p-4">
-                <span className="text-xs font-medium uppercase tracking-wider text-text-muted">24h Volume</span>
-                <div className="mt-1 font-mono text-xl font-semibold text-text-primary">{formatUsd(totalVolume)}</div>
-              </div>
-              <div className="rounded-lg border border-white/5 bg-bg-surface p-4">
-                <span className="text-xs font-medium uppercase tracking-wider text-text-muted">Unique Users</span>
-                <div className="mt-1 font-mono text-xl font-semibold text-text-primary">{totalUsers.toLocaleString()}</div>
-              </div>
-              <div className="rounded-lg border border-white/5 bg-bg-surface p-4">
-                <span className="text-xs font-medium uppercase tracking-wider text-text-muted">SM Net Inflow</span>
-                <div className={cn("mt-1 font-mono text-xl font-semibold", totalSmInflow >= 0 ? "text-accent-green" : "text-danger")}>
-                  {totalSmInflow >= 0 ? "+" : ""}{formatUsd(totalSmInflow)}
-                </div>
-              </div>
+    <TerminalShell>
+      <div className="h-full overflow-auto">
+        <div className="sticky top-0 bg-bg-deep z-10 px-4 py-3 border-b border-border-dim">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-3">
+              <h1 className="text-sm font-mono font-bold text-accent-cyan flex items-center gap-2">
+                <Layers size={14} /> DeFi DASHBOARD
+              </h1>
+              <span className="text-xs text-text-dim">Total TVL: <span className="text-accent-green font-mono">${formatTvl(totalTvl)}</span></span>
             </div>
-
-            {/* Filters */}
-            <div className="mt-6 flex flex-wrap items-center gap-3">
+            <span className="text-[10px] text-text-muted">{protocols.length} protocols · DeFiLlama</span>
+          </div>
+          <div className="flex gap-2">
+            <div className="relative flex-1 max-w-xs">
+              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 type="text"
-                placeholder="Search protocols..."
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-56 rounded-lg border border-white/10 bg-bg-surface px-3 py-1.5 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-accent-cyan"
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search protocols..."
+                className="w-full bg-bg-panel border border-border-dim rounded pl-7 pr-3 py-1 text-xs font-mono text-text-primary placeholder:text-text-muted focus:border-accent-cyan focus:outline-none"
               />
-              <select
-                value={chainFilter}
-                onChange={(e) => setChainFilter(e.target.value)}
-                className="rounded-lg border border-white/10 bg-bg-surface px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent-cyan"
-              >
-                <option value="All">All Chains</option>
-                {CHAINS.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-                className="rounded-lg border border-white/10 bg-bg-surface px-3 py-1.5 text-sm text-text-primary outline-none focus:border-accent-cyan"
-              >
-                <option value="All">All Categories</option>
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-              <span className="text-xs text-text-muted">{filtered.length} protocols</span>
             </div>
-
-            {/* Protocol grid */}
-            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filtered.map((p) => (
-                <ProtocolCard key={p.id} protocol={p} />
+            <div className="flex gap-1">
+              {['', 'Ethereum', 'Solana', 'BSC', 'Arbitrum', 'Base', 'Polygon', 'Avalanche'].map(c => (
+                <button
+                  key={c}
+                  onClick={() => setChain(c)}
+                  className={`px-2 py-0.5 rounded text-[10px] border font-mono transition-colors ${
+                    chain === c ? 'bg-border-active border-border-active text-text-primary' : 'bg-bg-panel border-border-dim text-text-dim hover:border-border-active'
+                  }`}
+                >
+                  {c || 'ALL'}
+                </button>
               ))}
-              {filtered.length === 0 && (
-                <div className="col-span-full py-12 text-center text-sm text-text-muted">
-                  No protocols match your filters.
-                </div>
-              )}
             </div>
-          </>
-        )}
+          </div>
+        </div>
+
+        <div className="px-4 py-2">
+          {loading ? (
+            <div className="text-center py-20 text-text-dim text-xs">Loading DeFi data from DeFiLlama...</div>
+          ) : filtered.length === 0 ? (
+            <div className="text-center py-20 text-text-dim text-xs">No protocols found</div>
+          ) : (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-text-muted text-[10px] uppercase">
+                  <th className="text-left py-2 px-2 font-mono">#</th>
+                  <th className="text-left py-2 px-2 font-mono">PROTOCOL</th>
+                  <th className="text-left py-2 px-2 font-mono">CHAIN</th>
+                  <th className="text-left py-2 px-2 font-mono">CATEGORY</th>
+                  <th className="text-right py-2 px-2 font-mono">TVL</th>
+                  <th className="text-right py-2 px-2 font-mono">1D CHANGE</th>
+                  <th className="text-right py-2 px-2 font-mono">7D CHANGE</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p, i) => (
+                  <tr key={p.name + i} className="border-t border-border-dim/30 hover:bg-bg-elevated cursor-pointer transition-colors">
+                    <td className="py-2 px-2 text-text-muted">{i + 1}</td>
+                    <td className="py-2 px-2 font-mono text-text-primary font-bold">{p.name}</td>
+                    <td className="py-2 px-2 text-accent-cyan">{p.chain}</td>
+                    <td className="py-2 px-2 text-text-dim">{p.category}</td>
+                    <td className="py-2 px-2 text-right font-mono text-accent-green">${formatTvl(Number(p.tvl))}</td>
+                    <td className={`py-2 px-2 text-right font-mono flex items-center justify-end gap-0.5 ${Number(p.change_1d) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                      {Number(p.change_1d) >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                      {formatChange(p.change_1d)}
+                    </td>
+                    <td className={`py-2 px-2 text-right font-mono ${Number(p.change_7d) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                      {formatChange(p.change_7d)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    </TerminalShell>
+  )
+}
+
+function formatTvl(n: number): string {
+  if (n >= 1e12) return `${(n / 1e12).toFixed(2)}T`
+  if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`
+  if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`
+  return n.toFixed(0)
+}
+
+function formatChange(v: unknown): string {
+  const n = Number(v)
+  if (isNaN(n)) return '—'
+  return `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
 }
