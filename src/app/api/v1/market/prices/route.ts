@@ -9,17 +9,34 @@ export async function GET() {
   const registry = registerAllModules()
 
   try {
-    const result = await registry.fetchOne('coingecko', { action: 'price', ids: 'bitcoin,ethereum,solana', vs_currency: 'usd' })
-    const data = result.data as Record<string, { usd: number; usd_24h_change: number }>
+    const result = await registry.fetchOne<Record<string, { usd: number; usd_24h_change: number }>>(
+      'coingecko',
+      { action: 'price', ids: 'bitcoin,ethereum,solana,binancecoin,ripple,cardano', vs_currency: 'usd' }
+    )
+    const data = result.data ?? {}
 
-    const tickers = [
-      { symbol: 'BTC', price: fmtPrice(data.bitcoin?.usd), change: fmtChange(data.bitcoin?.usd_24h_change), positive: (data.bitcoin?.usd_24h_change ?? 0) >= 0 },
-      { symbol: 'ETH', price: fmtPrice(data.ethereum?.usd), change: fmtChange(data.ethereum?.usd_24h_change), positive: (data.ethereum?.usd_24h_change ?? 0) >= 0 },
-      { symbol: 'SOL', price: fmtPrice(data.solana?.usd), change: fmtChange(data.solana?.usd_24h_change), positive: (data.solana?.usd_24h_change ?? 0) >= 0 },
+    const coins = [
+      { id: 'bitcoin', symbol: 'BTC' },
+      { id: 'ethereum', symbol: 'ETH' },
+      { id: 'solana', symbol: 'SOL' },
+      { id: 'binancecoin', symbol: 'BNB' },
+      { id: 'ripple', symbol: 'XRP' },
+      { id: 'cardano', symbol: 'ADA' },
     ]
 
+    const tickers = coins.map(c => {
+      const coin = data[c.id]
+      return {
+        symbol: c.symbol,
+        price: coin ? fmtPrice(coin.usd) : '—',
+        change: coin ? fmtChange(coin.usd_24h_change) : '—',
+        positive: (coin?.usd_24h_change ?? 0) >= 0,
+      }
+    })
+
     return NextResponse.json({ tickers })
-  } catch {
+  } catch (err) {
+    console.error('[market/prices] Error:', err)
     return NextResponse.json({ tickers: [] })
   }
 }

@@ -34,7 +34,7 @@ async function fetchCoinGecko(params: FetchParams): Promise<unknown> {
     case 'price': {
       const ids = (params.ids as string) ?? 'bitcoin'
       const vs = (params.vs_currency as string) ?? 'usd'
-      return cgFetch<unknown>(`/simple/price?ids=${ids}&vs_currency=${vs}&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true`)
+      return cgFetch<unknown>(`/simple/price?ids=${ids}&vs_currencies=${vs}&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true`)
     }
     case 'global':
       return cgFetch<unknown>('/global')

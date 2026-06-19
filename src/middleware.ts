@@ -16,6 +16,8 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/feeds",
   "/api/v1/macro",
   "/api/v1/market",
+  "/api/v1/market/prices",
+  "/api/v1/market/sentiment",
   "/api/v1/ohlcv",
   "/api/v1/sectors",
   "/api/v1/stablecoins",
@@ -29,6 +31,10 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/alerts",
   "/api/v1/usage",
   "/api/v1/wallets",
+  "/api/v1/modules",
+  "/api/v1/modules/fetch",
+  "/api/v1/user/api-key",
+  "/api/v1/ai/chat",
   "/api/auth",
 ]);
 

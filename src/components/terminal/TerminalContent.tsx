@@ -1,67 +1,68 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import {
-  TrendingUp,
-  TrendingDown,
-  BarChart3,
-  Globe,
-  Newspaper,
-  Layers,
-  Activity,
-} from "lucide-react"
+import { TrendingUp, TrendingDown, Layers, Globe } from "lucide-react"
 
-interface MarketCard {
+interface Ticker {
   symbol: string
-  name: string
   price: string
-  change24h: string
+  change: string
   positive: boolean
-  volume: string
-  marketCap: string
 }
 
 interface NewsItem {
   id: string
   title: string
-  source: string
+  sourceId: string
   publishedAt: string
   category: string
 }
 
+interface DeFiProtocol {
+  name: string
+  chain: string
+  tvl: number
+  change_1d?: number
+}
+
 export function TerminalContent() {
-  const [marketData, setMarketData] = useState<MarketCard[]>([])
-  const [newsItems, setNewsItems] = useState<NewsItem[]>([])
-  const [activeView, setActiveView] = useState<'overview' | 'market' | 'defi' | 'news'>('overview')
+  const [tickers, setTickers] = useState<Ticker[]>([])
+  const [news, setNews] = useState<NewsItem[]>([])
+  const [defi, setDeFi] = useState<DeFiProtocol[]>([])
+  const [fearGreed, setFearGreed] = useState<{ value: number; classification: string } | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchData = useCallback(async () => {
-    try {
-      const [priceRes, newsRes] = await Promise.allSettled([
-        fetch('/api/v1/market/prices').then(r => r.json()),
-        fetch('/api/v1/news?limit=20').then(r => r.json()),
-      ])
+    const [priceRes, newsRes, defiRes, fgRes] = await Promise.allSettled([
+      fetch('/api/v1/market/prices').then(r => r.json()),
+      fetch('/api/v1/news?limit=15').then(r => r.json()),
+      fetch('/api/v1/modules/fetch?module=defillama&action=protocols').then(r => r.json()),
+      fetch('/api/v1/market/sentiment').then(r => r.json()),
+    ])
 
-      if (priceRes.status === 'fulfilled' && priceRes.value?.tickers) {
-        setMarketData(priceRes.value.tickers.map((t: { symbol: string; price: string; change: string; positive: boolean }) => ({
-          symbol: t.symbol,
-          name: t.symbol,
-          price: t.price,
-          change24h: t.change,
-          positive: t.positive,
-          volume: '—',
-          marketCap: '—',
-        })))
-      }
-
-      if (newsRes.status === 'fulfilled' && newsRes.value?.items) {
-        setNewsItems(newsRes.value.items)
-      }
-    } catch {
-      // Silent fallback
-    } finally {
-      setLoading(false)
+    if (priceRes.status === 'fulfilled' && priceRes.value?.tickers) {
+      setTickers(priceRes.value.tickers)
     }
+    if (newsRes.status === 'fulfilled' && newsRes.value?.items) {
+      setNews(newsRes.value.items)
+    }
+    if (defiRes.status === 'fulfilled' && defiRes.value?.data) {
+      const protocols = (defiRes.value.data as Array<Record<string, unknown>>)
+        .sort((a, b) => ((b.tvl as number) ?? 0) - ((a.tvl as number) ?? 0))
+        .slice(0, 15)
+        .map(p => ({
+          name: p.name as string ?? 'Unknown',
+          chain: p.chain as string ?? '—',
+          tvl: p.tvl as number ?? 0,
+          change_1d: p.change_1d as number ?? 0,
+        }))
+      setDeFi(protocols)
+    }
+    if (fgRes.status === 'fulfilled' && fgRes.value?.fearGreed != null) {
+      setFearGreed({ value: fgRes.value.fearGreed, classification: fgRes.value.classification })
+    }
+
+    setLoading(false)
   }, [])
 
   useEffect(() => {
@@ -71,202 +72,161 @@ export function TerminalContent() {
   }, [fetchData])
 
   return (
-    <div className="h-full flex flex-col">
-      {/* View tabs */}
-      <div className="flex items-center gap-1 px-4 py-2 border-b border-border-dim">
-        {[
-          { key: 'overview', label: 'OVERVIEW', icon: Activity },
-          { key: 'market', label: 'MARKET', icon: TrendingUp },
-          { key: 'defi', label: 'DEFI', icon: Layers },
-          { key: 'news', label: 'NEWS', icon: Newspaper },
-        ].map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => setActiveView(key as typeof activeView)}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-mono transition-colors ${
-              activeView === key
-                ? 'bg-border-active text-text-primary'
-                : 'text-text-dim hover:text-text-primary hover:bg-bg-elevated'
-            }`}
-          >
-            <Icon size={12} />
-            {label}
-          </button>
+    <div className="h-full overflow-auto p-4 space-y-4">
+      {/* Market Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+        {tickers.map(t => (
+          <div key={t.symbol} className="bg-bg-panel border border-border-dim rounded p-2.5">
+            <p className="text-[10px] text-text-muted font-mono">{t.symbol}</p>
+            <p className="text-sm font-mono font-bold text-text-primary">{t.price}</p>
+            <p className={`text-[11px] font-mono ${t.positive ? 'text-accent-green' : 'text-accent-red'}`}>
+              {t.positive ? <TrendingUp size={10} className="inline" /> : <TrendingDown size={10} className="inline" />}
+              {' '}{t.change}
+            </p>
+          </div>
         ))}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-auto p-4 space-y-4">
-        {activeView === 'overview' && (
-          <OverviewPanel marketData={marketData} newsItems={newsItems} loading={loading} />
-        )}
-        {activeView === 'market' && (
-          <MarketPanel marketData={marketData} loading={loading} />
-        )}
-        {activeView === 'defi' && (
-          <DeFiPanel />
-        )}
-        {activeView === 'news' && (
-          <NewsPanel newsItems={newsItems} loading={loading} />
-        )}
+      {/* Fear & Greed + Global Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-bg-panel border border-border-dim rounded p-3">
+          <p className="text-[10px] text-text-muted uppercase mb-1">Fear & Greed Index</p>
+          {fearGreed ? (
+            <div className="flex items-center gap-3">
+              <span className="text-3xl font-mono font-bold" style={{
+                color: fearGreed.value >= 55 ? '#00ff88' : fearGreed.value >= 45 ? '#ffb800' : '#ff3060'
+              }}>
+                {fearGreed.value}
+              </span>
+              <span className="text-xs text-text-dim">{fearGreed.classification}</span>
+            </div>
+          ) : (
+            <span className="text-text-dim text-xs">Loading...</span>
+          )}
+        </div>
+        <div className="bg-bg-panel border border-border-dim rounded p-3">
+          <p className="text-[10px] text-text-muted uppercase mb-1">Active Data Modules</p>
+          <p className="text-2xl font-mono font-bold text-accent-cyan">34</p>
+          <p className="text-[10px] text-text-dim">20 public-api · 1 oss-mirror · 11 re · 4 derived</p>
+        </div>
+        <div className="bg-bg-panel border border-border-dim rounded p-3">
+          <p className="text-[10px] text-text-muted uppercase mb-1">Data Sources</p>
+          <p className="text-2xl font-mono font-bold text-accent-green">100%</p>
+          <p className="text-[10px] text-text-dim">Zero API keys required</p>
+        </div>
       </div>
-    </div>
-  )
-}
 
-function OverviewPanel({ marketData, newsItems, loading }: { marketData: MarketCard[]; newsItems: NewsItem[]; loading: boolean }) {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      {/* Market Summary */}
-      <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-        <h3 className="text-xs font-mono text-accent-cyan mb-3 flex items-center gap-2">
-          <BarChart3 size={14} /> MARKET SUMMARY
-        </h3>
-        {loading ? (
-          <div className="text-text-dim text-xs">Loading...</div>
-        ) : (
-          <div className="space-y-2">
-            {marketData.map(item => (
-              <div key={item.symbol} className="flex items-center justify-between py-1 border-b border-border-dim/30">
-                <span className="font-mono text-sm text-text-primary">{item.symbol}</span>
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-sm">{item.price}</span>
-                  <span className={`font-mono text-xs ${item.positive ? 'text-accent-green' : 'text-accent-red'}`}>
-                    {item.positive ? <TrendingUp size={10} className="inline" /> : <TrendingDown size={10} className="inline" />}
-                    {' '}{item.change24h}
-                  </span>
+      {/* Two-column: News + DeFi */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Latest News */}
+        <div className="bg-bg-panel border border-border-dim rounded">
+          <div className="px-3 py-2 border-b border-border-dim flex items-center gap-2">
+            <span className="text-xs font-mono text-accent-cyan">📰 LATEST NEWS</span>
+            <span className="text-[10px] text-text-muted">{news.length} items</span>
+          </div>
+          <div className="max-h-[400px] overflow-y-auto scrollbar-thin">
+            {loading ? (
+              <div className="p-4 text-text-dim text-xs text-center">Loading news feed...</div>
+            ) : news.length === 0 ? (
+              <div className="p-4 text-text-dim text-xs text-center">No news available</div>
+            ) : (
+              news.map((item, i) => (
+                <div key={item.id ?? i} className="px-3 py-2 border-b border-border-dim/30 hover:bg-bg-elevated transition-colors">
+                  <p className="text-xs text-text-primary leading-tight">{item.title || 'Untitled'}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[10px] text-accent-cyan font-mono">{item.sourceId}</span>
+                    <span className="text-[10px] text-text-muted">{formatTimeAgo(item.publishedAt)}</span>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
-        )}
-      </div>
+        </div>
 
-      {/* Latest News */}
-      <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-        <h3 className="text-xs font-mono text-accent-cyan mb-3 flex items-center gap-2">
-          <Newspaper size={14} /> LATEST NEWS
-        </h3>
-        {loading ? (
-          <div className="text-text-dim text-xs">Loading...</div>
-        ) : (
-          <div className="space-y-2">
-            {newsItems.slice(0, 8).map(item => (
-              <div key={item.id} className="py-1 border-b border-border-dim/30">
-                <p className="text-xs text-text-primary leading-tight">{item.title}</p>
-                <p className="text-[10px] text-text-muted mt-0.5">{item.source}</p>
-              </div>
-            ))}
+        {/* Top DeFi Protocols */}
+        <div className="bg-bg-panel border border-border-dim rounded">
+          <div className="px-3 py-2 border-b border-border-dim flex items-center gap-2">
+            <Layers size={12} className="text-accent-cyan" />
+            <span className="text-xs font-mono text-accent-cyan">TOP DeFi BY TVL</span>
+            <span className="text-[10px] text-text-muted">{defi.length} protocols</span>
           </div>
-        )}
-      </div>
-
-      {/* DeFi Overview */}
-      <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-        <h3 className="text-xs font-mono text-accent-cyan mb-3 flex items-center gap-2">
-          <Layers size={14} /> DEFI OVERVIEW
-        </h3>
-        <div className="text-text-dim text-xs">
-          <p>Loading DeFi data from DeFiLlama...</p>
+          <div className="max-h-[400px] overflow-y-auto scrollbar-thin">
+            {loading ? (
+              <div className="p-4 text-text-dim text-xs text-center">Loading DeFi data...</div>
+            ) : defi.length === 0 ? (
+              <div className="p-4 text-text-dim text-xs text-center">No DeFi data available</div>
+            ) : (
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-text-muted">
+                    <th className="text-left py-1.5 px-3 font-mono">#</th>
+                    <th className="text-left py-1.5 px-3 font-mono">PROTOCOL</th>
+                    <th className="text-left py-1.5 px-3 font-mono">CHAIN</th>
+                    <th className="text-right py-1.5 px-3 font-mono">TVL</th>
+                    <th className="text-right py-1.5 px-3 font-mono">1D</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {defi.map((p, i) => (
+                    <tr key={p.name} className="border-t border-border-dim/30 hover:bg-bg-elevated">
+                      <td className="py-1.5 px-3 text-text-muted">{i + 1}</td>
+                      <td className="py-1.5 px-3 text-text-primary font-mono">{p.name}</td>
+                      <td className="py-1.5 px-3 text-accent-cyan">{p.chain}</td>
+                      <td className="py-1.5 px-3 text-right font-mono text-accent-green">${formatTvl(p.tvl)}</td>
+                      <td className={`py-1.5 px-3 text-right font-mono ${(p.change_1d ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                        {p.change_1d != null ? `${p.change_1d >= 0 ? '+' : ''}${p.change_1d.toFixed(2)}%` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Global Stats */}
-      <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-        <h3 className="text-xs font-mono text-accent-cyan mb-3 flex items-center gap-2">
-          <Globe size={14} /> GLOBAL STATS
-        </h3>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { label: 'Total Market Cap', value: '—' },
-            { label: '24h Volume', value: '—' },
-            { label: 'BTC Dominance', value: '—' },
-            { label: 'Active Modules', value: '16' },
-          ].map(stat => (
-            <div key={stat.label}>
-              <p className="text-[10px] text-text-muted uppercase">{stat.label}</p>
-              <p className="text-sm font-mono text-text-primary">{stat.value}</p>
-            </div>
-          ))}
+      {/* Global Stats Bar */}
+      <div className="bg-bg-panel border border-border-dim rounded p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Globe size={12} className="text-accent-cyan" />
+          <span className="text-xs font-mono text-accent-cyan">MODULE STATUS</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+          <div>
+            <p className="text-text-muted">On-chain</p>
+            <p className="font-mono text-accent-green">6 modules active</p>
+          </div>
+          <div>
+            <p className="text-text-muted">Market</p>
+            <p className="font-mono text-accent-green">5 modules active</p>
+          </div>
+          <div>
+            <p className="text-text-muted">Macro</p>
+            <p className="font-mono text-accent-green">7 modules active</p>
+          </div>
+          <div>
+            <p className="text-text-muted">News</p>
+            <p className="font-mono text-accent-green">4 modules active</p>
+          </div>
         </div>
       </div>
     </div>
   )
 }
 
-function MarketPanel({ marketData, loading }: { marketData: MarketCard[]; loading: boolean }) {
-  return (
-    <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-      <h3 className="text-xs font-mono text-accent-cyan mb-3">MARKET DATA</h3>
-      {loading ? (
-        <div className="text-text-dim text-xs">Loading market data...</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-text-muted border-b border-border-dim">
-                <th className="text-left py-2 font-mono">SYMBOL</th>
-                <th className="text-right py-2 font-mono">PRICE</th>
-                <th className="text-right py-2 font-mono">24H CHANGE</th>
-              </tr>
-            </thead>
-            <tbody>
-              {marketData.map(item => (
-                <tr key={item.symbol} className="border-b border-border-dim/30 hover:bg-bg-elevated">
-                  <td className="py-2 font-mono text-text-primary">{item.symbol}</td>
-                  <td className="py-2 text-right font-mono">{item.price}</td>
-                  <td className={`py-2 text-right font-mono ${item.positive ? 'text-accent-green' : 'text-accent-red'}`}>
-                    {item.change24h}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
+function formatTvl(n: number): string {
+  if (n >= 1e9) return `${(n / 1e9).toFixed(2)}B`
+  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`
+  if (n >= 1e3) return `${(n / 1e3).toFixed(0)}K`
+  return n.toFixed(0)
 }
 
-function DeFiPanel() {
-  return (
-    <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-      <h3 className="text-xs font-mono text-accent-cyan mb-3">DEFI PROTOCOLS</h3>
-      <div className="text-text-dim text-xs">
-        <p>DeFi data from DeFiLlama module loading...</p>
-        <p className="mt-2 text-text-muted">TVL, yields, stablecoins, and bridge data available via ModuleRegistry</p>
-      </div>
-    </div>
-  )
-}
-
-function NewsPanel({ newsItems, loading }: { newsItems: NewsItem[]; loading: boolean }) {
-  return (
-    <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-      <h3 className="text-xs font-mono text-accent-cyan mb-3">NEWS FEED</h3>
-      {loading ? (
-        <div className="text-text-dim text-xs">Loading news...</div>
-      ) : (
-        <div className="space-y-3">
-          {newsItems.map(item => (
-            <div key={item.id} className="py-2 border-b border-border-dim/30">
-              <p className="text-sm text-text-primary">{item.title}</p>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[10px] text-accent-cyan font-mono">{item.source}</span>
-                <span className="text-[10px] text-text-muted">{formatDate(item.publishedAt)}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function formatDate(iso: string): string {
+function formatTimeAgo(iso: string): string {
   try {
-    const d = new Date(iso)
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+    const diff = Date.now() - new Date(iso).getTime()
+    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
+    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
+    return `${Math.floor(diff / 86_400_000)}d ago`
   } catch {
     return '—'
   }

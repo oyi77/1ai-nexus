@@ -24,14 +24,18 @@ export function TickerStrip() {
   const [fgValue, setFgValue] = useState<number | null>(null)
 
   useEffect(() => {
-    // Fetch real prices from coingecko
-    fetch('/api/v1/market/prices')
-      .then(r => r.json())
-      .then(data => {
-        if (data.tickers) setTickers(data.tickers)
-        if (data.fearGreed != null) setFgValue(data.fearGreed)
-      })
-      .catch(() => {}) // Silent fallback to defaults
+    // Fetch prices + sentiment in parallel
+    Promise.allSettled([
+      fetch('/api/v1/market/prices').then(r => r.json()),
+      fetch('/api/v1/market/sentiment').then(r => r.json()),
+    ]).then(([priceRes, fgRes]) => {
+      if (priceRes.status === 'fulfilled' && priceRes.value?.tickers?.length) {
+        setTickers(priceRes.value.tickers)
+      }
+      if (fgRes.status === 'fulfilled' && fgRes.value?.fearGreed != null) {
+        setFgValue(fgRes.value.fearGreed)
+      }
+    })
   }, [])
 
   const fgColor = fgValue == null ? 'text-text-dim' : fgValue >= 55 ? 'text-accent-green' : fgValue >= 45 ? 'text-accent-amber' : 'text-accent-red'
