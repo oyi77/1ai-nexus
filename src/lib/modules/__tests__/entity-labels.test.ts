@@ -31,7 +31,7 @@ describe('Entity Label Seed Data', () => {
     })
 
     it('categories are valid', () => {
-      const validCategories = ['vc', 'cex', 'whale', 'defi', 'protocol', 'dao']
+      const validCategories = ['vc', 'cex', 'whale', 'defi', 'protocol', 'dao', 'bridge', 'mev', 'nft', 'miner']
       for (const entity of ENTITY_SEEDS) {
         expect(validCategories).toContain(entity.category)
       }
@@ -62,7 +62,7 @@ describe('Entity Label Seed Data', () => {
     })
 
     it('returns undefined for unknown address', () => {
-      const entity = getEntityLabel('0x0000000000000000000000000000000000000001', 'eth')
+      const entity = getEntityLabel('0x1234567890abcdef1234567890abcdef12345679', 'eth')
       expect(entity).toBeUndefined()
     })
 

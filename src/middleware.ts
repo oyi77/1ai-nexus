@@ -37,7 +37,7 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/defi/overview",
   "/api/v1/ohlcv",
   "/api/v1/history",
-  "/api/v1/signals",
+  "/api/v1/exchange-flow",
   "/api/v1/sentiment",
   "/api/v1/defi/tvl",
   "/api/v1/defi/yields",

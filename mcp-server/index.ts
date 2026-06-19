@@ -72,6 +72,36 @@ const TOOLS: McpTool[] = [
     inputSchema: { type: 'object', properties: { address: { type: 'string' }, network: { type: 'string' } }, required: ['address'] },
   },
   {
+    name: 'nexus_get_ohlcv',
+    description: 'Get OHLCV candles with technical indicators (SMA, EMA, RSI, MACD, Bollinger)',
+    inputSchema: { type: 'object', properties: { symbol: { type: 'string' }, interval: { type: 'string', enum: ['1m', '5m', '15m', '1h', '4h', '1d'] }, limit: { type: 'number' }, indicators: { type: 'string', description: 'Comma-separated: sma20, ema20, rsi14, macd, bb' } }, required: ['symbol'] },
+  },
+  {
+    name: 'nexus_get_sentiment',
+    description: 'Get news sentiment scoring with per-asset breakdown',
+    inputSchema: { type: 'object', properties: { limit: { type: 'number' } } },
+  },
+  {
+    name: 'nexus_get_signals',
+    description: 'Get correlated cross-source intelligence signals',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'nexus_get_entity',
+    description: 'Get entity label and wallet profile for an address',
+    inputSchema: { type: 'object', properties: { address: { type: 'string' }, chain: { type: 'string' } }, required: ['address'] },
+  },
+  {
+    name: 'nexus_get_exchange_flow',
+    description: 'Get exchange flow intelligence (whale deposits/withdrawals)',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'nexus_get_defi_overview',
+    description: 'Get comprehensive DeFi data (TVL, DEX volume, stablecoins, fees, yields)',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
     name: 'nexus_get_module_status',
     description: 'Get status of all data modules',
     inputSchema: { type: 'object', properties: {} },
@@ -122,6 +152,26 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
       const chain = String(args.chain ?? 'eth')
       return callNexusApi(`/api/v1/modules/fetch?module=blockscout-eth&action=txlist&address=${address}&chain=${chain}`)
     }
+    case 'nexus_get_ohlcv': {
+      const symbol = String(args.symbol ?? 'BTC')
+      const interval = String(args.interval ?? '1h')
+      const limit = Number(args.limit ?? 100)
+      const indicators = String(args.indicators ?? '')
+      return callNexusApi(`/api/v1/ohlvc?symbol=${symbol}&interval=${interval}&limit=${limit}&indicators=${indicators}`)
+    }
+    case 'nexus_get_sentiment':
+      return callNexusApi(`/api/v1/sentiment?limit=${args.limit ?? 30}`)
+    case 'nexus_get_signals':
+      return callNexusApi(`/api/v1/signals`)
+    case 'nexus_get_entity': {
+      const address = String(args.address)
+      const chain = String(args.chain ?? 'eth')
+      return callNexusApi(`/api/v1/smart-money/wallet?address=${address}&chain=${chain}`)
+    }
+    case 'nexus_get_exchange_flow':
+      return callNexusApi(`/api/v1/exchange-flow`)
+    case 'nexus_get_defi_overview':
+      return callNexusApi(`/api/v1/defi/overview`)
     case 'nexus_get_module_status':
       return callNexusApi(`/api/v1/modules`)
     default:
