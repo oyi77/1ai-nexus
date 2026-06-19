@@ -31,7 +31,6 @@ export const ENTITY_SEEDS: EntitySeed[] = [
   { address: '0x503828976D22510aad0201ac7EC88293211D23Da', chain: 'eth', label: 'Coinbase Commerce', category: 'cex', confidence: 0.85 },
   { address: '0xA9D1e08C7793af67e9d92fe308d5697FB81d3E43', chain: 'eth', label: 'Coinbase Hot Wallet', category: 'cex', confidence: 0.9 },
   { address: '0x77134cbC06cB00b66F4c7e623D5fdBF6777635EC', chain: 'eth', label: 'Coinbase Hot Wallet 2', category: 'cex', confidence: 0.85 },
-  { address: '0x503828976D22510aad0201ac7EC88293211D23Da', chain: 'eth', label: 'Coinbase Wallet', category: 'cex', confidence: 0.85 },
 
   // OKX — ETH
   { address: '0xA7EFAe728D2936e78BDA97dc267687568dD593f3', chain: 'eth', label: 'OKX Hot Wallet', category: 'cex', confidence: 0.9 },
@@ -118,7 +117,7 @@ export const ENTITY_SEEDS: EntitySeed[] = [
 
   { address: '0x9759A6Ac90977b93B58547b4A71c78317f391A28', chain: 'eth', label: 'MakerDAO Treasury', category: 'dao', confidence: 0.85 },
   { address: '0x83F20F44975D03b1b09e64809B757c47f942BeEa', chain: 'eth', label: 'DAI Savings Rate (DSR)', category: 'defi', confidence: 0.9 },
-  { address: '0x6B175474E89094C44Da98b954EesdeECcD746c1', chain: 'eth', label: 'DAI Stablecoin', category: 'protocol', confidence: 0.95 },
+  { address: '0x6b175474E89094c44dA98B954eEDEecCd746C100', chain: 'eth', label: 'DAI Stablecoin', category: 'protocol', confidence: 0.95 },
   { address: '0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2', chain: 'eth', label: 'Maker MKR Token', category: 'protocol', confidence: 0.95 },
 
   // ═══════════════════════════════════════════════════════════
@@ -158,7 +157,7 @@ export const ENTITY_SEEDS: EntitySeed[] = [
   { address: '0x40ec5B33f54e0E8A33A975908C5BA1c14e5BbbDf', chain: 'eth', label: 'Polygon Bridge', category: 'defi', confidence: 0.9 },
 
   // ═══════════════════════════════════════════════════════════
-  // MAJOR TOKEN CONTRACTS (Protocol)
+  // MAJOR TOKEN CONTRACTS (Protocol) — only tokens NOT already listed above
   // ═══════════════════════════════════════════════════════════
 
   { address: '0x00000000219ab540356cBB839Cbe05303d7705Fa', chain: 'eth', label: 'Eth2 Deposit Contract', category: 'protocol', confidence: 0.99 },
@@ -166,14 +165,6 @@ export const ENTITY_SEEDS: EntitySeed[] = [
   { address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', chain: 'eth', label: 'USDT Contract', category: 'protocol', confidence: 0.99 },
   { address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', chain: 'eth', label: 'USDC Contract', category: 'protocol', confidence: 0.99 },
   { address: '0x2260FAC5E5542a773Aa44fBCfeDf7C193bc2C599', chain: 'eth', label: 'WBTC Contract', category: 'protocol', confidence: 0.95 },
-  { address: '0x514910771AF9Ca656af840dff83E8264EcF986CA', chain: 'eth', label: 'LINK Token', category: 'protocol', confidence: 0.95 },
-  { address: '0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984', chain: 'eth', label: 'UNI Token', category: 'protocol', confidence: 0.95 },
-  { address: '0x7Fc66500c84A76Ad7e9c93437bFc5Ac33E2DDaE9', chain: 'eth', label: 'AAVE Token', category: 'protocol', confidence: 0.95 },
-  { address: '0x6B175474E89094C44Da98b954EesdeECcD746c1', chain: 'eth', label: 'DAI Token', category: 'protocol', confidence: 0.95 },
-  { address: '0x9f8F72aA9304c8B593d555F12eF6589cC3A579A2', chain: 'eth', label: 'MKR Token', category: 'protocol', confidence: 0.9 },
-  { address: '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84', chain: 'eth', label: 'stETH Token', category: 'protocol', confidence: 0.95 },
-  { address: '0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0', chain: 'eth', label: 'wstETH Token', category: 'protocol', confidence: 0.9 },
-  { address: '0x514910771AF9Ca656af840dff83E8264EcF986CA', chain: 'eth', label: 'Chainlink LINK', category: 'protocol', confidence: 0.95 },
   { address: '0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0', chain: 'eth', label: 'Polygon MATIC', category: 'protocol', confidence: 0.9 },
   { address: '0x4Fabb145d64652a948d72533023f6E7A623C7C53', chain: 'eth', label: 'BUSD Token', category: 'protocol', confidence: 0.9 },
   { address: '0x95aD61b0a150d79219dCF64E1E6Cc01f0B64C4cE', chain: 'eth', label: 'SHIB Token', category: 'protocol', confidence: 0.9 },

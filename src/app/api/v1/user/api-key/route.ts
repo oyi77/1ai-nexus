@@ -5,6 +5,9 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
+import { z } from 'zod/v4'
+
+const ApiKeyRequest = z.object({ service: z.string().min(1), apiKey: z.string().min(1) })
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -20,12 +23,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json() as { service: string; apiKey: string }
-    const { service, apiKey } = body
-
-    if (!service || !apiKey) {
+    const parsed = ApiKeyRequest.safeParse(await request.json())
+    if (!parsed.success) {
       return NextResponse.json({ error: 'service and apiKey required' }, { status: 400 })
     }
+    const { service, apiKey } = parsed.data
+
 
     // In production: encrypt and store in UserApiKey table
     // For now: store in environment variable (runtime only)
