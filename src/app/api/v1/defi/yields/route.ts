@@ -13,8 +13,8 @@ export async function GET(request: Request) {
   const limit = Math.min(50, Math.max(10, Number(searchParams.get('limit') ?? 30)))
 
   try {
-    const result = await registry.fetchOne<{ data: Array<Record<string, unknown>> }>('defillama', { action: 'yields' })
-    let pools = (result.data?.data ?? [])
+    const result = await registry.fetchOne('defillama', { action: 'yields' })
+    const raw = result.data as any; let pools: any[] = Array.isArray(raw) ? raw : (raw?.data ?? raw ?? [])
 
     if (chain) {
       pools = pools.filter((p: Record<string, unknown>) => (p.chain as string)?.toLowerCase() === chain.toLowerCase())

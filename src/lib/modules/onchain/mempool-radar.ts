@@ -126,7 +126,7 @@ export async function getFeeLevels(): Promise<FeeLevel[]> {
   const cached = getCached<FeeLevel[]>(key)
   if (cached) return cached
 
-  const fees = await blockstreamFetch<{ fastestFee: number; halfHourFee: number; hourFee: number; economyFee: number; minimumFee: number }>('/v1/fees/recommended')
+  const fees = await blockstreamFetch<{ fastestFee: number; halfHourFee: number; hourFee: number; economyFee: number; minimumFee: number }>('/fee-estimates')
   const levels: FeeLevel[] = [
     { label: 'Fast', range: '~10 min', rate: fees.fastestFee },
     { label: 'Med', range: '~30 min', rate: fees.halfHourFee },
