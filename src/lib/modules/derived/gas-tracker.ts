@@ -20,12 +20,12 @@ async function fetchJson(url: string): Promise<unknown> {
 export async function getGasPrices(): Promise<GasPrice[]> {
   const prices: GasPrice[] = []
 
-  // Bitcoin fees from Blockstream
+  // Bitcoin fees from mempool.space
   try {
-    const fees = await fetchJson('https://blockstream.info/api/fee-estimates') as Record<string, number>
-    const slow = Math.round(fees['144'] || 5)
-    const standard = Math.round(fees['3'] || 10)
-    const fast = Math.round(fees['1'] || 20)
+    const fees = await fetchJson('https://mempool.space/api/v1/fees/recommended') as Record<string, number>
+    const slow = Math.round(fees.minimumFee || fees.economyFee || 1)
+    const standard = Math.round(fees.hourFee || fees.halfHourFee || 5)
+    const fast = Math.round(fees.fastestFee || fees.halfHourFee || 10)
     prices.push({
       chain: 'Bitcoin',
       slow, standard, fast,
@@ -33,7 +33,7 @@ export async function getGasPrices(): Promise<GasPrice[]> {
       congestion: fast > 50 ? 'high' : fast > 20 ? 'medium' : 'low',
     })
   } catch {
-    prices.push({ chain: 'Bitcoin', slow: 5, standard: 10, fast: 20, unit: 'sat/vB', congestion: 'low' })
+    prices.push({ chain: 'Bitcoin', slow: 1, standard: 5, fast: 10, unit: 'sat/vB', congestion: 'low' })
   }
 
   // ETH gas — use a simple estimation since we don't have Etherscan key

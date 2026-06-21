@@ -10,6 +10,6 @@ export async function GET() {
     })
   } catch (err) {
     console.error('[api/v1/market/flow] Error:', err)
-    return NextResponse.json({ flows: [], summary: null, error: String(err) }, { status: 200 })
+    return NextResponse.json({ flows: [], summary: null, error: String(err) }, { status: 502 })
   }
 }

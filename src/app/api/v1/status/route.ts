@@ -34,7 +34,7 @@ export async function GET() {
     checkService('WebSocket', (wsUrl.replace('ws://', 'http://').replace('wss://', 'https://')) + '/health'),
     checkService('DeFiLlama', 'https://api.llama.fi/protocols'),
     checkService('CoinGecko', 'https://api.coingecko.com/api/v3/ping'),
-    checkService('Blockstream', 'https://blockstream.info/api/blocks/tip/height'),
+    checkService('Mempool.space', 'https://mempool.space/api/v1/fees/recommended'),
     checkService('Binance', 'https://api.binance.com/api/v3/ping'),
   ])
 
@@ -45,8 +45,8 @@ export async function GET() {
   const overallStatus = services.every((s) => s.status === 'healthy')
     ? 'healthy'
     : services.some((s) => s.status === 'down')
-    ? 'degraded'
-    : 'healthy'
+    ? 'down'
+    : 'degraded'
 
   return NextResponse.json({
     data: {

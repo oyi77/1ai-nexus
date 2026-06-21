@@ -17,6 +17,7 @@ export async function GET(
         holdings: {
           include: { token: { select: { symbol: true, name: true, price: true, chain: true } } },
           orderBy: { usdValue: "desc" as const },
+          take: 100,
         },
         transactions: {
           orderBy: { timestamp: "desc" as const },

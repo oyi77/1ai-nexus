@@ -109,13 +109,13 @@ export function classifyWallet(wallet: {
  * Get all cohort definitions with current stats.
  */
 export async function getCohorts(): Promise<Cohort[]> {
-  // In production, this would query the database for real wallet stats
-  // For now, return definitions with placeholder stats
+  // TODO: Wire to Prisma — query SmartMoneyWallet + Transaction tables
+  // for real cohort aggregations. Currently returns definitions only.
   return COHORT_DEFINITIONS.map(def => ({
     ...def,
-    walletCount: Math.floor(Math.random() * 100) + 10,
-    netFlow24h: (Math.random() - 0.5) * 10000000,
-    topAssets: ['ETH', 'BTC', 'SOL', 'ARB', 'LINK'].slice(0, Math.floor(Math.random() * 3) + 2),
+    walletCount: 0,
+    netFlow24h: 0,
+    topAssets: [],
   }))
 }
 
@@ -123,22 +123,7 @@ export async function getCohorts(): Promise<Cohort[]> {
  * Generate cohort signals — what are the smart cohorts doing right now?
  */
 export async function getCohortSignals(): Promise<CohortSignal[]> {
-  const signals: CohortSignal[] = []
-  const assets = ['ETH', 'BTC', 'SOL', 'ARB', 'LINK', 'AAVE', 'UNI']
-  const actions: CohortSignal['action'][] = ['accumulating', 'distributing', 'rotating', 'dormant']
-
-  for (const def of COHORT_DEFINITIONS.slice(0, 4)) {
-    const asset = assets[Math.floor(Math.random() * assets.length)]
-    signals.push({
-      cohortId: def.id,
-      cohortName: def.name,
-      action: actions[Math.floor(Math.random() * actions.length)],
-      asset,
-      amountUsd: Math.random() * 5000000,
-      confidence: 0.5 + Math.random() * 0.5,
-      timestamp: new Date(),
-    })
-  }
-
-  return signals
+  // TODO: Wire to Prisma — derive signals from real transaction patterns.
+  // Currently returns empty until real data pipeline is implemented.
+  return []
 }

@@ -23,6 +23,8 @@ export async function GET() {
         },
         source: 'cache',
         error: null,
+      }, {
+        headers: { 'Cache-Control': 'public, max-age=3600, stale-while-revalidate=7200' },
       })
     }
 
@@ -35,6 +37,8 @@ export async function GET() {
       },
       source: 'live',
       error: null,
+    }, {
+      headers: { 'Cache-Control': 'public, max-age=3600, stale-while-revalidate=7200' },
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to fetch on-chain macro metrics'

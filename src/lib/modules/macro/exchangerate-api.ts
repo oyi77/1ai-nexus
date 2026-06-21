@@ -48,7 +48,7 @@ const exchangeRateModule: DataModule = {
     return cachedFetch<T>(
       'exchangerate-api',
       params,
-      TTL.PRICE_DATA,
+      TTL.MACRO_DATA,
       () => fetchExchangeRate(params) as Promise<T>,
     )
   },

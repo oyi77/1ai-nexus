@@ -25,6 +25,8 @@ export async function GET(request: NextRequest) {
         wallets,
         count: wallets.length,
         generated: new Date().toISOString(),
+      }, {
+        headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=120' },
       })
     }
 
@@ -40,6 +42,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       data: pnl,
       generated: new Date().toISOString(),
+    }, {
+      headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=60' },
     })
   } catch (error) {
     console.error('GET /api/v1/pnl error:', error)

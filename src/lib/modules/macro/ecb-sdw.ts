@@ -9,7 +9,7 @@ import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../typ
 import { TTL } from '../types'
 import { cachedFetch } from '../fetch-with-cache'
 
-const BASE = 'https://sdw-wsrest.ecb.europa.eu/service/data'
+const BASE = 'https://data-api.ecb.europa.eu/service/data'
 
 async function fetchECB(params: FetchParams): Promise<unknown> {
   const series = (params.series as string) ?? 'EXR.D.USD.EUR.SP00.A'

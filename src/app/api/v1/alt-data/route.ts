@@ -39,6 +39,8 @@ export async function GET() {
       weather, eonet, reliefweb, flights, fema, boc, uk,
       hackernews: hn,
       timestamp: Date.now()
+    }, {
+      headers: { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=600' },
     })
   } catch (err) {
     console.error('[api/v1/alt-data] Error:', err)

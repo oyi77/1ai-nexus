@@ -60,20 +60,9 @@ function extractMarketData(data: CoinGeckoMarket[]): {
  * without needing per-UTXO historical pricing data.
  */
 async function estimateRealizedCap(marketCap: number): Promise<number> {
-  // Attempt to refine using Blockstream's tip height as a liveness check;
-  // if unreachable, still return the heuristic so downstream isn't broken.
-  try {
-    const res = await fetch('https://blockstream.info/api/blocks/tip/height', {
-      signal: AbortSignal.timeout(10_000),
-    })
-    if (!res.ok) throw new Error(`Blockstream ${res.status}`)
-    // Blockstream is live — in a full implementation we'd sample UTXO ages
-    // and price history; for now, same heuristic with a slight refinement
-    // based on block height (older chain → more realised-cap buildup).
-    await res.text() // consume body
-  } catch {
-    // Blockstream offline — heuristic still applies
-  }
+  // Heuristic: realized cap ≈ 50% of market cap.
+  // A full implementation would sample UTXO ages and historical prices;
+  // this first-order estimate is sufficient for MVRV derivation.
   return marketCap * 0.5
 }
 

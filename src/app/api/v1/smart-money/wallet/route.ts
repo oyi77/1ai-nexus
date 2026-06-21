@@ -19,33 +19,28 @@ export async function GET(request: Request) {
   const registry = registerAllModules()
   const entityLabel = getEntityLabel(address, chain)
 
-  // Fetch transaction history from Blockscout
-  let txHistory: unknown[] = []
-  try {
-    const result = await registry.fetchOne('blockscout-eth', {
+  // Parallel fetch tx history + token transfers
+  const [txResult, tokenResult] = await Promise.allSettled([
+    registry.fetchOne('blockscout-eth', {
       action: 'txlist',
       address,
       chain,
       limit: '20',
-    })
-    txHistory = (result.data as unknown[]) ?? []
-  } catch {
-    // Silent — wallet may not have txs on this chain
-  }
-
-  // Fetch token transfers
-  let tokenTransfers: unknown[] = []
-  try {
-    const result = await registry.fetchOne('blockscout-eth', {
+    }),
+    registry.fetchOne('blockscout-eth', {
       action: 'tokentx',
       address,
       chain,
       limit: '20',
-    })
-    tokenTransfers = (result.data as unknown[]) ?? []
-  } catch {
-    // Silent
-  }
+    }),
+  ])
+
+  const txHistory: unknown[] = txResult.status === 'fulfilled'
+    ? ((txResult.value.data as unknown[]) ?? [])
+    : []
+  const tokenTransfers: unknown[] = tokenResult.status === 'fulfilled'
+    ? ((tokenResult.value.data as unknown[]) ?? [])
+    : []
 
   return NextResponse.json({
     address,
@@ -59,5 +54,7 @@ export async function GET(request: Request) {
     tokenTransferCount: tokenTransfers.length,
     recentTxs: txHistory.slice(0, 5),
     recentTokenTransfers: tokenTransfers.slice(0, 5),
+  }, {
+    headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=300' },
   })
 }

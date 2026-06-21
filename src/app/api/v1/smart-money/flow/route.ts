@@ -24,28 +24,38 @@ const CATEGORY_META: Record<string, { label: string; icon: string }> = {
 }
 
 export async function GET() {
-  const categories = new Map<string, { count: number; chains: Set<string> }>()
+  try {
+    const categories = new Map<string, { count: number; chains: Set<string> }>()
 
-  for (const entity of ENTITY_SEEDS) {
-    const existing = categories.get(entity.category) ?? { count: 0, chains: new Set() }
-    existing.count++
-    existing.chains.add(entity.chain)
-    categories.set(entity.category, existing)
+    for (const entity of ENTITY_SEEDS) {
+      const existing = categories.get(entity.category) ?? { count: 0, chains: new Set() }
+      existing.count++
+      existing.chains.add(entity.chain)
+      categories.set(entity.category, existing)
+    }
+
+    const flows: CategoryFlow[] = Array.from(categories.entries())
+      .map(([cat, data]) => ({
+        category: cat,
+        label: CATEGORY_META[cat]?.label ?? cat,
+        icon: CATEGORY_META[cat]?.icon ?? '📊',
+        entityCount: data.count,
+        chains: Array.from(data.chains),
+      }))
+      .sort((a, b) => b.entityCount - a.entityCount)
+
+    return NextResponse.json({
+      flows,
+      totalEntities: ENTITY_SEEDS.length,
+      chains: [...new Set(ENTITY_SEEDS.map(e => e.chain))],
+    }, {
+      headers: { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=600' },
+    })
+  } catch (err) {
+    console.error('[smart-money/flow] Error:', err)
+    return NextResponse.json(
+      { error: (err as Error).message, flows: [] },
+      { status: 502 },
+    )
   }
-
-  const flows: CategoryFlow[] = Array.from(categories.entries())
-    .map(([cat, data]) => ({
-      category: cat,
-      label: CATEGORY_META[cat]?.label ?? cat,
-      icon: CATEGORY_META[cat]?.icon ?? '📊',
-      entityCount: data.count,
-      chains: Array.from(data.chains),
-    }))
-    .sort((a, b) => b.entityCount - a.entityCount)
-
-  return NextResponse.json({
-    flows,
-    totalEntities: ENTITY_SEEDS.length,
-    chains: [...new Set(ENTITY_SEEDS.map(e => e.chain))],
-  })
 }
