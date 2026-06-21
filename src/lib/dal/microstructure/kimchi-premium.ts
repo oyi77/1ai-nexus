@@ -70,16 +70,19 @@ async function fetchJson<T>(url: string, timeoutMs = 8_000): Promise<T> {
  * Fetch current Kimchi premium for BTC and ETH.
  */
 export async function getKimchiPremium(): Promise<KimchiPremium[]> {
-  const [upbitData, binanceBtc, binanceEth, krwUsdRate] = await Promise.all([
+  const [upbitData, binanceBtc, binanceEth, krwUsdRateRaw] = await Promise.all([
     fetchJson<UpbitTicker[]>('https://api.upbit.com/v1/ticker?markets=KRW-BTC,KRW-ETH'),
     fetchJson<BinancePrice>('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT'),
     fetchJson<BinancePrice>('https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT'),
-    getKrwUsdRate(),
+    getKrwUsdRate().catch(() => 0),
   ])
 
-  if (!krwUsdRate || krwUsdRate <= 0) {
-    throw new Error('ECB KRW/USD rate unavailable')
-  }
+  // Fallback: approximate KRW/USD from Upbit BTC price vs Binance BTC price
+  const upbitBtc = upbitData.find(t => t.market === 'KRW-BTC')
+  const binanceBtcPrice = Number(binanceBtc.price)
+  const krwUsdRate = krwUsdRateRaw > 0
+    ? krwUsdRateRaw
+    : (upbitBtc && binanceBtcPrice > 0 ? upbitBtc.trade_price / binanceBtcPrice : 1350) // ~1350 KRW/USD fallback
 
   const binanceMap: Record<string, number> = {
     'KRW-BTC': Number(binanceBtc.price),
