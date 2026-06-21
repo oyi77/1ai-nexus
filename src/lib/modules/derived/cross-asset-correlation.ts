@@ -147,14 +147,14 @@ export async function calculateAllCorrelations(): Promise<CorrelationResult[]> {
   try {
     // Fetch market data
     const [marketRes, fearGreedRes, derivativesRes] = await Promise.allSettled([
-      fetch('http://localhost:4400/api/v1/market/prices').then(r => r.json()),
-      fetch('http://localhost:4400/api/v1/fear-greed').then(r => r.json()),
-      fetch('http://localhost:4400/api/v1/derivatives?limit=10').then(r => r.json()),
+      import('@/lib/modules').then(m => { const reg = m.registerAllModules(); return reg.fetchOne('coingecko') }),
+      import('@/lib/modules').then(m => { const reg = m.registerAllModules(); return reg.fetchOne('fear-greed') }),
+      import('@/lib/modules').then(m => { const reg = m.registerAllModules(); return reg.fetchOne('binance-futures', { limit: 10 }) }),
     ])
 
-    const tickers = marketRes.status === 'fulfilled' ? marketRes.value?.tickers || [] : []
-    const fgScore = fearGreedRes.status === 'fulfilled' ? fearGreedRes.value?.data?.composite?.score || 50 : 50
-    const pairs = derivativesRes.status === 'fulfilled' ? derivativesRes.value?.data?.topPairs || [] : []
+    const tickers = marketRes.status === 'fulfilled' ? (marketRes.value?.data as any)?.tickers || [] : []
+    const fgScore = fearGreedRes.status === 'fulfilled' ? (fearGreedRes.value?.data as any)?.composite?.score || 50 : 50
+    const pairs = derivativesRes.status === 'fulfilled' ? (derivativesRes.value?.data as any)?.topPairs || [] : []
 
     // BTC vs ETH correlation (from price data)
     const btcTicker = tickers.find((t: { symbol: string }) => t.symbol === 'BTC')

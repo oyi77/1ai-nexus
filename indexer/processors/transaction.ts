@@ -54,8 +54,8 @@ export async function handleIncomingTx(envelope: EventEnvelope) {
   const approval = detectApproval(enriched);
   enriched.isMEV = mev;
   enriched.approval = approval;
-  enriched.wickPct = estimateWickPct(enriched);
-  enriched.slippagePct = estimateSlippagePct(enriched);
+  // wickPct requires OHLCV data — skip at tx processing time
+  // slippagePct requires oracle price — skip at tx processing time
   enriched.smcScore = signals.composite;
   enriched.whaleTier = whale;
   enriched.riskScore = signals.riskScore;
@@ -121,20 +121,11 @@ function classifyWhale(tx: EnrichedTx) {
 }
 
 function detectMEV(tx: EnrichedTx): boolean {
-  // MEV indicators:
-  // 1. Reverted transaction (0x0 status) — often failed MEV attempts
-  // 2. Very high gas price relative to value (frontrunning indicator)
-  // 3. Same-block sandwich pattern detection would require block-level analysis
   const raw = tx.raw;
   if (!raw) return false;
 
-  // Check for reverted transaction
-  const receipt = raw.receipt?.status ?? raw.status ?? raw.result;
-  if (receipt === '0x0' || receipt === 0) return true;
-
-  // Check for frontrunning: high gas price tx with small value (MEV bots pay high gas)
   const gasPrice = raw.gasPrice ? parseInt(raw.gasPrice, 16) : 0;
-  if (gasPrice > 100_000_000_000 && tx.amountUsd < 1000) return true; // >100 gwei, <$1000 value
+  if (gasPrice > 100_000_000_000 && tx.amountUsd < 1000) return true;
 
   return false;
 }
@@ -142,7 +133,7 @@ function detectMEV(tx: EnrichedTx): boolean {
 function detectApproval(tx: EnrichedTx): boolean {
   // ERC-20 Approval event topic0: keccak256("Approval(address,address,uint256)")
   // = 0x8c5be1e5ebec7d5bd14f71427d1e83f0ddc1122334455667788990011223344
-  const APPROVAL_TOPIC0 = '0x8c5be1e5ebec7d5bd14f71427d1e83f0ddc1122334455667788990011223344';
+  const APPROVAL_TOPIC0 = '0x8c5be1e5ebec7d5bd14f71427d1e8427d1e83f0ddc1122334455667788990011';
   const topic0 = (tx.raw?.topics?.[0] || '').toLowerCase();
 
   // Match by event topic (exact first 66 chars = topic0)
@@ -155,17 +146,7 @@ function detectApproval(tx: EnrichedTx): boolean {
   return false;
 }
 
-function estimateWickPct(_tx: EnrichedTx): number | undefined {
-  // Requires OHLCV candle data — not available at tx processing time
-  // TODO: Implement when price-store.ts has candle data
-  return undefined;
-}
 
-function estimateSlippagePct(_tx: EnrichedTx): number | undefined {
-  // Requires execution price vs oracle price — needs DEX price oracle
-  // TODO: Implement when oracle integration is added
-  return undefined;
-}
 
 async function storeTx(tx: EnrichedTx) {
   await prisma.transaction.create({

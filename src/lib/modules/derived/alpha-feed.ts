@@ -64,13 +64,13 @@ export async function fetchAlphaSignals(limit = 50): Promise<AlphaSignal[]> {
   // Also fetch from existing APIs
   try {
     const [edgeRes, fgRes, newsRes] = await Promise.allSettled([
-      fetch('http://localhost:4400/api/v1/edge-report').then(r => r.json()),
-      fetch('http://localhost:4400/api/v1/fear-greed').then(r => r.json()),
-      fetch('http://localhost:4400/api/v1/news?limit=10').then(r => r.json()),
+      import('@/lib/modules/derived/edge-report').then(m => m.generateEdgeReport()),
+      import('@/lib/modules').then(m => { const reg = m.registerAllModules(); return reg.fetchOne('fear-greed') }),
+      import('@/lib/modules').then(m => { const reg = m.registerAllModules(); return reg.fetchOne('rss-engine', { limit: '10' }) }),
     ])
 
-    if (edgeRes.status === 'fulfilled' && edgeRes.value?.data?.signals) {
-      for (const s of edgeRes.value.data.signals) {
+    if (edgeRes.status === 'fulfilled' && edgeRes.value?.signals) {
+      for (const s of edgeRes.value.signals) {
         allSignals.push({
           id: `edge-${s.asset}-${Date.now()}`,
           type: 'smart_money',
@@ -87,8 +87,8 @@ export async function fetchAlphaSignals(limit = 50): Promise<AlphaSignal[]> {
       }
     }
 
-    if (fgRes.status === 'fulfilled' && fgRes.value?.data?.composite) {
-      const score = fgRes.value.data.composite.score
+    if (fgRes.status === 'fulfilled' && fgRes.value) {
+      const score = (fgRes.value.data as any).score
       if (score < 25 || score > 75) {
         allSignals.push({
           id: `fg-${Date.now()}`,
@@ -98,7 +98,7 @@ export async function fetchAlphaSignals(limit = 50): Promise<AlphaSignal[]> {
           strength: Math.abs(score - 50),
           confidence: 0.7,
           headline: `Fear & Greed: ${score} (${score < 25 ? 'Extreme Fear — buy signal' : 'Extreme Greed — caution'})`,
-          explanation: fgRes.value.data.composite.label || '',
+          explanation: (fgRes.value.data as any).label || '',
           source: 'Fear & Greed Index',
           timestamp: new Date(),
           route: '/fear-greed',
@@ -106,8 +106,8 @@ export async function fetchAlphaSignals(limit = 50): Promise<AlphaSignal[]> {
       }
     }
 
-    if (newsRes.status === 'fulfilled' && newsRes.value?.items) {
-      for (const item of newsRes.value.items.slice(0, 3)) {
+    if (newsRes.status === 'fulfilled' && newsRes.value?.data && (newsRes.value.data as any).items) {
+      for (const item of ((newsRes.value.data as any).items || []).slice(0, 3)) {
         allSignals.push({
           id: `news-${item.id}`,
           type: 'news',
@@ -127,9 +127,9 @@ export async function fetchAlphaSignals(limit = 50): Promise<AlphaSignal[]> {
 
     // Insider signals — fresh wallets with large txs
     try {
-      const insiderRes = await fetch('http://localhost:4400/api/v1/insider').then(r => r.json())
+      const insiderRes = await import('@/lib/modules').then(m => { const reg = m.registerAllModules(); return reg.fetchOne('insider-detector') })
       if (insiderRes.data) {
-        for (const s of insiderRes.data.slice(0, 5)) {
+        for (const s of (insiderRes.data as any[]).slice(0, 5)) {
           allSignals.push({
             id: `insider-${s.id}`,
             type: 'smart_money' as const,
