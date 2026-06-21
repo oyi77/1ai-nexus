@@ -7,9 +7,11 @@ import {
   LayoutDashboard, Coins, Building2, Zap, Bell,
   ChevronLeft, ChevronRight, Search, Globe,
   TrendingUp, BarChart3, Activity, Shield, Radio, Eye,
+  Thermometer,
 } from 'lucide-react'
 import { LiveDot } from '../primitives/LiveDot'
 import { CommandBar } from './CommandBar'
+import { NotificationTray } from './NotificationTray'
 
 const NAV_ITEMS = [
   { label: '⚡ Alpha Feed',  href: '/alpha',          icon: Zap },
@@ -18,11 +20,12 @@ const NAV_ITEMS = [
   { label: 'Entities',     href: '/entities',       icon: Building2 },
   { label: 'Smart Money',  href: '/smart-money',    icon: Zap },
   { label: 'Derivatives',  href: '/derivatives',    icon: TrendingUp },
-  { label: 'Gaps',         href: '/gaps',           icon: Activity },
+  { label: 'Liquidations', href: '/liquidations',   icon: Eye },
   { label: 'DEX Monitor',  href: '/dex',            icon: Activity },
+  { label: 'New Scanner',  href: '/scanner',        icon: Radio },
   { label: 'Alerts',       href: '/alerts',         icon: Bell },
-  { label: 'News',         href: '/news',           icon: Globe },
   { label: 'Macro',        href: '/macro',          icon: Globe },
+  { label: 'Weather',      href: '/weather',        icon: Thermometer },
   { label: 'PnL Tracker',  href: '/pnl',            icon: BarChart3 },
   { label: 'Status',       href: '/status',         icon: Shield },
 ]
@@ -84,9 +87,7 @@ export function NexusLayout({ children }: NexusLayoutProps) {
             <span className="text-text-muted hidden sm:inline">LIVE</span>
           </div>
           <span className="text-[11px] font-mono text-text-secondary tabular-nums">{time}</span>
-          <button className="p-1.5 rounded hover:bg-bg-raised transition-colors">
-            <Bell size={14} className="text-text-muted" />
-          </button>
+          <NotificationTray />
         </div>
       </header>
 

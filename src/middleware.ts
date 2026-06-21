@@ -62,6 +62,7 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/weather-signals",
   "/api/v1/news-intel",
   "/api/v1/tradfi",
+  "/api/v1/liquidations",
   "/api/auth",
 ]);
 
