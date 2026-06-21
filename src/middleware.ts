@@ -64,6 +64,12 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/tradfi",
   "/api/v1/liquidations",
   "/api/v1/insider",
+  "/api/v1/mempool",
+  "/api/v1/rugcheck",
+  "/api/v1/exchange-flow",
+  "/api/v1/gas",
+  "/api/v1/stablecoin-flow",
+  "/api/v1/whale-cluster",
   "/api/auth",
 ]);
 

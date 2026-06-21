@@ -4,20 +4,48 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
-import { ENTITY_SEEDS } from '@/lib/modules/ai-signals/entity-labels-seed'
+import {
+  getExchangeFlows,
+  getNetFlowByExchange,
+  getWhaleFlows,
+  getFlowSnapshot,
+} from '@/lib/modules/derived/exchange-flow-tracker'
 
-export async function GET() {
-  // Count entities by category and chain
-  const cexEntities = ENTITY_SEEDS.filter(e => e.category === 'cex')
-  const whaleEntities = ENTITY_SEEDS.filter(e => e.category === 'whale')
-  const allChains = [...new Set(ENTITY_SEEDS.map(e => e.chain))]
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const action = searchParams.get('action') ?? 'snapshot'
 
-  return NextResponse.json({
-    exchangeWallets: cexEntities.length,
-    whaleWallets: whaleEntities.length,
-    totalEntities: ENTITY_SEEDS.length,
-    chains: allChains,
-    topExchanges: ['Binance', 'Coinbase', 'OKX', 'Bybit', 'Kraken', 'Bitfinex'],
-    note: 'Exchange flow detection runs on-chain. Connect wallet tracking to see real-time deposits/withdrawals.',
-  })
+  try {
+    if (action === 'flows') {
+      const flows = await getExchangeFlows()
+      return NextResponse.json({ data: flows, error: null }, {
+        headers: { 'Cache-Control': 'public, max-age=30' },
+      })
+    }
+
+    if (action === 'net') {
+      const net = await getNetFlowByExchange()
+      return NextResponse.json({ data: net, error: null }, {
+        headers: { 'Cache-Control': 'public, max-age=30' },
+      })
+    }
+
+    if (action === 'whale') {
+      const whale = await getWhaleFlows()
+      return NextResponse.json({ data: whale, error: null }, {
+        headers: { 'Cache-Control': 'public, max-age=30' },
+      })
+    }
+
+    // Default: full snapshot
+    const snapshot = await getFlowSnapshot()
+    return NextResponse.json({ data: snapshot, error: null }, {
+      headers: { 'Cache-Control': 'public, max-age=30' },
+    })
+  } catch (err) {
+    return NextResponse.json(
+      { data: null, error: (err as Error).message },
+      { status: 502 },
+    )
+  }
 }
