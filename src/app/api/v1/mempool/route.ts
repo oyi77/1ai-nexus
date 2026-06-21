@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
+import { apiError } from '@/lib/api/response'
 import { registerAllModules } from '@/lib/modules'
 
 export async function GET(request: Request) {
@@ -35,26 +36,33 @@ export async function GET(request: Request) {
           congestion = { level: 'extreme', color: 'red', description: 'Extreme congestion' }
         }
 
-        return NextResponse.json({
-          count: txCount,
-          totalFee,
-          fees: feeData,
-          congestion,
-          avgFee: txCount > 0 ? Math.round(totalFee / txCount) : 0,
-          vsize: (mempoolData?.vsize as number) ?? 0,
+        const response = NextResponse.json({
+          data: {
+            count: txCount,
+            totalFee,
+            fees: feeData,
+            congestion,
+            avgFee: txCount > 0 ? Math.round(totalFee / txCount) : 0,
+            vsize: (mempoolData?.vsize as number) ?? 0,
+          },
+          error: null,
         }, {
           headers: { 'Cache-Control': 'public, max-age=10, stale-while-revalidate=20' },
         })
+        return response
       }
 
       case 'whale': {
         // Mempool.space doesn't have a direct whale endpoint
         // Return empty array with info message
         return NextResponse.json({
-          data: [],
-          count: 0,
-          threshold: '10 BTC (~$100K)',
-          note: 'Whale detection requires Blockstream API which is currently unavailable',
+          data: {
+            transactions: [],
+            count: 0,
+            threshold: '10 BTC (~$100K)',
+            note: 'Whale detection requires specialized mempool indexing',
+          },
+          error: null,
         }, {
           headers: { 'Cache-Control': 'public, max-age=60' },
         })
@@ -63,9 +71,12 @@ export async function GET(request: Request) {
       case 'all': {
         // Mempool.space doesn't expose full tx list via public API
         return NextResponse.json({
-          data: [],
-          count: 0,
-          note: 'Full mempool transaction list requires specialized API access',
+          data: {
+            transactions: [],
+            count: 0,
+            note: 'Full mempool transaction list requires specialized API access',
+          },
+          error: null,
         }, {
           headers: { 'Cache-Control': 'public, max-age=60' },
         })
@@ -73,34 +84,31 @@ export async function GET(request: Request) {
 
       case 'blocks': {
         const blocks = await registry.fetchOne('mempool-space', { action: 'blocks' })
-        return NextResponse.json({
+        const response = NextResponse.json({
           data: blocks.data,
-          count: Array.isArray(blocks.data) ? blocks.data.length : 0,
+          error: null,
         }, {
           headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=60' },
         })
+        return response
       }
 
       case 'hashrate': {
         const hashrate = await registry.fetchOne('mempool-space', { action: 'hashrate' })
-        return NextResponse.json({
+        const response = NextResponse.json({
           data: hashrate.data,
+          error: null,
         }, {
           headers: { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=600' },
         })
+        return response
       }
 
       default:
-        return NextResponse.json(
-          { error: `Unknown action: ${action}. Use: stats, whale, all, blocks, hashrate` },
-          { status: 400 },
-        )
+        return apiError(`Unknown action: ${action}. Use: stats, whale, all, blocks, hashrate`, 400)
     }
   } catch (err) {
     console.error('[mempool] Error:', err)
-    return NextResponse.json(
-      { error: (err as Error).message, data: [] },
-      { status: 502 },
-    )
+    return apiError((err as Error).message, 502)
   }
 }

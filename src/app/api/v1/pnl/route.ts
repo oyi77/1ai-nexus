@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { type NextRequest, NextResponse } from 'next/server'
+import { apiError } from '@/lib/api/response'
 import {
   calculateWalletPnl,
   getTopWallets,
@@ -21,35 +22,30 @@ export async function GET(request: NextRequest) {
     if (isLeaderboard) {
       await updateLeaderboard()
       const wallets = getTopWallets(limit)
-      return NextResponse.json({
-        wallets,
-        count: wallets.length,
-        generated: new Date().toISOString(),
+      const response = NextResponse.json({
+        data: { wallets, count: wallets.length, generated: new Date().toISOString() },
+        error: null,
       }, {
         headers: { 'Cache-Control': 'public, max-age=60, stale-while-revalidate=120' },
       })
+      return response
     }
 
     // Single wallet PnL
     if (!address) {
-      return NextResponse.json(
-        { error: 'address query parameter required (or use ?leaderboard=true)' },
-        { status: 400 },
-      )
+      return apiError('address query parameter required (or use ?leaderboard=true)', 400)
     }
 
     const pnl = await calculateWalletPnl(address, chain)
-    return NextResponse.json({
-      data: pnl,
-      generated: new Date().toISOString(),
+    const response = NextResponse.json({
+      data: { pnl, generated: new Date().toISOString() },
+      error: null,
     }, {
       headers: { 'Cache-Control': 'public, max-age=30, stale-while-revalidate=60' },
     })
+    return response
   } catch (error) {
     console.error('GET /api/v1/pnl error:', error)
-    return NextResponse.json(
-      { error: 'Failed to calculate PnL', details: String(error) },
-      { status: 500 },
-    )
+    return apiError('Failed to calculate PnL', 500)
   }
 }
