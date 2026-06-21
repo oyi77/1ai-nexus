@@ -12,15 +12,16 @@ import { LiveDot } from '../primitives/LiveDot'
 import { CommandBar } from './CommandBar'
 
 const NAV_ITEMS = [
-  { label: 'Dashboard',    href: '/',              icon: LayoutDashboard },
+  { label: '⚡ Alpha Feed',  href: '/alpha',          icon: Zap },
+  { label: 'Dashboard',    href: '/dashboard',      icon: LayoutDashboard },
   { label: 'Tokens',       href: '/tokens',        icon: Coins },
   { label: 'Entities',     href: '/entities',       icon: Building2 },
   { label: 'Smart Money',  href: '/smart-money',    icon: Zap },
   { label: 'Derivatives',  href: '/derivatives',    icon: TrendingUp },
-  { label: 'DEX Monitor',  href: '/flows',          icon: Activity },
-  { label: 'Mempool',      href: '/fear-greed',     icon: Radio },
+  { label: 'Gaps',         href: '/gaps',           icon: Activity },
+  { label: 'DEX Monitor',  href: '/dex',            icon: Activity },
   { label: 'Alerts',       href: '/alerts',         icon: Bell },
-  { label: 'OSINT',        href: '/compare',        icon: Eye },
+  { label: 'News',         href: '/news',           icon: Globe },
   { label: 'Macro',        href: '/macro',          icon: Globe },
   { label: 'PnL Tracker',  href: '/pnl',            icon: BarChart3 },
   { label: 'Status',       href: '/status',         icon: Shield },
