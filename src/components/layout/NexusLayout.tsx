@@ -9,6 +9,7 @@ import {
   TrendingUp, BarChart3, Activity, Shield, Radio, Eye,
 } from 'lucide-react'
 import { LiveDot } from '../primitives/LiveDot'
+import { CommandBar } from './CommandBar'
 
 const NAV_ITEMS = [
   { label: 'Dashboard',    href: '/',              icon: LayoutDashboard },
@@ -64,10 +65,7 @@ export function NexusLayout({ children }: NexusLayoutProps) {
             <span className="text-teal-vivid font-bold text-[15px] font-mono tracking-tight">NEXUS</span>
             <span className="text-[9px] text-text-muted font-mono hidden sm:inline">v2.0</span>
           </Link>
-          <div className="hidden md:flex items-center gap-1 px-2 py-1 rounded bg-bg-raised border border-bg-border">
-            <Search size={12} className="text-text-muted" />
-            <input type="text" placeholder="Search address, token, tx…" className="bg-transparent text-[11px] font-mono text-text-primary placeholder:text-text-muted outline-none w-48" />
-          </div>
+          <CommandBar />
         </div>
 
         {/* Center: Global Ticker — Live Data */}
