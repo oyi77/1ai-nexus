@@ -5,7 +5,6 @@ import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { DataTable, type Column } from '@/components/shell/DataTable'
 import { PriceTag } from '@/components/primitives/PriceTag'
-import { DeltaBadge } from '@/components/primitives/DeltaBadge'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { useLiveFetch } from '@/lib/hooks/useLiveFetch'
 
@@ -49,15 +48,11 @@ interface LeaderboardEntry {
 }
 
 interface LiquidationsResponse {
-  data: {
-    spotlight: SpotlightData | null
-    heatmap: HeatmapBin[]
-    fundingStrip: FundingEntry[]
-    topPositions: PositionEntry[]
-    leaderboard: LeaderboardEntry[]
-  } | null
-  meta: { symbol: string; marketCount: number; timestamp: number } | null
-  error: string | null
+  spotlight: SpotlightData | null
+  heatmap: HeatmapBin[]
+  fundingStrip: FundingEntry[]
+  topPositions: PositionEntry[]
+  leaderboard: LeaderboardEntry[]
 }
 
 // ── Helpers ───────────────────────────────────────────────
@@ -182,15 +177,15 @@ export default function LiquidationsPage() {
   const { data, status, refresh } = useLiveFetch<LiquidationsResponse>({
     url: `/api/v1/liquidations?symbol=${selectedSymbol}`,
     interval: 15_000,
-    initialData: { data: null, meta: null, error: null },
+    initialData: { spotlight: null, heatmap: [], fundingStrip: [], topPositions: [], leaderboard: [] },
   })
 
-  const spotlight = data?.data?.spotlight ?? null
-  const heatmap = data?.data?.heatmap ?? []
-  const fundingStrip = data?.data?.fundingStrip ?? []
-  const topPositions = data?.data?.topPositions ?? []
-  const leaderboard = data?.data?.leaderboard ?? []
-  const marketCount = data?.meta?.marketCount ?? 0
+  const spotlight = data?.spotlight ?? null
+  const heatmap = useMemo(() => data?.heatmap ?? [], [data])
+  const fundingStrip = useMemo(() => data?.fundingStrip ?? [], [data])
+  const topPositions = useMemo(() => data?.topPositions ?? [], [data])
+  const leaderboard = useMemo(() => data?.leaderboard ?? [], [data])
+  const marketCount = 0
 
   // Summary stats
   const totalLongLiq = useMemo(

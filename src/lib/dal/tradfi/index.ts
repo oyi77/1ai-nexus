@@ -24,6 +24,7 @@ const secEdgarSource: DalSource = {
       })
       return res.ok
     } catch {
+      // Health check: false means unreachable, no need to log
       return false
     }
   },

@@ -17,11 +17,10 @@ interface WalletCluster {
   label?: string
 }
 
-interface ClusterResponse { data: WalletCluster[]; count: number }
 
 export default function WhaleClusterPage() {
-  const { data, status, refresh } = useLiveFetch<ClusterResponse>({ url: '/api/v1/whale-cluster', interval: 300_000 })
-  const clusters = data?.data || []
+  const { data, status, refresh } = useLiveFetch<WalletCluster[]>({ url: '/api/v1/whale-cluster', interval: 300_000 })
+  const clusters = data || []
 
   const columns: Column<WalletCluster>[] = [
     {

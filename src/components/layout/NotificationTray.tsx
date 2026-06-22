@@ -29,7 +29,8 @@ export function NotificationTray() {
   const notifications = data?.data || []
 
   useEffect(() => {
-    if (notifications.length > 0) setHasUnread(true)
+    const mark = () => { if (notifications.length > 0) setHasUnread(true) }
+    mark()
   }, [notifications.length])
 
   const handleClick = useCallback(() => {

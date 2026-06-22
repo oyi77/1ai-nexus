@@ -6,7 +6,7 @@
 import { apiSuccess, apiError } from '@/lib/api/response'
 
 const VIMERO_FEED = 'https://trackai.adanghdyt.com/api/feed'
-let cache: { data: any; ts: number } | null = null
+let cache: { data: unknown; ts: number } | null = null
 const CACHE_TTL = 60_000
 
 async function fetchVimeroFeed() {

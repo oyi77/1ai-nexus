@@ -14,7 +14,7 @@ async function fetchAdsb(params: FetchParams): Promise<unknown> {
   return res.json()
 }
 
-const module: DataModule = {
+const dataModule: DataModule = {
   id: 'adsb-flight-tracking',
   name: 'ADS-B Flight Tracking',
   category: 'macro',
@@ -34,4 +34,4 @@ const module: DataModule = {
     return cachedFetch<T>('adsb-flight-tracking', params, TTL.MACRO_DATA, () => fetchAdsb(params) as Promise<T>)
   },
 }
-export default module
+export default dataModule

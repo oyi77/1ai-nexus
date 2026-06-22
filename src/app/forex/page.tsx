@@ -10,8 +10,8 @@ export default function ForexPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setError(null)
-    setLoading(true)
+    const reset = () => { setError(null); setLoading(true) }
+    reset()
     fetch(`/api/v1/modules/fetch?module=exchangerate-api&base=${base}`)
       .then(r => r.json())
       .then(d => { setRates(d.data?.rates ?? null); setLoading(false) })

@@ -14,7 +14,7 @@ async function fetchWeather(params: FetchParams): Promise<unknown> {
   return res.json()
 }
 
-const module: DataModule = {
+const dataModule: DataModule = {
   id: 'open-meteo',
   name: 'Open-Meteo Weather',
   category: 'macro',
@@ -34,4 +34,4 @@ const module: DataModule = {
     return cachedFetch<T>('open-meteo', params, TTL.MACRO_DATA, () => fetchWeather(params) as Promise<T>)
   },
 }
-export default module
+export default dataModule

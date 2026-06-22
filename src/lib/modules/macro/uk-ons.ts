@@ -2,7 +2,7 @@ import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../typ
 import { TTL } from '../types'
 import { cachedFetch } from '../fetch-with-cache'
 
-async function fetchUkOns(params: FetchParams): Promise<unknown> {
+async function fetchUkOns(_params: FetchParams): Promise<unknown> {
   const url = 'https://api.beta.ons.gov.uk/v1/datasets?limit=10&sort=release_date&q=inflation+GDP+unemployment'
   const res = await fetch(url, {
     headers: { 'User-Agent': 'NEXUS-T/1.0' },
@@ -12,7 +12,7 @@ async function fetchUkOns(params: FetchParams): Promise<unknown> {
   return res.json()
 }
 
-const module: DataModule = {
+const dataModule: DataModule = {
   id: 'uk-ons',
   name: 'UK ONS Statistics',
   category: 'macro',
@@ -32,4 +32,4 @@ const module: DataModule = {
     return cachedFetch<T>('uk-ons', params, TTL.MACRO_DATA, () => fetchUkOns(params) as Promise<T>)
   },
 }
-export default module
+export default dataModule

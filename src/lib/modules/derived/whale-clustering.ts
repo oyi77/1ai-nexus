@@ -18,7 +18,7 @@ interface ClusterConfig {
   minConfidence: number
 }
 
-const DEFAULT_CONFIG: ClusterConfig = {
+const _DEFAULT_CONFIG: ClusterConfig = {
   minClusterSize: 2,
   minConfidence: 0.5,
 }
@@ -60,7 +60,7 @@ export async function detectClusters(): Promise<WalletCluster[]> {
 /**
  * Check if two wallets are likely connected.
  */
-export function areWalletsConnected(walletA: string, walletB: string): { connected: boolean; confidence: number; method: string } {
+export function areWalletsConnected(_walletA: string, _walletB: string): { connected: boolean; confidence: number; method: string } {
   // In production, this would check:
   // 1. Common funding source (both funded by same address)
   // 2. Timing correlation (transactions within seconds of each other)

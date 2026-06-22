@@ -42,8 +42,6 @@ export function PriceChart({ symbol, className = '' }: PriceChartProps) {
       const marketData = data.data.market_data
       const currentPrice = marketData.current_price?.usd ?? 0
       const change24h = marketData.price_change_percentage_24h ?? 0
-      const high24h = marketData.high_24h?.usd ?? 0
-      const low24h = marketData.low_24h?.usd ?? 0
 
       // Generate synthetic OHLCV from 24h data (real chart would use historical endpoint)
       const now = Math.floor(Date.now() / 1000)
@@ -100,14 +98,15 @@ export function PriceChart({ symbol, className = '' }: PriceChartProps) {
       chartRef.current = chart
 
       setLoading(false)
-    } catch (err) {
+    } catch (_err) {
       setError('Failed to load chart')
       setLoading(false)
     }
   }, [symbol])
 
   useEffect(() => {
-    loadChart()
+    const invoke = () => loadChart()
+    invoke()
     return () => {
       if (chartRef.current) {
         chartRef.current.remove()

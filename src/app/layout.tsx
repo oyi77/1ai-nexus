@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 import "./globals.css";
 
 const inter = Inter({
@@ -56,7 +57,9 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
       </head>
       <body className="min-h-full flex flex-col bg-bg-base text-text-primary font-sans">
-        {children}
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
         <script
           dangerouslySetInnerHTML={{
             __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}`,

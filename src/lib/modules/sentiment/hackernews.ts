@@ -14,7 +14,7 @@ async function fetchHn(params: FetchParams): Promise<unknown> {
   return res.json()
 }
 
-const module: DataModule = {
+const dataModule: DataModule = {
   id: 'hackernews',
   name: 'HackerNews Stories',
   category: 'sentiment',
@@ -34,4 +34,4 @@ const module: DataModule = {
     return cachedFetch<T>('hackernews', params, TTL.SENTIMENT, () => fetchHn(params) as Promise<T>)
   },
 }
-export default module
+export default dataModule

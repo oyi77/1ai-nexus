@@ -2,7 +2,7 @@ import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../typ
 import { TTL } from '../types'
 import { cachedFetch } from '../fetch-with-cache'
 
-async function fetchBis(params: FetchParams): Promise<unknown> {
+async function fetchBis(_params: FetchParams): Promise<unknown> {
   const url = 'https://stats.bis.org/api/v1/data/BIS,WS_EER_AVG/latest?format=jsondata'
   const res = await fetch(url, {
     headers: { 'User-Agent': 'NEXUS-T/1.0', 'Accept': 'application/json' },
@@ -12,7 +12,7 @@ async function fetchBis(params: FetchParams): Promise<unknown> {
   return res.json()
 }
 
-const module: DataModule = {
+const dataModule: DataModule = {
   id: 'bis-sdmx',
   name: 'BIS SDMX Data',
   category: 'macro',
@@ -32,4 +32,4 @@ const module: DataModule = {
     return cachedFetch<T>('bis-sdmx', params, TTL.MACRO_DATA, () => fetchBis(params) as Promise<T>)
   },
 }
-export default module
+export default dataModule

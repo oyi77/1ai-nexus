@@ -34,7 +34,8 @@ export default function PredictionsTapePage() {
   }
 
   useEffect(() => {
-    fetchMarkets()
+    const invoke = () => fetchMarkets()
+    invoke()
   }, [])
 
   return (

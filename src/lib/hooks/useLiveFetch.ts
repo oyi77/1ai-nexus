@@ -17,6 +17,23 @@ interface UseLiveFetchResult<T> {
   refresh: () => Promise<void>
 }
 
+/**
+ * Detect and unwrap the standard API envelope { data: <payload>, error: ... }.
+ * Returns the inner payload when the envelope is present, otherwise passes through.
+ */
+function unwrapEnvelope(json: unknown): unknown {
+  if (
+    json !== null &&
+    typeof json === 'object' &&
+    !Array.isArray(json) &&
+    'data' in json &&
+    'error' in json
+  ) {
+    return (json as { data: unknown }).data
+  }
+  return json
+}
+
 export function useLiveFetch<T>({
   url,
   interval = 30_000,
@@ -31,8 +48,9 @@ export function useLiveFetch<T>({
     try {
       const res = await fetch(url)
       const json = await res.json()
+      const payload = unwrapEnvelope(json)
       if (mountedRef.current) {
-        setData((transform ? transform(json) : json) as T)
+        setData((transform ? transform(payload) : payload) as T)
         setStatus('live')
       }
     } catch {
@@ -42,7 +60,8 @@ export function useLiveFetch<T>({
 
   useEffect(() => {
     mountedRef.current = true
-    fetchData()
+    const invoke = () => fetchData()
+    invoke()
     const id = setInterval(fetchData, interval)
     return () => { mountedRef.current = false; clearInterval(id) }
   }, [fetchData, interval])

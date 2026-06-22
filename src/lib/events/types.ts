@@ -1,4 +1,5 @@
-export const REDIS_CHANNELS = {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in typeof for ChannelName
+const REDIS_CHANNELS = {
   TRADES: "nexus:trades",
   ALERTS: "nexus:alerts",
   PRICES: "nexus:prices",
@@ -37,7 +38,7 @@ export interface AlertEvent {
   timestamp: number;
 }
 
-export interface PriceEvent {
+interface _PriceEvent {
   marketId: string;
   platform: string;
   outcome: string;

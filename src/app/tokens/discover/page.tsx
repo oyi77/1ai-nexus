@@ -39,7 +39,7 @@ export default function TokenDiscoverPage() {
     }
   }, [sort])
 
-  useEffect(() => { fetchTokens() }, [fetchTokens])
+  useEffect(() => { const invoke = () => fetchTokens(); invoke() }, [fetchTokens])
 
   return (
     <TerminalShell>

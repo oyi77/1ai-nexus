@@ -14,11 +14,10 @@ interface GasPrice {
   congestion: string
 }
 
-interface GasResponse { data: GasPrice[] }
 
 export default function GasPage() {
-  const { data, status, refresh } = useLiveFetch<GasResponse>({ url: '/api/v1/gas', interval: 30_000 })
-  const prices = data?.data || []
+  const { data, status } = useLiveFetch<GasPrice[]>({ url: '/api/v1/gas', interval: 30_000 })
+  const prices = data || []
 
   const congestionColor = (c: string) => {
     switch (c) {

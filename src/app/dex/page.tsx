@@ -97,7 +97,8 @@ export default function DexMonitorPage() {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    const invoke = () => fetchData()
+    invoke()
     const interval = setInterval(fetchData, 15_000)
     return () => clearInterval(interval)
   }, [fetchData])

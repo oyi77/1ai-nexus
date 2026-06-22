@@ -2,7 +2,7 @@ import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../typ
 import { TTL } from '../types'
 import { cachedFetch } from '../fetch-with-cache'
 
-async function fetchBoC(params: FetchParams): Promise<unknown> {
+async function fetchBoC(_params: FetchParams): Promise<unknown> {
   const url = 'https://www.bankofcanada.ca/valet/observations/group/BOC_RATE_PREV/json'
   const res = await fetch(url, {
     headers: { 'User-Agent': 'NEXUS-T/1.0' },
@@ -12,7 +12,7 @@ async function fetchBoC(params: FetchParams): Promise<unknown> {
   return res.json()
 }
 
-const module: DataModule = {
+const dataModule: DataModule = {
   id: 'bank-of-canada',
   name: 'Bank of Canada Rates',
   category: 'macro',
@@ -32,4 +32,4 @@ const module: DataModule = {
     return cachedFetch<T>('bank-of-canada', params, TTL.MACRO_DATA, () => fetchBoC(params) as Promise<T>)
   },
 }
-export default module
+export default dataModule

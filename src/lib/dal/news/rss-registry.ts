@@ -150,7 +150,8 @@ export async function fetchFeed(url: string): Promise<FetchedFeedItem[]> {
 
     const xml = await res.text()
     return parseRssXml(xml, url)
-  } catch {
+  } catch (err) {
+    console.error('[rss-registry] Feed fetch failed:', url, err)
     return []
   }
 }

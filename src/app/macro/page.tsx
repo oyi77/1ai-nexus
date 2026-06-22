@@ -56,7 +56,7 @@ export default function MacroPage() {
     }
   }, [])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { const invoke = () => fetchData(); invoke() }, [fetchData])
 
   return (
     <NexusLayout>

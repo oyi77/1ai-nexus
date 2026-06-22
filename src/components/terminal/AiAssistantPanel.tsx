@@ -33,7 +33,7 @@ export function AiAssistantPanel() {
     fetch('/api/v1/ai/chat')
       .then(r => r.json())
       .then(d => setAgents(d.agents ?? []))
-      .catch(() => {})
+      .catch((err) => { console.warn('[AiAssistantPanel] Failed to fetch agents:', err) })
   }, [])
 
   useEffect(() => {
@@ -57,7 +57,8 @@ export function AiAssistantPanel() {
       })
       const data = await res.json()
       setMessages(prev => [...prev, { role: 'assistant', content: data.response ?? 'No response', agent: data.agent }])
-    } catch {
+    } catch (err) {
+      console.warn('[AiAssistantPanel] Chat request failed:', err)
       setMessages(prev => [...prev, { role: 'assistant', content: 'Error: Failed to get response' }])
     } finally {
       setLoading(false)

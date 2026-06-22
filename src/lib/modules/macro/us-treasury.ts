@@ -60,7 +60,7 @@ const COLUMN_MAP: Record<string, string> = {
   '30 Yr': 'thirtyYr',
 }
 
-const COLUMN_ORDER = ['1 Mo', '1.5 Month', '2 Mo', '3 Mo', '4 Mo', '6 Mo', '1 Yr', '2 Yr', '3 Yr', '5 Yr', '7 Yr', '10 Yr', '20 Yr', '30 Yr']
+const _COLUMN_ORDER = ['1 Mo', '1.5 Month', '2 Mo', '3 Mo', '4 Mo', '6 Mo', '1 Yr', '2 Yr', '3 Yr', '5 Yr', '7 Yr', '10 Yr', '20 Yr', '30 Yr']
 
 async function fetchTreasury(_params: FetchParams): Promise<TreasuryData> {
   const res = await fetch(CSV_URL, {
@@ -94,7 +94,7 @@ async function fetchTreasury(_params: FetchParams): Promise<TreasuryData> {
 
         const key = COLUMN_MAP[header]
         if (key && key in curve) {
-          (curve as any)[key] = val
+          (curve as Record<string, number | null>)[key] = val
           yields.push({
             securityType: header,
             avgInterestRateAmt: val,

@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Coins, Building2, Zap, Bell,
-  ChevronLeft, ChevronRight, Search, Globe,
+  ChevronLeft, ChevronRight, Globe,
   TrendingUp, BarChart3, Activity, Shield, Radio, Eye,
-  Thermometer, Menu, X,
+  Menu, X,
 } from 'lucide-react'
 import { LiveDot } from '../primitives/LiveDot'
 import { CommandBar } from './CommandBar'
@@ -68,7 +68,8 @@ export function NexusLayout({ children }: NexusLayoutProps) {
 
   // Close mobile menu on navigation
   useEffect(() => {
-    setMobileMenuOpen(false)
+    const close = () => setMobileMenuOpen(false)
+    close()
   }, [pathname])
 
   return (

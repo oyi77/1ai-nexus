@@ -6,12 +6,10 @@ import { LiveDot } from '@/components/primitives/LiveDot'
 import { useLiveFetch } from '@/lib/hooks/useLiveFetch'
 
 interface FearGreedResponse {
-  data: {
-    composite: { score: number; label: string }
-    categories: Array<{ name: string; score: number; weight: number }>
-    regime?: { state: string; stance: string }
-    history?: Array<{ date: string; score: number }>
-  }
+  composite: { score: number; label: string }
+  categories: Array<{ name: string; score: number; weight: number }>
+  regime?: { state: string; stance: string }
+  history?: Array<{ date: string; score: number }>
 }
 
 const scoreColor = (s: number) => s <= 25 ? 'text-data-bear' : s <= 45 ? 'text-data-warn' : s <= 55 ? 'text-data-neutral' : s <= 75 ? 'text-data-bull' : 'text-teal-vivid'
@@ -19,7 +17,7 @@ const scoreLabel = (s: number) => s <= 25 ? 'Extreme Fear' : s <= 45 ? 'Fear' : 
 
 export default function FearGreedPage() {
   const { data: resp, status } = useLiveFetch<FearGreedResponse>({ url: '/api/v1/fear-greed', interval: 60_000 })
-  const d = resp?.data
+  const d = resp
 
   return (
     <NexusLayout>
@@ -44,9 +42,9 @@ export default function FearGreedPage() {
 
             <Panel title="Category Breakdown" subtitle="Component scores">
               <div className="p-3 grid grid-cols-2 lg:grid-cols-3 gap-2">
-                {d.categories?.map((cat, i) => (
-                  <div key={i} className="bg-bg-raised rounded p-3">
-                    <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider mb-1">{cat.name}</div>
+                {d.categories && Object.entries(d.categories).map(([name, cat]) => (
+                  <div key={name} className="bg-bg-raised rounded p-3">
+                    <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider mb-1">{name}</div>
                     <div className="flex items-baseline gap-2">
                       <span className={`text-[20px] font-head font-bold tabular-nums ${scoreColor(cat.score)}`}>{cat.score}</span>
                       <span className="text-[10px] text-text-muted font-mono">×{cat.weight}</span>

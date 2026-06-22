@@ -77,10 +77,10 @@ async function fetchDeribit(_params: FetchParams): Promise<DeribitDerivData> {
         })
         if (r.ok) {
           const j = await r.json()
-          const perp = (j.result ?? []).find((i: any) => i.instrument_name === 'BTC-PERPETUAL')
+          const perp = (j.result ?? []).find((i: Record<string, unknown>) => i.instrument_name === 'BTC-PERPETUAL')
           if (perp) {
-            result.btc.markPrice = perp.mark_price ?? null
-            result.btc.volumeUsd = perp.volume_usd ?? null
+            result.btc.markPrice = (perp.mark_price as number | undefined) ?? null
+            result.btc.volumeUsd = (perp.volume_usd as number | undefined) ?? null
           }
         }
       } catch { /* skip */ }
@@ -93,10 +93,10 @@ async function fetchDeribit(_params: FetchParams): Promise<DeribitDerivData> {
         })
         if (r.ok) {
           const j = await r.json()
-          const perp = (j.result ?? []).find((i: any) => i.instrument_name === 'ETH-PERPETUAL')
+          const perp = (j.result ?? []).find((i: Record<string, unknown>) => i.instrument_name === 'ETH-PERPETUAL')
           if (perp) {
-            result.eth.markPrice = perp.mark_price ?? null
-            result.eth.volumeUsd = perp.volume_usd ?? null
+            result.eth.markPrice = (perp.mark_price as number | undefined) ?? null
+            result.eth.volumeUsd = (perp.volume_usd as number | undefined) ?? null
           }
         }
       } catch { /* skip */ }
@@ -137,8 +137,8 @@ async function fetchDeribit(_params: FetchParams): Promise<DeribitDerivData> {
           const j = await r.json()
           const instruments = j.result ?? []
           result.optionInstruments.btc.total = instruments.length
-          result.optionInstruments.btc.puts = instruments.filter((i: any) => i.option_type === 'put').length
-          result.optionInstruments.btc.calls = instruments.filter((i: any) => i.option_type === 'call').length
+          result.optionInstruments.btc.puts = instruments.filter((i: Record<string, unknown>) => i.option_type === 'put').length
+          result.optionInstruments.btc.calls = instruments.filter((i: Record<string, unknown>) => i.option_type === 'call').length
         }
       } catch { /* skip */ }
     })(),
@@ -152,8 +152,8 @@ async function fetchDeribit(_params: FetchParams): Promise<DeribitDerivData> {
           const j = await r.json()
           const instruments = j.result ?? []
           result.optionInstruments.eth.total = instruments.length
-          result.optionInstruments.eth.puts = instruments.filter((i: any) => i.option_type === 'put').length
-          result.optionInstruments.eth.calls = instruments.filter((i: any) => i.option_type === 'call').length
+          result.optionInstruments.eth.puts = instruments.filter((i: Record<string, unknown>) => i.option_type === 'put').length
+          result.optionInstruments.eth.calls = instruments.filter((i: Record<string, unknown>) => i.option_type === 'call').length
         }
       } catch { /* skip */ }
     })(),

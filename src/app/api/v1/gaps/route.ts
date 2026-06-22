@@ -8,7 +8,6 @@ import {
   getKimchiPremium,
   getKimchiHistory,
   getCrossExchangeBasis,
-  getAllBases,
   getWeekendGap,
   getWeekendDriftCorrelation,
   getAllGapSignals,

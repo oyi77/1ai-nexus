@@ -2,7 +2,7 @@ import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../typ
 import { TTL } from '../types'
 import { cachedFetch } from '../fetch-with-cache'
 
-async function fetchGdacs(params: FetchParams): Promise<unknown> {
+async function fetchGdacs(_params: FetchParams): Promise<unknown> {
   const url = 'https://gdacs.org/xml/rss.xml'
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
   if (!res.ok) throw new Error(`GDACS: ${res.status}`)

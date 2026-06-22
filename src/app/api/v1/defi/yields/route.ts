@@ -14,22 +14,22 @@ export async function GET(request: Request) {
 
   try {
     const result = await registry.fetchOne('defillama', { action: 'yields' })
-    const raw = result.data as any
+    const raw = result.data as Record<string, unknown> | unknown[] | null
 
     // Handle various response formats from DeFiLlama
-    let pools: any[] = []
+    let pools: Record<string, unknown>[] = []
     if (Array.isArray(raw)) {
-      pools = raw
-    } else if (raw?.data && Array.isArray(raw.data)) {
-      pools = raw.data
-    } else if (raw?.pools && Array.isArray(raw.pools)) {
-      pools = raw.pools
+      pools = raw.map(v => v as Record<string, unknown>)
+    } else if (raw && typeof raw === 'object' && 'data' in raw && Array.isArray(raw.data)) {
+      pools = (raw.data as unknown[]).map(v => v as Record<string, unknown>)
+    } else if (raw && typeof raw === 'object' && 'pools' in raw && Array.isArray(raw.pools)) {
+      pools = (raw.pools as unknown[]).map(v => v as Record<string, unknown>)
     } else if (raw && typeof raw === 'object') {
       // Try to extract any array from the response
       const values = Object.values(raw)
       const arrayValue = values.find(v => Array.isArray(v))
       if (arrayValue) {
-        pools = arrayValue as any[]
+        pools = (arrayValue as unknown[]).map(v => v as Record<string, unknown>)
       }
     }
 

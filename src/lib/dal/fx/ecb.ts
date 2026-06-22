@@ -49,7 +49,8 @@ export async function getEcbRates(): Promise<Map<string, number>> {
     cachedRates = rates
     cacheTimestamp = now
     return rates
-  } catch {
+  } catch (err) {
+    console.error('[ecb] FX rate fetch failed:', err)
     return cachedRates || new Map()
   }
 }

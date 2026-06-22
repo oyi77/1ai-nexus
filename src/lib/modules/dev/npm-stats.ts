@@ -13,7 +13,7 @@ async function fetchNPM(params: FetchParams): Promise<unknown> {
   return res.json()
 }
 
-const module: DataModule = {
+const dataModule: DataModule = {
   id: 'npm-stats',
   name: 'NPM Stats',
   category: 'sentiment',
@@ -33,4 +33,4 @@ const module: DataModule = {
     return cachedFetch<T>('npm-stats', params, TTL.MACRO_DATA, () => fetchNPM(params) as Promise<T>)
   },
 }
-export default module
+export default dataModule

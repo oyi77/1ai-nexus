@@ -25,6 +25,7 @@ export function getRedisClient(): Redis {
         const parsed = new URL(REDIS_URL);
         console.log("[Redis] Connected to", parsed.host);
       } catch {
+        // URL parsing failed for logging — connection still succeeded
         console.log("[Redis] Connected");
       }
     });

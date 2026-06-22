@@ -34,7 +34,8 @@ export default function StatusPage() {
   }
 
   useEffect(() => {
-    fetchStatus()
+    const invoke = () => fetchStatus()
+    invoke()
     const interval = setInterval(fetchStatus, 15_000) // Refresh every 15s
     return () => clearInterval(interval)
   }, [])

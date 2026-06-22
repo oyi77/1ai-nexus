@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { NexusLayout } from "@/components/layout/NexusLayout"
-import { Trophy, TrendingUp, Users } from "lucide-react"
+import { Trophy } from "lucide-react"
 import Link from "next/link"
 
 interface Market {
@@ -22,7 +22,8 @@ export default function PredictionsLeaderboardPage() {
   const [sortBy, setSortBy] = useState<"totalVolume" | "volume24h" | "traderCount">("totalVolume")
 
   useEffect(() => {
-    setLoading(true)
+    const startLoad = () => setLoading(true)
+    startLoad()
     fetch(`/api/v1/predictions?pageSize=50&sort=${sortBy}&order=desc`)
       .then(r => r.json())
       .then(d => {

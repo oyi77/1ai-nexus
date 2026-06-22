@@ -11,11 +11,6 @@ interface CurlResponse {
   body: string
 }
 
-interface ExecError {
-  stderr?: Buffer
-  stdout?: Buffer
-}
-
 /**
  * Fetch a URL using system `curl` with browser-like TLS fingerprint.
  * This bypasses Cloudflare challenges that block Node.js's built-in fetch.

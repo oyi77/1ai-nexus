@@ -36,7 +36,7 @@ export default function DeFiYieldsPage() {
     }
   }, [stableOnly])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { const invoke = () => fetchData(); invoke() }, [fetchData])
 
   return (
     <TerminalShell>

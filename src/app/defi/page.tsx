@@ -36,7 +36,7 @@ export default function DeFiPage() {
     }
   }, [chain])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { const invoke = () => fetchData(); invoke() }, [fetchData])
 
   const filtered = protocols.filter(p =>
     !search || p.name.toLowerCase().includes(search.toLowerCase())

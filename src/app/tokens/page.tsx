@@ -90,7 +90,8 @@ export default function TokensPage() {
   }, [])
 
   useEffect(() => {
-    fetchTokens()
+    const invoke = () => fetchTokens()
+    invoke()
     const interval = setInterval(fetchTokens, 30_000)
     return () => clearInterval(interval)
   }, [fetchTokens])

@@ -10,8 +10,8 @@ import { Sparkline } from '@/components/primitives/Sparkline'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { useLiveFetch } from '@/lib/hooks/useLiveFetch'
 
-interface DerivativesResponse { data: { topPairs: Array<Record<string, unknown>> } }
-interface HyperliquidResponse { data: Array<Record<string, unknown>>; count: number }
+interface DerivativesResponse { topPairs: Array<Record<string, unknown>> }
+type HyperliquidResponse = Array<Record<string, unknown>>
 
 interface Pair { symbol: string; price: number; change24h: number; volume24h: number; openInterest: number; fundingRate: number; high24h: number; low24h: number; sparkline: number[]; [k: string]: unknown }
 
@@ -23,10 +23,10 @@ export default function DerivativesPage() {
 
   const pairs: Pair[] = (() => {
     const map = new Map<string, Pair>()
-    for (const p of deriv?.data?.topPairs || []) {
+    for (const p of deriv?.topPairs || []) {
       map.set(p.symbol as string, { symbol: p.symbol as string, price: p.price as number, change24h: p.priceChange24h as number, volume24h: p.quoteVolume24h as number, openInterest: p.openInterest as number, fundingRate: p.fundingRate as number, high24h: p.high24h as number, low24h: p.low24h as number, sparkline: [] })
     }
-    for (const p of (hl?.data || []).slice(0, 30)) {
+    for (const p of (hl || []).slice(0, 30)) {
       const sym = p.symbol as string
       if (!map.has(sym) && !sym.startsWith('@')) map.set(sym, { symbol: sym, price: p.price as number, change24h: 0, volume24h: 0, openInterest: 0, fundingRate: 0, high24h: 0, low24h: 0, sparkline: [] })
     }

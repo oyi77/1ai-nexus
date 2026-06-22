@@ -15,17 +15,6 @@ interface HyperliquidMeta {
   }>
 }
 
-interface HyperliquidTicker {
-  coin: string
-  px: string
-  markPx: string
-  midPx: string
-  prevDayPx: string
-  dayNtlVlm: string
-  funding: string
-  openInterest: string
-  oraclePx: string
-}
 
 export interface HyperliquidMarket {
   symbol: string

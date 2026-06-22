@@ -116,15 +116,7 @@ export default function WeatherPage() {
 
   const [regionFilter, setRegionFilter] = useState('all')
 
-  const results = data?.results || []
-  const allCommodities = useMemo(() => {
-    const set = new Set<string>()
-    for (const r of results) {
-      for (const c of r.affectedCommodities) set.add(c.commodity)
-    }
-    return Array.from(set).sort()
-  }, [results])
-
+  const results = useMemo(() => data?.results || [], [data])
   // Flatten anomalies for the table
   const flatRows: FlatAnomaly[] = useMemo(() => {
     const rows: FlatAnomaly[] = []

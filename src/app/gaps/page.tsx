@@ -33,16 +33,11 @@ interface KimchiPremium {
 }
 
 interface KimchiResponse {
-  data: {
-    premium: KimchiPremium[]
-    history: Array<{ premiumPct: number; timestamp: number }>
-  }
+  premium: KimchiPremium[]
+  history: Array<{ premiumPct: number; timestamp: number }>
 }
 
-interface AllSignalsResponse {
-  data: GapSignalEntry[]
-  count: number
-}
+type AllSignalsResponse = GapSignalEntry[]
 
 function KimchiGauge({ premium, label }: { premium: number; label: string }) {
   // Gauge: -10 to +10 range, normalized to 0-100
@@ -80,20 +75,20 @@ export default function GapsPage() {
   const { data: allSignals, status } = useLiveFetch<AllSignalsResponse>({
     url: '/api/v1/gaps?action=all',
     interval: 15_000,
-    initialData: { data: [], count: 0 },
+    initialData: [],
   })
 
   const { data: kimchiData } = useLiveFetch<KimchiResponse>({
     url: '/api/v1/gaps?action=kimchi',
     interval: 15_000,
-    initialData: { data: { premium: [], history: [] } },
+    initialData: { premium: [], history: [] },
   })
 
   const [filter, setFilter] = useState<'all' | 'kimchi' | 'basis' | 'weekend'>('all')
   const [search, setSearch] = useState('')
 
-  const signals = allSignals?.data || []
-  const kimchiPremium = kimchiData?.data?.premium || []
+  const signals = useMemo(() => allSignals || [], [allSignals])
+  const kimchiPremium = useMemo(() => kimchiData?.premium || [], [kimchiData])
 
   const filtered = useMemo(() => {
     let result = signals

@@ -41,10 +41,10 @@ interface TradeResult {
 
 // ─── In-memory leaderboard cache ─────────────────────────────
 
-const LEADERBOARD_TTL_MS = 5 * 60 * 1000 // 5 minutes
+const _LEADERBOARD_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 let leaderboardCache: WalletPnl[] = []
-let leaderboardUpdatedAt = 0
+let _leaderboardUpdatedAt = 0
 
 /** Chain ID mapping for registry modules */
 const CHAIN_TO_COVALENT_ID: Record<string, string> = {
@@ -396,7 +396,7 @@ export async function updateLeaderboard(): Promise<void> {
   results.sort((a, b) => b.totalPnl - a.totalPnl)
 
   leaderboardCache = results
-  leaderboardUpdatedAt = Date.now()
+  _leaderboardUpdatedAt = Date.now()
 }
 
 /**
@@ -404,5 +404,5 @@ export async function updateLeaderboard(): Promise<void> {
  */
 export function resetPnlStore(): void {
   leaderboardCache = []
-  leaderboardUpdatedAt = 0
+  _leaderboardUpdatedAt = 0
 }

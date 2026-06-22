@@ -1,8 +1,9 @@
-// @ts-nocheck
 "use client";
 
 import { useRef, useEffect } from "react";
-import * as d3 from "d3";
+import { select, type Selection, type BaseType } from 'd3-selection';
+import { drag } from 'd3-drag';
+import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, type SimulationNodeDatum } from 'd3-force';
 import { cn, getEntityTypeColor } from "@/lib/utils";
 
 export interface ConnectedEntity {
@@ -18,8 +19,7 @@ interface ConnectedEntitiesGraphProps {
   className?: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type NodeDatum = { id: string; group: string; radius: number; x?: number; y?: number; fx?: number | null; fy?: number | null } & d3.SimulationNodeDatum;
+type NodeDatum = { id: string; group: string; radius: number; x?: number; y?: number; fx?: number | null; fy?: number | null } & SimulationNodeDatum;
 type LinkDatum = { source: string | NodeDatum; target: string | NodeDatum; strength: number; volume: number };
 
 export function ConnectedEntitiesGraph({ centerName, connections, className }: ConnectedEntitiesGraphProps) {
@@ -29,7 +29,7 @@ export function ConnectedEntitiesGraph({ centerName, connections, className }: C
     if (!svgRef.current) return;
     const currentSvg = svgRef.current;
 
-    const svg = d3.select(currentSvg);
+    const svg = select(currentSvg);
     svg.selectAll("*").remove();
 
     const width = 600;
@@ -52,12 +52,11 @@ export function ConnectedEntitiesGraph({ centerName, connections, className }: C
       volume: c.volume,
     }));
 
-    const simulation = d3
-      .forceSimulation(nodes)
-      .force("link", d3.forceLink<NodeDatum, LinkDatum>(links).id((d) => d.id).distance(120))
-      .force("charge", d3.forceManyBody().strength(-300))
-      .force("center", d3.forceCenter(width / 2, height / 2))
-      .force("collision", d3.forceCollide().radius(40));
+    const simulation = forceSimulation(nodes)
+      .force("link", forceLink<NodeDatum, LinkDatum>(links).id((d) => d.id).distance(120))
+      .force("charge", forceManyBody().strength(-300))
+      .force("center", forceCenter(width / 2, height / 2))
+      .force("collision", forceCollide().radius(40));
 
     const link = svg
       .append("g")
@@ -73,9 +72,8 @@ export function ConnectedEntitiesGraph({ centerName, connections, className }: C
       .selectAll("g")
       .data(nodes)
       .join("g")
-      // @ts-expect-error d3 drag type compatibility
       .call(
-        (d3.drag<SVGGElement, NodeDatum>()
+        drag<SVGGElement, NodeDatum>()
           .on("start", (event, d) => {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
@@ -89,7 +87,7 @@ export function ConnectedEntitiesGraph({ centerName, connections, className }: C
             if (!event.active) simulation.alphaTarget(0);
             d.fx = null;
             d.fy = null;
-          }) as any)
+          }) as unknown as (sel: Selection<BaseType | SVGGElement, NodeDatum, SVGGElement, unknown>) => void
       );
 
     node

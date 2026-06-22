@@ -6,7 +6,6 @@ import { DataTable, type Column } from '@/components/shell/DataTable'
 import { PriceTag } from '@/components/primitives/PriceTag'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { AddressChip } from '@/components/primitives/AddressChip'
-import { AlertPill } from '@/components/primitives/AlertPill'
 import { useLiveFetch } from '@/lib/hooks/useLiveFetch'
 
 interface InsiderSignal {
@@ -23,11 +22,11 @@ interface InsiderSignal {
   detectedAt: string
 }
 
-interface InsiderResponse { data: InsiderSignal[]; count: number }
+type InsiderSignals = InsiderSignal[]
 
 export default function InsiderPage() {
-  const { data, status, refresh } = useLiveFetch<InsiderResponse>({ url: '/api/v1/insider', interval: 60_000 })
-  const signals = data?.data || []
+  const { data, status, refresh } = useLiveFetch<InsiderSignals>({ url: '/api/v1/insider', interval: 60_000 })
+  const signals = data || []
 
   const columns: Column<InsiderSignal>[] = [
     {

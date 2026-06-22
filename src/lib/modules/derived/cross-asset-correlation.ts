@@ -152,13 +152,16 @@ export async function calculateAllCorrelations(): Promise<CorrelationResult[]> {
       import('@/lib/modules').then(m => { const reg = m.registerAllModules(); return reg.fetchOne('binance-futures', { limit: 10 }) }),
     ])
 
-    const tickers = marketRes.status === 'fulfilled' ? (marketRes.value?.data as any)?.tickers || [] : []
-    const fgScore = fearGreedRes.status === 'fulfilled' ? (fearGreedRes.value?.data as any)?.composite?.score || 50 : 50
-    const pairs = derivativesRes.status === 'fulfilled' ? (derivativesRes.value?.data as any)?.topPairs || [] : []
+    const tickerData = marketRes.status === 'fulfilled' ? (marketRes.value?.data as Record<string, unknown> | undefined)?.tickers as { symbol: string; change?: string }[] | undefined : undefined
+    const tickers = tickerData ?? []
+    const fgData = fearGreedRes.status === 'fulfilled' ? (fearGreedRes.value?.data as Record<string, unknown> | undefined)?.composite as { score?: number } | undefined : undefined
+    const fgScore = fgData?.score ?? 50
+    const pairData = derivativesRes.status === 'fulfilled' ? (derivativesRes.value?.data as Record<string, unknown> | undefined)?.topPairs as { fundingRate?: number }[] | undefined : undefined
+    const pairs = pairData ?? []
 
     // BTC vs ETH correlation (from price data)
-    const btcTicker = tickers.find((t: { symbol: string }) => t.symbol === 'BTC')
-    const ethTicker = tickers.find((t: { symbol: string }) => t.symbol === 'ETH')
+    const btcTicker = tickers.find(t => t.symbol === 'BTC')
+    const ethTicker = tickers.find(t => t.symbol === 'ETH')
     if (btcTicker && ethTicker) {
       const btcChange = parseFloat((btcTicker.change || '0').replace(/%+/g, ''))
       const ethChange = parseFloat((ethTicker.change || '0').replace(/%+/g, ''))
@@ -191,7 +194,7 @@ export async function calculateAllCorrelations(): Promise<CorrelationResult[]> {
 
     // Funding rate vs price (from derivatives data)
     if (pairs.length > 0) {
-      const avgFunding = pairs.reduce((s: number, p: { fundingRate?: number }) => s + (p.fundingRate || 0), 0) / pairs.length
+      const avgFunding = pairs.reduce((s, p) => s + (p.fundingRate || 0), 0) / pairs.length
       results.push({
         pair: 'Funding Rate vs Price',
         assetA: 'Avg Funding Rate',

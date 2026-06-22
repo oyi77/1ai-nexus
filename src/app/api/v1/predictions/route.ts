@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 export const dynamic = "force-dynamic";
 
 import { NextRequest } from "next/server";
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
     if (!PREDICTION_SORT_FIELDS.has(sort)) return apiError(`Invalid sort field`, 400);
     if (!["asc", "desc"].includes(order)) return apiError(`Invalid order`, 400);
 
-    const where: any = { status };
+    const where: Prisma.PredictionMarketWhereInput = { status };
     if (category) where.category = category;
 
     const [markets, total] = await Promise.all([

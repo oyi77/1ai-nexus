@@ -39,8 +39,9 @@ export default function PnlPage() {
   const fetchLeaderboard = useCallback(async () => {
     try {
       const res = await fetch('/api/v1/pnl?leaderboard=true&limit=50')
-      const data = await res.json()
-      setWallets(data.wallets ?? [])
+      const json = await res.json()
+      const payload = (json && typeof json === 'object' && 'data' in json && 'error' in json) ? json.data : json
+      setWallets(payload?.wallets ?? [])
     } catch {
       // Silent
     } finally {
@@ -49,7 +50,8 @@ export default function PnlPage() {
   }, [])
 
   useEffect(() => {
-    fetchLeaderboard()
+    const invoke = () => fetchLeaderboard()
+    invoke()
     const id = setInterval(fetchLeaderboard, 5 * 60_000) // refresh every 5 min
     return () => clearInterval(id)
   }, [fetchLeaderboard])

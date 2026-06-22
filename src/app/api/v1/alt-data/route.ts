@@ -3,7 +3,7 @@ import { registerAllModules } from '@/lib/modules'
 
 async function safeFetch(registry: ReturnType<typeof registerAllModules>, id: string) {
   try {
-    const res = await registry.fetchOne<any>(id, { action: 'get' })
+    const res = await registry.fetchOne<Record<string, unknown>>(id, { action: 'get' })
     return res.data
   } catch {
     return null

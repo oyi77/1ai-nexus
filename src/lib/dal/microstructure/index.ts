@@ -14,7 +14,7 @@ export type { WeekendGap } from './weekend-gap'
 
 import { getKimchiPremium } from './kimchi-premium'
 import { getAllBases } from './cross-exchange'
-import { getWeekendGap, getWeekendDriftCorrelation } from './weekend-gap'
+import { getWeekendGap } from './weekend-gap'
 
 export interface GapSignalEntry {
   pairLabel: string

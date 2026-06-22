@@ -1,6 +1,6 @@
 // CEX Exchange Client - Public API endpoints (no auth required)
 
-export interface CexTicker {
+interface CexTicker {
   symbol: string
   price: string
   volume: string
@@ -8,13 +8,13 @@ export interface CexTicker {
   priceChangePercent: string
 }
 
-export interface CexFundingRate {
+interface CexFundingRate {
   symbol: string
   fundingRate: string
   fundingTime: number
 }
 
-export interface CexLiquidation {
+interface CexLiquidation {
   symbol: string
   side: string
   quantity: string
@@ -31,12 +31,13 @@ async function fetchJson<T>(url: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export const cexClient = {
+const _cexClient = {
   async getExchangeStatus(): Promise<{ status: string }> {
     try {
       await fetchJson(`${BINANCE_API}/api/v3/ping`)
       return { status: 'online' }
-    } catch {
+    } catch (err) {
+      console.error('[cex-client] Exchange status check failed:', err)
       return { status: 'offline' }
     }
   },

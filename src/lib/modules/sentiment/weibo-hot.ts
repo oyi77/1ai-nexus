@@ -2,7 +2,7 @@ import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../typ
 import { TTL } from '../types'
 import { cachedFetch } from '../fetch-with-cache'
 
-async function fetchWeiboHot(params: FetchParams): Promise<unknown> {
+async function fetchWeiboHot(_params: FetchParams): Promise<unknown> {
   const url = 'https://tenapi.cn/v2/weibohot'
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
   if (!res.ok) throw new Error(`Weibo Hot: ${res.status}`)

@@ -64,12 +64,13 @@ export function DataTable<T extends Record<string, unknown>>({
     }
   }, [sortable, sortKey])
 
+  const safeData = useMemo(() => Array.isArray(data) ? data : [], [data])
   const sorted = useMemo(() => {
-    if (!sortKey) return data
+    if (!sortKey) return safeData
     const col = columns.find(c => c.key === sortKey)
-    if (!col) return data
+    if (!col) return safeData
     const accessor = col.accessor || ((row: T) => row[sortKey] as string | number)
-    return [...data].sort((a, b) => {
+    return [...safeData].sort((a, b) => {
       const va = accessor(a)
       const vb = accessor(b)
       if (typeof va === 'number' && typeof vb === 'number') {
@@ -79,15 +80,16 @@ export function DataTable<T extends Record<string, unknown>>({
         ? String(va).localeCompare(String(vb))
         : String(vb).localeCompare(String(va))
     })
-  }, [data, sortKey, sortDir, columns])
+  }, [safeData, sortKey, sortDir, columns])
 
   // Virtual scroll calculations
-  const totalHeight = sorted.length * rowHeight
+  const sortedArr = Array.isArray(sorted) ? sorted : []
+  const totalHeight = sortedArr.length * rowHeight
   const startIndex = virtualScroll ? Math.floor(scrollTop / rowHeight) : 0
   const endIndex = virtualScroll
-    ? Math.min(sorted.length, startIndex + Math.ceil(containerHeight / rowHeight) + 5)
-    : sorted.length
-  const visibleRows = sorted.slice(startIndex, endIndex)
+    ? Math.min(sortedArr.length, startIndex + Math.ceil(containerHeight / rowHeight) + 5)
+    : sortedArr.length
+  const visibleRows = sortedArr.slice(startIndex, endIndex)
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     if (virtualScroll) {
@@ -95,7 +97,7 @@ export function DataTable<T extends Record<string, unknown>>({
     }
   }, [virtualScroll])
 
-  if (data.length === 0 && emptyState) {
+  if (safeData.length === 0 && emptyState) {
     return <div className="p-4">{emptyState}</div>
   }
 

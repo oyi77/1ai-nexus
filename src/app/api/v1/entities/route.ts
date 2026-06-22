@@ -1,8 +1,9 @@
+import { Prisma } from '@prisma/client'
 export const dynamic = "force-dynamic";
 
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { apiSuccess, apiError, apiPaginated } from "@/lib/api/response";
+import { apiError, apiPaginated } from "@/lib/api/response";
 
 import { checkRateLimit } from "@/lib/api/rate-limit";
 
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest) {
     // Public endpoint — auth handled by middleware
 
     const ip = request.headers.get("x-forwarded-for") || "unknown";
-    const { allowed, remaining } = await checkRateLimit(ip);
+    const { allowed, remaining: _remaining } = await checkRateLimit(ip);
     if (!allowed) return apiError("Rate limit exceeded", 429);
 
     const { searchParams } = new URL(request.url);
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
     if (!ENTITY_SORT_FIELDS.has(sort)) return apiError(`Invalid sort field`, 400);
     if (!["asc", "desc"].includes(order)) return apiError(`Invalid order`, 400);
 
-    const where: any = {};
+    const where: Prisma.EntityWhereInput = {}
     if (type) where.type = type;
     if (chain) where.chains = { has: chain };
 

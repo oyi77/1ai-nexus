@@ -13,7 +13,7 @@ async function fetchEurostat(params: FetchParams): Promise<unknown> {
   return res.json()
 }
 
-const module: DataModule = {
+const dataModule: DataModule = {
   id: 'eurostat',
   name: 'Eurostat Statistics',
   category: 'macro',
@@ -33,4 +33,4 @@ const module: DataModule = {
     return cachedFetch<T>('eurostat', params, TTL.MACRO_DATA, () => fetchEurostat(params) as Promise<T>)
   },
 }
-export default module
+export default dataModule

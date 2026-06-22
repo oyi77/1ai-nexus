@@ -2,7 +2,7 @@ import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../typ
 import { TTL } from '../types'
 import { cachedFetch } from '../fetch-with-cache'
 
-async function fetchGoogleTrends(params: FetchParams): Promise<unknown> {
+async function fetchGoogleTrends(_params: FetchParams): Promise<unknown> {
   const url = 'https://trends.google.com/trends/trendingsearches/daily/rss?geo=US'
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
   if (!res.ok) throw new Error(`Google Trends: ${res.status}`)

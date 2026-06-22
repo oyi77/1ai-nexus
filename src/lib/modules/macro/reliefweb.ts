@@ -2,14 +2,14 @@ import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../typ
 import { TTL } from '../types'
 import { cachedFetch } from '../fetch-with-cache'
 
-async function fetchReliefWeb(params: FetchParams): Promise<unknown> {
+async function fetchReliefWeb(_params: FetchParams): Promise<unknown> {
   const url = 'https://api.reliefweb.int/v1/reports?appname=nexus-terminal&limit=20&preset=latest&slim=1'
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
   if (!res.ok) throw new Error(`ReliefWeb: ${res.status}`)
   return res.json()
 }
 
-const module: DataModule = {
+const dataModule: DataModule = {
   id: 'reliefweb',
   name: 'ReliefWeb Humanitarian',
   category: 'macro',
@@ -29,4 +29,4 @@ const module: DataModule = {
     return cachedFetch<T>('reliefweb', params, TTL.MACRO_DATA, () => fetchReliefWeb(params) as Promise<T>)
   },
 }
-export default module
+export default dataModule

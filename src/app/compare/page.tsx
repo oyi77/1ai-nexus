@@ -9,7 +9,7 @@ import { LiveDot } from '@/components/primitives/LiveDot'
 import { useLiveFetch } from '@/lib/hooks/useLiveFetch'
 
 interface MarketResponse { tickers: Array<{ symbol: string; price: string; change: string; positive: boolean }> }
-interface MacroResponse { data: { indicators: Array<{ id: string; name: string; latestValue: number; changePercent: number }> } }
+interface MacroResponse { indicators: Array<{ id: string; name: string; latestValue: number; changePercent: number }> }
 interface Asset { name: string; symbol: string; price: number; change: number; category: string; [k: string]: unknown }
 
 export default function ComparePage() {
@@ -18,7 +18,7 @@ export default function ComparePage() {
 
   const assets: Asset[] = [
     ...(market?.tickers || []).map(t => ({ name: t.symbol, symbol: t.symbol, price: parseFloat((t.price || '0').replace(/[$,]/g, '')), change: parseFloat((t.change || '0').replace(/%+/g, '')), category: ['BTC', 'ETH', 'SOL'].includes(t.symbol) ? 'Crypto' : 'Traditional' })),
-    ...(macro?.data?.indicators || []).map(i => ({ name: i.name, symbol: i.id, price: i.latestValue, change: i.changePercent || 0, category: 'Macro' })),
+    ...(macro?.indicators || []).map(i => ({ name: i.name, symbol: i.id, price: i.latestValue, change: i.changePercent || 0, category: 'Macro' })),
   ]
 
   const columns: Column<Asset>[] = [

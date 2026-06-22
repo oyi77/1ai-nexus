@@ -13,7 +13,6 @@ import {
 } from '@/lib/dal/weather/open-meteo'
 import {
   getAffectedCommodities,
-  getAffectedTickers,
   getAvailableRegions,
 } from '@/lib/dal/weather/commodity-mapper'
 

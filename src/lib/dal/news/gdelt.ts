@@ -83,7 +83,8 @@ export async function searchGdelt(
 
     fetchCache.set(cacheKey, { data: articles, ts: Date.now() })
     return articles
-  } catch {
+  } catch (err) {
+    console.error('[gdelt] Search failed:', query, err)
     return cached?.data ?? []
   }
 }

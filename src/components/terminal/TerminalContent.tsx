@@ -66,7 +66,8 @@ export function TerminalContent() {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    const invoke = () => fetchData()
+    invoke()
     const id = setInterval(fetchData, 60_000)
     return () => clearInterval(id)
   }, [fetchData])
@@ -228,6 +229,7 @@ function formatTimeAgo(iso: string): string {
     if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
     return `${Math.floor(diff / 86_400_000)}d ago`
   } catch {
+    // Expected: malformed ISO strings return fallback display
     return '—'
   }
 }

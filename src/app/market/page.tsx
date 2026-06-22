@@ -63,7 +63,8 @@ export default function MarketPage() {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    const invoke = () => fetchData()
+    invoke()
     const id = setInterval(fetchData, 60_000)
     return () => clearInterval(id)
   }, [fetchData])

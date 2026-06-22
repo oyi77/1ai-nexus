@@ -12,7 +12,7 @@ export interface TradeEvent {
   timestamp: string;
 }
 
-export interface WalletEvent {
+interface WalletEvent {
   type: "wallet_moved";
   address: string;
   amountUsd: number;
@@ -21,7 +21,7 @@ export interface WalletEvent {
   timestamp: string;
 }
 
-export interface SmartMoneyEvent {
+interface SmartMoneyEvent {
   type: "smart_money_action";
   action: "Accumulated" | "Exited" | "Bridged" | "Swapped";
   wallet: string;
@@ -31,7 +31,7 @@ export interface SmartMoneyEvent {
   timestamp: string;
 }
 
-export interface PredictionEvent {
+interface PredictionEvent {
   type: "prediction_threshold";
   marketId: string;
   marketTitle: string;

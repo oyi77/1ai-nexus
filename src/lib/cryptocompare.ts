@@ -25,7 +25,7 @@ async function ccFetch<T>(path: string, cacheSec = 60): Promise<T> {
 
 // ─── Price Data ────────────────────────────────────────────
 
-export interface PriceData {
+interface PriceData {
   [symbol: string]: {
     USD: number;
     EUR?: number;
@@ -48,7 +48,7 @@ export async function getPrice(fsym: string, tsym = "USD"): Promise<number> {
 
 // ─── OHLCV ────────────────────────────────────────────────
 
-export interface OhlcvData {
+interface OhlcvData {
   time: number;
   open: number;
   high: number;
@@ -74,7 +74,7 @@ export async function getDailyOhlcv(fsym: string, tsym = "USD", limit = 30): Pro
 
 // ─── News ──────────────────────────────────────────────────
 
-export interface NewsArticle {
+interface NewsArticle {
   id: string;
   published_on: number;
   title: string;
@@ -100,7 +100,7 @@ export async function getNews(categories?: string, limit = 20): Promise<NewsArti
 
 // ─── Social Stats ──────────────────────────────────────────
 
-export interface SocialStats {
+interface SocialStats {
   Reddit: { active_users: number; subscribers: number; posts_per_day: number };
   Twitter: { followers: number; statuses: number };
   CryptoCompare: { points: number; followers: number };

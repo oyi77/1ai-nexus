@@ -6,7 +6,6 @@ import { Panel } from '@/components/shell/Panel'
 import { DataTable, type Column } from '@/components/shell/DataTable'
 import { PriceTag } from '@/components/primitives/PriceTag'
 import { DeltaBadge } from '@/components/primitives/DeltaBadge'
-import { AlertPill } from '@/components/primitives/AlertPill'
 import { EntityLabel } from '@/components/primitives/EntityLabel'
 import { Sparkline } from '@/components/primitives/Sparkline'
 import { LiveDot } from '@/components/primitives/LiveDot'
@@ -96,7 +95,8 @@ export default function SmartMoneyPage() {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    const invoke = () => fetchData()
+    invoke()
     const interval = setInterval(fetchData, 30_000)
     return () => clearInterval(interval)
   }, [fetchData])

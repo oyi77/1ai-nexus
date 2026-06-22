@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { parseCommand, getHistory, getAllCommands } from '@/lib/command/parser'
 import { Search, ChevronRight, Clock, X } from 'lucide-react'
@@ -9,7 +9,14 @@ export function CommandBar() {
   const [input, setInput] = useState('')
   const [isOpen, setIsOpen] = useState(false)
   const [historyIdx, setHistoryIdx] = useState(-1)
-  const [suggestions, setSuggestions] = useState<string[]>([])
+  const suggestions = useMemo(() => {
+    if (!input.trim()) return [] as string[]
+    const commands = getAllCommands()
+    return commands
+      .filter(c => c.verb.startsWith(input.toUpperCase()) || c.description.toLowerCase().includes(input.toLowerCase()))
+      .map(c => `${c.verb} — ${c.description}`)
+      .slice(0, 5)
+  }, [input])
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
@@ -38,19 +45,6 @@ export function CommandBar() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  // Auto-suggest as user types
-  useEffect(() => {
-    if (!input.trim()) {
-      setSuggestions([])
-      return
-    }
-    const commands = getAllCommands()
-    const matches = commands
-      .filter(c => c.verb.startsWith(input.toUpperCase()) || c.description.toLowerCase().includes(input.toLowerCase()))
-      .map(c => `${c.verb} — ${c.description}`)
-      .slice(0, 5)
-    setSuggestions(matches)
-  }, [input])
 
   const execute = useCallback(() => {
     if (!input.trim()) return

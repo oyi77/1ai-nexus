@@ -13,7 +13,7 @@ async function fetchImf(params: FetchParams): Promise<unknown> {
   return res.json()
 }
 
-const module: DataModule = {
+const dataModule: DataModule = {
   id: 'imf-sdmx',
   name: 'IMF SDMX Data',
   category: 'macro',
@@ -33,4 +33,4 @@ const module: DataModule = {
     return cachedFetch<T>('imf-sdmx', params, TTL.MACRO_DATA, () => fetchImf(params) as Promise<T>)
   },
 }
-export default module
+export default dataModule

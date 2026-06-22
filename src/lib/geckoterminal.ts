@@ -132,7 +132,7 @@ export async function getPoolOhlcv(
 
 // ─── Token Info ────────────────────────────────────────────
 
-export interface TokenInfo {
+interface TokenInfo {
   id: string;
   attributes: {
     name: string;
@@ -157,7 +157,7 @@ export async function getTokenInfo(network: string, tokenAddress: string): Promi
 
 // ─── Search ────────────────────────────────────────────────
 
-export interface SearchResult {
+interface SearchResult {
   id: string;
   type: string;
   attributes: {

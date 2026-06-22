@@ -4,8 +4,6 @@ import { useState } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
-import { PriceTag } from '@/components/primitives/PriceTag'
-import { AlertPill } from '@/components/primitives/AlertPill'
 import { useLiveFetch } from '@/lib/hooks/useLiveFetch'
 
 interface AlphaSignal {
@@ -25,7 +23,6 @@ interface AlphaSignal {
   route?: string
 }
 
-interface AlphaFeedResponse { data: AlphaSignal[]; count: number }
 
 const typeIcons: Record<string, string> = {
   smart_money: '🐋', gap: '📊', news: '📰', weather: '🌤️',
@@ -39,9 +36,9 @@ const typeColors: Record<string, string> = {
 }
 
 export default function AlphaFeedPage() {
-  const { data, status, refresh } = useLiveFetch<AlphaFeedResponse>({ url: '/api/v1/alpha-feed?limit=50', interval: 15_000 })
+  const { data, status, refresh } = useLiveFetch<AlphaSignal[]>({ url: '/api/v1/alpha-feed?limit=50', interval: 15_000 })
   const [filterType, setFilterType] = useState('all')
-  const signals = data?.data || []
+  const signals = data || []
   const filtered = filterType === 'all' ? signals : signals.filter(s => s.type === filterType)
   const types = ['all', ...new Set(signals.map(s => s.type))]
 

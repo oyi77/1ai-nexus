@@ -6,7 +6,7 @@
 import { type NextRequest } from 'next/server'
 import { apiSuccess, apiError } from '@/lib/api/response'
 import { searchGdelt, getTopNews } from '@/lib/dal/news/gdelt'
-import { getFeedsByCountry, getAllFeeds, fetchFeed, type CountryCode } from '@/lib/dal/news/rss-registry'
+import { getFeedsByCountry, getAllFeeds, type CountryCode } from '@/lib/dal/news/rss-registry'
 import { calculateLocalScore, isLocalExclusive } from '@/lib/dal/news/local-score'
 
 export const dynamic = 'force-dynamic'

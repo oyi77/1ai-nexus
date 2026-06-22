@@ -27,13 +27,13 @@ describe('Entity Label Seed Data', () => {
       const solanaPattern = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
       const btcPattern = /^(bc1|[13])[a-zA-HJ-NP-Z0-9]{25,62}$/
       let verifiedCount = 0
-      let placeholderCount = 0
+      let _placeholderCount = 0
       for (const entity of ENTITY_SEEDS) {
         const addr = entity.address
         if (hexPattern.test(addr) || solanaPattern.test(addr) || btcPattern.test(addr)) {
           verifiedCount++
         } else {
-          placeholderCount++
+          _placeholderCount++
         }
       }
       // Must have at least some verified addresses

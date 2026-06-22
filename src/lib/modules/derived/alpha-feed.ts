@@ -88,7 +88,7 @@ export async function fetchAlphaSignals(limit = 50): Promise<AlphaSignal[]> {
     }
 
     if (fgRes.status === 'fulfilled' && fgRes.value) {
-      const score = (fgRes.value.data as any).score
+      const score = ((fgRes.value.data as Record<string, unknown>)?.score as number) ?? 50
       if (score < 25 || score > 75) {
         allSignals.push({
           id: `fg-${Date.now()}`,
@@ -98,7 +98,7 @@ export async function fetchAlphaSignals(limit = 50): Promise<AlphaSignal[]> {
           strength: Math.abs(score - 50),
           confidence: 0.7,
           headline: `Fear & Greed: ${score} (${score < 25 ? 'Extreme Fear — buy signal' : 'Extreme Greed — caution'})`,
-          explanation: (fgRes.value.data as any).label || '',
+          explanation: ((fgRes.value.data as Record<string, unknown>)?.label as string) || '',
           source: 'Fear & Greed Index',
           timestamp: new Date(),
           route: '/fear-greed',
@@ -106,20 +106,20 @@ export async function fetchAlphaSignals(limit = 50): Promise<AlphaSignal[]> {
       }
     }
 
-    if (newsRes.status === 'fulfilled' && newsRes.value?.data && (newsRes.value.data as any).items) {
-      for (const item of ((newsRes.value.data as any).items || []).slice(0, 3)) {
+    if (newsRes.status === 'fulfilled' && newsRes.value?.data && (newsRes.value.data as Record<string, unknown>).items) {
+      for (const item of ((newsRes.value.data as Record<string, unknown>).items as Record<string, unknown>[] || []).slice(0, 3)) {
         allSignals.push({
-          id: `news-${item.id}`,
+          id: `news-${String(item.id)}`,
           type: 'news',
           asset: 'Crypto',
           direction: 'neutral',
           strength: 40,
           confidence: 0.5,
-          headline: item.title || 'News update',
-          explanation: item.summary || '',
-          source: item.sourceId || 'RSS',
+          headline: String(item.title || 'News update'),
+          explanation: String(item.summary || ''),
+          source: String(item.sourceId || 'RSS'),
           sourceCountry: 'global',
-          timestamp: new Date(item.publishedAt),
+          timestamp: new Date(String(item.publishedAt)),
           route: '/news',
         })
       }
@@ -129,18 +129,18 @@ export async function fetchAlphaSignals(limit = 50): Promise<AlphaSignal[]> {
     try {
       const insiderRes = await import('@/lib/modules').then(m => { const reg = m.registerAllModules(); return reg.fetchOne('insider-detector') })
       if (insiderRes.data) {
-        for (const s of (insiderRes.data as any[]).slice(0, 5)) {
+        for (const s of (insiderRes.data as Record<string, unknown>[]).slice(0, 5)) {
           allSignals.push({
-            id: `insider-${s.id}`,
+            id: `insider-${String(s.id)}`,
             type: 'smart_money' as const,
-            asset: s.largeTxToken || 'Unknown',
+            asset: String(s.largeTxToken || 'Unknown'),
             direction: 'bearish' as const, // Insider selling is bearish signal
-            strength: s.riskScore,
-            confidence: s.riskScore / 100,
-            headline: `🔍 INSIDER: Fresh wallet moved $${(s.largeTxAmount / 1000).toFixed(0)}K (${s.totalTxs} prior txs, age: ${s.walletAge})`,
-            explanation: s.suspicionReasons?.join('. ') || 'Fresh wallet with large transaction',
+            strength: Number(s.riskScore),
+            confidence: Number(s.riskScore) / 100,
+            headline: `🔍 INSIDER: Fresh wallet moved $${(Number(s.largeTxAmount) / 1000).toFixed(0)}K (${String(s.totalTxs)} prior txs, age: ${String(s.walletAge)})`,
+            explanation: String((s.suspicionReasons as string[] | undefined)?.join('. ') || 'Fresh wallet with large transaction'),
             source: 'Insider Detector',
-            timestamp: new Date(s.detectedAt),
+            timestamp: new Date(String(s.detectedAt)),
             route: '/insider',
           })
         }

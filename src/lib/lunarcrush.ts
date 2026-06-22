@@ -27,7 +27,7 @@ async function lcFetch<T>(path: string, cacheSec = 120): Promise<T> {
 
 // ─── Coins Overview ────────────────────────────────────────
 
-export interface CoinMetrics {
+interface CoinMetrics {
   id: number;
   name: string;
   symbol: string;
@@ -78,7 +78,7 @@ export async function getCoinMetrics(symbol: string): Promise<CoinMetrics> {
 
 // ─── Social Posts ──────────────────────────────────────────
 
-export interface SocialPost {
+interface SocialPost {
   id: string;
   post_type: string;
   created_at: number;

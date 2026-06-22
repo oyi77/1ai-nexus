@@ -4,7 +4,6 @@ import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { DataTable, type Column } from '@/components/shell/DataTable'
 import { LiveDot } from '@/components/primitives/LiveDot'
-import { DeltaBadge } from '@/components/primitives/DeltaBadge'
 import { useLiveFetch } from '@/lib/hooks/useLiveFetch'
 
 interface CorrelationData {
@@ -23,7 +22,7 @@ interface CorrelationResponse { data: CorrelationData[] }
 
 export default function CorrelationsPage() {
   const { data, status, refresh } = useLiveFetch<CorrelationResponse>({ url: '/api/v1/correlations', interval: 60_000 })
-  const correlations = data?.data || []
+  const correlations = data || []
 
   const columns: Column<CorrelationData>[] = [
     { key: 'pair', header: 'Pair', width: 150, render: r => <span className="text-teal-vivid font-bold">{r.pair}</span> },

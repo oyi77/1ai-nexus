@@ -15,12 +15,12 @@ export async function GET() {
       { action: 'price', ids: 'bitcoin,ethereum,solana,binancecoin,ripple,cardano', vs_currency: 'usd' }
     ).catch(() => null)
 
-    const yfPromise = registry.fetchOne<any[]>(
+    const yfPromise = registry.fetchOne<Record<string, unknown>[]>(
       'yahoo-finance',
       { action: 'quote', symbols: '^JKSE,^GSPC,USDIDR=X,GC=F' }
     ).catch(() => null)
 
-    const emPromise = registry.fetchOne<any>(
+    const emPromise = registry.fetchOne<Record<string, unknown>>(
       'eastmoney',
       { action: 'get' }
     ).catch(() => null)
@@ -47,14 +47,15 @@ export async function GET() {
 
     if (yfResult?.data && Array.isArray(yfResult.data)) {
       for (const item of yfResult.data) {
-        let sym = item.symbol
+        const rec = item as Record<string, unknown>
+        let sym = String(rec.symbol ?? '')
         if (sym === '^JKSE') sym = 'IHSG'
         if (sym === '^GSPC') sym = 'S&P 500'
         if (sym === 'USDIDR=X') sym = 'USD/IDR'
         if (sym === 'GC=F') sym = 'GOLD'
         
-        const price = item.regularMarketPrice
-        const changePct = item.regularMarketChangePercent
+        const price = rec.regularMarketPrice as number | undefined
+        const changePct = rec.regularMarketChangePercent as number | undefined
         tickers.push({
           symbol: sym,
           price: price ? fmtPriceRaw(price, sym === 'USD/IDR' ? 0 : 2) : '—',
@@ -64,21 +65,24 @@ export async function GET() {
       }
     }
 
-    if (emResult?.data?.data?.diff) {
-      const aShares = emResult.data.data.diff
-      if (aShares && aShares.length > 0) {
+    const emData = emResult?.data as Record<string, unknown> | undefined
+    const emInner = emData?.data as Record<string, unknown> | undefined
+    if (emInner?.diff && Array.isArray(emInner.diff)) {
+      const aShares = emInner.diff as Record<string, unknown>[]
+      if (aShares.length > 0) {
          // Add Shanghai Composite or top A-share just as an example
          const top = aShares[0]
          if (top) {
            tickers.push({
              symbol: 'CSI300 (EastMoney)',
              price: String(top.f2),
-             change: fmtChange(top.f3),
-             positive: top.f3 >= 0
+             change: fmtChange(top.f3 as number),
+             positive: (top.f3 as number) >= 0
            })
          }
       }
     }
+
 
     const r = apiSuccess({ tickers })
     r.headers.set('Cache-Control', 'public, max-age=15, stale-while-revalidate=30')

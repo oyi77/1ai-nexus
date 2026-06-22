@@ -78,15 +78,16 @@ export function LiveFeedPanel() {
       }
 
       setItems(feedItems)
-    } catch {
-      // Silent — keep existing items
+    } catch (err) {
+      console.warn('[LiveFeedPanel] Feed fetch failed:', err)
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    fetchFeed()
+    const invoke = () => fetchFeed()
+    invoke()
     const id = setInterval(fetchFeed, 60_000)
     return () => clearInterval(id)
   }, [fetchFeed])
@@ -145,6 +146,7 @@ function formatTime(iso: string): string {
     const d = new Date(iso)
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   } catch {
+    // Expected: invalid ISO strings return fallback display
     return '—:—'
   }
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { Bell, Search, Wallet, User } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export function TopNav() {
   return (

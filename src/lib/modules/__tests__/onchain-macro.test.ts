@@ -1,12 +1,11 @@
 // ─────────────────────────────────────────────────────────────
 // On-Chain Macro Metrics Tests
 // ─────────────────────────────────────────────────────────────
-import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
   buildOnchainMacro,
   getLatestMacro,
   resetMacroCache,
-  type OnchainMacro,
 } from '../derived/onchain-macro'
 
 // We test buildOnchainMacro (pure) + caching logic of getLatestMacro.

@@ -2,14 +2,14 @@ import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../typ
 import { TTL } from '../types'
 import { cachedFetch } from '../fetch-with-cache'
 
-async function fetchEonet(params: FetchParams): Promise<unknown> {
+async function fetchEonet(_params: FetchParams): Promise<unknown> {
   const url = 'https://eonet.gsfc.nasa.gov/api/v3/events?limit=50&status=open'
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
   if (!res.ok) throw new Error(`NASA EONET: ${res.status}`)
   return res.json()
 }
 
-const module: DataModule = {
+const dataModule: DataModule = {
   id: 'nasa-eonet',
   name: 'NASA EONET Events',
   category: 'macro',
@@ -29,4 +29,4 @@ const module: DataModule = {
     return cachedFetch<T>('nasa-eonet', params, TTL.MACRO_DATA, () => fetchEonet(params) as Promise<T>)
   },
 }
-export default module
+export default dataModule

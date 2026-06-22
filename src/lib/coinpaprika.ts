@@ -17,7 +17,7 @@ async function cpFetch<T>(path: string, cacheSec = 60): Promise<T> {
 
 // ─── Raw API types (matches actual CoinPaprika response) ───
 
-export interface RawTicker {
+interface RawTicker {
   id: string;
   name: string;
   symbol: string;
@@ -74,7 +74,7 @@ export interface Ticker {
   maxSupply: number | null;
 }
 
-export function mapTicker(raw: RawTicker): Ticker {
+function mapTicker(raw: RawTicker): Ticker {
   const q = raw.quotes.USD;
   return {
     id: raw.id,
@@ -132,7 +132,7 @@ export async function getTicker(coinId: string): Promise<Ticker> {
 
 // ─── Coins List ────────────────────────────────────────────
 
-export interface CoinSummary {
+interface CoinSummary {
   id: string;
   name: string;
   symbol: string;

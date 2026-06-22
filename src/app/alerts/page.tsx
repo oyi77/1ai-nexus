@@ -40,7 +40,7 @@ export default function AlertsPage() {
     try {
       // Fetch real alerts from API
       const res = await fetch('/api/v1/alerts')
-      const data = await res.json()
+      const _data = await res.json()
 
       // Generate sample rules
       setRules([
@@ -67,7 +67,8 @@ export default function AlertsPage() {
   }, [])
 
   useEffect(() => {
-    fetchAlerts()
+    const invoke = () => fetchAlerts()
+    invoke()
     const interval = setInterval(fetchAlerts, 30_000)
     return () => clearInterval(interval)
   }, [fetchAlerts])

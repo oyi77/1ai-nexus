@@ -6,7 +6,7 @@ export async function GET() {
   const registry = registerAllModules()
 
   try {
-    const result = await registry.fetchOne<any>(
+    const result = await registry.fetchOne<Record<string, unknown>>(
       'sectors-app',
       { action: 'indeks' }
     )

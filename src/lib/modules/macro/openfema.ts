@@ -2,7 +2,7 @@ import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../typ
 import { TTL } from '../types'
 import { cachedFetch } from '../fetch-with-cache'
 
-async function fetchOpenFema(params: FetchParams): Promise<unknown> {
+async function fetchOpenFema(_params: FetchParams): Promise<unknown> {
   const url = 'https://www.fema.gov/api/open/v2/DisasterDeclarationsSummaries?$top=25&$orderby=incidentBeginDate%20desc&$format=json'
   const res = await fetch(url, {
     headers: { 'User-Agent': 'NEXUS-T/1.0' },
@@ -12,7 +12,7 @@ async function fetchOpenFema(params: FetchParams): Promise<unknown> {
   return res.json()
 }
 
-const module: DataModule = {
+const dataModule: DataModule = {
   id: 'openfema',
   name: 'OpenFEMA Disasters',
   category: 'macro',
@@ -32,4 +32,4 @@ const module: DataModule = {
     return cachedFetch<T>('openfema', params, TTL.MACRO_DATA, () => fetchOpenFema(params) as Promise<T>)
   },
 }
-export default module
+export default dataModule

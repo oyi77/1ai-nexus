@@ -13,7 +13,7 @@ async function fetchPyPI(params: FetchParams): Promise<unknown> {
   return res.json()
 }
 
-const module: DataModule = {
+const dataModule: DataModule = {
   id: 'pypi-stats',
   name: 'PyPI Stats',
   category: 'sentiment',
@@ -33,4 +33,4 @@ const module: DataModule = {
     return cachedFetch<T>('pypi-stats', params, TTL.MACRO_DATA, () => fetchPyPI(params) as Promise<T>)
   },
 }
-export default module
+export default dataModule

@@ -20,6 +20,7 @@ interface Congestion {
   level: string
   label: string
   color: string
+  description?: string
 }
 
 interface MempoolStatsResponse {
@@ -27,7 +28,7 @@ interface MempoolStatsResponse {
   vsize: number
   totalFee: number
   avgFee: number
-  fees: FeeLevel[]
+  fees: Record<string, number>
   congestion: Congestion
 }
 
@@ -42,9 +43,10 @@ interface WhaleTx {
 }
 
 interface WhaleResponse {
-  data: WhaleTx[]
+  transactions: WhaleTx[]
   count: number
   threshold: string
+  note?: string
 }
 
 // ── Helpers ───────────────────────────────────────────────
@@ -102,9 +104,17 @@ export default function MempoolPage() {
       interval: 10_000,
     })
 
-  const fees = statsData?.fees ?? []
-  const congestion = statsData?.congestion
-  const whales = whaleData?.data ?? []
+  const fees: FeeLevel[] = statsData?.fees
+    ? Object.entries(statsData.fees as Record<string, number>).map(([key, rate]) => ({
+        label: key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()),
+        range: key.replace('Fee', ''),
+        rate,
+      }))
+    : []
+  const congestion: Congestion | undefined = statsData?.congestion
+    ? { ...statsData.congestion, label: statsData.congestion.label ?? statsData.congestion.description ?? statsData.congestion.level }
+    : undefined
+  const whales: WhaleTx[] = whaleData?.transactions ?? []
 
   const whaleColumns: Column<WhaleTx>[] = useMemo(() => [
     {

@@ -121,7 +121,8 @@ export default function DashboardPage() {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    const invoke = () => fetchData()
+    invoke()
     const interval = setInterval(fetchData, 30_000)
     return () => clearInterval(interval)
   }, [fetchData])

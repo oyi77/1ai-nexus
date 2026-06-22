@@ -35,7 +35,7 @@ export default function DeFiTvlPage() {
     }
   }, [chain])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { const invoke = () => fetchData(); invoke() }, [fetchData])
 
   return (
     <TerminalShell>

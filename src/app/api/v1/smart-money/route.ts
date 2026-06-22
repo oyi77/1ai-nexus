@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 export const dynamic = "force-dynamic";
 
 import { NextRequest } from "next/server";
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     if (!SMART_MONEY_SORT_FIELDS.has(sort)) return apiError(`Invalid sort field`, 400);
     if (!["asc", "desc"].includes(order)) return apiError(`Invalid order`, 400);
 
-    const where: any = {};
+    const where: Prisma.SmartMoneyWalletWhereInput = {};
     if (category) where.category = category;
 
     const [wallets, total] = await Promise.all([

@@ -100,7 +100,7 @@ export async function getWhalePendingTxs(): Promise<WhalePendingTx[]> {
   if (cached) return cached
 
   const txs = await getRecentMempoolTxs()
-  const now = Date.now() / 1000
+  const _now = Date.now() / 1000
 
   // Estimate BTC price from fee histogram (rough: assume ~$100K for threshold)
   // We filter by satoshi value directly — WHALE_THRESHOLD_SAT ≈ 10 BTC
@@ -152,7 +152,7 @@ export function getCongestionLevel(txCount: number): CongestionLevel {
 
 // ── Helpers ─────────────────────────────────────────────────
 
-let cachedBtcPrice = 100_000 // fallback BTC price for USD estimates
+const cachedBtcPrice = 100_000 // fallback BTC price for USD estimates
 
 function estimateBtcPrice(): number {
   // Refresh price every 5 minutes from the fee market signals

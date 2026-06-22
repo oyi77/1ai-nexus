@@ -1,8 +1,9 @@
+import { Prisma } from '@prisma/client'
 export const dynamic = "force-dynamic";
 
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { apiSuccess, apiError, apiPaginated } from "@/lib/api/response";
+import { apiError, apiPaginated } from "@/lib/api/response";
 
 import { checkRateLimit } from "@/lib/api/rate-limit";
 
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
     if (!TOKEN_SORT_FIELDS.has(sort)) return apiError(`Invalid sort field`, 400);
     if (!["asc", "desc"].includes(order)) return apiError(`Invalid order`, 400);
 
-    const where: any = {};
+    const where: Prisma.TokenWhereInput = {};
     if (chain) where.chain = chain;
 
     const [tokens, total] = await Promise.all([
