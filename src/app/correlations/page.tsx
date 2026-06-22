@@ -27,8 +27,8 @@ export default function CorrelationsPage() {
   const columns: Column<CorrelationData>[] = [
     { key: 'pair', header: 'Pair', width: 150, render: r => <span className="text-teal-vivid font-bold">{r.pair}</span> },
     { key: 'correlation', header: 'Correlation', width: 100, align: 'right', render: r => (
-      <span className={`font-mono font-bold ${r.correlation > 0.5 ? 'text-data-bull' : r.correlation < -0.5 ? 'text-data-bear' : 'text-data-neutral'}`}>
-        {r.correlation.toFixed(3)}
+      <span className={`font-mono font-bold ${(r.correlation ?? 0) > 0.5 ? 'text-data-bull' : (r.correlation ?? 0) < -0.5 ? 'text-data-bear' : 'text-data-neutral'}`}>
+        {(r.correlation ?? 0).toFixed(3)}
       </span>
     )},
     { key: 'significance', header: 'Strength', width: 80, render: r => (
@@ -38,7 +38,7 @@ export default function CorrelationsPage() {
         'bg-data-neutral/20 text-data-neutral'
       }`}>{r.significance}</span>
     )},
-    { key: 'pValue', header: 'p-value', width: 80, align: 'right', render: r => <span className="text-text-muted font-mono">{r.pValue.toFixed(4)}</span> },
+    { key: 'pValue', header: 'p-value', width: 80, align: 'right', render: r => <span className="text-text-muted font-mono">{(r.pValue ?? 0).toFixed(4)}</span> },
     { key: 'sampleSize', header: 'N', width: 50, align: 'right', render: r => <span className="text-text-secondary">{r.sampleSize}</span> },
     { key: 'lag', header: 'Lag', width: 50, align: 'right', render: r => <span className="text-text-muted">{r.lag}d</span> },
     { key: 'description', header: 'Insight', width: 300, render: r => <span className="text-[10px] text-text-secondary line-clamp-2">{r.description}</span> },
