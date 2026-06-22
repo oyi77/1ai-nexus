@@ -112,12 +112,17 @@ export function DataTable<T extends Record<string, unknown>>({
       style={{ maxHeight: maxHeight || undefined }}
       onScroll={handleScroll}
     >
-      <table className="w-full border-collapse min-w-[600px] md:min-w-0" style={{ minHeight: virtualScroll ? totalHeight : undefined }}>
-        <thead className={stickyHeader ? 'sticky top-0 z-10' : ''}>
-          <tr className="bg-bg-raised border-b border-bg-border">
+      <table role="table" className="w-full border-collapse min-w-[600px] md:min-w-0" style={{ minHeight: virtualScroll ? totalHeight : undefined }}>
+
+        <thead role="rowgroup" className={stickyHeader ? 'sticky top-0 z-10' : ''}>
+
+          <tr role="row" className="bg-bg-raised border-b border-bg-border">
+
             {columns.map(col => (
               <th
                 key={col.key}
+                role="columnheader"
+                aria-sort={sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                 className={`px-2 py-1.5 text-[10px] font-mono font-medium text-text-muted uppercase tracking-wider
                   ${alignClass(col.align)}
                   ${sortable && col.sortable !== false ? 'cursor-pointer hover:text-text-secondary select-none' : ''}`}
@@ -131,14 +136,17 @@ export function DataTable<T extends Record<string, unknown>>({
                   )}
                 </span>
               </th>
+
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody role="rowgroup">
+
           {visibleRows.map((row, i) => {
             const actualIndex = startIndex + i
             return (
               <tr
+                role="row"
                 key={actualIndex}
                 className={`border-b border-bg-border/50 hover:bg-bg-raised/50 transition-colors
                   ${onRowClick ? 'cursor-pointer' : ''}`}
@@ -147,9 +155,11 @@ export function DataTable<T extends Record<string, unknown>>({
               >
                 {columns.map(col => (
                   <td
+                    role="cell"
                     key={col.key}
                     className={`px-2 text-[11px] font-mono text-text-primary ${alignClass(col.align)}`}
                   >
+
                     {col.render ? col.render(row, actualIndex) : String(row[col.key] ?? '')}
                   </td>
                 ))}

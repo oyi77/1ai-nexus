@@ -7,13 +7,15 @@ export default function ForexPage() {
   const [rates, setRates] = useState<Record<string, number> | null>(null)
   const [base, setBase] = useState('USD')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    setError(null)
     setLoading(true)
     fetch(`/api/v1/modules/fetch?module=exchangerate-api&base=${base}`)
       .then(r => r.json())
       .then(d => { setRates(d.data?.rates ?? null); setLoading(false) })
-      .catch(() => setLoading(false))
+      .catch((err) => { setLoading(false); setError((err as Error).message) })
   }, [base])
 
   const majorPairs = ['EUR', 'GBP', 'JPY', 'CHF', 'CNY', 'AUD', 'CAD', 'NZD', 'SGD', 'HKD']
@@ -39,6 +41,7 @@ export default function ForexPage() {
             ))}
           </div>
         </div>
+        {error && <div className="text-data-bear text-[11px] font-mono p-4">Error: {error}</div>}
 
         {loading ? (
           <div className="text-text-dim text-xs">Loading FX rates...</div>

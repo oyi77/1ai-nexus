@@ -36,9 +36,12 @@ export function Panel({
 
   return (
     <div
+      role="region"
+      aria-label={title}
       className={`flex flex-col bg-bg-panel border border-bg-border overflow-hidden ${className}`}
       style={{ maxHeight: maxHeight || undefined }}
     >
+
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-bg-border shrink-0">
         <div className="flex items-center gap-2 min-w-0">

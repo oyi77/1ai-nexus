@@ -209,7 +209,8 @@ export default function DashboardPage() {
         {/* ── KPI Strip ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-1">
           {kpis.map((kpi, i) => (
-            <div key={i} className="bg-bg-panel border border-bg-border px-3 py-2">
+            <div key={i} aria-label={`${kpi.label}: ${kpi.value}`} className="bg-bg-panel border border-bg-border px-3 py-2">
+
               <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider mb-1">
                 {kpi.label}
               </div>
@@ -267,7 +268,8 @@ export default function DashboardPage() {
           liveStatus={feedStatus}
           maxHeight={300}
         >
-          <div className="space-y-0">
+          <div role="status" aria-live="polite" className="space-y-0">
+
             {activity.map((event) => (
               <div
                 key={event.id}

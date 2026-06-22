@@ -12,6 +12,7 @@ const COMMODITIES = [
 
 export default function CommoditiesPage() {
   const [quotes, setQuotes] = useState<Record<string, { price: number; change: number }>>({})
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -26,13 +27,14 @@ export default function CommoditiesPage() {
         setQuotes(map)
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch((err) => { setLoading(false); setError((err as Error).message) })
   }, [])
 
   return (
     <NexusLayout>
       <div className="p-6 space-y-6">
         <h1 className="text-xl font-bold font-mono text-accent-cyan">COMMODITIES</h1>
+        {error && <div className="text-data-bear text-[11px] font-mono p-4">Error: {error}</div>}
 
         {loading ? (
           <div className="text-text-dim text-xs">Loading Yahoo Finance RE data...</div>

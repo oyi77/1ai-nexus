@@ -118,12 +118,18 @@ export function NexusLayout({ children }: NexusLayoutProps) {
         {mobileMenuOpen && (
           <div
             className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation menu"
             onClick={() => setMobileMenuOpen(false)}
           />
+
         )}
 
         {/* ── SideNav — Desktop: fixed sidebar, Mobile: slide-out drawer ── */}
         <nav
+          role="navigation"
+          aria-label="Main navigation"
           className={`
             flex flex-col border-r border-bg-border bg-bg-panel shrink-0 overflow-y-auto scrollbar-thin transition-all duration-200 z-50
             lg:relative lg:translate-x-0
@@ -132,6 +138,7 @@ export function NexusLayout({ children }: NexusLayoutProps) {
           `}
           style={{ width: collapsed ? 48 : 200 }}
         >
+
           {/* Nav Items */}
           <div className="flex-1 py-1">
             {NAV_ITEMS.map(item => {

@@ -36,6 +36,7 @@ export default function StablecoinsPage() {
           <div><h1 className="text-[20px] font-head font-bold text-text-primary">Stablecoins</h1><p className="text-[11px] text-text-muted font-mono">Peg stability and market data</p></div>
           <LiveDot status={status} label />
         </div>
+        {status === 'error' && <div className="text-data-bear text-[11px] font-mono p-4">Error: Failed to fetch stablecoin data</div>}
         <Panel title="Stablecoin Monitor" subtitle={`${stablecoins.length} tracked`} liveStatus={status} onRefresh={refresh} maxHeight={600}>
           <DataTable columns={columns} data={stablecoins} sortable rowHeight={28} emptyState={<div className="text-text-muted text-[11px] p-4">Loading...</div>} />
         </Panel>

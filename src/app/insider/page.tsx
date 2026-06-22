@@ -113,6 +113,7 @@ export default function InsiderPage() {
           </div>
           <LiveDot status={status} label />
         </div>
+        {status === 'error' && <div className="text-data-bear text-[11px] font-mono p-4">Error: Failed to fetch insider signals</div>}
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-1">

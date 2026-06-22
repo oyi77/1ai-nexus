@@ -8,6 +8,7 @@ const INDICES = ['^GSPC', '^IXIC', '^DJI', '^VIX']
 
 export default function EquitiesPage() {
   const [quotes, setQuotes] = useState<Record<string, { price: number; change: number; name: string }>>({})
+  const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -22,13 +23,14 @@ export default function EquitiesPage() {
         setQuotes(map)
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch((err) => { setLoading(false); setError((err as Error).message) })
   }, [])
 
   return (
     <NexusLayout>
       <div className="p-6 space-y-6">
         <h1 className="text-xl font-bold font-mono text-accent-cyan">EQUITIES — CRYPTO-ADJACENT</h1>
+        {error && <div className="text-data-bear text-[11px] font-mono p-4">Error: {error}</div>}
 
         {/* Indices */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
