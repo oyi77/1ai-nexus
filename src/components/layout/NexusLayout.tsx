@@ -35,6 +35,8 @@ const NAV_ITEMS = [
   { label: 'Macro',        href: '/macro',          icon: Globe },
   { label: 'Weather',      href: '/weather',        icon: BarChart3 },
   { label: 'PnL Tracker',  href: '/pnl',            icon: BarChart3 },
+  { label: 'Yields',       href: '/yields',         icon: Activity },
+  { label: 'Trending',     href: '/trending',       icon: TrendingUp },
   { label: 'Basis',        href: '/basis',          icon: Activity },
   { label: 'Calendar',     href: '/calendar',       icon: Globe },
   { label: 'Watchlist',    href: '/watchlist',      icon: Eye },
