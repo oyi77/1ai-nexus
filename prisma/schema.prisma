@@ -75,15 +75,28 @@ model TokenHolding {
 }
 
 model Transaction {
-  id        String @id @default(cuid())
-  walletId  String
-  wallet    Wallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
-  txHash    String
-  value     Float
-  timestamp DateTime
+  id            String   @id @default(cuid())
+  walletId      String?
+  wallet        Wallet?  @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  chain         String   @default("ethereum")
+  txHash        String
+  from          String?
+  to            String?
+  blockNumber   BigInt?
+  value         Float    @default(0)
+  amountRaw     String?
+  amountUsd     Float    @default(0)
+  tokenSymbol   String?
+  tokenAddress  String?
+  dex           String?
+  isMEV         Boolean  @default(false)
+  approval      Boolean  @default(false)
+  timestamp     DateTime
 
-  @@unique([walletId, txHash])
+  @@unique([chain, txHash])
   @@index([walletId, timestamp(sort: Desc)])
+  @@index([chain, timestamp(sort: Desc)])
+  @@index([amountUsd(sort: Desc)])
 }
 
 model PredictionMarket {

@@ -57,7 +57,7 @@ function connectSolana() {
     solReconnectAttempts = 0;
     // Get tracked SOL wallets
     const wallets = await prisma.wallet.findMany({
-      where: { chain: "sol" },
+      where: { chain: { in: ["solana", "sol"] } },
       select: { address: true },
     });
 
@@ -103,7 +103,7 @@ function connectSolana() {
 
         // Update checkpoint
         await prisma.indexerCheckpoint.upsert({
-          where: { chain: "sol" },
+          where: { chain: { in: ["solana", "sol"] } },
           update: { updatedAt: new Date() },
           create: { chain: "sol", lastBlock: BigInt(0) },
         });

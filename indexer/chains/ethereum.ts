@@ -56,8 +56,16 @@ function connectChain(chain: Chain) {
     resetReconnectAttempts(chain);
 
     // Get tracked wallet addresses
+    // Map short chain IDs to full names used in DB
+    const CHAIN_ALIASES: Record<string, string[]> = {
+      eth: ['ethereum', 'eth', 'multi-chain'],
+      arb: ['arbitrum', 'arb'],
+      base: ['base'],
+      op: ['optimism', 'op'],
+    };
+    const chainNames = CHAIN_ALIASES[chain] ?? [chain];
     const wallets = await prisma.wallet.findMany({
-      where: { chain },
+      where: { chain: { in: chainNames } },
       select: { address: true },
     });
 

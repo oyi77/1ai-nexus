@@ -164,8 +164,120 @@ async function storeTx(tx: EnrichedTx) {
       dex: tx.dex,
       isMEV: tx.isMEV,
       approval: tx.approval,
-    } as any,
+    },
   });
+}
+
+// ─── DecodedTransaction (used by ethereum.ts listener) ─────────
+
+export interface DecodedTransaction {
+  hash: string;
+  from: string;
+  to: string;
+  chain: string;
+  walletId?: string;
+  decodedType: string;
+  amountUsd: number;
+  amountRaw: string;
+  tokenSymbol: string;
+  tokenAddress: string;
+  blockNumber: bigint;
+  timestamp: Date;
+  isMEV: boolean;
+  approval: boolean;
+  value: string;
+  input: string;
+}
+
+/**
+ * Decode a raw transaction log into a DecodedTransaction.
+ * Called by the ethereum chain listener when wallet activity is detected.
+ */
+export async function decodeTransaction(raw: {
+  hash: string;
+  from: string;
+  to: string;
+  chain: string;
+  value: string;
+  timestamp: number;
+  input: string;
+}): Promise<DecodedTransaction> {
+  // Look up wallet in DB
+  const wallet = await prisma.wallet.findFirst({
+    where: {
+      OR: [
+        { address: { equals: raw.from, mode: 'insensitive' } },
+        { address: { equals: raw.to, mode: 'insensitive' } },
+      ],
+    },
+  });
+
+  // Decode transaction type from input data
+  let decodedType = 'transfer';
+  if (raw.input && raw.input.length > 10) {
+    const selector = raw.input.slice(0, 10);
+    // Common DEX selectors
+    if (['0x38ed1739', '0x8803dbee', '0x7ff36ab5', '0x18cbafe5', '0xfb3bdb41'].includes(selector)) {
+      decodedType = 'swap';
+    } else if (['0x095ea7b3', '0xd505accf'].includes(selector)) {
+      decodedType = 'approval';
+    } else if (['0xa9059cbb', '0x23b872dd'].includes(selector)) {
+      decodedType = 'transfer';
+    }
+  }
+
+  const amountUsd = parseFloat(raw.value) / 1e18 * 0; // Price lookup done later by enrichTx
+
+  return {
+    hash: raw.hash,
+    from: raw.from,
+    to: raw.to,
+    chain: raw.chain,
+    walletId: wallet?.id,
+    decodedType,
+    amountUsd,
+    amountRaw: raw.value,
+    tokenSymbol: 'ETH',
+    tokenAddress: '',
+    blockNumber: BigInt(0),
+    timestamp: new Date(raw.timestamp * 1000),
+    isMEV: false,
+    approval: decodedType === 'approval',
+    value: raw.value,
+    input: raw.input,
+  };
+}
+
+/**
+ * Store a decoded transaction to the database.
+ * Called by the ethereum chain listener after decoding.
+ */
+export async function storeTransaction(tx: DecodedTransaction): Promise<void> {
+  try {
+    await prisma.transaction.create({
+      data: {
+        walletId: tx.walletId ?? undefined,
+        chain: tx.chain,
+        txHash: tx.hash,
+        from: tx.from,
+        to: tx.to,
+        blockNumber: tx.blockNumber,
+        value: parseFloat(tx.value) / 1e18,
+        amountRaw: tx.amountRaw,
+        amountUsd: tx.amountUsd,
+        tokenSymbol: tx.tokenSymbol,
+        tokenAddress: tx.tokenAddress,
+        isMEV: tx.isMEV,
+        approval: tx.approval,
+        timestamp: tx.timestamp,
+      },
+    });
+  } catch (err) {
+    // Duplicate txHash — already stored
+    if ((err as { code?: string }).code !== 'P2002') {
+      console.error('[storeTransaction] failed:', (err as Error).message);
+    }
+  }
 }
 
 export async function getSmartMoneyWallets(limit = 50) {

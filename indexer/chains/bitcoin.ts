@@ -38,7 +38,7 @@ async function pollBitcoin() {
   try {
     // Get tracked BTC wallets
     const wallets = await prisma.wallet.findMany({
-      where: { chain: "btc" },
+      where: { chain: { in: ["bitcoin", "btc"] } },
       select: { address: true },
     });
 
@@ -57,7 +57,7 @@ async function pollBitcoin() {
     const tipHeight = await fetchTipHeight();
     if (tipHeight) {
       await prisma.indexerCheckpoint.upsert({
-        where: { chain: "btc" },
+        where: { chain: { in: ["bitcoin", "btc"] } },
         update: { lastBlock: BigInt(tipHeight), updatedAt: new Date() },
         create: { chain: "btc", lastBlock: BigInt(tipHeight) },
       });
