@@ -1,4 +1,5 @@
 "use client"
+import { LiveTerminalFeed } from '@/components/features/LiveTerminalFeed'
 
 import { useState, useEffect, useCallback } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
@@ -7,7 +8,6 @@ import { DataTable, type Column } from '@/components/shell/DataTable'
 import { PriceTag } from '@/components/primitives/PriceTag'
 import { DeltaBadge } from '@/components/primitives/DeltaBadge'
 import { LiveDot } from '@/components/primitives/LiveDot'
-import { EntityLabel } from '@/components/primitives/EntityLabel'
 
 interface KPIData {
   label: string
@@ -271,6 +271,13 @@ export default function DashboardPage() {
             />
           </Panel>
         </div>
+
+        {/* Live Terminal Feed */}
+        <Panel title="LIVE TERMINAL FEED" subtitle="Aggregated real-time intelligence from all sources" liveStatus={feedStatus}>
+          <div className="h-[300px]">
+            <LiveTerminalFeed />
+          </div>
+        </Panel>
       </div>
     </NexusLayout>
   )
