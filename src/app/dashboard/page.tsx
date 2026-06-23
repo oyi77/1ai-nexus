@@ -37,10 +37,13 @@ interface DexTrending {
 }
 
 interface WhaleMove {
-  txid: string
-  valueBtc: number
-  valueUsd: number
-  block: number
+  id: string
+  amount: number
+  symbol: string
+  usd: number
+  from: string
+  to: string
+  link?: string
   [key: string]: unknown
 }
 
@@ -75,7 +78,7 @@ export default function DashboardPage() {
       const [derivRes, fgRes, whaleRes, alphaRes, newsRes, dexRes] = await Promise.allSettled([
         fetch('/api/v1/derivatives?limit=10').then(r => r.json()),
         fetch('/api/v1/fear-greed').then(r => r.json()),
-        fetch('/api/v1/mempool?action=whale').then(r => r.json()),
+        fetch('/api/v1/whale-alert').then(r => r.json()),
         fetch('/api/v1/alpha-feed?limit=10').then(r => r.json()),
         fetch('/api/v1/news?category=crypto&limit=10').then(r => r.json()),
         fetch('/api/v1/dex/trending?network=solana').then(r => r.json()),
@@ -90,7 +93,7 @@ export default function DashboardPage() {
         { label: 'BTC Price', value: `$${(btcPrice ?? 0).toLocaleString()}`, delta: deriv?.topPairs?.[0]?.priceChange24h ?? 0 },
         { label: 'Fear & Greed', value: String(fgScore), suffix: '/100' },
         { label: 'Global Crypto', value: '$2.5T' }, // Can be replaced with actual global market cap
-        { label: 'Whale TXs', value: String(whaleRes.status === 'fulfilled' ? (whaleRes.value?.data?.transactions?.length ?? 0) : 0) },
+        { label: 'Whale Alerts', value: String(whaleRes.status === 'fulfilled' ? (whaleRes.value?.data?.items?.length ?? 0) : 0) },
       ])
 
       if (newsRes.status === 'fulfilled' && Array.isArray(newsRes.value?.data?.items)) {
@@ -113,14 +116,16 @@ export default function DashboardPage() {
           priceChange24h: Number(d.priceChange24h ?? 0),
         })))
       }
-
       const whaleData = whaleRes.status === 'fulfilled' ? whaleRes.value?.data : null
-      if (whaleData?.transactions) {
-        setWhaleMoves(whaleData.transactions.slice(0, 10).map((w: Record<string, unknown>) => ({
-          txid: String(w.txid ?? ''),
-          valueBtc: Number(w.valueBtc ?? 0),
-          valueUsd: Number(w.valueUsd ?? 0),
-          block: Number(w.block ?? 0),
+      if (whaleData?.items) {
+        setWhaleMoves(whaleData.items.slice(0, 10).map((w: Record<string, unknown>) => ({
+          id: String(w.id ?? ''),
+          amount: Number(w.amount ?? 0),
+          symbol: String(w.symbol ?? ''),
+          usd: Number(w.usd ?? 0),
+          from: String(w.from ?? ''),
+          to: String(w.to ?? ''),
+          link: w.link ? String(w.link) : undefined,
         })))
       }
 
@@ -138,7 +143,7 @@ export default function DashboardPage() {
       }
 
       setFeedStatus('live')
-    } catch {
+    } catch (e) {
       setFeedStatus('error')
     }
   }, [])
@@ -167,9 +172,24 @@ export default function DashboardPage() {
   ]
 
   const whaleColumns: Column<WhaleMove>[] = [
-    { key: 'txid', header: 'Onchain Flow (Arkham)', width: 140, render: r => <span className="text-text-muted font-mono text-[10px]">{String(r.txid).slice(0, 16)}...</span> },
-    { key: 'valueBtc', header: 'BTC', width: 80, align: 'right', render: r => <span className="text-teal-vivid font-bold tabular-nums">{(r.valueBtc ?? 0).toFixed(2)} ₿</span> },
-    { key: 'valueUsd', header: 'USD', width: 80, align: 'right', render: r => <PriceTag value={r.valueUsd} size="sm" /> },
+    { key: 'from', header: 'Multi-Chain Flow (Whale Alert)', width: 250, render: r => (
+      <div className="flex items-center space-x-1 truncate">
+        <span className="text-text-primary text-[11px] truncate max-w-[100px]">{r.from}</span>
+        <span className="text-text-muted text-[10px]">→</span>
+        <span className="text-text-primary text-[11px] truncate max-w-[100px]">{r.to}</span>
+        {r.link && (
+          <a href={r.link} target="_blank" rel="noopener noreferrer" className="ml-1 text-teal-vivid hover:underline">
+            ↗
+          </a>
+        )}
+      </div>
+    )},
+    { key: 'amount', header: 'Amount', width: 100, align: 'right', render: r => (
+      <span className="text-teal-vivid font-bold tabular-nums text-[11px]">
+        {r.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[9px] text-text-muted">{r.symbol}</span>
+      </span>
+    )},
+    { key: 'usd', header: 'USD', width: 80, align: 'right', render: r => <PriceTag value={r.usd} size="sm" /> },
   ]
 
   const activityColumns: Column<ActivityEvent>[] = [

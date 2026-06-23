@@ -12,6 +12,7 @@ import {
 import { LiveDot } from '../primitives/LiveDot'
 import { CommandBar } from './CommandBar'
 import { NotificationTray } from './NotificationTray'
+import { TickerStrip } from './TickerStrip'
 import { PwaInstallPrompt } from './PwaInstallPrompt'
 const NAV_ITEMS = [
   { label: '⚡ Alpha Feed',  href: '/alpha',          icon: Zap },
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { label: '🐋 Whale Clusters', href: '/whale-cluster', icon: Building2 },
   { label: 'Tokens',       href: '/tokens',        icon: Coins },
   { label: 'Entities',     href: '/entities',       icon: Building2 },
+  { label: 'Knowledge Graph', href: '/graph',       icon: Eye },
   { label: 'Smart Money',  href: '/smart-money',    icon: Zap },
   { label: 'Derivatives',  href: '/derivatives',    icon: TrendingUp },
   { label: 'Liquidations', href: '/liquidations',   icon: Activity },
@@ -75,6 +77,7 @@ export function NexusLayout({ children }: NexusLayoutProps) {
   return (
     <div className="h-screen flex flex-col bg-bg-base text-text-primary overflow-hidden">
       {/* ── TopBar (48px) ── */}
+      <TickerStrip />
       <header className="flex items-center justify-between px-3 border-b border-bg-border bg-bg-panel shrink-0" style={{ height: 48 }}>
         {/* Left: Mobile menu + Logo + Search */}
         <div className="flex items-center gap-3">
