@@ -13,6 +13,7 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/data-sources",
   "/api/v1/defillama",
   "/api/v1/feed",
+  "/api/v1/dex/trending",
   "/api/v1/fear-greed",
   "/api/v1/feeds",
   "/api/v1/macro",
