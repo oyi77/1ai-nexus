@@ -27,7 +27,7 @@ interface InsiderConfig {
 }
 
 const DEFAULT_CONFIG: InsiderConfig = {
-  maxTxCount: 10,
+  maxTxCount: 20,
   minAmountUsd: 100_000,
   walletAgeDays: 30,
 }
