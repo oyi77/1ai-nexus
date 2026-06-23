@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import type { Mock } from 'vitest'
 
 // ─── SEC EDGAR tests ───────────────────────────────────────
 
@@ -204,7 +205,7 @@ describe('SEC EDGAR', () => {
       const { searchCompany } = await import('@/lib/dal/tradfi/sec-edgar')
       await searchCompany('test')
 
-      const callArgs = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0]
+      const callArgs = (globalThis.fetch as Mock).mock.calls[0]
       const headers = callArgs[1]?.headers as Record<string, string>
       expect(headers['User-Agent']).toContain('1ai-tracker')
       expect(headers['Accept']).toBe('application/json')
@@ -215,28 +216,30 @@ describe('SEC EDGAR', () => {
 // ─── FRED DAL wrapper tests ────────────────────────────────
 
 describe('FRED DAL wrapper', () => {
-  const originalEnv = process.env.FRED_API_KEY
-
-  afterEach(() => {
-    process.env.FRED_API_KEY = originalEnv
-  })
-
   describe('getFredSeriesData', () => {
-    it('throws when FRED_API_KEY is not set', async () => {
+    it('returns data without requiring FRED_API_KEY', async () => {
       delete process.env.FRED_API_KEY
 
       const { getFredSeriesData } = await import('@/lib/dal/tradfi/fred')
-      await expect(getFredSeriesData('FEDFUNDS')).rejects.toThrow('FRED_API_KEY not configured')
+      const result = await getFredSeriesData('FEDFUNDS')
+
+      expect(result).toHaveProperty('id', 'FEDFUNDS')
+      expect(result).toHaveProperty('title')
+      expect(result).toHaveProperty('observations')
+      expect(result.observations.length).toBeGreaterThan(0)
     })
   })
 
   describe('getFredLatestValue', () => {
-    it('returns null gracefully when FRED_API_KEY is not set', async () => {
+    it('returns a value without requiring FRED_API_KEY', async () => {
       delete process.env.FRED_API_KEY
 
       const { getFredLatestValue } = await import('@/lib/dal/tradfi/fred')
       const result = await getFredLatestValue('FEDFUNDS')
-      expect(result).toBeNull()
+
+      expect(result).not.toBeNull()
+      expect(result).toHaveProperty('date')
+      expect(result).toHaveProperty('value')
     })
   })
 

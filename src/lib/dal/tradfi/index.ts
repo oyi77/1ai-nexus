@@ -50,13 +50,11 @@ const fredSource: DalSource = {
   name: 'Federal Reserve Economic Data',
   domain: 'tradfi-macro',
   tier: 0,
-  requiresKey: 'FRED_API_KEY',
-  rateLimit: { maxRequests: 120, windowMs: 60_000 }, // 120/min free tier
+  rateLimit: { maxRequests: 30, windowMs: 60_000 }, // World Bank rate limit
   cacheTtlMs: 30 * 60 * 1000, // 30 minutes
   healthCheck: async () => {
-    if (!process.env.FRED_API_KEY) return false
     try {
-      const obs = await getFredLatestValue('FEDFUNDS')
+      const obs = await getFredLatestValue('UNRATE')
       return obs !== null
     } catch {
       return false

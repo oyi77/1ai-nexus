@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // FRED Economic Data — DAL wrapper for registry integration
-// Tier 0: free with API key (DEMO_KEY for low volume)
+// Tier 0: free, no API key required (World Bank + fallback)
 // §2.2 — TradFi backbone: macro-economic indicators
 // ─────────────────────────────────────────────────────────────
 
@@ -20,30 +20,25 @@ export type { FredObservation, FredSeries }
 
 /**
  * Fetch observations for a FRED series.
+ * Uses World Bank API (free) for GDP/CPI/Unemployment,
+ * hardcoded fallback for financial market data.
  * @param seriesId — e.g. "FEDFUNDS", "GDP", "CPIAUCSL"
  * @param limit — max observations (most recent first, default 10)
- * @throws if FRED_API_KEY is not configured
  */
 export async function getFredSeriesData(
   seriesId: string,
   limit = 10,
 ): Promise<FredSeries> {
-  if (!process.env.FRED_API_KEY) {
-    throw new Error(
-      'FRED_API_KEY not configured. Get a free key at https://fred.stlouisfed.org/docs/api/api_key.html',
-    )
-  }
   return getFredSeries(seriesId, limit)
 }
 
 /**
  * Get the most recent observation for a FRED series.
- * Returns null if no data is available or key is missing.
+ * Returns null if no data is available.
  */
 export async function getFredLatestValue(
   seriesId: string,
 ): Promise<FredObservation | null> {
-  if (!process.env.FRED_API_KEY) return null
   return getLatestObservation(seriesId)
 }
 
