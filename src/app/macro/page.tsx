@@ -6,8 +6,21 @@ import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { FearGreedGauge } from '@/components/features/FearGreedGauge'
 
+interface MacroIndicator {
+  id: string
+  name: string
+  category: string
+  latestValue: number
+  latestDate: string
+  previousValue: number
+  change: number
+  changePercent: number
+  unit: string
+  trend: string
+}
+
 interface MacroData {
-  indicators: Array<{ name: string; value: number; change: number; source: string }>
+  indicators: MacroIndicator[]
   yieldCurve: { spread10Y2Y: number; signal: string }
   summary: { gdpGrowth: number; inflationRate: number; unemploymentRate: number; fedRate: number }
 }
@@ -62,9 +75,9 @@ export default function MacroCommandCenter() {
               <div className="space-y-3 p-2">
                 {macro?.summary && (
                   <>
-                    <MacroRow label="Fed Rate" value={`${macro.summary.fedRate.toFixed(2)}%`} />
-                    <MacroRow label="US GDP Growth" value={`${macro.summary.gdpGrowth.toFixed(1)}%`} />
-                    <MacroRow label="US Inflation" value={`${macro.summary.inflationRate.toFixed(1)}%`} />
+                    <MacroRow label="Fed Rate" value={macro.summary.fedRate > 0 ? `${macro.summary.fedRate.toFixed(2)}%` : 'N/A'} />
+                    <MacroRow label="US GDP (Nominal)" value={macro.summary.gdpGrowth > 1000 ? `$${(macro.summary.gdpGrowth / 1000).toFixed(1)}T` : `${macro.summary.gdpGrowth.toFixed(1)}%`} />
+                    <MacroRow label="US CPI (Inflation)" value={macro.summary.inflationRate > 100 ? `${macro.summary.inflationRate.toFixed(1)} Index` : `${macro.summary.inflationRate.toFixed(1)}%`} />
                     <MacroRow label="US Unemployment" value={`${macro.summary.unemploymentRate.toFixed(1)}%`} />
                   </>
                 )}
@@ -90,13 +103,14 @@ export default function MacroCommandCenter() {
                   <div key={i} className="bg-bg-raised p-3 rounded border border-bg-border">
                     <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{ind.name}</div>
                     <div className="text-[20px] font-head font-bold text-text-primary tabular-nums">
-                      {ind.value.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      {ind.latestValue?.toLocaleString(undefined, { maximumFractionDigits: 2 }) ?? '—'}
+                      <span className="text-[10px] text-text-muted ml-1">{ind.unit}</span>
                     </div>
                     <div className="flex items-center justify-between mt-1">
-                      <span className={`text-[10px] font-mono font-bold ${ind.change >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
-                        {ind.change >= 0 ? '+' : ''}{ind.change.toFixed(2)}%
+                      <span className={`text-[10px] font-mono font-bold ${(ind.changePercent ?? 0) >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                        {(ind.changePercent ?? 0) >= 0 ? '+' : ''}{(ind.changePercent ?? 0).toFixed(2)}%
                       </span>
-                      <span className="text-[9px] font-mono text-text-muted">{ind.source}</span>
+                      <span className="text-[9px] font-mono text-text-muted">{ind.category} · {ind.latestDate}</span>
                     </div>
                   </div>
                 ))}
