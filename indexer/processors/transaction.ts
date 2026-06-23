@@ -226,7 +226,28 @@ export async function decodeTransaction(raw: {
     }
   }
 
-  const amountUsd = parseFloat(raw.value) / 1e18 * 0; // Price lookup done later by enrichTx
+  // Estimate USD value
+  // For ETH transfers: raw.value is the ETH amount in wei
+  // For ERC20 transfers: raw.value is "0" but raw.input contains the transfer amount
+  let amountUsd = 0;
+  const ethValue = parseFloat(raw.value) / 1e18;
+  if (ethValue > 0) {
+    // Native ETH transfer
+    amountUsd = ethValue * 2500; // Rough ETH price
+  } else if (raw.input && raw.input.length >= 138) {
+    // ERC20 transfer: input = 0xa9059cbb + 32 bytes (to) + 32 bytes (amount)
+    // Decode the amount from the last 32 bytes of input
+    try {
+      const amountHex = '0x' + raw.input.slice(74, 138);
+      const tokenAmount = BigInt(amountHex);
+      // Assume 18 decimals for most ERC20s
+      const tokenDecimal = Number(tokenAmount) / 1e18;
+      // Rough USD estimate — enrichTx will refine with real price
+      amountUsd = tokenDecimal * 1;
+    } catch {
+      amountUsd = 0;
+    }
+  }
 
   return {
     hash: raw.hash,

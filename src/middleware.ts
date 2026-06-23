@@ -72,6 +72,7 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/stablecoin-flow",
   "/api/v1/whale-cluster",
   "/api/v1/status/cache",
+  "/api/v1/top-traders",
   "/api/auth",
 ]);
 
