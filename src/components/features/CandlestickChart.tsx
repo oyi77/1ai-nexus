@@ -1,7 +1,18 @@
 "use client"
 
 import { useEffect, useRef } from 'react'
-import { createChart, ColorType, CandlestickSeries, HistogramSeries, type IChartApi, type ISeriesApi, type CandlestickData, type HistogramData } from 'lightweight-charts'
+import {
+  createChart,
+  ColorType,
+  CandlestickSeries,
+  HistogramSeries,
+  LineSeries,
+  type IChartApi,
+  type ISeriesApi,
+  type CandlestickData,
+  type HistogramData,
+  type LineData,
+} from 'lightweight-charts'
 
 interface Candle {
   time: number
@@ -12,16 +23,33 @@ interface Candle {
   volume: number
 }
 
+interface IndicatorData {
+  [key: string]: Array<{ time: number; value: number }> | undefined
+}
+
 interface CandlestickChartProps {
   candles: Candle[]
+  indicators?: IndicatorData
   height?: number
 }
 
-export function CandlestickChart({ candles, height = 400 }: CandlestickChartProps) {
+const INDICATOR_COLORS: Record<string, string> = {
+  SMA20: '#ff9800',
+  SMA50: '#2196f3',
+  SMA200: '#9c27b0',
+  EMA20: '#ff9800',
+  EMA50: '#2196f3',
+  BB_upper: '#26a69a',
+  BB_middle: '#888',
+  BB_lower: '#ef5350',
+}
+
+export function CandlestickChart({ candles, indicators, height = 400 }: CandlestickChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
   const volRef = useRef<ISeriesApi<'Histogram'> | null>(null)
+  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<'Line'>>>(new Map())
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -88,6 +116,7 @@ export function CandlestickChart({ candles, height = 400 }: CandlestickChartProp
     }
   }, [height])
 
+  // Update candlestick data
   useEffect(() => {
     if (!seriesRef.current || !volRef.current || candles.length === 0) return
 
@@ -109,6 +138,41 @@ export function CandlestickChart({ candles, height = 400 }: CandlestickChartProp
     volRef.current.setData(volData)
     chartRef.current?.timeScale().fitContent()
   }, [candles])
+
+  // Update indicator overlays
+  useEffect(() => {
+    if (!chartRef.current || !indicators) return
+
+    // Clear existing indicator series
+    for (const [_key, series] of indicatorSeriesRef.current) {
+      try { chartRef.current.removeSeries(series) } catch { /* already removed */ }
+    }
+    indicatorSeriesRef.current.clear()
+
+    // Add new indicator series
+    for (const [key, data] of Object.entries(indicators)) {
+      if (!data || !Array.isArray(data) || data.length === 0) continue
+
+      const color = INDICATOR_COLORS[key] ?? '#ff9800'
+      const series = chartRef.current.addSeries(LineSeries, {
+        color,
+        lineWidth: 1,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        crosshairMarkerVisible: false,
+      })
+
+      const lineData: LineData[] = data
+        .filter((d) => d && typeof d === 'object' && 'time' in d && 'value' in d)
+        .map((d) => ({
+          time: (d as { time: number; value: number }).time as never,
+          value: (d as { time: number; value: number }).value,
+        }))
+
+      series.setData(lineData)
+      indicatorSeriesRef.current.set(key, series)
+    }
+  }, [indicators])
 
   return <div ref={containerRef} className="w-full" style={{ height }} />
 }

@@ -44,6 +44,7 @@ export default function TokenDetailPage() {
   const address = params?.address as string
   const [token, setToken] = useState<TokenInfo | null>(null)
   const [candles, setCandles] = useState<OhlcvCandle[]>([])
+  const [indicators, setIndicators] = useState<Record<string, Array<{ time: number; value: number }>>>({})
   const [interval, setIntervalStr] = useState('1h')
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
   const [chartStatus, setChartStatus] = useState<'loading' | 'live' | 'error'>('loading')
@@ -76,12 +77,13 @@ export default function TokenDetailPage() {
     const symbol = token.symbol.replace('/', '').replace('SOL', 'SOLUSDT').replace('USDT', 'USDT')
     const binanceSymbol = symbol.endsWith('USDT') ? symbol : `${symbol}USDT`
 
-    fetch(`/api/v1/ohlcv?symbol=${encodeURIComponent(token.symbol.split('/')[0])}&interval=${interval}&limit=100`)
+    fetch(`/api/v1/ohlcv?symbol=${encodeURIComponent(token.symbol.split('/')[0])}&interval=${interval}&limit=100&indicators=sma20,ema50,bb`)
       .then(r => r.json())
       .then(d => {
         const data = d.data as OhlcvResponse
         if (data?.candles && data.candles.length > 0) {
           setCandles(data.candles)
+          setIndicators(data.indicators as Record<string, Array<{ time: number; value: number }>>)
           setChartStatus('live')
         } else {
           setChartStatus('error')
@@ -142,7 +144,7 @@ export default function TokenDetailPage() {
               ))}
             </div>
             {chartStatus === 'live' && candles.length > 0 ? (
-              <CandlestickChart candles={candles} height={450} />
+              <CandlestickChart candles={candles} indicators={indicators} height={450} />
             ) : chartStatus === 'loading' ? (
               <div className="flex items-center justify-center h-[450px] text-[12px] font-mono text-text-muted">
                 Loading candlestick data...
