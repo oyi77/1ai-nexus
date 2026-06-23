@@ -32,6 +32,7 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/tokens",
   "/api/v1/tokens/discover",
   "/api/v1/entities",
+  "/api/v1/entities/graph",
   "/api/v1/smart-money",
   "/api/v1/smart-money/flow",
   "/api/v1/smart-money/wallet",
