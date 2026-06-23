@@ -11,8 +11,9 @@ export default function EntityDetailPage() {
 
   useEffect(() => {
     if (!slug) return
-    import("@/lib/modules/ai-signals/entity-labels-seed").then(mod => {
-      const found = mod.ENTITY_SEEDS.find(e => e.label.toLowerCase().replace(/[^a-z0-9]/g, "-") === slug)
+    import("@/lib/modules/ai-signals/entity-labels-seed").then(async (mod) => {
+      const seeds = await mod.getEntitySeeds()
+      const found = seeds.find(e => e.label.toLowerCase().replace(/[^a-z0-9]/g, "-") === slug)
       setEntity(found ?? null)
     })
   }, [slug])

@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
-import { ENTITY_SEEDS } from '@/lib/modules/ai-signals/entity-labels-seed'
+import { getEntitySeeds } from '@/lib/modules/ai-signals/entity-labels-seed'
 
 interface CategoryFlow {
   category: string
@@ -25,9 +25,10 @@ const CATEGORY_META: Record<string, { label: string; icon: string }> = {
 
 export async function GET() {
   try {
+    const allSeeds = await getEntitySeeds()
     const categories = new Map<string, { count: number; chains: Set<string> }>()
 
-    for (const entity of ENTITY_SEEDS) {
+    for (const entity of allSeeds) {
       const existing = categories.get(entity.category) ?? { count: 0, chains: new Set() }
       existing.count++
       existing.chains.add(entity.chain)
@@ -46,8 +47,8 @@ export async function GET() {
 
     return NextResponse.json({
       flows,
-      totalEntities: ENTITY_SEEDS.length,
-      chains: [...new Set(ENTITY_SEEDS.map(e => e.chain))],
+      totalEntities: allSeeds.length,
+      chains: [...new Set(allSeeds.map(e => e.chain))],
     }, {
       headers: { 'Cache-Control': 'public, max-age=300, stale-while-revalidate=600' },
     })

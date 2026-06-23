@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   }
 
   const registry = registerAllModules()
-  const entityLabel = getEntityLabel(address, chain)
+  const entityLabel = await getEntityLabel(address, chain)
 
   // Parallel fetch tx history + token transfers
   const [txResult, tokenResult] = await Promise.allSettled([

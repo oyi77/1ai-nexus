@@ -3,7 +3,7 @@
 // Uses entity labels to identify exchange-bound transactions
 // ─────────────────────────────────────────────────────────────
 
-import { ENTITY_SEEDS, type EntitySeed } from '../ai-signals/entity-labels-seed'
+import { getEntityLabel, type EntitySeed } from '../ai-signals/entity-labels-seed'
 
 export interface FlowEvent {
   id: string
@@ -22,23 +22,21 @@ const flowLog: FlowEvent[] = []
 const MAX_FLOWS = 1000
 
 /** Check if an address is a known exchange */
-export function isExchangeAddress(address: string, chain: string = 'eth'): EntitySeed | undefined {
-  const normalized = address.toLowerCase()
-  return ENTITY_SEEDS.find(e =>
-    e.address.toLowerCase() === normalized &&
-    e.chain === chain &&
-    e.category === 'cex'
-  )
+export async function isExchangeAddress(address: string, chain: string = 'eth'): Promise<EntitySeed | undefined> {
+  const entity = await getEntityLabel(address.toLowerCase(), chain)
+  return entity?.category === 'cex' ? entity : undefined
 }
 
 /** Classify a transfer as deposit/withdrawal based on entity labels */
-export function classifyTransfer(from: string, to: string, chain: string): {
+export async function classifyTransfer(from: string, to: string, chain: string): Promise<{
   type: 'deposit' | 'withdrawal' | 'transfer'
   fromLabel: string
   toLabel: string
-} {
-  const fromEntity = isExchangeAddress(from, chain)
-  const toEntity = isExchangeAddress(to, chain)
+}> {
+  const [fromEntity, toEntity] = await Promise.all([
+    isExchangeAddress(from, chain),
+    isExchangeAddress(to, chain),
+  ])
 
   if (!fromEntity && toEntity) return { type: 'deposit', fromLabel: 'Unknown', toLabel: toEntity.label }
   if (fromEntity && !toEntity) return { type: 'withdrawal', fromLabel: fromEntity.label, toLabel: 'Unknown' }

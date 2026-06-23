@@ -40,7 +40,7 @@ async function fetchArkham(params: FetchParams): Promise<unknown> {
         return await arkhamFetch<unknown>(`/api/entities/address/${address}`)
       } catch {
         // Fallback to seed data
-        const label = getEntityLabel(address, (params.chain as string) ?? 'eth')
+        const label = await getEntityLabel(address, (params.chain as string) ?? 'eth')
         return label ? { label: label.label, category: label.category, confidence: label.confidence } : null
       }
     }
@@ -90,7 +90,7 @@ const arkhamModule: DataModule = {
   async fallbackFn<T>(params: FetchParams): Promise<ModuleResult<T>> {
     const address = params.address as string
     const chain = (params.chain as string) ?? 'eth'
-    const label = address ? getEntityLabel(address, chain) : undefined
+    const label = address ? await getEntityLabel(address, chain) : undefined
     return {
       data: (label ? { label: label.label, category: label.category } : { label: 'Unknown', category: 'unknown' }) as T,
       source: 'arkham-re (seed fallback)',
