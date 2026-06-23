@@ -11,6 +11,9 @@ export default function PredictionsLayout({ children }: { children: ReactNode })
         <Link href="/predictions/tape" className="text-sm text-text-muted transition-colors hover:text-text-primary">
           Trade Tape
         </Link>
+        <Link href="/predictions/paper" className="text-sm text-text-muted transition-colors hover:text-text-primary">
+          Paper Trading
+        </Link>
         <Link href="/predictions/leaderboard" className="text-sm text-text-muted transition-colors hover:text-text-primary">
           Leaderboard
         </Link>

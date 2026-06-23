@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Coins, Building2, Zap, TrendingUp, Activity, Radio,
-  Bell, Eye, Globe, BarChart3, Shield, ChevronLeft, ChevronRight,
+  Bell, Eye, Globe, BarChart3, Shield, ChevronLeft, ChevronRight, Target,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -18,7 +18,8 @@ const NAV_ITEMS = [
   { label: 'OSINT',        href: '/compare',          icon: Eye },
   { label: 'Macro',        href: '/macro',            icon: Globe },
   { label: 'PnL Tracker',  href: '/pnl',              icon: BarChart3 },
-  { label: 'Status',       href: '/status',           icon: Shield },
+  { label: 'Predictions', href: '/predictions',    icon: Target },
+  { label: 'Status',       href: '/status',         icon: Shield },
 ]
 
 interface SidebarProps {

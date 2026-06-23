@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Coins, Building2, Zap, Bell,
   ChevronLeft, ChevronRight, ChevronDown, Globe,
   TrendingUp, BarChart3, Activity, Shield, Radio, Eye,
-  Menu, X,
+  Menu, X, Target,
 } from 'lucide-react'
 import { LiveDot } from '../primitives/LiveDot'
 import { CommandBar } from './CommandBar'
@@ -63,6 +63,8 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Trending',      href: '/trending',       icon: TrendingUp },
       { label: 'Arbitrage',     href: '/arbitrage',      icon: Activity },
       { label: 'MEV Detector',  href: '/mev',            icon: Shield },
+      { label: 'Alpha Engine',  href: '/alpha-engine',   icon: Zap },
+      { label: 'Predictions',   href: '/prediction-markets', icon: Target },
       { label: 'RugCheck',      href: '/rugcheck',       icon: Shield },
     ],
   },

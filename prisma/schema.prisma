@@ -116,6 +116,7 @@ model PredictionMarket {
   @@index([category, status])
   @@index([volume24h(sort: Desc)])
   @@index([totalVolume(sort: Desc)])
+  paperTrades  PaperTrade[]
 }
 
 model PredictionTrade {
@@ -416,4 +417,28 @@ model CorrelationSnapshot {
   createdAt DateTime @default(now())
 
   @@index([pair, createdAt])
+}
+
+model PaperTrade {
+  id            String           @id @default(cuid())
+  marketId      String
+  market        PredictionMarket @relation(fields: [marketId], references: [id], onDelete: Cascade)
+  userId        String           @default("default")
+  direction     String
+  shares        Float
+  entryPrice    Float
+  exitPrice     Float?
+  resolvedPrice Float?
+  outcome       String?
+  status        String           @default("open")
+  pnl           Float            @default(0)
+  notes         String?
+  closedAt      DateTime?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  @@index([userId, status])
+  @@index([marketId])
+  @@index([createdAt(sort: Desc)])
+  @@index([status])
 }
