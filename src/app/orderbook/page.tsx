@@ -55,7 +55,7 @@ export default function OrderBookPage() {
 
   useEffect(() => {
     fetchData()
-    const id = setInterval(fetchData, 5_000) // 5s refresh for live depth
+    const id = setInterval(fetchData, 3_000) // 5s refresh for live depth
     return () => clearInterval(id)
   }, [fetchData])
 
