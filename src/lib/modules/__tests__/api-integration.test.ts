@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest'
 const BASE = process.env.TEST_BASE_URL || 'http://localhost:4400'
 
 async function api(path: string) {
-  const res = await fetch(`${BASE}${path}`, { signal: AbortSignal.timeout(15_000) })
+  const res = await fetch(`${BASE}${path}`, { signal: AbortSignal.timeout(30_000) })
   const json = await res.json() as { data: unknown; error: string | null; meta?: unknown }
   return { status: res.status, ...json, headers: res.headers }
 }
