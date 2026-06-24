@@ -45,53 +45,44 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'On-Chain',
     items: [
-      { label: 'Whale Alerts',  href: '/whale-cluster',  icon: Building2 },
-      { label: 'Smart Money',   href: '/smart-money',    icon: Zap },
-      { label: 'Entities',      href: '/entities',       icon: Building2 },
+      { label: 'On-Chain Hub',  href: '/onchain',        icon: Radio },
       { label: 'Knowledge Graph', href: '/graph',        icon: Eye },
       { label: 'Top Traders',   href: '/top-traders',    icon: TrendingUp },
-      { label: 'Mempool',       href: '/mempool',        icon: Radio },
     ],
   },
   {
     title: 'Trading',
     items: [
       { label: 'Live Trades',   href: '/trades',         icon: Activity },
-      { label: 'Token Scanner', href: '/scanner',        icon: Radio },
-      { label: 'DEX Monitor',   href: '/dex',            icon: Activity },
-      { label: 'Trending',      href: '/trending',       icon: TrendingUp },
+      { label: 'Trading Hub',   href: '/trading',        icon: Radio },
       { label: 'Arbitrage',     href: '/arbitrage',      icon: Activity },
       { label: 'MEV Detector',  href: '/mev',            icon: Shield },
-      { label: 'Alpha Engine',  href: '/alpha-engine',   icon: Zap },
-      { label: 'Predictions',   href: '/prediction-markets', icon: Target },
-      { label: 'RugCheck',      href: '/rugcheck',       icon: Shield },
     ],
   },
   {
     title: 'DeFi',
     items: [
-      { label: 'Yield Farming', href: '/yields',         icon: Activity },
-      { label: 'Sector Flows',  href: '/sectors',        icon: Activity },
-      { label: 'Revenue',       href: '/revenue',        icon: BarChart3 },
-      { label: 'DeFi Overview', href: '/defi',           icon: Coins },
+      { label: 'DeFi Hub',      href: '/defi-hub',       icon: Coins },
     ],
   },
   {
     title: 'Macro & News',
     items: [
-      { label: 'News Feed',     href: '/news',           icon: Globe },
-      { label: 'Macro',         href: '/macro',          icon: Globe },
-      { label: 'Calendar',      href: '/calendar',       icon: Globe },
+      { label: 'Macro Hub',     href: '/macro-hub',      icon: Globe },
+    ],
+  },
+  {
+    title: 'Analytics',
+    items: [
+      { label: 'Analytics Hub', href: '/analytics',      icon: Zap },
     ],
   },
   {
     title: 'Tools',
     items: [
       { label: 'PnL Tracker',   href: '/pnl',            icon: BarChart3 },
-      { label: 'Insider',       href: '/insider',        icon: Eye },
       { label: 'Exchange Flow', href: '/exchange-flow',  icon: BarChart3 },
       { label: 'Gas Tracker',   href: '/gas',            icon: Activity },
-      { label: 'Weather',       href: '/weather',        icon: BarChart3 },
       { label: 'Status',        href: '/status',         icon: Shield },
     ],
   },
