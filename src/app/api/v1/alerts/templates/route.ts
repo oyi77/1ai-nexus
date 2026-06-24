@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
+import { apiJson } from '@/lib/api/response'
 
 interface AlertTemplate {
   id: string

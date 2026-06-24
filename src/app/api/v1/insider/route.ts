@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { apiJson } from '@/lib/api/response'
 import { scanForInsiderSignals } from '@/lib/modules/derived/insider-detector'
 
 export async function GET() {

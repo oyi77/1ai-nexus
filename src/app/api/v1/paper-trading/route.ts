@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
+import { apiJson } from '@/lib/api/response'
 import { getOpenPredictions, getClosedPredictions, getAccuracy, recordPrediction } from '@/lib/modules/derived/paper-trader'
 
 export async function GET() {
@@ -53,7 +54,7 @@ export async function POST(request: Request) {
       expiresAt: Date.now() + (body.ttlMinutes ?? 60) * 60_000,
     })
 
-    return NextResponse.json({ data: pred, error: null })
+    return apiJson(pred)
   } catch (error) {
     console.error('Paper trading POST error:', error)
     return NextResponse.json({ data: null, error: 'Failed to record prediction' }, { status: 502 })

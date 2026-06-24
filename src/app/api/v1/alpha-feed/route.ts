@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { apiJson } from '@/lib/api/response'
 import { fetchAlphaSignals } from '@/lib/modules/derived/alpha-feed'
 
 export async function GET(request: Request) {

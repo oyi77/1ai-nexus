@@ -36,3 +36,19 @@ export function cacheHeaders<T>(response: NextResponse<T>, maxAge: number): Next
   response.headers.set("Cache-Control", `public, max-age=${maxAge}, stale-while-revalidate=${maxAge * 2}`);
   return response;
 }
+
+/**
+ * Unified JSON response — always returns { data, error } envelope.
+ * Use this instead of raw NextResponse.json for consistent API responses.
+ */
+export function apiJson<T>(
+  data: T,
+  options?: { error?: string; status?: number; headers?: Record<string, string> }
+): NextResponse {
+  const { error = null, status = 200, headers = {} } = options ?? {}
+  const resp = NextResponse.json({ data, error }, { status })
+  for (const [key, value] of Object.entries(headers)) {
+    resp.headers.set(key, value)
+  }
+  return resp
+}

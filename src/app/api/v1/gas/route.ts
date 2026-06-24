@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { apiJson } from '@/lib/api/response'
 import { getGasPrices } from '@/lib/modules/derived/gas-tracker'
 
 export async function GET() {

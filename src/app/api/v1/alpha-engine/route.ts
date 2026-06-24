@@ -4,12 +4,13 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
+import { apiJson } from '@/lib/api/response'
 import { getAlphaSignals } from '@/lib/modules/derived/alpha-engine'
 
 export async function GET() {
   try {
     const result = await getAlphaSignals()
-    const resp = NextResponse.json({ data: result, error: null })
+    const resp = apiJson(result)
     resp.headers.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60')
     return resp
   } catch (error) {

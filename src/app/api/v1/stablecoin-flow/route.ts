@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { apiJson } from '@/lib/api/response'
 import { getStablecoinFlows, getNetMintBurn } from '@/lib/modules/derived/stablecoin-flow'
 
 export async function GET(request: Request) {

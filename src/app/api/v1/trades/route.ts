@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
+import { apiJson } from '@/lib/api/response'
 import { getFlowData, getRecentTrades, startTradeAggregator } from '@/lib/modules/market/trade-aggregator'
 
 // Start aggregator on first request (lazy init)

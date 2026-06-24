@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { apiJson } from '@/lib/api/response'
 import { detectClusters } from '@/lib/modules/derived/whale-clustering'
 
 export async function GET() {

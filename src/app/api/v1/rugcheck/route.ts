@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { apiJson } from '@/lib/api/response'
 import { checkTokenSafety } from '@/lib/modules/derived/rug-checker'
 
 export async function GET(request: Request) {

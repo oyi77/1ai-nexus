@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
+import { apiJson } from '@/lib/api/response'
 import { detectMevCached } from '@/lib/modules/derived/mev-detector'
 
 export async function GET(request: Request) {

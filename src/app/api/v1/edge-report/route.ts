@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { apiJson } from '@/lib/api/response'
 import { generateEdgeReport, getCachedReport } from '@/lib/modules/derived/edge-report'
 
 export async function GET() {

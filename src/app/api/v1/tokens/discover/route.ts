@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
+import { apiJson } from '@/lib/api/response'
 import { registerAllModules } from '@/lib/modules'
 
 interface DiscoveredToken {
