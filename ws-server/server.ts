@@ -212,31 +212,55 @@ liquidationsNs.on("connection", (socket) => {
 // ═══════════════════════════════════════════════════════════
 const arbitrageNs = io.of("/arbitrage")
 
-// DEX price cache
-const dexPrices = new Map<string, { price: number; name: string; network: string; updatedAt: number }>()
+// DEX price cache — from DexScreener (real-time, multi-chain, no API key)
+const dexPrices = new Map<string, { price: number; name: string; network: string; pair: string; volume24h: number; liquidity: number; updatedAt: number }>()
+
+// Top tokens to track across DEXes
+const TRACKED_TOKENS = ['BTC', 'ETH', 'SOL', 'DOGE', 'PEPE', 'WIF', 'BONK', 'SHIB', 'ARB', 'OP', 'AVAX', 'LINK', 'DOT', 'MATIC', 'SUI', 'SEI', 'APT', 'NEAR', 'FIL', 'INJ']
 
 async function fetchDexPrices() {
-  for (const network of ['solana', 'eth', 'base']) {
+  for (const token of TRACKED_TOKENS) {
     try {
-      const res = await fetch(`https://api.geckoterminal.com/api/v2/networks/${network}/trending_pools?page=1`, {
+      const res = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${token}`, {
         headers: { Accept: 'application/json' },
-        signal: { timeout: 10000 } as unknown as AbortSignal,
+        signal: AbortSignal.timeout(10_000),
       })
       if (!res.ok) continue
-      const data = (await res.json()) as { data: Array<{ attributes: { name: string; address: string; base_token_price_usd: string; volume_usd: { h24: string } } }> }
-      for (const pool of (data.data ?? [])) {
-        const name = pool.attributes.name.split('/')[0].trim().toUpperCase()
-        const price = parseFloat(pool.attributes.base_token_price_usd)
-        const volume = parseFloat(pool.attributes.volume_usd?.h24 ?? '0')
-        if (price > 0 && volume > 10000) {
-          const existing = dexPrices.get(name)
-          if (!existing || existing.updatedAt < Date.now() - 30000) {
-            dexPrices.set(name, { price, name, network, updatedAt: Date.now() })
-          }
-        }
+      
+      const data = (await res.json()) as {
+        pairs: Array<{
+          baseToken: { symbol: string; name: string }
+          quoteToken: { symbol: string }
+          chainId: string
+          dexId: string
+          priceUsd: string
+          volume: { h24: string }
+          liquidity: { usd: string }
+          pairAddress: string
+        }>
+      }
+      
+      // Pick highest liquidity pair per token
+      const pairs = (data.pairs ?? [])
+        .filter(p => parseFloat(p.priceUsd) > 0 && parseFloat(p.liquidity?.usd ?? '0') > 10000)
+        .sort((a, b) => parseFloat(b.liquidity?.usd ?? '0') - parseFloat(a.liquidity?.usd ?? '0'))
+      
+      if (pairs.length > 0) {
+        const best = pairs[0]
+        const sym = best.baseToken.symbol.toUpperCase()
+        dexPrices.set(sym, {
+          price: parseFloat(best.priceUsd),
+          name: best.baseToken.name,
+          network: best.chainId,
+          pair: `${best.baseToken.symbol}/${best.quoteToken.symbol}`,
+          volume24h: parseFloat(best.volume?.h24 ?? '0'),
+          liquidity: parseFloat(best.liquidity?.usd ?? '0'),
+          updatedAt: Date.now(),
+        })
       }
     } catch {}
   }
+  console.log(`[arbitrage] DEX prices updated: ${dexPrices.size} tokens`)
 }
 
 // Fetch DEX prices on startup and every 15s
@@ -295,31 +319,31 @@ function computeArbitrage() {
     }
   }
 
-  // 2. DEX vs CEX price differences
+  // 2. DEX vs CEX price differences (DexScreener vs Binance)
   for (const [symbol, dexData] of dexPrices) {
     const cexData = latestPrices.get(symbol.toLowerCase())
     if (!cexData) continue
 
     const cexPrice = (cexData as Record<string, number>).price
     const dexPrice = dexData.price
-    if (!cexPrice || !dexPrice) continue
+    if (!cexPrice || !dexPrice || cexPrice === 0) continue
 
     const diff = ((dexPrice - cexPrice) / cexPrice) * 100
     const diffBps = diff * 100
 
-    if (Math.abs(diffBps) > 20) { // > 20 bps
+    if (Math.abs(diffBps) > 10) { // > 10 bps
       opportunities.push({
         type: 'DEX-CEX',
         symbol,
-        buyAt: diff > 0 ? 'Binance' : dexData.network,
+        buyAt: diff > 0 ? 'Binance CEX' : `${dexData.network} DEX (${dexData.pair})`,
         buyPrice: Math.min(cexPrice, dexPrice),
-        sellAt: diff > 0 ? dexData.network : 'Binance',
+        sellAt: diff > 0 ? `${dexData.network} DEX (${dexData.pair})` : 'Binance CEX',
         sellPrice: Math.max(cexPrice, dexPrice),
         spread: Math.abs(dexPrice - cexPrice),
         spreadPercent: Math.abs(diff),
         spreadBps: Math.abs(diffBps),
-        volume24h: 0,
-        signal: diff > 0 ? 'Buy CEX / Sell DEX' : 'Buy DEX / Sell CEX',
+        volume24h: dexData.volume24h,
+        signal: diff > 0 ? 'Buy CEX → Sell DEX' : 'Buy DEX → Sell CEX',
         timestamp: Date.now(),
       })
     }
