@@ -75,6 +75,7 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/top-traders",
   "/api/v1/orderbook",
   "/api/v1/token/holders",
+  "/api/v1/token/god-mode",
   "/api/v1/liquidations/heatmap",
   "/api/v1/basis",
   "/api/v1/yields",
