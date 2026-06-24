@@ -14,16 +14,13 @@ interface Entity {
   id: string
   name: string
   type: string
-  address: string
-  chain: string
-  balance: number
-  balanceUsd: number
-  txCount: number
-  firstSeen: string
-  lastActive: string
-  labels: string[]
-  pnl7d: number
-  sparkline: number[]
+  chains: string[]
+  totalUsdValue: number
+  change1d: number
+  verified: boolean
+  wallets: Array<{ address: string; chain: string }>
+  createdAt: string
+  updatedAt: string
   [key: string]: unknown
 }
 
@@ -40,21 +37,19 @@ export default function EntitiesPage() {
       const res = await fetch('/api/v1/entities')
       const data = await res.json()
 
-      if (data.data && Array.isArray(data.data)) {
-        setEntities(data.data.map((e: Record<string, unknown>, i: number) => ({
+      const items = data.data ?? data
+      if (Array.isArray(items)) {
+        setEntities(items.map((e: Record<string, unknown>, i: number) => ({
           id: (e.id as string) || String(i),
           name: (e.name as string) || 'Unknown',
           type: (e.type as string) || 'unknown',
-          address: (e.address as string) || `entity-${i}`,
-          chain: Array.isArray(e.chains) ? (e.chains as string[])[0] || 'ethereum' : 'ethereum',
-          balance: (e.balance as number) || 0,
-          balanceUsd: (e.totalUsdValue as number) || 0,
-          txCount: (e.txCount as number) || 0,
-          firstSeen: (e.createdAt as string) || '',
-          lastActive: (e.updatedAt as string) || '',
-          labels: Array.isArray(e.labels) ? e.labels as string[] : [e.type as string || 'unknown'],
-          pnl7d: (e.pnl7d as number) || 0,
-          sparkline: Array.isArray(e.sparkline) ? e.sparkline as number[] : [],
+          chains: Array.isArray(e.chains) ? e.chains as string[] : ['ethereum'],
+          totalUsdValue: (e.totalUsdValue as number) || 0,
+          change1d: (e.change1d as number) || 0,
+          verified: Boolean(e.verified),
+          wallets: Array.isArray(e.wallets) ? e.wallets as Array<{ address: string; chain: string }> : [],
+          createdAt: (e.createdAt as string) || '',
+          updatedAt: (e.updatedAt as string) || '',
         })))
       }
       setFeedStatus('live')
@@ -71,8 +66,8 @@ export default function EntitiesPage() {
   }, [fetchEntities])
 
   const filtered = entities.filter(e => {
-    if (filterType !== 'all' && e.type !== filterType) return false
-    if (search && !e.name.toLowerCase().includes(search.toLowerCase()) && !e.address.includes(search)) return false
+    if (filterType !== 'all' && e.type.toLowerCase() !== filterType.toLowerCase()) return false
+    if (search && !e.name.toLowerCase().includes(search.toLowerCase())) return false
     return true
   })
 
@@ -97,41 +92,34 @@ export default function EntitiesPage() {
       render: (row) => <span className="text-text-secondary text-[10px]">{row.type}</span>,
     },
     {
-      key: 'chain',
+      key: 'chains',
       header: 'Chain',
-      width: 60,
-      render: (row) => <span className="text-text-muted text-[10px]">{row.chain}</span>,
+      width: 80,
+      render: (row) => <span className="text-text-muted text-[10px]">{row.chains[0]}</span>,
     },
     {
-      key: 'balanceUsd',
-      header: 'Balance',
-      width: 100,
+      key: 'totalUsdValue',
+      header: 'TVL',
+      width: 120,
       align: 'right',
-      render: (row) => <PriceTag value={row.balanceUsd} size="sm" />,
+      render: (row) => <PriceTag value={row.totalUsdValue} size="sm" />,
     },
     {
-      key: 'txCount',
-      header: 'Txs',
-      width: 60,
-      align: 'right',
-      render: (row) => <span className="text-text-secondary">{row.txCount.toLocaleString()}</span>,
-    },
-    {
-      key: 'pnl7d',
-      header: '7d PnL',
+      key: 'change1d',
+      header: '24h',
       width: 70,
       align: 'right',
       render: (row) => (
-        <span className={`font-mono ${row.pnl7d > 0 ? 'text-data-bull' : 'text-data-bear'}`}>
-          {row.pnl7d > 0 ? '+' : ''}{(row.pnl7d ?? 0).toFixed(1)}%
+        <span className={`font-mono ${row.change1d > 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+          {row.change1d > 0 ? '+' : ''}{(row.change1d ?? 0).toFixed(2)}%
         </span>
       ),
     },
     {
-      key: 'sparkline',
-      header: '7d',
-      width: 50,
-      render: (row) => <Sparkline data={row.sparkline} width={40} height={14} />,
+      key: 'verified',
+      header: 'Status',
+      width: 60,
+      render: (row) => row.verified ? <span className="text-data-bull text-[10px]">✓</span> : <span className="text-text-muted text-[10px]">—</span>,
     },
   ]
 
@@ -205,18 +193,20 @@ export default function EntitiesPage() {
                 <div className="text-center">
                   <EntityLabel type={selectedEntity.type.toLowerCase() as 'whale' | 'cex' | 'fund' | 'protocol'} label={selectedEntity.type} size="md" />
                   <div className="mt-2 text-[14px] font-head font-bold text-text-primary">{selectedEntity.name}</div>
-                  <AddressChip address={selectedEntity.address} truncate={8} size="sm" />
+                  {selectedEntity.wallets?.[0] && (
+                    <AddressChip address={selectedEntity.wallets[0].address} truncate={8} size="sm" />
+                  )}
                 </div>
 
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { label: 'Balance', value: `$${selectedEntity.balanceUsd.toLocaleString()}` },
-                    { label: 'Tx Count', value: selectedEntity.txCount.toLocaleString() },
-                    { label: '7d PnL', value: `${selectedEntity.pnl7d > 0 ? '+' : ''}${(selectedEntity.pnl7d ?? 0).toFixed(1)}%` },
-                    { label: 'First Seen', value: selectedEntity.firstSeen },
-                    { label: 'Last Active', value: selectedEntity.lastActive },
-                    { label: 'Chain', value: selectedEntity.chain },
+                    { label: 'TVL', value: `$${(selectedEntity.totalUsdValue / 1e6).toFixed(1)}M` },
+                    { label: '24h Change', value: `${selectedEntity.change1d > 0 ? '+' : ''}${(selectedEntity.change1d ?? 0).toFixed(2)}%` },
+                    { label: 'Type', value: selectedEntity.type },
+                    { label: 'Chains', value: selectedEntity.chains.join(', ') },
+                    { label: 'Wallets', value: String(selectedEntity.wallets.length) },
+                    { label: 'Status', value: selectedEntity.verified ? 'Verified' : 'Unverified' },
                   ].map((stat, i) => (
                     <div key={i} className="bg-bg-raised rounded p-2">
                       <div className="text-[9px] text-text-muted font-mono uppercase">{stat.label}</div>
@@ -225,17 +215,20 @@ export default function EntitiesPage() {
                   ))}
                 </div>
 
-                {/* Labels */}
-                <div>
-                  <div className="text-[10px] text-text-muted font-mono mb-1">LABELS</div>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedEntity.labels.map((label, i) => (
-                      <span key={i} className="px-2 py-0.5 rounded bg-bg-raised border border-bg-border text-[10px] font-mono text-text-secondary">
-                        {label}
-                      </span>
-                    ))}
+                {/* Wallets */}
+                {selectedEntity.wallets.length > 0 && (
+                  <div>
+                    <div className="text-[10px] text-text-muted font-mono mb-1">WALLETS ({selectedEntity.wallets.length})</div>
+                    <div className="space-y-1 max-h-[200px] overflow-y-auto">
+                      {selectedEntity.wallets.slice(0, 5).map((w, i) => (
+                        <div key={i} className="flex items-center gap-2 text-[10px] font-mono">
+                          <span className="px-1.5 py-0.5 rounded bg-bg-raised text-text-muted uppercase">{w.chain}</span>
+                          <AddressChip address={w.address} truncate={12} size="sm" />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ) : (
               <div className="flex items-center justify-center h-full text-text-muted text-[11px]">

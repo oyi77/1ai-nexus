@@ -15,6 +15,7 @@ model Entity {
   logoUrl       String?
   chains        String[]
   totalUsdValue Float    @default(0)
+  change1d      Float    @default(0)
   wallets       Wallet[]
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
