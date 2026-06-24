@@ -84,6 +84,25 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* ── Ticker Strip ────────────────────────────────────────── */
+.ticker-strip {
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+}
+
+.ticker-content {
+  display: inline-flex;
+  animation: ticker-scroll 40s linear infinite;
+  will-change: transform;
+}
+
+.ticker-content:hover {
+  animation-play-state: paused;
+}
+
+
 /* ── Base ────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;
