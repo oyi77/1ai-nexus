@@ -137,10 +137,9 @@ export function LiveTerminalFeed() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-bg-border">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-bg-border">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-data-bull animate-pulse" />
-          <span className="text-[11px] font-mono font-bold text-text-primary">LIVE FEED</span>
           <span className="text-[10px] font-mono text-text-muted">{items.length} events</span>
         </div>
         <button
