@@ -5,6 +5,7 @@ import { select } from 'd3-selection'
 import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide, type SimulationNodeDatum } from 'd3-force'
 import { drag } from 'd3-drag'
 import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom'
+import 'd3-transition'
 
 interface GraphNode extends SimulationNodeDatum {
   id: string
@@ -103,7 +104,7 @@ export function EntityGraph({ data }: { data: GraphData }) {
           if (!event.active) simulation.alphaTarget(0)
           event.subject.fx = null
           event.subject.fy = null
-        }))
+        }) as any)
 
     node.append('title')
       .text((d: GraphNode) => `${d.label}\nType: ${d.type}\nTVL: $${(d.tvl / 1e6).toFixed(2)}M`)
@@ -170,7 +171,7 @@ export function EntityGraph({ data }: { data: GraphData }) {
         if (n.label.toLowerCase().includes(trimmed)) matched.add(n.id)
       })
       highlightedRef.current = matched
-      setHighlightedIds([...matched])
+      setHighlightedIds(Array.from(matched))
 
       node
         .attr('opacity', (d: GraphNode) => matched.has(d.id) ? 1 : 0.08)

@@ -73,7 +73,7 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d`
 }
 
-const ENTITY_TYPE_MAP: Record<string, EntityLabel['type']> = {
+const ENTITY_TYPE_MAP: Record<string, 'whale' | 'dex' | 'cex' | 'contract' | 'unknown' | 'fund' | 'mev' | 'protocol'> = {
   exchange: 'cex',
   fund: 'fund',
   whale: 'whale',
