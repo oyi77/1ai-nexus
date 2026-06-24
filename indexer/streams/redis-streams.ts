@@ -46,7 +46,8 @@ export class RedisStreamsBus implements IEventBus {
       for (const [, [, ...entries]] of res) {
         for (const entry of entries) {
           const [id, ...kvs] = entry;
-          const envelope: EventEnvelope = JSON.parse(kvs[1]);
+          let envelope: EventEnvelope;
+          try { envelope = JSON.parse(kvs[1]); } catch { await this.client.xack(stream, 'tracker', id); continue; }
           await onMessage(envelope);
           await this.client.xack(stream, "tracker", id);
         }
