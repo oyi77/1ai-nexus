@@ -203,6 +203,178 @@ liquidationsNs.on("connection", (socket) => {
   socket.on("disconnect", () => {})
 })
 
+
+// ═══════════════════════════════════════════════════════════
+// ARBITRAGE: Spot vs Futures spread + DEX vs CEX comparison
+// Uses existing spot (latestPrices) + futures (latestDeriv) maps
+// Computes spreads in real-time → /arbitrage namespace
+// Also fetches DEX prices from GeckoTerminal every 15s
+// ═══════════════════════════════════════════════════════════
+const arbitrageNs = io.of("/arbitrage")
+
+// DEX price cache
+const dexPrices = new Map<string, { price: number; name: string; network: string; updatedAt: number }>()
+
+async function fetchDexPrices() {
+  for (const network of ['solana', 'eth', 'base']) {
+    try {
+      const res = await fetch(`https://api.geckoterminal.com/api/v2/networks/${network}/trending_pools?page=1`, {
+        headers: { Accept: 'application/json' },
+        signal: { timeout: 10000 } as unknown as AbortSignal,
+      })
+      if (!res.ok) continue
+      const data = (await res.json()) as { data: Array<{ attributes: { name: string; address: string; base_token_price_usd: string; volume_usd: { h24: string } } }> }
+      for (const pool of (data.data ?? [])) {
+        const name = pool.attributes.name.split('/')[0].trim().toUpperCase()
+        const price = parseFloat(pool.attributes.base_token_price_usd)
+        const volume = parseFloat(pool.attributes.volume_usd?.h24 ?? '0')
+        if (price > 0 && volume > 10000) {
+          const existing = dexPrices.get(name)
+          if (!existing || existing.updatedAt < Date.now() - 30000) {
+            dexPrices.set(name, { price, name, network, updatedAt: Date.now() })
+          }
+        }
+      }
+    } catch {}
+  }
+}
+
+// Fetch DEX prices on startup and every 15s
+fetchDexPrices()
+setInterval(fetchDexPrices, 15_000)
+
+// Compute arbitrage opportunities on every price update
+function computeArbitrage() {
+  const opportunities: Array<{
+    type: string
+    symbol: string
+    buyAt: string
+    buyPrice: number
+    sellAt: string
+    sellPrice: number
+    spread: number
+    spreadPercent: number
+    spreadBps: number
+    volume24h: number
+    signal: string
+    timestamp: number
+  }> = []
+
+  // 1. Spot vs Futures spreads (Binance)
+  for (const [symbol, spotData] of latestPrices) {
+    const derivData = latestDeriv.get(symbol)
+    if (!derivData) continue
+
+    const spotPrice = (spotData as Record<string, number>).price
+    const futuresPrice = (derivData as Record<string, number>).price
+    if (!spotPrice || !futuresPrice) continue
+
+    const spread = futuresPrice - spotPrice
+    const spreadPercent = (spread / spotPrice) * 100
+    const spreadBps = spreadPercent * 100
+
+    if (Math.abs(spreadBps) > 1) {
+      let signal = 'No Edge'
+      if (spreadBps > 5) signal = 'Short Futures / Long Spot'
+      else if (spreadBps < -5) signal = 'Long Futures / Short Spot'
+
+      opportunities.push({
+        type: 'CEX Spot-Futures',
+        symbol: symbol.toUpperCase(),
+        buyAt: spread > 0 ? 'Binance Spot' : 'Binance Futures',
+        buyPrice: Math.min(spotPrice, futuresPrice),
+        sellAt: spread > 0 ? 'Binance Futures' : 'Binance Spot',
+        sellPrice: Math.max(spotPrice, futuresPrice),
+        spread: Math.abs(spread),
+        spreadPercent: Math.abs(spreadPercent),
+        spreadBps: Math.abs(spreadBps),
+        volume24h: (spotData as Record<string, number>).volume24h || 0,
+        signal,
+        timestamp: Date.now(),
+      })
+    }
+  }
+
+  // 2. DEX vs CEX price differences
+  for (const [symbol, dexData] of dexPrices) {
+    const cexData = latestPrices.get(symbol.toLowerCase())
+    if (!cexData) continue
+
+    const cexPrice = (cexData as Record<string, number>).price
+    const dexPrice = dexData.price
+    if (!cexPrice || !dexPrice) continue
+
+    const diff = ((dexPrice - cexPrice) / cexPrice) * 100
+    const diffBps = diff * 100
+
+    if (Math.abs(diffBps) > 20) { // > 20 bps
+      opportunities.push({
+        type: 'DEX-CEX',
+        symbol,
+        buyAt: diff > 0 ? 'Binance' : dexData.network,
+        buyPrice: Math.min(cexPrice, dexPrice),
+        sellAt: diff > 0 ? dexData.network : 'Binance',
+        sellPrice: Math.max(cexPrice, dexPrice),
+        spread: Math.abs(dexPrice - cexPrice),
+        spreadPercent: Math.abs(diff),
+        spreadBps: Math.abs(diffBps),
+        volume24h: 0,
+        signal: diff > 0 ? 'Buy CEX / Sell DEX' : 'Buy DEX / Sell CEX',
+        timestamp: Date.now(),
+      })
+    }
+  }
+
+  // 3. Funding rate arbitrage
+  for (const [symbol, derivData] of latestDeriv) {
+    const d = derivData as Record<string, unknown>
+    const fundingRate = d.fundingRate as number
+    if (!fundingRate) continue
+
+    if (Math.abs(fundingRate) > 0.0003) {
+      const annualized = fundingRate * 3 * 365 * 100
+      opportunities.push({
+        type: 'Funding Arb',
+        symbol: symbol.toUpperCase(),
+        buyAt: fundingRate > 0 ? 'Spot (neutral)' : 'Perp (earning)',
+        buyPrice: d.price as number || 0,
+        sellAt: fundingRate > 0 ? 'Perp (paying)' : 'Spot (neutral)',
+        sellPrice: d.price as number || 0,
+        spread: 0,
+        spreadPercent: 0,
+        spreadBps: 0,
+        volume24h: d.volume24h as number || 0,
+        signal: fundingRate > 0 ? `Short Perp (paying ${(fundingRate*100).toFixed(4)}%)` : `Long Perp (earning ${Math.abs(fundingRate*100).toFixed(4)}%)`,
+        timestamp: Date.now(),
+      })
+    }
+  }
+
+  // Sort by spread
+  opportunities.sort((a, b) => b.spreadBps - a.spreadBps)
+
+  arbitrageNs.emit("arbitrage", {
+    opportunities: opportunities.slice(0, 50),
+    summary: {
+      total: opportunities.length,
+      cexFutures: opportunities.filter(o => o.type === 'CEX Spot-Futures').length,
+      dexCex: opportunities.filter(o => o.type === 'DEX-CEX').length,
+      funding: opportunities.filter(o => o.type === 'Funding Arb').length,
+    },
+    timestamp: Date.now(),
+  })
+}
+
+// Recompute arbitrage every 2 seconds (using cached WS data)
+setInterval(computeArbitrage, 2000)
+
+arbitrageNs.on("connection", (socket) => {
+  console.log(`[arbitrage] Client: ${socket.id}`)
+  // Send initial snapshot
+  computeArbitrage()
+  socket.on("disconnect", () => {})
+})
+
 // ═══════════════════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════════════════
@@ -215,7 +387,7 @@ const subscriber = startSubscriber(io);
 
 httpServer.listen(PORT, () => {
   console.log(`[WS] Socket.io server on port ${PORT}`);
-  console.log(`[WS] Streams: orderbook(${DEPTH_SYMBOLS.length}), prices, derivatives, liquidations`);
+  console.log(`[WS] Streams: orderbook(${DEPTH_SYMBOLS.length}), prices, derivatives, liquidations, arbitrage`);
 });
 
 process.on("SIGTERM", async () => {
