@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
@@ -37,6 +37,10 @@ export default function OrderBookPage() {
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
 
+  const [wsConnected, setWsConnected] = useState(false)
+  const wsRef = useRef<WebSocket | null>(null)
+
+  // REST fallback for ticker data
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch(`/api/v1/orderbook?symbol=${symbol}`)
@@ -45,19 +49,74 @@ export default function OrderBookPage() {
         setData(d.data as OrderBookData)
         setStatus('live')
         setLastUpdate(new Date())
-      } else {
-        setStatus('error')
       }
-    } catch {
-      setStatus('error')
-    }
+    } catch { /* silent */ }
   }, [symbol])
 
+  // WebSocket for realtime depth updates
   useEffect(() => {
+    const binanceSymbol = symbol.toLowerCase() + 'usdt'
+    let ws: WebSocket | null = null
+    let reconnectTimeout: NodeJS.Timeout
+
+    const connect = () => {
+      try {
+        // Connect directly to Binance depth stream (free, no key)
+        ws = new WebSocket(`wss://stream.binance.com:9443/ws/${binanceSymbol}@depth20@100ms`)
+        wsRef.current = ws
+
+        ws.onopen = () => {
+          setWsConnected(true)
+          setStatus('live')
+        }
+
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data as string) as { bids: Array<[string, string]>; asks: Array<[string, string]> }
+            const bids: DepthLevel[] = (msg.bids ?? []).slice(0, 15).map(([p, q]) => {
+              const price = parseFloat(p); const quantity = parseFloat(q)
+              return { price, quantity, total: price * quantity }
+            })
+            const asks: DepthLevel[] = (msg.asks ?? []).slice(0, 15).map(([p, q]) => {
+              const price = parseFloat(p); const quantity = parseFloat(q)
+              return { price, quantity, total: price * quantity }
+            })
+            const bidDepth = bids.reduce((s, b) => s + b.total, 0)
+            const askDepth = asks.reduce((s, a) => s + a.total, 0)
+            const bestBid = bids[0]?.price ?? 0
+            const bestAsk = asks[0]?.price ?? 0
+            const midPrice = (bestBid + bestAsk) / 2
+            const spread = bestAsk - bestBid
+            const spreadBps = midPrice > 0 ? (spread / midPrice) * 10000 : 0
+            const imbalance = bidDepth + askDepth > 0 ? (bidDepth - askDepth) / (bidDepth + askDepth) : 0
+
+            setData(prev => ({
+              bids, asks, bidDepth, askDepth, spread, spreadBps, midPrice, imbalance,
+              ticker: prev?.ticker ?? { price: midPrice, change24h: 0, volume24h: 0, high24h: 0, low24h: 0 },
+            }))
+            setLastUpdate(new Date())
+          } catch { /* silent */ }
+        }
+
+        ws.onerror = () => setWsConnected(false)
+        ws.onclose = () => {
+          setWsConnected(false)
+          reconnectTimeout = setTimeout(connect, 3000)
+        }
+      } catch { /* silent */ }
+    }
+
+    connect()
+    // Also fetch ticker data via REST every 30s
     fetchData()
-    const id = setInterval(fetchData, 2000) // 2s polling — fast enough for depth
-    return () => clearInterval(id)
-  }, [fetchData])
+    const tickerInterval = setInterval(fetchData, 30_000)
+
+    return () => {
+      clearTimeout(reconnectTimeout)
+      clearInterval(tickerInterval)
+      if (ws) ws.close()
+    }
+  }, [symbol, fetchData])
 
   const maxTotal = data ? Math.max(
     ...data.bids.map(b => b.total),
