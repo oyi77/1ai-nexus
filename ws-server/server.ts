@@ -394,21 +394,78 @@ arbitrageNs.on("connection", (socket) => {
 // MEMECOIN: Solana Raydium + Pump.fun WS → /memecoins namespace
 // Real-time swap events on Solana DEXes via public RPC
 // ═══════════════════════════════════════════════════════════
+// MULTI-CHAIN DEX MONITOR: Solana + Ethereum + BSC + Base
+// Real-time swap events via public RPC WebSockets
+// Zero API keys, zero cost
+// ═══════════════════════════════════════════════════════════
 const memecoinsNs = io.of("/memecoins")
 
-// Solana programs to monitor
+// === SOLANA DEX PROGRAMS ===
 const SOL_PROGRAMS: Record<string, string> = {
-  raydium: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8',
-  raydium_cpmm: 'CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C',
-  pumpfun: '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
+  // Raydium ecosystem
+  'raydium-amm': '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8',
+  'raydium-cpmm': 'CPMMoo8L3F4NbTegBCKVNunggL7H1ZpdTHKxQB5qKP1C',
+  'raydium-clmm': 'CAMMCzo5YL8w4VFF8KVHrK22GGUsp5VTaW7grrKgrWqK',
+  // Pump.fun
+  'pumpfun': '6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P',
+  // Meteora
+  'meteora-dlmm': 'LBUZKhRxPF3XUpBCjp4YzTKgLccjZhTSDM9YuVaPwxo',
+  'meteora-amm': 'Eo7WjKq67rjJQSZxS6z3YkapzY3eBj6xsLusPn6TYZro',
+  // Orca
+  'orca-whirlpool': 'whirLbMiicVdio4qvUfM5KAg6Ct8VwpYzGff3uctyCc',
+  // Jupiter
+  'jupiter': 'JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4',
+  // OpenBook
+  'openbook': 'srmqPwymBn95sGJmkfDT25F3geVg593rr3EdB85e2gA',
+  // Phoenix
+  'phoenix': 'PhoeNiXZ8ByJGLkxNfZRnkUfjvmuYqLR8971M8LD42V',
+  // Lifinity
+  'lifinity': '2wT8Yq49kHgDzXuPxZSaeLb4Liti6UWsCNrFhk8o773a',
 }
 
+// === EVM DEX ROUTERS ===
+const EVM_ROUTERS: Record<string, { chain: string; rpc: string; routers: string[] }> = {
+  ethereum: {
+    chain: 'eth',
+    rpc: 'wss://ethereum-rpc.publicnode.com',
+    routers: [
+      '0x7a250d5630b4cf539739df2c5dacb4c659f2488d', // Uniswap V2
+      '0xe592427a0aece92de3edee1f18e0157c05861564', // Uniswap V3
+      '0xd9e1ce17f2641f24ae83637ab66a2cca9c378b9f', // SushiSwap
+    ],
+  },
+  base: {
+    chain: 'base',
+    rpc: 'wss://base-rpc.publicnode.com',
+    routers: [
+      '0xcF77a3Ba9A5CA399B7c97c74d54e5b1Beb874E43', // Aerodrome
+      '0x327Df1E6de05895BFa8c4d48f81A3f1F10D9DeD7', // BaseSwap
+    ],
+  },
+  bsc: {
+    chain: 'bsc',
+    rpc: 'wss://bsc-rpc.publicnode.com',
+    routers: [
+      '0x10ED43C718714eb63d5aA57B78B54704E256024E', // PancakeSwap
+    ],
+  },
+  arbitrum: {
+    chain: 'arbitrum',
+    rpc: 'wss://arbitrum-one-rpc.publicnode.com',
+    routers: [
+      '0x6ddF18B5168E1e3b4ECfC2Bf3baA192F4cdDA9DA', // Camelot
+      '0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506', // SushiSwap
+    ],
+  },
+}
+
+// === SOLANA WS ===
 function connectSolanaWS() {
   const ws = new WebSocket('wss://api.mainnet-beta.solana.com')
   activeStreams++
 
   ws.on('open', () => {
-    console.log('[memecoins] Solana WS connected')
+    console.log('[memecoins] Solana WS connected — subscribing to ' + Object.keys(SOL_PROGRAMS).length + ' DEX programs')
     for (const [name, programId] of Object.entries(SOL_PROGRAMS)) {
       ws.send(JSON.stringify({
         jsonrpc: '2.0',
@@ -419,7 +476,6 @@ function connectSolanaWS() {
           { commitment: 'confirmed' }
         ]
       }))
-      console.log('[memecoins] Subscribed to ' + name)
     }
   })
 
@@ -432,21 +488,35 @@ function connectSolanaWS() {
         
         const signature = log.signature as string
         const logs = (log.logs || []) as string[]
+        const err = log.err
         
+        // Detect program from logs
+        let program = 'unknown'
+        for (const [name, addr] of Object.entries(SOL_PROGRAMS)) {
+          if (logs.some((l: string) => l.includes(addr))) {
+            program = name
+            break
+          }
+        }
+        
+        // Detect swap pattern
         const isSwap = logs.some((l: string) => 
           l.includes('ray_log') || 
           l.includes('Instruction: Swap') ||
           l.includes('Instruction: Buy') ||
-          l.includes('Instruction: Sell')
+          l.includes('Instruction: Sell') ||
+          l.includes('Instruction: Create') ||
+          l.includes('swap')
         )
         
-        if (isSwap) {
+        if (isSwap || program === 'pumpfun') {
           memecoinsNs.emit('memecoin', {
-            type: 'swap',
+            type: isSwap ? 'swap' : 'activity',
             signature,
             chain: 'solana',
-            program: 'raydium',
-            success: !log.err,
+            program,
+            success: !err,
+            logSnippet: logs.slice(0, 3).join(' | ').slice(0, 200),
             timestamp: Date.now(),
           })
         }
@@ -457,11 +527,74 @@ function connectSolanaWS() {
   ws.on('error', () => {})
   ws.on('close', () => {
     activeStreams--
-    console.log('[memecoins] Solana WS disconnected, reconnecting...')
     setTimeout(connectSolanaWS, 3000)
   })
 }
 
+// === EVM WS (Uniswap V2/V3 Swap events) ===
+function connectEvmDex(name: string, config: { chain: string; rpc: string; routers: string[] }) {
+  const ws = new WebSocket(config.rpc)
+  activeStreams++
+
+  // Uniswap V2 Swap event signature
+  const UNISWAP_V2_SWAP = '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822'
+  // Uniswap V3 Swap event signature
+  const UNISWAP_V3_SWAP = '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64f8ee05b2b2c7d7c428'
+
+  ws.on('open', () => {
+    console.log(`[memecoins] ${name} EVM DEX WS connected`)
+    // Subscribe to logs for all routers
+    ws.send(JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'eth_subscribe',
+      params: ['logs', {
+        address: config.routers,
+        topics: [[UNISWAP_V2_SWAP, UNISWAP_V3_SWAP]]
+      }]
+    }))
+  })
+
+  ws.on('message', (data: Buffer) => {
+    try {
+      const msg = JSON.parse(data.toString())
+      if (msg.method === 'eth_subscription' && msg.params?.result) {
+        const log = msg.params.result
+        const topic0 = log.topics?.[0]
+        
+        let type = 'swap'
+        if (topic0 === UNISWAP_V2_SWAP) type = 'v2_swap'
+        else if (topic0 === UNISWAP_V3_SWAP) type = 'v3_swap'
+
+        memecoinsNs.emit('memecoin', {
+          type,
+          signature: log.transactionHash,
+          chain: config.chain,
+          contract: log.address,
+          blockNumber: parseInt(log.blockNumber, 16),
+          timestamp: Date.now(),
+        })
+      }
+    } catch {}
+  })
+
+  ws.on('error', () => {})
+  ws.on('close', () => {
+    activeStreams--
+    setTimeout(() => connectEvmDex(name, config), 5000)
+  })
+}
+
+// === START ALL DEX STREAMS ===
+function startAllDexStreams() {
+  connectSolanaWS()
+  for (const [name, config] of Object.entries(EVM_ROUTERS)) {
+    connectEvmDex(name, config)
+  }
+  console.log('[memecoins] All DEX streams started: Solana(11 programs) + EVM(4 chains)')
+}
+
+// Client connections
 memecoinsNs.on('connection', (socket) => {
   console.log('[memecoins] Client: ' + socket.id)
   socket.on('disconnect', () => {})
@@ -473,7 +606,7 @@ for (const sym of DEPTH_SYMBOLS) connectDepth(sym)
 connectTicker()
 connectFuturesTicker()
 connectLiquidations()
-connectSolanaWS()
+startAllDexStreams()
 
 const subscriber = startSubscriber(io);
 
