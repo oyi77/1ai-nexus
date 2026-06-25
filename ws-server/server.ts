@@ -212,56 +212,50 @@ liquidationsNs.on("connection", (socket) => {
 // ═══════════════════════════════════════════════════════════
 const arbitrageNs = io.of("/arbitrage")
 
-// DEX price cache — from DexScreener (real-time, multi-chain, no API key)
+// DEX price cache — from GeckoTerminal (fast REST, 30s cache)
+// Used only for tokens NOT on Binance (memecoins, new tokens)
 const dexPrices = new Map<string, { price: number; name: string; network: string; pair: string; volume24h: number; liquidity: number; updatedAt: number }>()
 
-// Top tokens to track across DEXes
-const TRACKED_TOKENS = ['BTC', 'ETH', 'SOL', 'DOGE', 'PEPE', 'WIF', 'BONK', 'SHIB', 'ARB', 'OP', 'AVAX', 'LINK', 'DOT', 'MATIC', 'SUI', 'SEI', 'APT', 'NEAR', 'FIL', 'INJ']
+// GeckoTerminal token addresses for memecoins not on Binance
+const DEX_TOKENS: Record<string, { network: string; address: string }> = {
+  'PEPE': { network: 'eth', address: '0x6982508145454Ce325dDbE47a25d4ec3d2311933' },
+  'WIF': { network: 'solana', address: 'EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm' },
+  'BONK': { network: 'solana', address: 'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263' },
+  'SHIB': { network: 'eth', address: '0x95aD61b0a150d79219dCF64E1D6c04dd4f6e0002' },
+  'FLOKI': { network: 'eth', address: '0xcf0c122c6b73ff809c693db761e7baebe62b6a2e' },
+}
 
 async function fetchDexPrices() {
-  for (const token of TRACKED_TOKENS) {
+  for (const [symbol, info] of Object.entries(DEX_TOKENS)) {
     try {
-      const res = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${token}`, {
+      const res = await fetch(`https://api.geckoterminal.com/api/v2/simple/networks/${info.network}/token_price/${info.address}`, {
         headers: { Accept: 'application/json' },
         signal: AbortSignal.timeout(10_000),
       })
       if (!res.ok) continue
-      
-      const data = (await res.json()) as {
-        pairs: Array<{
-          baseToken: { symbol: string; name: string }
-          quoteToken: { symbol: string }
-          chainId: string
-          dexId: string
-          priceUsd: string
-          volume: { h24: string }
-          liquidity: { usd: string }
-          pairAddress: string
-        }>
-      }
-      
-      // Pick highest liquidity pair per token
-      const pairs = (data.pairs ?? [])
-        .filter(p => parseFloat(p.priceUsd) > 0 && parseFloat(p.liquidity?.usd ?? '0') > 10000)
-        .sort((a, b) => parseFloat(b.liquidity?.usd ?? '0') - parseFloat(a.liquidity?.usd ?? '0'))
-      
-      if (pairs.length > 0) {
-        const best = pairs[0]
-        const sym = best.baseToken.symbol.toUpperCase()
-        dexPrices.set(sym, {
-          price: parseFloat(best.priceUsd),
-          name: best.baseToken.name,
-          network: best.chainId,
-          pair: `${best.baseToken.symbol}/${best.quoteToken.symbol}`,
-          volume24h: parseFloat(best.volume?.h24 ?? '0'),
-          liquidity: parseFloat(best.liquidity?.usd ?? '0'),
+      const data = (await res.json()) as { data: { attributes: { token_prices: Record<string, string> } } }
+      const price = parseFloat(data.data?.attributes?.token_prices?.[info.address] ?? '0')
+      if (price > 0) {
+        dexPrices.set(symbol, {
+          price,
+          name: symbol,
+          network: info.network,
+          pair: `${symbol}/USDT`,
+          volume24h: 0,
+          liquidity: 0,
           updatedAt: Date.now(),
         })
       }
     } catch {}
   }
-  console.log(`[arbitrage] DEX prices updated: ${dexPrices.size} tokens`)
+  if (dexPrices.size > 0) {
+    console.log(`[arbitrage] DEX prices updated: ${dexPrices.size} memecoins`)
+  }
 }
+
+// Fetch DEX prices every 30s (only for non-Binance tokens)
+fetchDexPrices()
+setInterval(fetchDexPrices, 30_000)
 
 // Fetch DEX prices on startup and every 15s
 fetchDexPrices()
