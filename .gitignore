@@ -49,3 +49,4 @@ yarn-error.log*
 next-env.d.ts
 indexer/node_modules/
 ws-server/node_modules/
+dump.rdb
