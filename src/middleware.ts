@@ -95,6 +95,11 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/trending-coins",
   "/api/v1/calendar",
   "/api/v1/alpha-cross-correlation",
+  "/api/v1/modules",
+  "/api/v1/modules/fetch",
+  "/api/v1/indonesia-macro",
+  "/api/v1/trading",
+  "/api/v1/compliance",
   "/api/auth",
 ]);
 
