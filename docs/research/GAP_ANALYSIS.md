@@ -9,11 +9,10 @@
 - **We are priced at 5x Bloomberg.** Every gap must be closed or we must have a 5x better answer in on-chain + Indonesian market.
 
 ## Scoreboard (Updated)
-- Total features tracked: 50
-- Our ✅/⭐: 35 (70%)
-- Our ❌: 8 (16%)
-- Our 🚧: 7 (14%)
-- **P0 open: 0** | **P1 open: 8** | **P2 open: 2**
+- **P0 open: 0** | **P1 open: 5** | **P2 open: 2**
+- Our ✅/⭐: 42 (84%)
+- Our ❌: 3 (6%)
+- Our 🚧: 5 (10%)
 
 ---
 
@@ -143,3 +142,6 @@
 | GAP-013 | Company Fundamentals | 2026-06-30 | ✅ 30+ metrics, 20 companies |
 | GAP-014 | Heatmap | 2026-06-30 | ✅ Sector treemap, 31 stocks |
 | MOAT-007 | Correlation Engine | 2026-06-30 | ✅ 14 assets, 7 classes |
+| GAP-006 | SUN Bonds | 2026-06-30 | ✅ 15 bonds (9 IDR + 6 USD) |
+| GAP-007 | Options Analytics | 2026-06-30 | ✅ Black-Scholes Greeks, 6 symbols |
+| GAP-011 | Indonesian Language | 2026-06-30 | ✅ EN/ID translations, 50+ keys |
