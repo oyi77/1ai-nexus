@@ -1,45 +1,31 @@
 // ─────────────────────────────────────────────────────────────
 // Module: FRED (Federal Reserve Economic Data)
 // sourceType: public-api
-// Endpoint: api.stlouisfed.org/fred
-// Coverage: Fed rates, CPI, GDP, unemployment, M2, treasury yields
+// Endpoint: api.stlouisfed.org/fred + Treasury CSV + World Bank
+// Coverage: Fed rates, CPI, GDP, unemployment, treasury yields
 // ─────────────────────────────────────────────────────────────
 
 import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../types'
 import { TTL } from '../types'
 import { cachedFetch } from '../fetch-with-cache'
-
-const BASE = 'https://api.stlouisfed.org/fred/series/observations'
+import { getFredSeries, FRED_SERIES as SHARED_SERIES } from '@/lib/fred-client'
 
 export const FRED_SERIES: Record<string, { title: string; unit: string; category: string }> = {
-  FEDFUNDS:  { title: 'Federal Funds Effective Rate',              unit: '%',     category: 'rates' },
-  DGS10:     { title: '10-Year Treasury Constant Maturity Rate',   unit: '%',     category: 'rates' },
-  DGS2:      { title: '2-Year Treasury Constant Maturity Rate',    unit: '%',     category: 'rates' },
-  T10Y2Y:    { title: '10Y-2Y Treasury Spread',                   unit: '%',     category: 'rates' },
-  CPIAUCSL:  { title: 'Consumer Price Index',                     unit: 'Index', category: 'inflation' },
-  UNRATE:    { title: 'Unemployment Rate',                         unit: '%',     category: 'employment' },
-  GDP:       { title: 'Gross Domestic Product',                    unit: 'B$',    category: 'gdp' },
-  M2SL:      { title: 'M2 Money Supply',                           unit: 'B$',    category: 'money' },
-  DXY:       { title: 'Trade Weighted U.S. Dollar Index',          unit: 'Index', category: 'currency' },
-  VIXCLS:    { title: 'CBOE Volatility Index',                    unit: 'Index', category: 'volatility' },
+  ...SHARED_SERIES,
 }
 
 async function fetchFred(params: FetchParams): Promise<unknown> {
   const seriesId = (params.series as string) ?? 'FEDFUNDS'
   const limit = (params.limit as number) ?? 30
 
-  // Use DEMO_KEY for free access (rate-limited but works for low volume)
-  const url = `${BASE}?series_id=${seriesId}&api_key=DEMO_KEY&file_type=json&sort_order=desc&limit=${limit}`
-  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) })
-  if (!res.ok) throw new Error(`FRED ${res.status}: ${seriesId}`)
-  const json = await res.json() as { observations: Array<{ date: string; value: string }> }
-
+  const result = await getFredSeries(seriesId, limit)
   return {
     seriesId,
     meta: FRED_SERIES[seriesId],
-    observations: json.observations
-      .filter(o => o.value !== '.')
-      .map(o => ({ date: o.date, value: Number(o.value) })),
+    observations: result.observations.map(o => ({
+      date: o.date,
+      value: o.value === '' ? null : Number(o.value),
+    })),
   }
 }
 
@@ -49,9 +35,9 @@ const fredModule: DataModule = {
   category: 'macro',
   sourceType: 'public-api',
   provenance: {
-    describesItself: 'Federal Reserve Economic Data — rates, CPI, GDP, unemployment, M2, treasury yields',
+    describesItself: 'Federal Reserve Economic Data — rates, CPI, GDP, unemployment, M2, treasury yields. Uses Treasury CSV (free) + World Bank (free) + FRED API (with key).',
     fragility: 'stable',
-    lastVerified: '2026-06-19',
+    lastVerified: '2026-06-30',
     toleratesAbsence: true,
   },
 
@@ -59,10 +45,11 @@ const fredModule: DataModule = {
 
   async healthCheck(): Promise<ModuleHealth> {
     try {
-      const url = `${BASE}?series_id=FEDFUNDS&api_key=DEMO_KEY&file_type=json&limit=1`
-      const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      return { status: 'active', lastChecked: new Date(), lastSuccess: new Date(), failureCount: 0 }
+      const result = await getFredSeries('DGS10', 1)
+      if (result.observations.length > 0) {
+        return { status: 'active', lastChecked: new Date(), lastSuccess: new Date(), failureCount: 0 }
+      }
+      return { status: 'degraded', lastChecked: new Date(), failureCount: 1, notes: 'Treasury CSV returned no data' }
     } catch (e) {
       return { status: 'offline', lastChecked: new Date(), failureCount: 1, notes: String(e) }
     }

@@ -1,11 +1,227 @@
 // ─── Macro-Economic Data Client ────────────────────────────
 // Sources:
+//   - FRED API (free key from fred.stlouisfed.org, set FRED_API_KEY env)
+//   - U.S. Treasury yield curve CSV (free, no key) for rates
 //   - World Bank API (free, no key) for GDP, CPI, Unemployment
-// No API keys required. Returns empty if live data unavailable.
+// Requires FRED API key for full data; yields/WB work without one.
 // ─────────────────────────────────────────────────────────
 
-
+const FRED_API_KEY = process.env.FRED_API_KEY ?? ''
 const FRED_API_BASE = 'https://api.stlouisfed.org/fred/series/observations'
+const TREASURY_CSV_URL = 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/2026/all?type=daily_treasury_yield_curve&field_tdr_date_value=2026&page&_format=csv'
+const WORLD_BANK_BASE = 'https://api.worldbank.org/v2'
+
+// ─── Types ────────────────────────────────────────────────
+
+export interface FredObservation {
+  date: string
+  value: string
+}
+
+export interface FredSeries {
+  id: string
+  title: string
+  observations: FredObservation[]
+}
+
+// ─── Key FRED Series (metadata preserved for callers) ─────
+
+export const FRED_SERIES: Record<string, { title: string; unit: string; category: string }> = {
+  // ─── Rates ────────────────────────────────────────────
+  FEDFUNDS:             { title: 'Federal Funds Effective Rate',              unit: '%',       category: 'rates' },
+  DFF:                  { title: 'Federal Funds Effective Rate (Daily)',      unit: '%',       category: 'rates' },
+  DGS10:                { title: '10-Year Treasury Constant Maturity Rate',   unit: '%',       category: 'rates' },
+  DGS2:                 { title: '2-Year Treasury Constant Maturity Rate',    unit: '%',       category: 'rates' },
+  T10Y2Y:               { title: '10Y-2Y Treasury Spread',                   unit: '%',       category: 'rates' },
+
+  // ─── Inflation ────────────────────────────────────────
+  CPIAUCSL:             { title: 'Consumer Price Index for All Urban Consumers', unit: 'Index', category: 'inflation' },
+  T10YIE:               { title: '10-Year Breakeven Inflation Rate',          unit: '%',       category: 'inflation' },
+  T5YIFR:               { title: '5-Year Forward Inflation Expectation Rate', unit: '%',       category: 'inflation' },
+
+  // ─── Employment ───────────────────────────────────────
+  UNRATE:               { title: 'Unemployment Rate',                         unit: '%',        category: 'employment' },
+  ICSA:                 { title: 'Initial Jobless Claims',                    unit: 'Thousands', category: 'employment' },
+  PAYEMS:               { title: 'Total Nonfarm Payrolls',                    unit: 'Thousands', category: 'employment' },
+
+  // ─── Growth ───────────────────────────────────────────
+  GDP:                  { title: 'Gross Domestic Product',                    unit: '$B',      category: 'growth' },
+  INDPRO:               { title: 'Industrial Production Index',               unit: 'Index',   category: 'growth' },
+
+  // ─── Real Estate ───────────────────────────────────────
+  HOUST:                { title: 'Housing Starts',                            unit: 'Thousands', category: 'real-estate' },
+  MORTGAGE30US:         { title: '30-Year Fixed Rate Mortgage Average',       unit: '%',       category: 'real-estate' },
+
+  // ─── Sentiment ────────────────────────────────────────
+  UMCSENT:              { title: 'University of Michigan Consumer Sentiment', unit: 'Index',   category: 'sentiment' },
+
+  // ─── Monetary ──────────────────────────────────────────
+  M2SL:                 { title: 'M2 Money Stock',                            unit: '$B',      category: 'monetary' },
+
+  // ─── Cross-Market ────────────────────────────────────
+  DTWEXBGS:             { title: 'Trade Weighted U.S. Dollar Index',          unit: 'Index',   category: 'cross-market' },
+  DCOILWTICO:           { title: 'WTI Crude Oil Price',                       unit: '$/bbl',   category: 'cross-market' },
+  GOLDAMGBD228NLBM:     { title: 'Gold Price (London Fix)',                   unit: '$/oz',    category: 'cross-market' },
+  SP500:                { title: 'S&P 500 Index',                             unit: 'Index',   category: 'cross-market' },
+  VIXCLS:               { title: 'CBOE Volatility Index (VIX)',               unit: 'Index',   category: 'cross-market' },
+}
+
+// ─── Treasury CSV column → FRED series mapping ───────────
+// The daily Treasury yield curve CSV columns map to these series.
+const TREASURY_COLUMNS: Record<string, string> = {
+  '2 Yr': 'DGS2',
+  '3 Yr': 'DGS3',
+  '5 Yr': 'DGS5',
+  '7 Yr': 'DGS7',
+  '10 Yr': 'DGS10',
+  '20 Yr': 'DGS20',
+  '30 Yr': 'DGS30',
+}
+
+// Yield-related series we can serve from Treasury CSV
+const TREASURY_SERIES = new Set(['DGS2', 'DGS10', 'T10Y2Y', 'DGS3', 'DGS5', 'DGS7', 'DGS20', 'DGS30'])
+
+// ─── World Bank indicator mappings ────────────────────────
+
+const WORLD_BANK_INDICATORS: Record<string, { indicator: string; transform: (val: number) => string }> = {
+  GDP:      { indicator: 'NY.GDP.MKTP.CD', transform: (v) => (v / 1e9).toFixed(1) },
+  CPIAUCSL: { indicator: 'FP.CPI.TOTL',    transform: (v) => v.toFixed(2) },
+  UNRATE:   { indicator: 'SL.UEM.TOTL.ZS', transform: (v) => v.toFixed(1) },
+}
+
+// ─── Cache ────────────────────────────────────────────────
+
+interface CacheEntry {
+  data: FredSeries
+  timestamp: number
+}
+
+const CACHE_TTL_MS = 30 * 60 * 1000 // 30 minutes
+const seriesCache = new Map<string, CacheEntry>()
+
+// ─── Treasury CSV Parser ─────────────────────────────────
+
+interface TreasuryRow {
+  date: string
+  columns: Record<string, string>
+}
+
+function parseTreasuryCsv(text: string): TreasuryRow[] {
+  const lines = text.trim().split('\n')
+  if (lines.length < 2) return []
+
+  // Parse header line: Date,"1 Mo","1.5 Month","2 Mo",...
+  const headers = parseCsvLine(lines[0])
+  const dateIdx = headers.findIndex(h => h.toLowerCase() === 'date')
+  if (dateIdx === -1) return []
+
+  const rows: TreasuryRow[] = []
+  for (let i = lines.length - 1; i >= 1; i--) {
+    const cols = parseCsvLine(lines[i])
+    const dateVal = cols[dateIdx]
+    if (!dateVal) continue
+
+    const columns: Record<string, string> = {}
+    for (let j = 0; j < headers.length; j++) {
+      if (j !== dateIdx && cols[j] && cols[j] !== '.') {
+        columns[headers[j]] = cols[j]
+      }
+    }
+    rows.push({ date: normalizeTreasuryDate(dateVal), columns })
+  }
+
+  return rows
+}
+
+function parseCsvLine(line: string): string[] {
+  const result: string[] = []
+  let current = ''
+  let inQuotes = false
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      inQuotes = !inQuotes
+    } else if (ch === ',' && !inQuotes) {
+      result.push(current.trim())
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  result.push(current.trim())
+  return result
+}
+
+function normalizeTreasuryDate(dateStr: string): string {
+  // "06/29/2026" → "2026-06-29"
+  const parts = dateStr.split('/')
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`
+  }
+  return dateStr
+}
+
+let treasuryCache: { rows: TreasuryRow[]; timestamp: number } | null = null
+const TREASURY_CACHE_TTL = 30 * 60 * 1000
+
+async function fetchTreasuryCsv(): Promise<TreasuryRow[]> {
+  if (treasuryCache && Date.now() - treasuryCache.timestamp <= TREASURY_CACHE_TTL) {
+    return treasuryCache.rows
+  }
+
+  const res = await fetch(TREASURY_CSV_URL, { signal: AbortSignal.timeout(15_000) })
+  if (!res.ok) throw new Error(`Treasury CSV HTTP ${res.status}`)
+
+  const text = await res.text()
+  const rows = parseTreasuryCsv(text)
+
+  treasuryCache = { rows, timestamp: Date.now() }
+  return rows
+}
+
+function fetchFromTreasury(
+  seriesId: string,
+  rows: TreasuryRow[],
+  limit: number,
+): FredObservation[] {
+  if (rows.length === 0) return []
+
+  if (seriesId === 'T10Y2Y') {
+    // Compute spread from 10Y and 2Y columns
+    const dgs10Col = Object.keys(TREASURY_COLUMNS).find(k => TREASURY_COLUMNS[k] === 'DGS10')
+    const dgs2Col = Object.keys(TREASURY_COLUMNS).find(k => TREASURY_COLUMNS[k] === 'DGS2')
+    if (!dgs10Col || !dgs2Col) return []
+
+    const observations: FredObservation[] = []
+    for (const row of rows) {
+      const d10 = row.columns[dgs10Col]
+      const d2 = row.columns[dgs2Col]
+      if (d10 && d2) {
+        const spread = (Number.parseFloat(d10) - Number.parseFloat(d2)).toFixed(2)
+        observations.push({ date: row.date, value: spread })
+      }
+      if (observations.length >= limit) break
+    }
+    return observations
+  }
+
+  // Find the Treasury column for this series
+  const treasuryCol = Object.keys(TREASURY_COLUMNS).find(k => TREASURY_COLUMNS[k] === seriesId)
+  if (!treasuryCol) return []
+
+  const observations: FredObservation[] = []
+  for (const row of rows) {
+    const val = row.columns[treasuryCol]
+    if (val) {
+      observations.push({ date: row.date, value: val })
+    }
+    if (observations.length >= limit) break
+  }
+  return observations
+}
+
+// ─── FRED API type guards ─────────────────────────────────
 
 function isFredObservations(value: unknown): value is Array<{ date: string; value: string }> {
   if (!Array.isArray(value)) return false
@@ -27,90 +243,16 @@ function isFredResponse(value: unknown): value is { observations: Array<{ date: 
     isFredObservations((value as Record<string, unknown>).observations)
   )
 }
-const WORLD_BANK_BASE = "https://api.worldbank.org/v2";
-
-// ─── Types ────────────────────────────────────────────────
-
-export interface FredObservation {
-  date: string;
-  value: string;
-}
-
-export interface FredSeries {
-  id: string;
-  title: string;
-  observations: FredObservation[];
-}
-
-// ─── Key FRED Series (metadata preserved for callers) ─────
-
-export const FRED_SERIES: Record<string, { title: string; unit: string; category: string }> = {
-  // ─── Rates ────────────────────────────────────────────
-  FEDFUNDS:             { title: "Federal Funds Effective Rate",              unit: "%",       category: "rates" },
-  DFF:                  { title: "Federal Funds Effective Rate (Daily)",      unit: "%",       category: "rates" },
-  DGS10:                { title: "10-Year Treasury Constant Maturity Rate",   unit: "%",       category: "rates" },
-  DGS2:                 { title: "2-Year Treasury Constant Maturity Rate",    unit: "%",       category: "rates" },
-  T10Y2Y:               { title: "10Y-2Y Treasury Spread",                   unit: "%",       category: "rates" },
-
-  // ─── Inflation ────────────────────────────────────────
-  CPIAUCSL:             { title: "Consumer Price Index for All Urban Consumers", unit: "Index", category: "inflation" },
-  T10YIE:               { title: "10-Year Breakeven Inflation Rate",          unit: "%",       category: "inflation" },
-  T5YIFR:               { title: "5-Year Forward Inflation Expectation Rate", unit: "%",       category: "inflation" },
-
-  // ─── Employment ───────────────────────────────────────
-  UNRATE:               { title: "Unemployment Rate",                         unit: "%",       category: "employment" },
-  ICSA:                 { title: "Initial Jobless Claims",                    unit: "Thousands", category: "employment" },
-  PAYEMS:               { title: "Total Nonfarm Payrolls",                    unit: "Thousands", category: "employment" },
-
-  // ─── Growth ───────────────────────────────────────────
-  GDP:                  { title: "Gross Domestic Product",                    unit: "$B",      category: "growth" },
-  INDPRO:               { title: "Industrial Production Index",               unit: "Index",   category: "growth" },
-
-  // ─── Real Estate ───────────────────────────────────────
-  HOUST:                { title: "Housing Starts",                            unit: "Thousands", category: "real-estate" },
-  MORTGAGE30US:         { title: "30-Year Fixed Rate Mortgage Average",       unit: "%",       category: "real-estate" },
-
-  // ─── Sentiment ────────────────────────────────────────
-  UMCSENT:              { title: "University of Michigan Consumer Sentiment", unit: "Index",   category: "sentiment" },
-
-  // ─── Monetary ──────────────────────────────────────────
-  M2SL:                 { title: "M2 Money Stock",                            unit: "$B",      category: "monetary" },
-
-  // ─── Cross-Market ────────────────────────────────────
-  DTWEXBGS:             { title: "Trade Weighted U.S. Dollar Index",          unit: "Index",   category: "cross-market" },
-  DCOILWTICO:           { title: "WTI Crude Oil Price",                       unit: "$/bbl",   category: "cross-market" },
-  GOLDAMGBD228NLBM:     { title: "Gold Price (London Fix)",                   unit: "$/oz",    category: "cross-market" },
-  SP500:                { title: "S&P 500 Index",                             unit: "Index",   category: "cross-market" },
-  VIXCLS:               { title: "CBOE Volatility Index (VIX)",               unit: "Index",   category: "cross-market" },
-};
-
-// ─── World Bank indicator mappings ────────────────────────
-
-const WORLD_BANK_INDICATORS: Record<string, { indicator: string; transform: (val: number) => string }> = {
-  GDP:      { indicator: "NY.GDP.MKTP.CD", transform: (v) => (v / 1e9).toFixed(1) },
-  CPIAUCSL: { indicator: "FP.CPI.TOTL",    transform: (v) => v.toFixed(2) },
-  UNRATE:   { indicator: "SL.UEM.TOTL.ZS", transform: (v) => v.toFixed(1) },
-};
-
-// ─── Cache ────────────────────────────────────────────────
-
-interface CacheEntry {
-  data: FredSeries;
-  timestamp: number;
-}
-
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
-const seriesCache = new Map<string, CacheEntry>();
 
 // ─── World Bank fetcher ───────────────────────────────────
 
 interface WorldBankObservation {
-  date: string;
-  value: number | null;
+  date: string
+  value: number | null
 }
 
 function isWorldBankResponse(json: unknown): json is [unknown, WorldBankObservation[]] {
-  return Array.isArray(json) && json.length === 2 && Array.isArray(json[1]);
+  return Array.isArray(json) && json.length === 2 && Array.isArray(json[1])
 }
 
 async function fetchFromWorldBank(
@@ -118,17 +260,17 @@ async function fetchFromWorldBank(
   mapping: { indicator: string; transform: (val: number) => string },
   limit: number,
 ): Promise<FredObservation[]> {
-  const url = `${WORLD_BANK_BASE}/country/us/indicator/${mapping.indicator}?format=json&per_page=${Math.max(limit * 2, 20)}`;
+  const url = `${WORLD_BANK_BASE}/country/us/indicator/${mapping.indicator}?format=json&per_page=${Math.max(limit * 2, 20)}`
 
   const res = await fetch(url, {
     signal: AbortSignal.timeout(5000),
-    headers: { Accept: "application/json" },
-  });
+    headers: { Accept: 'application/json' },
+  })
 
-  if (!res.ok) throw new Error(`World Bank API ${res.status} for ${seriesId}`);
+  if (!res.ok) throw new Error(`World Bank API ${res.status} for ${seriesId}`)
 
-  const json: unknown = await res.json();
-  if (!isWorldBankResponse(json)) throw new Error(`Unexpected World Bank response for ${seriesId}`);
+  const json: unknown = await res.json()
+  if (!isWorldBankResponse(json)) throw new Error(`Unexpected World Bank response for ${seriesId}`)
 
   return json[1]
     .filter((obs) => obs.value !== null)
@@ -136,67 +278,97 @@ async function fetchFromWorldBank(
     .map((obs) => ({
       date: obs.date,
       value: mapping.transform(obs.value as number),
-    }));
+    }))
+}
+
+// ─── FRED API fetcher ─────────────────────────────────────
+
+async function fetchFromFredApi(
+  seriesId: string,
+  limit: number,
+): Promise<FredObservation[] | null> {
+  // If no API key is configured, skip FRED API entirely
+  if (!FRED_API_KEY) return null
+
+  const url = `${FRED_API_BASE}?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=${limit}`
+  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) })
+  if (!res.ok) return null
+
+  const raw: unknown = await res.json()
+  if (!isFredResponse(raw)) return null
+
+  const observations: FredObservation[] = raw.observations
+    .filter(o => o.value !== '.')
+    .map(o => ({ date: o.date, value: o.value }))
+
+  return observations.length > 0 ? observations : null
 }
 
 // ─── Client ───────────────────────────────────────────────
 
 /**
  * Fetch observations for a macro-economic series.
- * Uses World Bank API for GDP/CPI/Unemployment. Returns empty if unavailable.
+ * Priority: FRED API (with key) → Treasury CSV (yields only) → World Bank (GDP/CPI/UNRATE)
+ *
  * @param seriesId — e.g. "FEDFUNDS", "GDP"
  * @param limit — max observations to return (most recent first, default 10)
  */
 export async function getFredSeries(seriesId: string, limit = 10): Promise<FredSeries> {
   // Check cache
-  const cached = seriesCache.get(seriesId);
+  const cached = seriesCache.get(seriesId)
   if (cached && Date.now() - cached.timestamp <= CACHE_TTL_MS) {
-    return { ...cached.data, observations: cached.data.observations.slice(0, limit) };
+    return { ...cached.data, observations: cached.data.observations.slice(0, limit) }
   }
 
-  const meta = FRED_SERIES[seriesId];
-  const title = meta?.title ?? seriesId;
+  const meta = FRED_SERIES[seriesId]
+  const title = meta?.title ?? seriesId
 
-  // Try real FRED API with DEMO_KEY (rate-limited but works for low volume)
+  // 1. Try FRED API (requires FRED_API_KEY env var / free registration)
   try {
-    const url = `${FRED_API_BASE}?series_id=${seriesId}&api_key=DEMO_KEY&file_type=json&sort_order=desc&limit=${limit}`
-    const res = await fetch(url, { signal: AbortSignal.timeout(15_000) })
-    if (res.ok) {
-      const raw: unknown = await res.json()
-      if (isFredResponse(raw)) {
-        const observations: FredObservation[] = raw.observations
-          .filter(o => o.value !== '.')
-          .map(o => ({ date: o.date, value: o.value }))
-        if (observations.length > 0) {
-          const series: FredSeries = { id: seriesId, title, observations }
-          seriesCache.set(seriesId, { data: series, timestamp: Date.now() })
-          return series
-        }
-      }
+    const fredObs = await fetchFromFredApi(seriesId, limit)
+    if (fredObs) {
+      const series: FredSeries = { id: seriesId, title, observations: fredObs }
+      seriesCache.set(seriesId, { data: series, timestamp: Date.now() })
+      return series
     }
   } catch {
-    console.warn(`[fred-client] FRED API failed for ${seriesId}, trying World Bank fallback`)
+    // Silently fall through
   }
 
-  // Fallback: World Bank for GDP/CPI/Unemployment indicators
-  const wbMapping = WORLD_BANK_INDICATORS[seriesId];
-  if (wbMapping) {
+  // 2. Try Treasury CSV for yield curve series (free, no key)
+  if (TREASURY_SERIES.has(seriesId)) {
     try {
-      const observations = await fetchFromWorldBank(seriesId, wbMapping, limit);
+      const rows = await fetchTreasuryCsv()
+      const observations = fetchFromTreasury(seriesId, rows, limit)
       if (observations.length > 0) {
-        const series: FredSeries = { id: seriesId, title, observations };
-        seriesCache.set(seriesId, { data: series, timestamp: Date.now() });
-        return series;
+        const series: FredSeries = { id: seriesId, title, observations }
+        seriesCache.set(seriesId, { data: series, timestamp: Date.now() })
+        return series
       }
     } catch {
-      console.warn(`[fred-client] World Bank API failed for ${seriesId}`)
+      // Silently fall through
     }
   }
 
-  // No data available
-  const series: FredSeries = { id: seriesId, title, observations: [] };
-  seriesCache.set(seriesId, { data: series, timestamp: Date.now() });
-  return series;
+  // 3. Try World Bank for GDP/CPI/UNRATE
+  const wbMapping = WORLD_BANK_INDICATORS[seriesId]
+  if (wbMapping) {
+    try {
+      const observations = await fetchFromWorldBank(seriesId, wbMapping, limit)
+      if (observations.length > 0) {
+        const series: FredSeries = { id: seriesId, title, observations }
+        seriesCache.set(seriesId, { data: series, timestamp: Date.now() })
+        return series
+      }
+    } catch {
+      // Silently fall through
+    }
+  }
+
+  // 4. No data available — return empty series
+  const empty: FredSeries = { id: seriesId, title, observations: [] }
+  seriesCache.set(seriesId, { data: empty, timestamp: Date.now() })
+  return empty
 }
 
 /**
@@ -204,6 +376,6 @@ export async function getFredSeries(seriesId: string, limit = 10): Promise<FredS
  * Returns null if no data is available.
  */
 export async function getLatestObservation(seriesId: string): Promise<FredObservation | null> {
-  const series = await getFredSeries(seriesId, 1);
-  return series.observations[0] ?? null;
+  const series = await getFredSeries(seriesId, 1)
+  return series.observations[0] ?? null
 }
