@@ -58,6 +58,8 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Trading',
     items: [
+      { label: 'Charts',        href: '/charts',         icon: BarChart3 },
+      { label: 'Backtest',      href: '/backtest',       icon: Activity },
       { label: 'Order Book',    href: '/orderbook',      icon: BarChart3 },
       { label: 'Options',       href: '/options',        icon: TrendingUp },
       { label: 'Basis Scanner', href: '/basis',          icon: Activity },
