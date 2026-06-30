@@ -8,6 +8,12 @@ function walletAddress(seed: number): string {
   return `0x${hex}`;
 }
 
+const WELL_KNOWN_WALLETS: Record<string, Partial<Record<string, string>>> = {
+  Binance: {
+    ethereum: "0x28C6c06298d514Db089934071355E5743bf21d60",
+  },
+}
+
 const ENTITY_TYPES = ["Exchange", "Whale", "Fund", "Protocol", "Government", "Unknown"] as const;
 const CHAINS = ["ethereum", "arbitrum", "base", "optimism", "solana", "bitcoin"] as const;
 const PM_CATEGORIES = ["Politics", "Crypto", "Sports", "Science", "Finance"] as const;
@@ -141,9 +147,10 @@ async function main() {
     const numWallets = entity.type === "Exchange" ? 3 : entity.type === "Whale" || entity.type === "Unknown" ? 1 : 2;
     for (let j = 0; j < numWallets; j++) {
       const chain = entity.chains[j % entity.chains.length];
+      const knownAddress = WELL_KNOWN_WALLETS[entity.name]?.[chain]
       const wallet = await prisma.wallet.create({
         data: {
-          address: walletAddress(i * 10 + j + 1),
+          address: knownAddress ?? walletAddress(i * 10 + j + 1),
           chain,
           entityId: entity.id,
           labels: [entity.name, entity.type],

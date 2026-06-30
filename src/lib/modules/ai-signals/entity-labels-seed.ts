@@ -15,6 +15,20 @@ export interface EntitySeed {
 
 let cachedSeeds: EntitySeed[] | null = null
 
+function normalizeChain(chain: string | null | undefined): string {
+  if (!chain) return 'ethereum'
+  const lower = chain.toLowerCase()
+  if (lower === 'eth') return 'ethereum'
+  if (lower === 'btc') return 'bitcoin'
+  return lower
+}
+
+function normalizeCategory(category: string | null | undefined): string {
+  const lower = (category ?? 'unknown').toLowerCase()
+  if (lower === 'unknown') return 'whale'
+  return lower
+}
+
 async function loadSeeds(): Promise<EntitySeed[]> {
   if (cachedSeeds) return cachedSeeds
   const entities = await prisma.entity.findMany({
@@ -25,9 +39,9 @@ async function loadSeeds(): Promise<EntitySeed[]> {
     for (const w of e.wallets) {
       cachedSeeds.push({
         address: w.address,
-        chain: w.chain || 'eth',
+        chain: normalizeChain(w.chain),
         label: e.name,
-        category: e.type,
+        category: normalizeCategory(e.type),
         confidence: e.verified ? 0.9 : 0.7,
       })
     }
@@ -36,16 +50,18 @@ async function loadSeeds(): Promise<EntitySeed[]> {
 }
 
 /** Get entity label for an address */
-export async function getEntityLabel(address: string, chain: string = 'eth'): Promise<EntitySeed | undefined> {
+export async function getEntityLabel(address: string, chain: string = 'ethereum'): Promise<EntitySeed | undefined> {
   const seeds = await loadSeeds()
-  const normalized = address.toLowerCase()
-  return seeds.find(e => e.address.toLowerCase() === normalized && e.chain === chain)
+  const normalizedAddress = address.toLowerCase()
+  const normalizedChain = normalizeChain(chain)
+  return seeds.find(e => e.address.toLowerCase() === normalizedAddress && e.chain === normalizedChain)
 }
 
 /** Get all entities by category */
 export async function getEntitiesByCategory(category: string): Promise<EntitySeed[]> {
   const seeds = await loadSeeds()
-  return seeds.filter(e => e.category === category)
+  const normalizedCategory = normalizeCategory(category)
+  return seeds.filter(e => e.category === normalizedCategory)
 }
 
 /** Get all entity seeds (for backward compatibility with callers that need the full array) */

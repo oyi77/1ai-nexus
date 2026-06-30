@@ -36,7 +36,7 @@ describe('Entity Label Service (DB-backed)', () => {
 
     it('categories match DB entity types', async () => {
       const seeds = await getEntitySeeds()
-      const validCategories = ['exchange', 'protocol', 'bridge', 'fund', 'whale', 'dao', 'Exchange', 'Protocol', 'Fund', 'Government']
+      const validCategories = ['exchange', 'protocol', 'bridge', 'fund', 'whale', 'dao', 'government', 'unknown', 'Exchange', 'Protocol', 'Fund', 'Government', 'Whale', 'Unknown']
       for (const entity of seeds.slice(0, 50)) {
         expect(validCategories).toContain(entity.category)
       }
