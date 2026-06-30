@@ -1,95 +1,142 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
+
+interface Position {
+  symbol: string
+  qty: string
+  avgEntryPrice: string
+  currentPrice: string
+  marketValue: string
+  unrealizedPnl: string
+  unrealizedPnlPct: string
+  side: string
+}
 
 interface Order {
   id: string
   symbol: string
-  side: 'BUY' | 'SELL'
-  type: 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT'
-  quantity: number
-  price: number | null
-  stopPrice: number | null
-  status: 'PENDING' | 'FILLED' | 'PARTIALLY_FILLED' | 'CANCELLED' | 'REJECTED'
-  filledQuantity: number
-  avgFillPrice: number | null
-  timestamp: string
-  broker: string
-}
-
-interface Position {
-  symbol: string
-  quantity: number
-  avgCost: number
-  currentPrice: number
-  marketValue: number
-  unrealizedPnl: number
-  unrealizedPnlPercent: number
+  qty: string
+  side: string
+  type: string
+  status: string
+  filled_avg_price: string | null
+  filled_qty: string
+  submitted_at: string
+  filled_at: string | null
 }
 
 interface Account {
-  broker: string
-  balance: number
-  buyingPower: number
-  equity: number
-  positions: Position[]
+  cash: string
+  portfolio_value: string
+  buying_power: string
+  equity: string
+  long_market_value: string
+  unrealized_pl: string
+  unrealized_plpc: string
 }
 
-// Simulated trading data
-const SAMPLE_ORDERS: Order[] = [
-  { id: '1', symbol: 'AAPL', side: 'BUY', type: 'LIMIT', quantity: 100, price: 195.50, stopPrice: null, status: 'FILLED', filledQuantity: 100, avgFillPrice: 195.50, timestamp: '2026-06-30T10:30:00Z', broker: 'Alpaca' },
-  { id: '2', symbol: 'BTC-USD', side: 'BUY', type: 'MARKET', quantity: 0.5, price: null, stopPrice: null, status: 'FILLED', filledQuantity: 0.5, avgFillPrice: 70250.00, timestamp: '2026-06-30T09:15:00Z', broker: 'Binance' },
-  { id: '3', symbol: 'MSFT', side: 'BUY', type: 'LIMIT', quantity: 50, price: 448.00, stopPrice: null, status: 'FILLED', filledQuantity: 50, avgFillPrice: 448.00, timestamp: '2026-06-29T14:45:00Z', broker: 'Alpaca' },
-  { id: '4', symbol: 'ETH-USD', side: 'SELL', type: 'LIMIT', quantity: 2.0, price: 3850.00, stopPrice: null, status: 'PENDING', filledQuantity: 0, avgFillPrice: null, timestamp: '2026-06-30T11:00:00Z', broker: 'Binance' },
-  { id: '5', symbol: 'NVDA', side: 'BUY', type: 'STOP_LIMIT', quantity: 25, price: 128.00, stopPrice: 130.00, status: 'PENDING', filledQuantity: 0, avgFillPrice: null, timestamp: '2026-06-30T11:30:00Z', broker: 'Alpaca' },
-  { id: '6', symbol: 'TSLA', side: 'SELL', type: 'MARKET', quantity: 10, price: null, stopPrice: null, status: 'FILLED', filledQuantity: 10, avgFillPrice: 248.75, timestamp: '2026-06-28T16:00:00Z', broker: 'Alpaca' },
-]
-
-const SAMPLE_POSITIONS: Position[] = [
-  { symbol: 'AAPL', quantity: 100, avgCost: 195.50, currentPrice: 198.25, marketValue: 19825, unrealizedPnl: 275, unrealizedPnlPercent: 1.41 },
-  { symbol: 'BTC-USD', quantity: 0.5, avgCost: 70250, currentPrice: 71500, marketValue: 35750, unrealizedPnl: 625, unrealizedPnlPercent: 1.78 },
-  { symbol: 'MSFT', quantity: 50, avgCost: 448, currentPrice: 452.30, marketValue: 22615, unrealizedPnl: 215, unrealizedPnlPercent: 0.96 },
-  { symbol: 'NVDA', quantity: 25, avgCost: 125.50, currentPrice: 132.80, marketValue: 3320, unrealizedPnl: 182.50, unrealizedPnlPercent: 5.82 },
-]
-
 export default function TradingPage() {
-  const [orders, setOrders] = useState<Order[]>(SAMPLE_ORDERS)
-  const [positions] = useState<Position[]>(SAMPLE_POSITIONS)
-  const [activeTab, setActiveTab] = useState<'orders' | 'positions' | 'new-order'>('positions')
+  const [account, setAccount] = useState<Account | null>(null)
+  const [positions, setPositions] = useState<Position[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'new-order'>('positions')
   const [newOrder, setNewOrder] = useState({
     symbol: '',
-    side: 'BUY' as 'BUY' | 'SELL',
-    type: 'LIMIT' as 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT',
-    quantity: '',
-    price: '',
-    broker: 'Alpaca',
+    side: 'buy' as 'buy' | 'sell',
+    type: 'market' as 'market' | 'limit',
+    qty: '',
+    limitPrice: '',
   })
+  const [orderStatus, setOrderStatus] = useState<string | null>(null)
 
-  const totalEquity = positions.reduce((s, p) => s + p.marketValue, 0)
-  const totalPnl = positions.reduce((s, p) => s + p.unrealizedPnl, 0)
-  const totalPnlPercent = totalEquity > 0 ? (totalPnl / (totalEquity - totalPnl)) * 100 : 0
+  const fetchData = useCallback(async () => {
+    try {
+      const [acctRes, posRes, ordRes] = await Promise.all([
+        fetch('/api/v1/trading/account'),
+        fetch('/api/v1/trading/positions'),
+        fetch('/api/v1/trading/orders?status=all&limit=20'),
+      ])
 
-  const handleSubmitOrder = () => {
-    if (!newOrder.symbol || !newOrder.quantity) return
-    const order: Order = {
-      id: Date.now().toString(),
-      symbol: newOrder.symbol.toUpperCase(),
-      side: newOrder.side,
-      type: newOrder.type,
-      quantity: Number.parseFloat(newOrder.quantity),
-      price: newOrder.price ? Number.parseFloat(newOrder.price) : null,
-      stopPrice: null,
-      status: 'PENDING',
-      filledQuantity: 0,
-      avgFillPrice: null,
-      timestamp: new Date().toISOString(),
-      broker: newOrder.broker,
+      if (acctRes.ok) {
+        const acctData = await acctRes.json()
+        setAccount(acctData.data)
+      }
+      if (posRes.ok) {
+        const posData = await posRes.json()
+        setPositions(posData.data ?? [])
+      }
+      if (ordRes.ok) {
+        const ordData = await ordRes.json()
+        setOrders(ordData.data ?? [])
+      }
+
+      setLoading(false)
+    } catch (err) {
+      setError((err as Error).message)
+      setLoading(false)
     }
-    setOrders(prev => [order, ...prev])
-    setNewOrder({ symbol: '', side: 'BUY', type: 'LIMIT', quantity: '', price: '', broker: 'Alpaca' })
-    setActiveTab('orders')
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+    const interval = setInterval(fetchData, 10000) // Refresh every 10s
+    return () => clearInterval(interval)
+  }, [fetchData])
+
+  const handlePlaceOrder = async () => {
+    if (!newOrder.symbol || !newOrder.qty) return
+    setOrderStatus(null)
+
+    try {
+      const res = await fetch('/api/v1/trading/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: newOrder.symbol.toUpperCase(),
+          side: newOrder.side,
+          type: newOrder.type,
+          qty: Number.parseFloat(newOrder.qty),
+          limit_price: newOrder.type === 'limit' ? Number.parseFloat(newOrder.limitPrice) : undefined,
+        }),
+      })
+
+      const data = await res.json()
+      if (res.ok) {
+        setOrderStatus(`Order placed: ${newOrder.side.toUpperCase()} ${newOrder.qty} ${newOrder.symbol.toUpperCase()}`)
+        setNewOrder({ symbol: '', side: 'buy', type: 'market', qty: '', limitPrice: '' })
+        fetchData() // Refresh
+      } else {
+        setOrderStatus(`Error: ${data.error}`)
+      }
+    } catch (err) {
+      setOrderStatus(`Error: ${(err as Error).message}`)
+    }
+  }
+
+  const handleCancelOrder = async (orderId: string) => {
+    try {
+      await fetch(`/api/v1/trading/orders/${orderId}`, { method: 'DELETE' })
+      fetchData()
+    } catch { /* ignore */ }
+  }
+
+  const fmt = (n: string | number | null | undefined, decimals = 2) => {
+    if (n == null) return '—'
+    const num = typeof n === 'string' ? Number.parseFloat(n) : n
+    if (Number.isNaN(num)) return '—'
+    return num.toLocaleString(undefined, { maximumFractionDigits: decimals })
+  }
+
+  const fmtPnl = (n: string | null | undefined) => {
+    if (n == null) return '—'
+    const num = Number.parseFloat(n)
+    if (Number.isNaN(num)) return '—'
+    return `${num >= 0 ? '+' : ''}$${num.toFixed(2)}`
   }
 
   return (
@@ -99,35 +146,41 @@ export default function TradingPage() {
           <div>
             <h1 className="text-xl font-bold font-mono text-accent-cyan">TRADING TERMINAL</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
-              Multi-broker execution · Alpaca (US stocks) · Binance (Crypto)
+              Alpaca Paper Trading · Commission-free · Real-time
             </p>
           </div>
-          <LiveDot status="live" label />
+          <LiveDot status={loading ? 'stale' : error ? 'error' : 'live'} label />
         </div>
 
+        {error && (
+          <div className="text-data-bear text-[11px] font-mono p-4 bg-bg-panel border border-border-dim rounded">
+            Error: {error}
+          </div>
+        )}
+
         {/* Account Summary */}
-        <div className="grid grid-cols-4 gap-4">
-          <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <p className="text-[10px] text-text-muted font-mono">TOTAL EQUITY</p>
-            <p className="text-xl font-bold font-mono text-text-primary">${totalEquity.toLocaleString()}</p>
+        {account && (
+          <div className="grid grid-cols-4 gap-4">
+            <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+              <p className="text-[10px] text-text-muted font-mono">PORTFOLIO VALUE</p>
+              <p className="text-xl font-bold font-mono text-text-primary">${fmt(account.portfolio_value)}</p>
+            </div>
+            <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+              <p className="text-[10px] text-text-muted font-mono">CASH</p>
+              <p className="text-xl font-bold font-mono text-text-primary">${fmt(account.cash)}</p>
+            </div>
+            <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+              <p className="text-[10px] text-text-muted font-mono">BUYING POWER</p>
+              <p className="text-xl font-bold font-mono text-text-primary">${fmt(account.buying_power)}</p>
+            </div>
+            <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+              <p className="text-[10px] text-text-muted font-mono">UNREALIZED P&L</p>
+              <p className={`text-xl font-bold font-mono ${Number.parseFloat(account.unrealized_pl ?? '0') >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                {fmtPnl(account.unrealized_pl)}
+              </p>
+            </div>
           </div>
-          <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <p className="text-[10px] text-text-muted font-mono">UNREALIZED P&L</p>
-            <p className={`text-xl font-bold font-mono ${totalPnl >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
-              {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
-            </p>
-          </div>
-          <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <p className="text-[10px] text-text-muted font-mono">P&L %</p>
-            <p className={`text-xl font-bold font-mono ${totalPnlPercent >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
-              {totalPnlPercent >= 0 ? '+' : ''}{totalPnlPercent.toFixed(2)}%
-            </p>
-          </div>
-          <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <p className="text-[10px] text-text-muted font-mono">OPEN POSITIONS</p>
-            <p className="text-xl font-bold font-mono text-text-primary">{positions.length}</p>
-          </div>
-        </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-1 border-b border-border-dim">
@@ -138,198 +191,182 @@ export default function TradingPage() {
                   ? 'text-accent-cyan border-b-2 border-accent-cyan font-bold'
                   : 'text-text-muted hover:text-text-primary'
               }`}>
-              {tab === 'positions' ? 'Positions' : tab === 'orders' ? 'Orders' : 'New Order'}
+              {tab === 'positions' ? `Positions (${positions.length})` : tab === 'orders' ? `Orders (${orders.length})` : 'New Order'}
             </button>
           ))}
         </div>
 
-        {/* Positions Tab */}
+        {/* Positions */}
         {activeTab === 'positions' && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <h3 className="text-xs font-mono text-accent-cyan mb-3">OPEN POSITIONS</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-text-muted border-b border-border-dim">
-                    <th className="text-left py-2 font-mono">SYMBOL</th>
-                    <th className="text-right py-2 font-mono">QTY</th>
-                    <th className="text-right py-2 font-mono">AVG COST</th>
-                    <th className="text-right py-2 font-mono">CURRENT</th>
-                    <th className="text-right py-2 font-mono">MKT VALUE</th>
-                    <th className="text-right py-2 font-mono">P&L</th>
-                    <th className="text-right py-2 font-mono">P&L %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {positions.map(pos => (
-                    <tr key={pos.symbol} className="border-b border-border-dim/30 hover:bg-bg-elevated">
-                      <td className="py-2 font-mono text-accent-cyan font-bold">{pos.symbol}</td>
-                      <td className="py-2 text-right font-mono">{pos.quantity}</td>
-                      <td className="py-2 text-right font-mono">${pos.avgCost.toFixed(2)}</td>
-                      <td className="py-2 text-right font-mono">${pos.currentPrice.toFixed(2)}</td>
-                      <td className="py-2 text-right font-mono">${pos.marketValue.toLocaleString()}</td>
-                      <td className={`py-2 text-right font-mono font-bold ${pos.unrealizedPnl >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
-                        {pos.unrealizedPnl >= 0 ? '+' : ''}${pos.unrealizedPnl.toFixed(2)}
-                      </td>
-                      <td className={`py-2 text-right font-mono ${pos.unrealizedPnlPercent >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
-                        {pos.unrealizedPnlPercent >= 0 ? '+' : ''}{pos.unrealizedPnlPercent.toFixed(2)}%
-                      </td>
+            {positions.length === 0 ? (
+              <p className="text-xs text-text-dim p-4 text-center">No open positions</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-text-muted border-b border-border-dim">
+                      <th className="text-left py-2 font-mono">SYMBOL</th>
+                      <th className="text-right py-2 font-mono">QTY</th>
+                      <th className="text-right py-2 font-mono">AVG COST</th>
+                      <th className="text-right py-2 font-mono">CURRENT</th>
+                      <th className="text-right py-2 font-mono">MKT VALUE</th>
+                      <th className="text-right py-2 font-mono">P&L</th>
+                      <th className="text-right py-2 font-mono">P&L %</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {positions.map(pos => (
+                      <tr key={pos.symbol} className="border-b border-border-dim/30 hover:bg-bg-elevated">
+                        <td className="py-2 font-mono text-accent-cyan font-bold">{pos.symbol}</td>
+                        <td className="py-2 text-right font-mono">{pos.qty}</td>
+                        <td className="py-2 text-right font-mono">${fmt(pos.avgEntryPrice)}</td>
+                        <td className="py-2 text-right font-mono">${fmt(pos.currentPrice)}</td>
+                        <td className="py-2 text-right font-mono">${fmt(pos.marketValue)}</td>
+                        <td className={`py-2 text-right font-mono font-bold ${Number.parseFloat(pos.unrealizedPnl ?? '0') >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                          {fmtPnl(pos.unrealizedPnl)}
+                        </td>
+                        <td className={`py-2 text-right font-mono ${Number.parseFloat(pos.unrealizedPnlPct ?? '0') >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                          {fmt(pos.unrealizedPnlPct ? Number.parseFloat(pos.unrealizedPnlPct) * 100 : null)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Orders Tab */}
+        {/* Orders */}
         {activeTab === 'orders' && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <h3 className="text-xs font-mono text-accent-cyan mb-3">ORDER HISTORY</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-text-muted border-b border-border-dim">
-                    <th className="text-left py-2 font-mono">TIME</th>
-                    <th className="text-left py-2 font-mono">SYMBOL</th>
-                    <th className="text-right py-2 font-mono">SIDE</th>
-                    <th className="text-right py-2 font-mono">TYPE</th>
-                    <th className="text-right py-2 font-mono">QTY</th>
-                    <th className="text-right py-2 font-mono">PRICE</th>
-                    <th className="text-right py-2 font-mono">FILLED</th>
-                    <th className="text-right py-2 font-mono">STATUS</th>
-                    <th className="text-right py-2 font-mono">BROKER</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {orders.map(order => (
-                    <tr key={order.id} className="border-b border-border-dim/30 hover:bg-bg-elevated">
-                      <td className="py-2 font-mono text-text-muted">{new Date(order.timestamp).toLocaleString()}</td>
-                      <td className="py-2 font-mono text-accent-cyan">{order.symbol}</td>
-                      <td className={`py-2 text-right font-mono font-bold ${order.side === 'BUY' ? 'text-data-bull' : 'text-data-bear'}`}>
-                        {order.side}
-                      </td>
-                      <td className="py-2 text-right font-mono text-text-muted">{order.type}</td>
-                      <td className="py-2 text-right font-mono">{order.quantity}</td>
-                      <td className="py-2 text-right font-mono">{order.price ? `$${order.price.toFixed(2)}` : 'MARKET'}</td>
-                      <td className="py-2 text-right font-mono">{order.filledQuantity}/{order.quantity}</td>
-                      <td className={`py-2 text-right font-mono ${
-                        order.status === 'FILLED' ? 'text-data-bull' :
-                        order.status === 'PENDING' ? 'text-accent-cyan' :
-                        order.status === 'CANCELLED' ? 'text-text-muted' : 'text-data-bear'
-                      }`}>
-                        {order.status}
-                      </td>
-                      <td className="py-2 text-right font-mono text-text-muted">{order.broker}</td>
+            {orders.length === 0 ? (
+              <p className="text-xs text-text-dim p-4 text-center">No orders</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-text-muted border-b border-border-dim">
+                      <th className="text-left py-2 font-mono">TIME</th>
+                      <th className="text-left py-2 font-mono">SYMBOL</th>
+                      <th className="text-right py-2 font-mono">SIDE</th>
+                      <th className="text-right py-2 font-mono">TYPE</th>
+                      <th className="text-right py-2 font-mono">QTY</th>
+                      <th className="text-right py-2 font-mono">FILLED</th>
+                      <th className="text-right py-2 font-mono">STATUS</th>
+                      <th className="text-right py-2 font-mono">ACTION</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {orders.map(order => (
+                      <tr key={order.id} className="border-b border-border-dim/30 hover:bg-bg-elevated">
+                        <td className="py-2 font-mono text-text-muted">{new Date(order.submitted_at).toLocaleString()}</td>
+                        <td className="py-2 font-mono text-accent-cyan">{order.symbol}</td>
+                        <td className={`py-2 text-right font-mono font-bold ${order.side === 'buy' ? 'text-data-bull' : 'text-data-bear'}`}>
+                          {order.side.toUpperCase()}
+                        </td>
+                        <td className="py-2 text-right font-mono text-text-muted">{order.type}</td>
+                        <td className="py-2 text-right font-mono">{order.qty}</td>
+                        <td className="py-2 text-right font-mono">{order.filled_qty}/{order.qty}</td>
+                        <td className={`py-2 text-right font-mono ${
+                          order.status === 'filled' ? 'text-data-bull' :
+                          order.status === 'canceled' ? 'text-text-muted' :
+                          order.status === 'rejected' ? 'text-data-bear' : 'text-accent-cyan'
+                        }`}>
+                          {order.status}
+                        </td>
+                        <td className="py-2 text-right">
+                          {['new', 'partially_filled', 'pending_new'].includes(order.status) && (
+                            <button onClick={() => handleCancelOrder(order.id)}
+                              className="text-[10px] font-mono text-data-bear hover:text-data-bear/80">
+                              Cancel
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
 
-        {/* New Order Tab */}
+        {/* New Order */}
         {activeTab === 'new-order' && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <h3 className="text-xs font-mono text-accent-cyan mb-3">PLACE NEW ORDER</h3>
+            <h3 className="text-xs font-mono text-accent-cyan mb-3">PLACE ORDER (ALPACA PAPER TRADING)</h3>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-[10px] text-text-muted font-mono block mb-1">Symbol</label>
-                <input
-                  type="text"
-                  value={newOrder.symbol}
+                <input type="text" value={newOrder.symbol}
                   onChange={e => setNewOrder(prev => ({ ...prev, symbol: e.target.value }))}
-                  placeholder="AAPL, BTC-USD, etc."
-                  className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary"
-                />
+                  placeholder="AAPL"
+                  className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
               </div>
               <div>
-                <label className="text-[10px] text-text-muted font-mono block mb-1">Broker</label>
-                <select
-                  value={newOrder.broker}
-                  onChange={e => setNewOrder(prev => ({ ...prev, broker: e.target.value }))}
-                  className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary"
-                >
-                  <option value="Alpaca">Alpaca (US Stocks)</option>
-                  <option value="Binance">Binance (Crypto)</option>
-                  <option value="Indodax">Indodax (IDR Crypto)</option>
-                </select>
+                <label className="text-[10px] text-text-muted font-mono block mb-1">Quantity</label>
+                <input type="number" value={newOrder.qty}
+                  onChange={e => setNewOrder(prev => ({ ...prev, qty: e.target.value }))}
+                  placeholder="10"
+                  className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
               </div>
               <div>
                 <label className="text-[10px] text-text-muted font-mono block mb-1">Side</label>
                 <div className="flex gap-2">
-                  {(['BUY', 'SELL'] as const).map(side => (
+                  {(['buy', 'sell'] as const).map(side => (
                     <button key={side} onClick={() => setNewOrder(prev => ({ ...prev, side }))}
                       className={`flex-1 px-3 py-2 text-xs font-mono rounded border ${
                         newOrder.side === side
-                          ? side === 'BUY' ? 'bg-data-bull text-white border-data-bull' : 'bg-data-bear text-white border-data-bear'
+                          ? side === 'buy' ? 'bg-data-bull text-white border-data-bull' : 'bg-data-bear text-white border-data-bear'
                           : 'bg-bg-elevated border-border-dim text-text-muted'
                       }`}>
-                      {side}
+                      {side.toUpperCase()}
                     </button>
                   ))}
                 </div>
               </div>
               <div>
-                <label className="text-[10px] text-text-muted font-mono block mb-1">Order Type</label>
-                <select
-                  value={newOrder.type}
-                  onChange={e => setNewOrder(prev => ({ ...prev, type: e.target.value as 'MARKET' | 'LIMIT' }))}
-                  className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary"
-                >
-                  <option value="MARKET">Market</option>
-                  <option value="LIMIT">Limit</option>
-                  <option value="STOP">Stop</option>
-                  <option value="STOP_LIMIT">Stop Limit</option>
+                <label className="text-[10px] text-text-muted font-mono block mb-1">Type</label>
+                <select value={newOrder.type}
+                  onChange={e => setNewOrder(prev => ({ ...prev, type: e.target.value as 'market' | 'limit' }))}
+                  className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary">
+                  <option value="market">Market</option>
+                  <option value="limit">Limit</option>
                 </select>
               </div>
-              <div>
-                <label className="text-[10px] text-text-muted font-mono block mb-1">Quantity</label>
-                <input
-                  type="number"
-                  value={newOrder.quantity}
-                  onChange={e => setNewOrder(prev => ({ ...prev, quantity: e.target.value }))}
-                  placeholder="100"
-                  className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary"
-                />
-              </div>
-              <div>
-                <label className="text-[10px] text-text-muted font-mono block mb-1">Price (for Limit orders)</label>
-                <input
-                  type="number"
-                  value={newOrder.price}
-                  onChange={e => setNewOrder(prev => ({ ...prev, price: e.target.value }))}
-                  placeholder="195.50"
-                  className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary"
-                />
-              </div>
+              {newOrder.type === 'limit' && (
+                <div>
+                  <label className="text-[10px] text-text-muted font-mono block mb-1">Limit Price</label>
+                  <input type="number" value={newOrder.limitPrice}
+                    onChange={e => setNewOrder(prev => ({ ...prev, limitPrice: e.target.value }))}
+                    placeholder="195.50"
+                    className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
+                </div>
+              )}
             </div>
-            <button onClick={handleSubmitOrder}
-              className={`mt-4 px-6 py-3 text-sm font-mono font-bold rounded ${
-                newOrder.side === 'BUY' ? 'bg-data-bull text-white hover:bg-data-bull/80' : 'bg-data-bear text-white hover:bg-data-bear/80'
-              }`}>
-              {newOrder.side} {newOrder.symbol || '...'}
-            </button>
+            <div className="mt-4 flex items-center gap-4">
+              <button onClick={handlePlaceOrder}
+                className={`px-6 py-3 text-sm font-mono font-bold rounded ${
+                  newOrder.side === 'buy' ? 'bg-data-bull text-white hover:bg-data-bull/80' : 'bg-data-bear text-white hover:bg-data-bear/80'
+                }`}>
+                {newOrder.side.toUpperCase()} {newOrder.symbol || '...'}
+              </button>
+              {orderStatus && (
+                <span className="text-xs font-mono text-accent-cyan">{orderStatus}</span>
+              )}
+            </div>
           </div>
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">BROKER INTEGRATION</h2>
-          <div className="grid grid-cols-3 gap-4 text-xs text-text-dim">
-            <div>
-              <p className="font-mono text-text-primary mb-1">Alpaca (US Stocks)</p>
-              <p>Commission-free US stock trading. Paper trading available for testing.</p>
-            </div>
-            <div>
-              <p className="font-mono text-text-primary mb-1">Binance (Crypto)</p>
-              <p>Largest crypto exchange. Spot and futures trading. Low fees.</p>
-            </div>
-            <div>
-              <p className="font-mono text-text-primary mb-1">Indodax (IDR Crypto)</p>
-              <p>Indonesian crypto exchange. IDR trading pairs. Local compliance.</p>
-            </div>
-          </div>
+          <h2 className="text-xs font-mono text-accent-cyan mb-2">BROKER</h2>
+          <p className="text-xs text-text-dim">
+            Alpaca Paper Trading — commission-free US stock trading with virtual money.
+            Real market data, real order execution, zero risk.
+            Set ALPACA_API_KEY and ALPACA_SECRET_KEY to connect.
+          </p>
         </div>
       </div>
     </NexusLayout>

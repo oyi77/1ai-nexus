@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
 
-interface HistoricalFinancial {
+interface FinancialData {
   period: string
   revenue: number | null
   netIncome: number | null
@@ -16,6 +16,7 @@ interface HistoricalFinancial {
   freeCashFlow: number | null
 }
 
+// Companies with CIK numbers for SEC EDGAR
 const COMPANIES = [
   { ticker: 'AAPL', name: 'Apple', cik: '0000320193' },
   { ticker: 'MSFT', name: 'Microsoft', cik: '0000789019' },
@@ -39,86 +40,88 @@ const COMPANIES = [
   { ticker: 'BAC', name: 'BofA', cik: '0000070858' },
 ]
 
+async function fetchEdgarFinancials(cik: string): Promise<FinancialData[]> {
+  const res = await fetch(`https://data.sec.gov/api/xbrl/companyfacts/CIK${cik}.json`, {
+    headers: { 'User-Agent': '1ai-nexus/1.0 (contact@1ai-nexus.com)' },
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!res.ok) return []
+
+  const data = await res.json() as Record<string, unknown>
+  const facts = data.facts as Record<string, unknown>
+  const gaap = facts['us-gaap'] as Record<string, unknown> | undefined
+  if (!gaap) return []
+
+  const extractAnnual = (field: unknown): Map<string, number> => {
+    const map = new Map<string, number>()
+    if (!field || typeof field !== 'object') return map
+    const f = field as { units?: Record<string, Array<{ end: string; val: number; form: string }>> }
+    if (!f.units) return map
+    const usd = f.units.USD ?? []
+    for (const item of usd) {
+      if (item.form === '10-K') {
+        const year = item.end.substring(0, 4)
+        if (!map.has(year)) map.set(year, item.val)
+      }
+    }
+    return map
+  }
+
+  const revenue = extractAnnual(gaap.Revenues)
+  const netIncome = extractAnnual(gaap.NetIncomeLoss)
+  const assets = extractAnnual(gaap.Assets)
+  const liabilities = extractAnnual(gaap.Liabilities)
+  const equity = extractAnnual(gaap.StockholdersEquity)
+  const operatingCF = extractAnnual(gaap.OperatingCashFlow)
+  const capex = extractAnnual(gaap.PaymentsToAcquirePropertyPlantAndEquipment)
+
+  const years = new Set<string>()
+  for (const map of [revenue, netIncome, assets, liabilities, equity, operatingCF, capex]) {
+    for (const year of map.keys()) years.add(year)
+  }
+
+  const result: FinancialData[] = []
+  for (const year of [...years].sort().reverse()) {
+    const rev = revenue.get(year) ?? null
+    const ocf = operatingCF.get(year) ?? null
+    const cx = capex.get(year) ?? null
+    result.push({
+      period: year,
+      revenue: rev,
+      netIncome: netIncome.get(year) ?? null,
+      totalAssets: assets.get(year) ?? null,
+      totalLiabilities: liabilities.get(year) ?? null,
+      totalEquity: equity.get(year) ?? null,
+      operatingCashFlow: ocf,
+      capitalExpenditure: cx,
+      freeCashFlow: ocf != null && cx != null ? ocf - cx : null,
+    })
+  }
+
+  return result
+}
+
 export default function HistoricalFinancialsPage() {
   const [selected, setSelected] = useState('AAPL')
-  const [data, setData] = useState<HistoricalFinancial[]>([])
+  const [data, setData] = useState<FinancialData[]>([])
   const [loading, setLoading] = useState(true)
-  const [filings, setFilings] = useState<Array<{ date: string; form: string; description: string }>>([])
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     setLoading(true)
+    setError(null)
     const company = COMPANIES.find(c => c.ticker === selected)
     if (!company) { setLoading(false); return }
 
-    const fetchFinancials = async () => {
-      try {
-        // Fetch XBRL data from SEC EDGAR
-        const res = await fetch(`https://data.sec.gov/api/xbrl/companyfacts/CIK${company.cik}.json`, {
-          headers: { 'User-Agent': '1ai-nexus/1.0 (contact@1ai-nexus.com)' },
-          signal: AbortSignal.timeout(15_000),
-        })
-        if (!res.ok) { setLoading(false); return }
-
-        const data = await res.json() as Record<string, unknown>
-        const facts = data.facts as Record<string, unknown>
-        const gaap = facts['us-gaap'] as Record<string, unknown> | undefined
-        if (!gaap) { setLoading(false); return }
-
-        // Helper to extract annual values
-        const extractAnnual = (field: unknown): Map<string, number> => {
-          const map = new Map<string, number>()
-          if (!field || typeof field !== 'object') return map
-          const f = field as { units?: Record<string, Array<{ end: string; val: number; form: string }>> }
-          if (!f.units) return map
-          const usd = f.units.USD ?? []
-          for (const item of usd) {
-            if (item.form === '10-K') {
-              const year = item.end.substring(0, 4)
-              if (!map.has(year)) map.set(year, item.val)
-            }
-          }
-          return map
-        }
-
-        const revenue = extractAnnual(gaap.Revenues)
-        const netIncome = extractAnnual(gaap.NetIncomeLoss)
-        const assets = extractAnnual(gaap.Assets)
-        const liabilities = extractAnnual(gaap.Liabilities)
-        const equity = extractAnnual(gaap.StockholdersEquity)
-        const operatingCF = extractAnnual(gaap.OperatingCashFlow)
-        const capex = extractAnnual(gaap.PaymentsToAcquirePropertyPlantAndEquipment)
-
-        const years = new Set<string>()
-        for (const map of [revenue, netIncome, assets, liabilities, equity, operatingCF, capex]) {
-          for (const year of map.keys()) years.add(year)
-        }
-
-        const result: HistoricalFinancial[] = []
-        for (const year of [...years].sort().reverse()) {
-          const rev = revenue.get(year) ?? null
-          const ocf = operatingCF.get(year) ?? null
-          const cx = capex.get(year) ?? null
-          result.push({
-            period: year,
-            revenue: rev,
-            netIncome: netIncome.get(year) ?? null,
-            totalAssets: assets.get(year) ?? null,
-            totalLiabilities: liabilities.get(year) ?? null,
-            totalEquity: equity.get(year) ?? null,
-            operatingCashFlow: ocf,
-            capitalExpenditure: cx,
-            freeCashFlow: ocf != null && cx != null ? ocf - cx : null,
-          })
-        }
-
+    fetchEdgarFinancials(company.cik)
+      .then(result => {
         setData(result)
         setLoading(false)
-      } catch {
+      })
+      .catch(err => {
+        setError(err.message)
         setLoading(false)
-      }
-    }
-
-    fetchFinancials()
+      })
   }, [selected])
 
   const fmtB = (n: number | null) => {
@@ -141,11 +144,17 @@ export default function HistoricalFinancialsPage() {
           <div>
             <h1 className="text-xl font-bold font-mono text-accent-cyan">HISTORICAL FINANCIALS</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
-              20+ years of SEC EDGAR data · {COMPANIES.length} companies · XBRL structured data
+              SEC EDGAR XBRL data · {COMPANIES.length} companies · 20+ years of 10-K filings
             </p>
           </div>
-          <LiveDot status={loading ? 'stale' : 'live'} label />
+          <LiveDot status={loading ? 'stale' : error ? 'error' : 'live'} label />
         </div>
+
+        {error && (
+          <div className="text-data-bear text-[11px] font-mono p-4 bg-bg-panel border border-border-dim rounded">
+            Error: {error}
+          </div>
+        )}
 
         {/* Company Selector */}
         <div className="flex flex-wrap gap-2">
@@ -161,15 +170,15 @@ export default function HistoricalFinancialsPage() {
           ))}
         </div>
 
-        {/* Historical Data Table */}
+        {/* Data Table */}
         {loading ? (
           <div className="text-text-dim text-xs p-8 text-center">Loading SEC EDGAR data for {selected}...</div>
         ) : data.length === 0 ? (
-          <div className="text-text-dim text-xs p-8 text-center">No historical data available for {selected}</div>
+          <div className="text-text-dim text-xs p-8 text-center">No data available for {selected}</div>
         ) : (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
             <h2 className="text-xs font-mono text-accent-cyan mb-3">
-              {selected} — ANNUAL FINANCIALS (10-K FILINGS)
+              {selected} — ANNUAL FINANCIALS (SEC 10-K FILINGS)
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -187,7 +196,7 @@ export default function HistoricalFinancialsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((row, i) => {
+                  {data.slice(0, 15).map((row, i) => {
                     const prevRev = i < data.length - 1 ? data[i + 1].revenue : null
                     const revGrowth = calcGrowth(row.revenue, prevRev)
 
@@ -216,10 +225,9 @@ export default function HistoricalFinancialsPage() {
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
           <h2 className="text-xs font-mono text-accent-cyan mb-2">SOURCE</h2>
           <p className="text-xs text-text-dim">
-            SEC EDGAR XBRL API (data.sec.gov) — free, no API key.
+            SEC EDGAR XBRL API (data.sec.gov) — free, no API key required.
             Structured financial data from 10-K annual filings.
-            Covers {COMPANIES.length} major US companies. Data goes back 20+ years.
-            Rate limit: 10 requests/second.
+            User-Agent required per SEC policy.
           </p>
         </div>
       </div>
