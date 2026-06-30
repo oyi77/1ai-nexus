@@ -100,6 +100,9 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/indonesia-macro",
   "/api/v1/trading",
   "/api/v1/compliance",
+  "/api/v1/historical",
+  "/api/v1/screener",
+  "/api/v1/keys",
   "/api/auth",
 ]);
 
