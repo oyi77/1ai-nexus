@@ -147,10 +147,10 @@ export async function getAlerts(): Promise<Alert[]> {
 }
 
 export async function deleteAlert(id: string): Promise<boolean> {
-  const existed = alerts.has(id)
-  await prisma.alert.delete({ where: { id } }).catch(() => undefined)
+  const existing = alerts.get(id)
+  const deleted = await prisma.alert.delete({ where: { id } }).then(() => true).catch(() => false)
   alerts.delete(id)
-  return existed
+  return deleted || Boolean(existing)
 }
 
 export async function toggleAlert(id: string): Promise<Alert | undefined> {
@@ -183,7 +183,30 @@ export async function toggleAlert(id: string): Promise<Alert | undefined> {
 }
 
 export async function fireAlert(alertId: string, value: unknown, message: string): Promise<void> {
-  const alert = alerts.get(alertId)
+  let alert = alerts.get(alertId)
+
+  if (!alert) {
+    const dbAlert = await prisma.alert.findUnique({ where: { id: alertId } }).catch(() => null)
+    if (dbAlert) {
+      alert = {
+        id: dbAlert.id,
+        userId: dbAlert.userId ?? undefined,
+        triggerType: dbAlert.triggerType ?? undefined,
+        conditions: (dbAlert.conditions as Prisma.InputJsonValue) ?? {},
+        templateId: dbAlert.templateId ?? undefined,
+        name: dbAlert.name ?? undefined,
+        condition: dbAlert.condition ?? undefined,
+        webhookUrl: dbAlert.webhookUrl ?? undefined,
+        webhookSecret: dbAlert.webhookSecret ?? undefined,
+        enabled: dbAlert.isActive,
+        lastFired: fromDbDate(dbAlert.lastFired),
+        createdAt: dbAlert.createdAt.getTime(),
+        updatedAt: dbAlert.updatedAt.getTime(),
+      }
+      alerts.set(alertId, alert)
+    }
+  }
+
   if (!alert || !alert.enabled) return
 
   const event: AlertEvent = {

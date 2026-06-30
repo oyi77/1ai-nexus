@@ -1,9 +1,8 @@
 import { type NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
-
-// ─── Transform: DB shape → Page shape ────────────────────
+import { AlertCondition } from "@/lib/alerts/schemas";
+import { createAlert, getAlerts, toggleAlert, deleteAlert, type Alert as EngineAlert } from "@/lib/modules/derived/alert-engine";
 
 interface AlertPageShape {
   id: string;
@@ -15,124 +14,6 @@ interface AlertPageShape {
   lastTriggered: string | null;
   config: Record<string, unknown>;
 }
-
-function dbToPage(dbAlert: {
-  id: string;
-  triggerType: string;
-  name: string | null;
-  condition: string | null;
-  conditions: unknown;
-  isActive: boolean;
-  lastFired: Date | null;
-}): AlertPageShape {
-  const conditions = (dbAlert.conditions as Record<string, unknown>) ?? {};
-  return {
-    id: dbAlert.id,
-    type: dbAlert.triggerType,
-    name: dbAlert.name ?? dbAlert.triggerType,
-    description: dbAlert.condition ?? "",
-    channel: (conditions.channel as string) ?? "telegram",
-    enabled: dbAlert.isActive,
-    lastTriggered: dbAlert.lastFired?.toISOString() ?? null,
-    config: (conditions.config as Record<string, unknown>) ?? {},
-  };
-}
-
-// ─── GET /api/v1/alerts — List all alerts ────────────────
-
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = request.nextUrl;
-    const active = searchParams.get("active");
-
-    const where: Record<string, unknown> = {};
-    if (active !== null) where.isActive = active === "true";
-
-    const dbAlerts = await prisma.alert.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
-
-    const alerts = dbAlerts.map(dbToPage);
-    return cacheHeaders(apiSuccess(alerts), 10);
-  } catch (error) {
-    console.error("GET /api/v1/alerts error:", error);
-    return apiError("Internal server error", 500);
-  }
-}
-
-// ─── POST /api/v1/alerts — Create an alert ───────────────
-
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { type, name, config, channel } = body as {
-      type?: string;
-      name?: string;
-      config?: Record<string, unknown>;
-      channel?: string;
-    };
-
-    if (!type) return apiError("Missing required field: type", 400);
-
-    const alert = await prisma.alert.create({
-      data: {
-        userId: "default",
-        triggerType: type,
-        name: name ?? type,
-        condition: buildDescription(type, config ?? {}),
-        conditions: { config: config ?? {}, channel: channel ?? "telegram" } as Prisma.InputJsonValue,
-        isActive: true,
-      },
-    });
-
-    return apiSuccess(dbToPage(alert));
-  } catch (error) {
-    console.error("POST /api/v1/alerts error:", error);
-    return apiError("Internal server error", 500);
-  }
-}
-
-// ─── PATCH /api/v1/alerts — Toggle alert (body: { id }) ──
-
-export async function PATCH(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { id } = body as { id?: string };
-    if (!id) return apiError("Missing required field: id", 400);
-
-    const existing = await prisma.alert.findUnique({ where: { id } });
-    if (!existing) return apiError("Alert not found", 404);
-
-    const updated = await prisma.alert.update({
-      where: { id },
-      data: { isActive: !existing.isActive },
-    });
-
-    return apiSuccess(dbToPage(updated));
-  } catch (error) {
-    console.error("PATCH /api/v1/alerts error:", error);
-    return apiError("Internal server error", 500);
-  }
-}
-
-// ─── DELETE /api/v1/alerts?id=xxx ────────────────────────
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const id = request.nextUrl.searchParams.get("id");
-    if (!id) return apiError("Missing required param: id", 400);
-
-    await prisma.alert.delete({ where: { id } }).catch(() => undefined);
-    return apiSuccess({ deleted: id });
-  } catch (error) {
-    console.error("DELETE /api/v1/alerts error:", error);
-    return apiError("Internal server error", 500);
-  }
-}
-
-// ─── Helpers ─────────────────────────────────────────────
 
 function buildDescription(type: string, config: Record<string, unknown>): string {
   switch (type) {
@@ -150,5 +31,104 @@ function buildDescription(type: string, config: Record<string, unknown>): string
       return `Market ${config.marketId} ${config.direction} ${config.threshold}`;
     default:
       return type;
+  }
+}
+
+function engineToPage(alert: EngineAlert): AlertPageShape {
+  const conditions = (alert.conditions as Record<string, unknown>) ?? {};
+  return {
+    id: alert.id,
+    type: alert.triggerType ?? "manual",
+    name: alert.name ?? alert.triggerType ?? "Alert",
+    description: alert.condition ?? "",
+    channel: (conditions.channel as string) ?? "telegram",
+    enabled: alert.enabled,
+    lastTriggered: alert.lastFired ? new Date(alert.lastFired).toISOString() : null,
+    config: (conditions.config as Record<string, unknown>) ?? {},
+  };
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const { searchParams } = request.nextUrl;
+    const active = searchParams.get("active");
+    const alerts = (await getAlerts()).map(engineToPage);
+    const filtered = active === null ? alerts : alerts.filter((a) => a.enabled === (active === "true"));
+    return cacheHeaders(apiSuccess(filtered), 10);
+  } catch (error) {
+    console.error("GET /api/v1/alerts error:", error);
+    return apiError("Internal server error", 500);
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { type, name, config, channel, webhookUrl, webhookSecret } = body as {
+      type?: string;
+      name?: string;
+      config?: Record<string, unknown>;
+      channel?: string;
+      webhookUrl?: string;
+      webhookSecret?: string;
+    };
+
+    if (!type) return apiError("Missing required field: type", 400);
+    if (!config || typeof config !== "object") return apiError("Missing required field: config", 400);
+
+    const parsed = AlertCondition.safeParse({ type, ...config });
+    if (!parsed.success) {
+      return apiError(`Invalid alert config: ${parsed.error.issues.map((i) => i.message).join(", ")}`, 400);
+    }
+
+    const created = await createAlert({
+      id: "",
+      userId: "default",
+      triggerType: type,
+      conditions: { config, channel: channel ?? "telegram" } as Prisma.InputJsonValue,
+      name: name ?? type,
+      condition: buildDescription(type, config),
+      webhookUrl,
+      webhookSecret,
+      enabled: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    return apiSuccess(engineToPage(created));
+  } catch (error) {
+    console.error("POST /api/v1/alerts error:", error);
+    return apiError((error as Error).message || "Internal server error", 500);
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id } = body as { id?: string };
+    if (!id) return apiError("Missing required field: id", 400);
+
+    const updated = await toggleAlert(id);
+    if (!updated) return apiError("Alert not found", 404);
+
+    return apiSuccess(engineToPage(updated));
+  } catch (error) {
+    console.error("PATCH /api/v1/alerts error:", error);
+    return apiError("Internal server error", 500);
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const id = request.nextUrl.searchParams.get("id");
+    if (!id) return apiError("Missing required param: id", 400);
+
+    const deleted = await deleteAlert(id);
+    if (!deleted) return apiError("Alert not found", 404);
+
+    return apiSuccess({ deleted: id });
+  } catch (error) {
+    console.error("DELETE /api/v1/alerts error:", error);
+    return apiError("Internal server error", 500);
   }
 }

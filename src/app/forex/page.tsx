@@ -12,7 +12,7 @@ export default function ForexPage() {
   useEffect(() => {
     setError(null)
     setLoading(true)
-    fetch(`/api/v1/modules/fetch?module=exchangerate-api&base=${base}`)
+    fetch(`/api/v1/forex?base=${base}`)
       .then(r => r.json())
       .then(d => { setRates(d.data?.rates ?? null); setLoading(false) })
       .catch((err) => { setLoading(false); setError((err as Error).message) })

@@ -4,74 +4,67 @@ import { type NextRequest } from "next/server";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
 import { registerAllModules } from "@/lib/modules";
 
-// Major indices
 const INDICES = [
   { symbol: "^GSPC", name: "S&P 500" },
-  { symbol: "^DJI", name: "Dow Jones" },
   { symbol: "^IXIC", name: "NASDAQ" },
-  { symbol: "^RUT", name: "Russell 2000" },
-  { symbol: "^JKSE", name: "IHSG (Jakarta)" },
-];
+  { symbol: "^DJI", name: "Dow Jones" },
+  { symbol: "^VIX", name: "VIX" },
+  { symbol: "^FTSE", name: "FTSE 100" },
+  { symbol: "^N225", name: "Nikkei 225" },
+  { symbol: "^HSI", name: "Hang Seng" },
+  { symbol: "^STOXX50E", name: "Euro Stoxx 50" },
+] as const;
 
-// 1-min in-memory cache (shorter for equities — more volatile)
-let cachedEquities: Record<string, unknown> | null = null;
-let cacheTimestamp = 0;
+const DEFAULT_STOCKS = [
+  "AAPL","MSFT","GOOGL","AMZN","NVDA","TSLA","META","AMD","AVGO",
+  "JPM","GS","V","BAC","BRK-B","UNH","JNJ","PFE","LLY",
+  "XOM","CVX","WMT","KO","PG","SAP.DE","MC.PA","7203.T","BABA",
+  "0700.HK","BHP.AX","D05.SI","RELIANCE.NS","005930.KS","2330.TW",
+  "VALE","PBR","BBCA.JK","BBRI.JK","BMRI.JK","TLKM.JK","ADRO.JK",
+] as const;
+
+const cache = new Map<string, { data: Record<string, unknown>; ts: number }>();
 const CACHE_TTL = 60 * 1000;
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
     const symbolsParam = searchParams.get("symbols");
+    const stockSymbols = symbolsParam
+      ? symbolsParam.split(",").map((s) => s.trim()).filter(Boolean)
+      : [...DEFAULT_STOCKS];
 
+    const allSymbols = [...new Set([...stockSymbols, ...INDICES.map((i) => i.symbol)])];
+    const cacheKey = `equities:${allSymbols.join(",")}`;
     const now = Date.now();
-    if (cachedEquities && now - cacheTimestamp < CACHE_TTL) {
-      return cacheHeaders(apiSuccess(cachedEquities), 60);
+    const cached = cache.get(cacheKey);
+    if (cached && now - cached.ts < CACHE_TTL) {
+      return cacheHeaders(apiSuccess(cached.data), 60);
     }
 
     const registry = registerAllModules();
+    const result = await registry.fetchOne("yahoo-finance", { symbols: allSymbols.join(","), action: "quote" });
+    const quotes = (result?.data as Array<Record<string, unknown>> | null) ?? [];
 
-    // Determine which stocks to fetch
-    const stockSymbols = symbolsParam
-      ? symbolsParam.split(",").map((s) => s.trim()).filter(Boolean)
-      : ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "BRK-B", "JPM", "V"];
-
-    // Fetch stocks + indices in parallel
-    const allSymbols = [
-      ...stockSymbols.map((s) => ({ symbol: s, isIndex: false })),
-      ...INDICES.map((i) => ({ symbol: i.symbol, isIndex: true })),
-    ];
-
-    const results = await Promise.allSettled(
-      allSymbols.map((item) =>
-        registry.fetchOne("yahoo-finance", { symbol: item.symbol, action: "quote" })
-      ),
-    );
-
+    const indicesSet = new Set<string>(INDICES.map((i) => i.symbol));
+    const indexMeta = new Map<string, string>(INDICES.map((i) => [i.symbol, i.name]));
     const stocks: Array<Record<string, unknown>> = [];
     const indices: Array<Record<string, unknown>> = [];
 
-    for (let i = 0; i < allSymbols.length; i++) {
-      const r = results[i];
-      if (r.status === "fulfilled" && r.value?.data) {
-        const quote = r.value.data as Record<string, unknown>;
-        const entry = {
-          symbol: allSymbols[i].symbol,
-          name: (quote.shortName as string) ?? (quote.longName as string) ?? allSymbols[i].symbol,
-          price: quote.price ?? quote.regularMarketPrice,
-          change: quote.change ?? quote.regularMarketChange,
-          changePercent: quote.changePercent ?? quote.regularMarketChangePercent,
-          volume: quote.volume ?? quote.regularMarketVolume,
-          marketCap: quote.marketCap,
-          sector: quote.sector,
-        };
-        if (allSymbols[i].isIndex) {
-          const meta = INDICES.find((idx) => idx.symbol === allSymbols[i].symbol);
-          if (meta) entry.name = meta.name;
-          indices.push(entry);
-        } else {
-          stocks.push(entry);
-        }
-      }
+    for (const quote of quotes) {
+      const symbol = String(quote.symbol ?? "");
+      const entry = {
+        symbol,
+        name: indexMeta.get(symbol) ?? String(quote.shortName ?? quote.longName ?? symbol),
+        price: (quote.price as number | undefined) ?? (quote.regularMarketPrice as number | undefined) ?? null,
+        change: (quote.change as number | undefined) ?? (quote.regularMarketChange as number | undefined) ?? null,
+        changePercent: (quote.changePercent as number | undefined) ?? (quote.regularMarketChangePercent as number | undefined) ?? null,
+        volume: (quote.volume as number | undefined) ?? (quote.regularMarketVolume as number | undefined) ?? null,
+        marketCap: (quote.marketCap as number | undefined) ?? null,
+        sector: (quote.sector as string | undefined) ?? null,
+      };
+      if (indicesSet.has(symbol)) indices.push(entry);
+      else stocks.push(entry);
     }
 
     const data = {
@@ -85,9 +78,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
     };
 
-    cachedEquities = data;
-    cacheTimestamp = now;
-
+    cache.set(cacheKey, { data, ts: now });
     return cacheHeaders(apiSuccess(data), 60);
   } catch (error) {
     console.error("GET /api/v1/equities error:", error);

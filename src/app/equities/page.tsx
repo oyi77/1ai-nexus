@@ -126,13 +126,16 @@ export default function EquitiesPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const allSymbols = [...GLOBAL_STOCKS.map(s => s.symbol), ...INDICES].join(',')
-    fetch(`/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${allSymbols}`)
+    const allSymbols = GLOBAL_STOCKS.map(s => s.symbol).join(',')
+    fetch(`/api/v1/equities?symbols=${allSymbols}`)
       .then(r => r.json())
       .then(d => {
         const map: Record<string, { price: number; change: number; name: string }> = {}
-        for (const q of d.data ?? []) {
-          map[q.symbol] = { price: q.regularMarketPrice, change: q.regularMarketChangePercent, name: q.shortName ?? q.symbol }
+        for (const q of d.data?.stocks ?? []) {
+          map[q.symbol] = { price: q.price, change: q.changePercent, name: q.name ?? q.symbol }
+        }
+        for (const q of d.data?.indices ?? []) {
+          map[q.symbol] = { price: q.price, change: q.changePercent, name: q.name ?? q.symbol }
         }
         setQuotes(map)
         setLoading(false)

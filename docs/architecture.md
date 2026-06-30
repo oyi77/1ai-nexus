@@ -2,8 +2,7 @@
 
 ## Overview
 
-NEXUS is a Next.js 16 SaaS crypto intelligence platform that monitors blockchain transactions in real-time to identify whale activity, smart money movements, and significant on-chain events. It aggregates data from 17 external sources and serves it through a REST API, WebSocket streams, and a reactive frontend.
-
+NEXUS is a Next.js 16 finance intelligence platform that combines crypto market structure, on-chain analytics, macroeconomics, forex, commodities, global equities, and derivatives into one API + WebSocket + terminal-style frontend. It aggregates data from free public APIs (FRED, World Bank, ExchangeRate API, Yahoo Finance, DeFiLlama, CoinGecko, DexScreener, Deribit, Polymarket, Blockstream, RSS feeds, public RPC nodes) and serves them through REST endpoints, WebSocket streams, and reactive dashboards.
 ## System Architecture
 
 ```mermaid
@@ -28,6 +27,7 @@ graph TB
         Redis["Redis 7<br/>Pub/Sub + Cache"]
     end
 
+
     subgraph "External Data Sources"
         RPC["Public RPC Nodes<br/>ETH / SOL / BTC / ARB / BASE / OP"]
         DeFiLlama["DeFiLlama<br/>TVL, Yields, DEX Volumes"]
@@ -46,6 +46,8 @@ graph TB
         Alchemy["Alchemy<br/>Enhanced RPC"]
         Helius["Helius<br/>Solana Enriched"]
         Etherscan["Etherscan<br/>Tx History"]
+        YahooFinance["Yahoo Finance<br/>Equities, Indices, Commodities"]
+        Deribit["Deribit<br/>Options Chain, IV, Greeks"]
     end
 
     CFTunnel --> NextJS
@@ -79,7 +81,11 @@ graph TB
     NextJS --> RSSFeeds
     NextJS --> FRED
     NextJS --> ExchangeRates
+    NextJS --> YahooFinance
+    NextJS --> Deribit
 ```
+
+**ClickHouse status:** Docker and `indexer/db/clickhouse.ts` are scaffolded for future time-series analytics, but the active persistence path today is PostgreSQL via Prisma. No indexer path writes to ClickHouse yet.
 
 ## Tech Stack
 

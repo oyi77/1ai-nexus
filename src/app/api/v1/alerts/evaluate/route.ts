@@ -5,19 +5,28 @@ import { prisma } from "@/lib/db";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { evaluateCondition, type NexusEvent } from "@/lib/alerts/evaluator";
 import { fireAlert } from "@/lib/modules/derived/alert-engine";
-import type { AlertCondition } from "@/lib/alerts/schemas";
+import { AlertCondition } from "@/lib/alerts/schemas";
+import { registerAllModules } from "@/lib/modules";
 
-// ─── GET /api/v1/alerts/evaluate — Check all alerts ──────
+interface CalendarApiResponse {
+  data?: {
+    events?: Array<{ date: string; event: string; country: string }>
+  }
+}
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const dbAlerts = await prisma.alert.findMany({
-      where: { isActive: true },
-    });
-
+    const dbAlerts = await prisma.alert.findMany({ where: { isActive: true } });
     if (dbAlerts.length === 0) {
       return apiSuccess({ evaluated: 0, triggered: 0, results: [] });
     }
+
+    const today = new Date().toISOString().slice(0, 10);
+    const origin = request.nextUrl.origin;
+    const calendarEvents = await fetch(`${origin}/api/v1/calendar`)
+      .then((r) => r.json() as Promise<CalendarApiResponse>)
+      .then((j) => j.data?.events ?? [])
+      .catch(() => [] as Array<{ date: string; event: string; country: string }>);
 
     const results: Array<{ id: string; type: string; triggered: boolean; message: string }> = [];
     let triggered = 0;
@@ -27,19 +36,20 @@ export async function GET(_request: NextRequest) {
       const conditions = (dbAlert.conditions as Record<string, unknown>) ?? {};
       const config = (conditions.config as Record<string, unknown>) ?? {};
 
+      const parsed = AlertCondition.safeParse({ type, ...config });
+      if (!parsed.success) {
+        results.push({ id: dbAlert.id, type, triggered: false, message: `Invalid config: ${parsed.error.issues.map((i) => i.message).join(", ")}` });
+        continue;
+      }
+
       try {
-        const event = await fetchEventForAlert(type, config);
+        const event = await fetchEventForAlert(type, config, calendarEvents, today);
         if (!event) {
           results.push({ id: dbAlert.id, type, triggered: false, message: "No event data available" });
           continue;
         }
 
-        const condition: AlertCondition = {
-          type: type as AlertCondition["type"],
-          ...config,
-        } as AlertCondition;
-
-        const isTriggered = evaluateCondition(condition, event);
+        const isTriggered = evaluateCondition(parsed.data, event);
         if (isTriggered) {
           triggered++;
           const message = buildTriggerMessage(type, config, event);
@@ -62,63 +72,53 @@ export async function GET(_request: NextRequest) {
   }
 }
 
-// ─── Fetch current market data for alert evaluation ──────
-
 async function fetchEventForAlert(
   type: string,
   config: Record<string, unknown>,
+  calendarEvents: Array<{ date: string; event: string; country: string }>,
+  today: string,
 ): Promise<NexusEvent | null> {
   const timestamp = new Date().toISOString();
+  const registry = registerAllModules();
 
   switch (type) {
     case "price_threshold": {
-      const symbol = config.symbol as string;
+      const symbol = String(config.symbol ?? "");
       if (!symbol) return null;
-      try {
-        const { registerAllModules } = await import("@/lib/modules");
-        const registry = registerAllModules();
-        const result = await registry.fetchOne("yahoo-finance", { symbol, action: "quote" });
-        const data = result?.data as Record<string, unknown> | undefined;
-        const price = (data?.price as number) ?? (data?.regularMarketPrice as number);
-        if (!price) return null;
-        return { type: "price_threshold", symbol, price, timestamp };
-      } catch {
-        return null;
-      }
+      const result = await registry.fetchOne("yahoo-finance", { symbols: symbol, action: "quote" });
+      const data = ((result?.data as Array<Record<string, unknown>> | null) ?? [])[0];
+      const price = (data?.price as number | undefined) ?? (data?.regularMarketPrice as number | undefined);
+      if (price == null) return null;
+      return { type: "price_threshold", symbol, price, timestamp };
     }
 
     case "forex_rate": {
-      const pair = config.pair as string;
-      if (!pair) return null;
-      try {
-        const { registerAllModules } = await import("@/lib/modules");
-        const registry = registerAllModules();
-        // Try fetching via exchange-rate module or yahoo
-        const symbol = pair.replace("/", "") + "=X";
-        const result = await registry.fetchOne("yahoo-finance", { symbol, action: "quote" });
-        const data = result?.data as Record<string, unknown> | undefined;
-        const rate = (data?.price as number) ?? (data?.regularMarketPrice as number);
-        if (!rate) return null;
-        return { type: "forex_rate", pair, rate, timestamp };
-      } catch {
-        return null;
-      }
+      const pair = String(config.pair ?? "");
+      if (!pair.includes("/")) return null;
+      const [base, quote] = pair.split("/").map((s) => s.toUpperCase());
+      const result = await registry.fetchOne("exchangerate-api", { base: "USD" });
+      const rates = ((result?.data as { rates?: Record<string, number> } | null)?.rates) ?? {};
+
+      let rate: number | null = null;
+      if (base === "USD" && rates[quote] != null) rate = rates[quote];
+      else if (quote === "USD" && rates[base] != null) rate = 1 / rates[base];
+      else if (rates[base] != null && rates[quote] != null) rate = rates[quote] / rates[base];
+
+      if (rate == null || !Number.isFinite(rate)) return null;
+      return { type: "forex_rate", pair, rate, timestamp };
     }
 
     case "macro_event": {
-      // For macro events, we check the calendar API
-      return {
-        type: "macro_event",
-        event: config.event as string ?? "",
-        country: config.country as string ?? "US",
-        timestamp,
-      };
+      const eventName = String(config.event ?? "");
+      const country = String(config.country ?? "US");
+      const match = calendarEvents.find((e) => e.date === today && e.event === eventName && (!country || e.country === country));
+      if (!match) return null;
+      return { type: "macro_event", event: match.event, country: match.country, timestamp };
     }
 
     case "wallet_moved":
     case "smart_money_action":
     case "prediction_threshold":
-      // These are event-driven (blockchain indexer pushes) — not polled
       return null;
 
     default:
@@ -137,7 +137,7 @@ function buildTriggerMessage(type: string, config: Record<string, unknown>, even
       return `${config.pair} at ${e.rate.toFixed(4)} — ${config.direction} ${config.threshold}`;
     }
     case "macro_event":
-      return `Macro event: ${config.event} (${config.country})`;
+      return `Macro event: ${config.event}${config.country ? ` (${config.country})` : ""}`;
     default:
       return `Alert triggered: ${type}`;
   }

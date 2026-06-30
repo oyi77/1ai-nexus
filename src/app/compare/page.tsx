@@ -13,7 +13,9 @@ import { useLiveFetch } from '@/lib/hooks/useLiveFetch'
 
 interface MarketResponse { tickers: Array<{ symbol: string; price: string; change: string; positive: boolean }> }
 interface MacroResponse { indicators: Array<{ id: string; name: string; latestValue: number; changePercent: number }> }
-interface ForexResponse { data: { rates: Record<string, number> } }
+interface ForexResponse { rates: Record<string, number> }
+interface CommoditiesResponse { commodities: Array<{ symbol: string; price: number; changePercent: number }> }
+interface EquitiesResponse { indices: Array<{ symbol: string; price: number; changePercent: number }> }
 
 interface Asset {
   name: string
@@ -43,16 +45,10 @@ const EQUITY_INDICES: Record<string, string> = {
 export default function ComparePage() {
   const { data: market, status } = useLiveFetch<MarketResponse>({ url: '/api/v1/market/prices', interval: 60_000 })
   const { data: macro } = useLiveFetch<MacroResponse>({ url: '/api/v1/macro', interval: 300_000 })
-  const { data: forexData } = useLiveFetch<ForexResponse>({
-    url: '/api/v1/modules/fetch?module=exchangerate-api&base=USD',
-    interval: 300_000,
-  })
-  const { data: commodityData } = useLiveFetch<{ data: Array<{ symbol: string; regularMarketPrice: number; regularMarketChangePercent: number }> }>({
-    url: `/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${Object.keys(COMMODITY_SYMBOLS).join(',')}`,
-    interval: 60_000,
-  })
-  const { data: indexData } = useLiveFetch<{ data: Array<{ symbol: string; regularMarketPrice: number; regularMarketChangePercent: number }> }>({
-    url: `/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${Object.keys(EQUITY_INDICES).join(',')}`,
+  const { data: forexData } = useLiveFetch<ForexResponse>({ url: '/api/v1/forex?base=USD', interval: 300_000 })
+  const { data: commodityData } = useLiveFetch<CommoditiesResponse>({ url: '/api/v1/commodities', interval: 60_000 })
+  const { data: indexData } = useLiveFetch<EquitiesResponse>({
+    url: `/api/v1/equities?symbols=${Object.keys(EQUITY_INDICES).join(',')}`,
     interval: 60_000,
   })
 
@@ -84,7 +80,7 @@ export default function ComparePage() {
     }
 
     // Forex
-    const rates = forexData?.data?.rates
+    const rates = forexData?.rates
     if (rates) {
       for (const [code, pair] of Object.entries(FOREX_PAIRS)) {
         const rate = rates[code]
@@ -93,7 +89,7 @@ export default function ComparePage() {
             name: pair,
             symbol: pair,
             price: rate,
-            change: 0, // ExchangeRate API doesn't provide change
+            change: 0,
             category: 'Forex',
           })
         }
@@ -101,25 +97,25 @@ export default function ComparePage() {
     }
 
     // Commodities
-    for (const q of commodityData?.data ?? []) {
+    for (const q of commodityData?.commodities ?? []) {
       const name = COMMODITY_SYMBOLS[q.symbol] ?? q.symbol
       result.push({
         name,
         symbol: q.symbol,
-        price: q.regularMarketPrice,
-        change: q.regularMarketChangePercent ?? 0,
+        price: q.price,
+        change: q.changePercent ?? 0,
         category: 'Commodities',
       })
     }
 
     // Equity indices
-    for (const q of indexData?.data ?? []) {
+    for (const q of indexData?.indices ?? []) {
       const name = EQUITY_INDICES[q.symbol] ?? q.symbol
       result.push({
         name,
         symbol: q.symbol,
-        price: q.regularMarketPrice,
-        change: q.regularMarketChangePercent ?? 0,
+        price: q.price,
+        change: q.changePercent ?? 0,
         category: 'Indices',
       })
     }

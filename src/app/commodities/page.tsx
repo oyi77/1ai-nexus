@@ -66,17 +66,16 @@ export default function CommoditiesPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const symbols = ALL_COMMODITIES.map(c => c.symbol).join(',')
-    fetch(`/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${symbols}`)
+    fetch(`/api/v1/commodities`)
       .then(r => r.json())
       .then(d => {
         const map: Record<string, Quote> = {}
-        for (const q of d.data ?? []) {
+        for (const q of d.data?.commodities ?? []) {
           map[q.symbol] = {
-            price: q.regularMarketPrice,
-            change: q.regularMarketChange,
-            changePct: q.regularMarketChangePercent,
-            prevClose: q.regularMarketPreviousClose,
+            price: q.price,
+            change: q.change,
+            changePct: q.changePercent,
+            prevClose: q.prevClose,
           }
         }
         setQuotes(map)

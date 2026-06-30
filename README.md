@@ -1,6 +1,6 @@
-# NEXUS — Open-Source Crypto Whale Tracker & On-Chain Intelligence Platform
+# NEXUS — Open-Source Finance Intelligence Platform
 
-Real-time blockchain analytics for tracking whale movements, smart money flows, and on-chain activity across **Ethereum, Solana, Bitcoin, Arbitrum, Base, and Optimism**. Zero API keys required — runs entirely on free public RPC endpoints.
+Real-time market intelligence across **crypto, macro, forex, commodities, global equities, and options**. NEXUS combines blockchain analytics, macroeconomic data, exchange rates, commodity futures, global stock quotes, and derivatives data into one terminal-style platform that runs primarily on free public APIs.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](docker-compose.yml)
@@ -11,20 +11,23 @@ Real-time blockchain analytics for tracking whale movements, smart money flows, 
 
 ## What is NEXUS?
 
-NEXUS is an **open-source crypto intelligence platform** that monitors blockchain transactions in real-time to identify whale activity, smart money movements, and significant on-chain events. Built for traders, analysts, and developers who need actionable blockchain data without expensive API subscriptions.
+NEXUS is an **open-source finance intelligence platform** for traders, analysts, desks, and researchers who need cross-asset visibility without stitching together half a dozen terminals. It still includes the original crypto intelligence stack (whales, smart money, entities, memecoin scanner), but now also ships real macro calendars, FRED indicators, forex rates, commodities, global equities, and live Deribit options chains.
 
 ### Key Capabilities
 
+- **Cross-Asset Terminal** — Compare crypto, forex, commodities, indices, and macro indicators in one dashboard
+- **Macro Intelligence** — FRED-backed rates, inflation, employment, growth, yield curve, and a real economic calendar
+- **Forex Monitoring** — Major FX pairs with IDR priority and TradFi alert support
+- **Commodities Dashboard** — Precious metals, energy, agriculture, industrial metals, and livestock futures
+- **Global Equities** — Major stocks across US, Europe, Asia, Australia, Singapore, Canada, India, Korea, Taiwan, Brazil, and IDX
+- **Real Options Chain** — BTC/ETH Deribit options with bid/ask, IV, Greeks, OI, and expiry tabs
+- **Structured Alerts** — Price threshold, forex rate, macro event, whale, smart money, and prediction alerts
 - **Whale Wallet Tracking** — Monitor large holders across 6 blockchain networks
 - **Smart Money Detection** — AI-powered scoring identifies accumulation, distribution, and exit patterns
 - **Entity Mapping** — Connect wallets to known entities (exchanges, funds, protocols, whales)
-- **Flow Analysis** — Visualize capital flows between entities and chains
-- **Real-Time Alerts** — Custom conditions with webhook delivery and HMAC signing
-- **Prediction Markets** — Crypto prediction market interface with order book and leaderboards
-- **DeFi Protocol Analytics** — Track TVL, yields, and protocol-level activity
-- **Meme Token Detection** — Real-time scanning for new Solana/EVM token creation (Pump.fun, Raydium) with hype scoring engine
+- **DeFi Protocol Analytics** — Track TVL, yields, protocol revenue, and sector dominance
+- **Meme Token Detection** — Real-time Pump.fun / Raydium token creation with hype scoring engine
 - **DEX Sniper Scanner** — `/scanner` page with sub-second WebSocket updates showing new liquidity pools with risk scoring
-
 ---
 
 ## Supported Blockchains
@@ -176,30 +179,37 @@ docker compose exec postgres pg_dump -U nexus nexus > backup_$(date +%Y%m%d).sql
 
 ### REST API (v1)
 
-All endpoints require Bearer token authentication.
+All endpoints use the standard `{ data, meta, error }` envelope.
 
 ```
-GET  /api/v1/entities          — List tracked entities (whales, funds, exchanges)
-GET  /api/v1/tokens            — Token analytics and rankings
-GET  /api/v1/flows             — Capital flow data between entities
+GET  /api/v1/alerts            — User alert configurations
+POST /api/v1/alerts            — Create structured alert
+PATCH /api/v1/alerts           — Toggle alert enabled/disabled
+DELETE /api/v1/alerts?id=...   — Delete alert
+GET  /api/v1/alerts/evaluate   — Evaluate active alerts against live data
+
+GET  /api/v1/fear-greed        — Composite fear & greed with history
+GET  /api/v1/macro             — FRED / Treasury / World Bank macro indicators
+GET  /api/v1/calendar          — FRED release calendar + central bank schedules
+GET  /api/v1/indonesia-macro   — Indonesia macro indicators + BI rate
+GET  /api/v1/global-macro      — Multi-country macro snapshot
+GET  /api/v1/forex             — FX rates (dedicated backend route)
+GET  /api/v1/commodities       — Commodity futures snapshot by category
+GET  /api/v1/equities          — Global equities and major indices
+GET  /api/v1/correlations      — Cross-asset correlations
+GET  /api/v1/gaps              — Cross-venue dislocations and kimchi premium
+GET  /api/v1/stablecoins       — Stablecoin peg monitor
+
+GET  /api/v1/market/prices     — Core crypto market snapshot
+GET  /api/v1/news              — News feed
+GET  /api/v1/flows             — Capital flow data
 GET  /api/v1/smart-money       — Smart money signals and scores
 GET  /api/v1/predictions       — Prediction market data
-GET  /api/v1/alerts            — User alert configurations
-GET  /api/v1/wallets/:address  — Individual wallet analytics
-
-GET  /api/v1/defillama         — DeFiLlama data (protocols, yields, chains, stablecoins, DEX volumes)
-GET  /api/v1/data-sources      — Integration health & availability status
-
-# DeFiLlama actions (?action=...)
-#   protocols  — Top DeFi protocols by TVL
-#   yields     — Top yield pools (filter: ?chain=eth&stablecoin=true)
-#   chains     — Chain TVL breakdown
-#   chain-tvl  — Historical TVL for a chain (?chain=ethereum)
-#   stablecoins — Tracked stablecoins
-#   dex-volumes — DEX volume overview
-#   bridges    — Bridge volume overview
-#   fees       — Protocol fees overview
-#   health     — DeFiLlama API health check
+GET  /api/v1/defi/overview     — DeFi TVL / yields / fees overview
+GET  /api/v1/revenue           — Protocol revenue snapshot
+GET  /api/v1/yields            — Yield pools
+GET  /api/v1/status            — Infra + data source health
+GET  /api/v1/modules/fetch     — Generic module passthrough (internal/debug use)
 ```
 
 ### WebSocket Events

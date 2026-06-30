@@ -249,54 +249,75 @@ export default function AlertsPage() {
   const [channel, setChannel] = useState<Channel>('telegram')
   const [filterCategory, setFilterCategory] = useState<'all' | 'tradfi' | 'crypto'>('all')
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [evaluating, setEvaluating] = useState(false)
+  const [evalSummary, setEvalSummary] = useState<{ evaluated: number; triggered: number; results: Array<{ id: string; type: string; triggered: boolean; message: string }> } | null>(null)
 
-  // Load alerts from API on mount
   useEffect(() => {
     fetch('/api/v1/alerts')
       .then(r => r.json())
-      .then(d => { if (d.data) setAlerts(d.data) })
-      .catch(() => {})
+      .then(d => { if (d.data) setAlerts(d.data); else setError(d.error ?? 'Failed to load alerts') })
+      .catch((e) => setError((e as Error).message))
       .finally(() => setLoading(false))
   }, [])
 
   const toggleAlert = useCallback(async (id: string) => {
-    // Optimistic update
+    setError(null)
     setAlerts(prev => prev.map(a => a.id === id ? { ...a, enabled: !a.enabled } : a))
     try {
-      await fetch('/api/v1/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    } catch {
-      // Revert on error
+      const res = await fetch('/api/v1/alerts', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+      if (!res.ok) throw new Error('Toggle failed')
+    } catch (e) {
       setAlerts(prev => prev.map(a => a.id === id ? { ...a, enabled: !a.enabled } : a))
+      setError((e as Error).message)
     }
   }, [])
 
   const deleteAlert = useCallback(async (id: string) => {
+    setError(null)
     const prev = alerts
     setAlerts(a => a.filter(x => x.id !== id))
     try {
-      await fetch(`/api/v1/alerts?id=${id}`, { method: 'DELETE' })
-    } catch {
+      const res = await fetch(`/api/v1/alerts?id=${id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error('Delete failed')
+    } catch (e) {
       setAlerts(prev)
+      setError((e as Error).message)
     }
   }, [alerts])
 
   const createAlert = useCallback(async () => {
     const meta = ALERT_TYPES[alertType]
     const body = { type: alertType, name: meta.label, config, channel }
+    setError(null)
     try {
       const res = await fetch('/api/v1/alerts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const d = await res.json()
-      if (d.data) {
-        setAlerts(prev => [d.data, ...prev])
-      }
-    } catch {
-      // Fallback: add locally
-      const alert: Alert = { id: Date.now().toString(), type: alertType, name: meta.label, description: describeAlert({ type: alertType, config } as Alert), channel, enabled: true, lastTriggered: null, config }
-      setAlerts(prev => [...prev, alert])
+      if (!res.ok || !d.data) throw new Error(d.error ?? 'Failed to create alert')
+      setAlerts(prev => [d.data, ...prev])
+      setConfig({})
+      setShowCreate(false)
+    } catch (e) {
+      setError((e as Error).message)
     }
-    setConfig({})
-    setShowCreate(false)
   }, [alertType, config, channel])
+
+  const evaluateAlerts = useCallback(async () => {
+    setEvaluating(true)
+    try {
+      const res = await fetch('/api/v1/alerts/evaluate')
+      const d = await res.json()
+      if (d.data) {
+        setEvalSummary(d.data)
+        // refresh latest lastTriggered timestamps after evaluation
+        const alertsRes = await fetch('/api/v1/alerts')
+        const alertsJson = await alertsRes.json()
+        if (alertsJson.data) setAlerts(alertsJson.data)
+      }
+    } finally {
+      setEvaluating(false)
+    }
+  }, [])
 
   const loadPreset = (preset: typeof PRESETS[0]) => {
     setAlertType(preset.type)
@@ -320,12 +341,25 @@ export default function AlertsPage() {
           </div>
           <div className="flex items-center gap-2">
             <LiveDot status="live" label />
+            {alerts.length > 0 && (
+              <button onClick={evaluateAlerts}
+                className="px-3 py-1.5 text-xs font-mono bg-bg-elevated border border-border-dim text-text-primary rounded hover:border-border-active disabled:opacity-50"
+                disabled={evaluating}>
+                {evaluating ? 'Evaluating…' : 'Evaluate Now'}
+              </button>
+            )}
             <button onClick={() => { setShowCreate(!showCreate); setConfig({}) }}
               className="px-3 py-1.5 text-xs font-mono bg-teal-vivid text-bg-base rounded hover:bg-teal-vivid/80">
               + New Alert
             </button>
           </div>
         </div>
+
+        {error && (
+          <div className="bg-bg-panel border border-data-bear/40 rounded-lg p-3 text-[11px] font-mono text-data-bear">
+            {error}
+          </div>
+        )}
 
         {/* Quick presets */}
         {!showCreate && alerts.length === 0 && (
@@ -406,6 +440,30 @@ export default function AlertsPage() {
                 {cat} ({cat === 'all' ? alerts.length : alerts.filter(a => ALERT_TYPES[a.type].category === cat).length})
               </button>
             ))}
+          </div>
+        )}
+
+        {evalSummary && (
+          <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-xs font-mono text-accent-cyan">LATEST EVALUATION</h3>
+              <span className="text-[10px] font-mono text-text-muted">
+                {evalSummary.triggered}/{evalSummary.evaluated} triggered
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              {evalSummary.results.slice(0, 8).map((result) => (
+                <div key={result.id} className="flex items-start justify-between gap-3 text-[10px] font-mono">
+                  <div className="flex items-center gap-2">
+                    <span className={result.triggered ? 'text-accent-green' : 'text-text-dim'}>
+                      {result.triggered ? 'TRIGGERED' : 'SKIPPED'}
+                    </span>
+                    <span className="text-text-primary">{result.type}</span>
+                  </div>
+                  <span className="text-text-muted text-right">{result.message}</span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

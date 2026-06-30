@@ -1,8 +1,48 @@
 # Changelog
 
-All notable changes to the NEXUS crypto intelligence platform are documented in this file.
+All notable changes to the NEXUS finance intelligence platform are documented in this file.
 
+## v1.4.0 — Real Options Chain + Alert Pipeline + TradFi Route Cutover
 
+### New Features
+
+- **Real Deribit Options Chain** — `/options` now shows live BTC/ETH options data from Deribit with bid/ask, mark price, mark IV, Greeks, open interest, volume, and expiry tabs.
+- **Structured Alert Builder** — `/alerts` now supports 6 alert types: `price_threshold`, `forex_rate`, `macro_event`, `wallet_moved`, `smart_money_action`, and `prediction_threshold`.
+- **Manual Alert Evaluation** — `/api/v1/alerts/evaluate` checks active alerts against live market data and calendar events, and the alerts page can trigger evaluation on demand.
+- **Dedicated TradFi Routes** — `/api/v1/forex`, `/api/v1/commodities`, and `/api/v1/equities` now provide dedicated server-side routes instead of relying on the generic module passthrough from the UI.
+
+### Changed
+
+- **Route Cutover** — `/forex`, `/commodities`, `/equities`, and `/compare` now fetch through dedicated backend routes with server-side caching.
+- **Alert Engine Wiring** — `/api/v1/alerts` now validates alert configs against `src/lib/alerts/schemas.ts` and creates alerts through `src/lib/modules/derived/alert-engine.ts` so evaluation and delivery share one state path.
+- **Alert Firing on Cold Start** — `fireAlert()` now lazy-loads DB alerts into the in-memory engine cache so triggered alerts are not silently dropped after restart.
+- **Docs Sync** — README and architecture docs now describe NEXUS as a cross-asset finance platform instead of crypto-only.
+
+## v1.3.0 — Calendar, Commodities, TradFi Alerts, and Monitoring
+
+### New Features
+
+- **Real Economic Calendar** — `/api/v1/calendar` now uses real FRED release dates plus central bank schedules (FOMC, ECB, BOJ, BI, BOE, RBA, RBNZ, PBOC, BCB).
+- **Expanded Commodities** — `/commodities` grew from 4 instruments to a multi-category dashboard covering precious metals, energy, industrial metals, agriculture, and livestock.
+- **TradFi Alert Types** — Added `price_threshold`, `macro_event`, and `forex_rate` conditions to the alert schema and evaluator.
+- **TradFi / Macro Monitoring** — `/status` now monitors Yahoo Finance, ExchangeRate API, US Treasury, FRED, and World Bank in addition to crypto sources.
+
+### Changed
+
+- **Status UI** — `/status` now groups services by `core`, `crypto`, `tradfi`, and `macro`.
+
+## v1.2.0 — Multi-Asset Navigation, Equities, and Global Compare
+
+### New Features
+
+- **Global Equities Dashboard** — `/equities` now covers major stocks across the US, Europe, Asia, Australia, Singapore, Canada, India, Korea, Taiwan, Brazil, and IDX.
+- **Cross-Market Compare** — `/compare` now includes crypto, forex, commodities, indices, and macro categories in one table.
+- **DeFi Sector Rankings** — `/sectors` now computes real 24h/7d weighted changes by aggregating DeFiLlama protocol data per chain.
+
+### Changed
+
+- **Sidebar Restructure** — navigation now exposes the multi-asset surface area (Markets, Macro & News, Analytics, On-Chain, Trading, DeFi, Tools) instead of a crypto-heavy layout.
+- **Macro Pipeline** — `src/lib/fred-client.ts` now uses the real `FRED_API_KEY` when present and falls back to Treasury/World Bank/Yahoo only when required.
 ## v1.1.0 — Real-Time DEX Watcher
 
 ### New Features
