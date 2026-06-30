@@ -88,6 +88,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'DeFi Hub',      href: '/defi-hub',       icon: Coins },
       { label: 'Stablecoins',   href: '/stablecoins',    icon: Coins },
       { label: 'Sectors',       href: '/sectors',        icon: PieChart },
+      { label: 'Token Unlocks', href: '/unlocks',        icon: PieChart },
     ],
   },
   {
