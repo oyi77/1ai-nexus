@@ -47,20 +47,39 @@ export default function SmartMoneyPage() {
   return <NexusLayout><SmartMoneyPageInner /></NexusLayout>
 }
 
+interface CohortData {
+  id: string
+  name: string
+  description: string
+  walletCount: number
+  netFlow24h: number
+  topAssets: string[]
+}
+
+interface CohortSignal {
+  cohortName: string
+  action: string
+  asset: string
+  amountUsd: number
+  confidence: number
+}
+
 function SmartMoneyPageInner() {
   const [signals, setSignals] = useState<SmartMoneySignal[]>([])
   const [topWallets, setTopWallets] = useState<TopWallet[]>([])
+  const [cohorts, setCohorts] = useState<CohortData[]>([])
+  const [cohortSignals, setCohortSignals] = useState<CohortSignal[]>([])
   const [feedStatus, setFeedStatus] = useState<'live' | 'stale' | 'error'>('live')
   const [filterAction, setFilterAction] = useState<string>('all')
 
   const fetchData = useCallback(async () => {
     try {
-      const [smRes, copyTradeRes] = await Promise.allSettled([
+      const [smRes, copyTradeRes, cohortRes] = await Promise.allSettled([
         fetch('/api/v1/smart-money?pageSize=20').then(r => r.json()),
         fetch('/api/v1/copy-trade?limit=10').then(r => r.json()),
+        fetch('/api/v1/cohorts').then(r => r.json()),
       ])
 
-      // Real smart money wallets from DB
       if (smRes.status === 'fulfilled' && smRes.value?.data) {
         setTopWallets(smRes.value.data.map((w: Record<string, unknown>, i: number) => {
           const wallet = w.wallet as Record<string, unknown> || {}
@@ -78,7 +97,6 @@ function SmartMoneyPageInner() {
         }))
       }
 
-      // Real copy trade signals
       if (copyTradeRes.status === 'fulfilled' && copyTradeRes.value?.data) {
         setSignals(copyTradeRes.value.data.map((s: Record<string, unknown>, i: number) => ({
           id: s.id as string || `sig-${i}`,
@@ -94,6 +112,11 @@ function SmartMoneyPageInner() {
           chain: (s.chain as string) || 'multi',
           sparkline: Array.isArray(s.sparkline) ? s.sparkline as number[] : [],
         })))
+      }
+
+      if (cohortRes.status === 'fulfilled' && cohortRes.value?.data) {
+        setCohorts(cohortRes.value.data.cohorts ?? [])
+        setCohortSignals(cohortRes.value.data.signals ?? [])
       }
 
       setFeedStatus('live')
@@ -289,6 +312,55 @@ function SmartMoneyPageInner() {
             />
           </Panel>
         </div>
+
+        {/* Cohort Intelligence */}
+        {cohorts.length > 0 && (
+          <Panel title="Cohort Intelligence" subtitle={`${cohorts.length} behavioral cohorts`} liveStatus={feedStatus} maxHeight={400}>
+            <div className="p-3 space-y-2">
+              {cohorts.map(cohort => (
+                <div key={cohort.id} className="flex items-center justify-between border-b border-border-dim/30 py-2">
+                  <div>
+                    <p className="text-[11px] font-mono text-text-primary font-bold">{cohort.name}</p>
+                    <p className="text-[10px] text-text-muted">{cohort.description}</p>
+                    <p className="text-[9px] text-text-dim mt-0.5">Top: {cohort.topAssets.join(', ') || 'N/A'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-mono font-bold">{cohort.walletCount} wallets</p>
+                    <p className={`text-[10px] font-mono ${cohort.netFlow24h >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                      {cohort.netFlow24h >= 0 ? '+' : ''}{(cohort.netFlow24h / 1e6).toFixed(1)}M 24h
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        )}
+
+        {/* Cohort Signals */}
+        {cohortSignals.length > 0 && (
+          <Panel title="Cohort Signals" subtitle={`${cohortSignals.length} signals from smart money cohorts`} liveStatus={feedStatus} maxHeight={300}>
+            <div className="p-3 space-y-1">
+              {cohortSignals.slice(0, 10).map((sig, i) => (
+                <div key={i} className="flex items-center justify-between border-b border-border-dim/30 py-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                      sig.action === 'accumulating' ? 'bg-data-bull/20 text-data-bull' :
+                      sig.action === 'distributing' ? 'bg-data-bear/20 text-data-bear' :
+                      sig.action === 'rotating' ? 'bg-accent-amber/20 text-accent-amber' :
+                      'bg-bg-raised text-text-muted'
+                    }`}>{sig.action}</span>
+                    <span className="text-[11px] font-mono text-teal-vivid font-bold">{sig.asset}</span>
+                    <span className="text-[10px] text-text-muted">from {sig.cohortName}</span>
+                  </div>
+                  <div className="text-right">
+                    <PriceTag value={sig.amountUsd} size="sm" />
+                    <span className="text-[9px] text-text-dim ml-1">{(sig.confidence * 100).toFixed(0)}%</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+        )}
       </div>
     </>
   )
