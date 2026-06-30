@@ -1,9 +1,9 @@
 // ─── Macro-Economic Data Client ────────────────────────────
-// Sources:
-//   - FRED API (free key from fred.stlouisfed.org, set FRED_API_KEY env)
-//   - U.S. Treasury yield curve CSV (free, no key) for rates
-//   - World Bank API (free, no key) for GDP, CPI, Unemployment
-// Requires FRED API key for full data; yields/WB work without one.
+// Sources (priority order — free first, FRED API second):
+//   1. U.S. Treasury yield curve CSV (free, no key) for yields
+//   2. World Bank API (free, no key) for GDP, CPI, Unemployment
+//   3. FRED API (free key from fred.stlouisfed.org) for everything else
+// Set FRED_API_KEY env var for full 22-series coverage.
 // ─────────────────────────────────────────────────────────
 
 const FRED_API_KEY = process.env.FRED_API_KEY ?? ''
@@ -27,38 +27,43 @@ export interface FredSeries {
 // ─── Key FRED Series (metadata preserved for callers) ─────
 
 export const FRED_SERIES: Record<string, { title: string; unit: string; category: string }> = {
-  // ─── Rates ────────────────────────────────────────────
+  // ─── Rates (sourced from Treasury CSV — free, no key) ──
   FEDFUNDS:             { title: 'Federal Funds Effective Rate',              unit: '%',       category: 'rates' },
   DFF:                  { title: 'Federal Funds Effective Rate (Daily)',      unit: '%',       category: 'rates' },
-  DGS10:                { title: '10-Year Treasury Constant Maturity Rate',   unit: '%',       category: 'rates' },
   DGS2:                 { title: '2-Year Treasury Constant Maturity Rate',    unit: '%',       category: 'rates' },
+  DGS3:                 { title: '3-Year Treasury Constant Maturity Rate',    unit: '%',       category: 'rates' },
+  DGS5:                 { title: '5-Year Treasury Constant Maturity Rate',    unit: '%',       category: 'rates' },
+  DGS7:                 { title: '7-Year Treasury Constant Maturity Rate',    unit: '%',       category: 'rates' },
+  DGS10:                { title: '10-Year Treasury Constant Maturity Rate',   unit: '%',       category: 'rates' },
+  DGS20:                { title: '20-Year Treasury Constant Maturity Rate',   unit: '%',       category: 'rates' },
+  DGS30:                { title: '30-Year Treasury Constant Maturity Rate',   unit: '%',       category: 'rates' },
   T10Y2Y:               { title: '10Y-2Y Treasury Spread',                   unit: '%',       category: 'rates' },
 
-  // ─── Inflation ────────────────────────────────────────
+  // ─── Inflation (FRED API) ──────────────────────────────
   CPIAUCSL:             { title: 'Consumer Price Index for All Urban Consumers', unit: 'Index', category: 'inflation' },
   T10YIE:               { title: '10-Year Breakeven Inflation Rate',          unit: '%',       category: 'inflation' },
   T5YIFR:               { title: '5-Year Forward Inflation Expectation Rate', unit: '%',       category: 'inflation' },
 
-  // ─── Employment ───────────────────────────────────────
+  // ─── Employment (UNRATE from World Bank, rest FRED API) ─
   UNRATE:               { title: 'Unemployment Rate',                         unit: '%',        category: 'employment' },
   ICSA:                 { title: 'Initial Jobless Claims',                    unit: 'Thousands', category: 'employment' },
   PAYEMS:               { title: 'Total Nonfarm Payrolls',                    unit: 'Thousands', category: 'employment' },
 
-  // ─── Growth ───────────────────────────────────────────
+  // ─── Growth (GDP from World Bank, rest FRED API) ───────
   GDP:                  { title: 'Gross Domestic Product',                    unit: '$B',      category: 'growth' },
   INDPRO:               { title: 'Industrial Production Index',               unit: 'Index',   category: 'growth' },
 
-  // ─── Real Estate ───────────────────────────────────────
+  // ─── Real Estate (FRED API) ────────────────────────────
   HOUST:                { title: 'Housing Starts',                            unit: 'Thousands', category: 'real-estate' },
   MORTGAGE30US:         { title: '30-Year Fixed Rate Mortgage Average',       unit: '%',       category: 'real-estate' },
 
-  // ─── Sentiment ────────────────────────────────────────
+  // ─── Sentiment (FRED API) ──────────────────────────────
   UMCSENT:              { title: 'University of Michigan Consumer Sentiment', unit: 'Index',   category: 'sentiment' },
 
-  // ─── Monetary ──────────────────────────────────────────
+  // ─── Monetary (FRED API) ───────────────────────────────
   M2SL:                 { title: 'M2 Money Stock',                            unit: '$B',      category: 'monetary' },
 
-  // ─── Cross-Market ────────────────────────────────────
+  // ─── Cross-Market (FRED API) ───────────────────────────
   DTWEXBGS:             { title: 'Trade Weighted U.S. Dollar Index',          unit: 'Index',   category: 'cross-market' },
   DCOILWTICO:           { title: 'WTI Crude Oil Price',                       unit: '$/bbl',   category: 'cross-market' },
   GOLDAMGBD228NLBM:     { title: 'Gold Price (London Fix)',                   unit: '$/oz',    category: 'cross-market' },
@@ -66,8 +71,9 @@ export const FRED_SERIES: Record<string, { title: string; unit: string; category
   VIXCLS:               { title: 'CBOE Volatility Index (VIX)',               unit: 'Index',   category: 'cross-market' },
 }
 
-// ─── Treasury CSV column → FRED series mapping ───────────
-// The daily Treasury yield curve CSV columns map to these series.
+// ─── Free source coverage ─────────────────────────────────
+
+// Treasury CSV columns → FRED series IDs
 const TREASURY_COLUMNS: Record<string, string> = {
   '2 Yr': 'DGS2',
   '3 Yr': 'DGS3',
@@ -78,16 +84,18 @@ const TREASURY_COLUMNS: Record<string, string> = {
   '30 Yr': 'DGS30',
 }
 
-// Yield-related series we can serve from Treasury CSV
-const TREASURY_SERIES = new Set(['DGS2', 'DGS10', 'T10Y2Y', 'DGS3', 'DGS5', 'DGS7', 'DGS20', 'DGS30'])
+// Yield series served by Treasury CSV (free, no key)
+const TREASURY_SERIES = new Set(['DGS2', 'DGS3', 'DGS5', 'DGS7', 'DGS10', 'DGS20', 'DGS30', 'T10Y2Y'])
 
-// ─── World Bank indicator mappings ────────────────────────
-
+// World Bank indicator mappings (free, no key)
 const WORLD_BANK_INDICATORS: Record<string, { indicator: string; transform: (val: number) => string }> = {
   GDP:      { indicator: 'NY.GDP.MKTP.CD', transform: (v) => (v / 1e9).toFixed(1) },
   CPIAUCSL: { indicator: 'FP.CPI.TOTL',    transform: (v) => v.toFixed(2) },
   UNRATE:   { indicator: 'SL.UEM.TOTL.ZS', transform: (v) => v.toFixed(1) },
 }
+
+// Series covered by free sources (no FRED API call needed)
+const FREE_SERIES = new Set([...TREASURY_SERIES, ...Object.keys(WORLD_BANK_INDICATORS)])
 
 // ─── Cache ────────────────────────────────────────────────
 
@@ -110,7 +118,6 @@ function parseTreasuryCsv(text: string): TreasuryRow[] {
   const lines = text.trim().split('\n')
   if (lines.length < 2) return []
 
-  // Parse header line: Date,"1 Mo","1.5 Month","2 Mo",...
   const headers = parseCsvLine(lines[0])
   const dateIdx = headers.findIndex(h => h.toLowerCase() === 'date')
   if (dateIdx === -1) return []
@@ -154,7 +161,6 @@ function parseCsvLine(line: string): string[] {
 }
 
 function normalizeTreasuryDate(dateStr: string): string {
-  // "06/29/2026" → "2026-06-29"
   const parts = dateStr.split('/')
   if (parts.length === 3) {
     return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`
@@ -188,7 +194,6 @@ function fetchFromTreasury(
   if (rows.length === 0) return []
 
   if (seriesId === 'T10Y2Y') {
-    // Compute spread from 10Y and 2Y columns
     const dgs10Col = Object.keys(TREASURY_COLUMNS).find(k => TREASURY_COLUMNS[k] === 'DGS10')
     const dgs2Col = Object.keys(TREASURY_COLUMNS).find(k => TREASURY_COLUMNS[k] === 'DGS2')
     if (!dgs10Col || !dgs2Col) return []
@@ -206,7 +211,6 @@ function fetchFromTreasury(
     return observations
   }
 
-  // Find the Treasury column for this series
   const treasuryCol = Object.keys(TREASURY_COLUMNS).find(k => TREASURY_COLUMNS[k] === seriesId)
   if (!treasuryCol) return []
 
@@ -287,7 +291,6 @@ async function fetchFromFredApi(
   seriesId: string,
   limit: number,
 ): Promise<FredObservation[] | null> {
-  // If no API key is configured, skip FRED API entirely
   if (!FRED_API_KEY) return null
 
   const url = `${FRED_API_BASE}?series_id=${seriesId}&api_key=${FRED_API_KEY}&file_type=json&sort_order=desc&limit=${limit}`
@@ -308,7 +311,8 @@ async function fetchFromFredApi(
 
 /**
  * Fetch observations for a macro-economic series.
- * Priority: FRED API (with key) → Treasury CSV (yields only) → World Bank (GDP/CPI/UNRATE)
+ * Priority: free sources first (Treasury CSV, World Bank), then FRED API.
+ * This conserves FRED API rate limits for series that need it.
  *
  * @param seriesId — e.g. "FEDFUNDS", "GDP"
  * @param limit — max observations to return (most recent first, default 10)
@@ -323,19 +327,7 @@ export async function getFredSeries(seriesId: string, limit = 10): Promise<FredS
   const meta = FRED_SERIES[seriesId]
   const title = meta?.title ?? seriesId
 
-  // 1. Try FRED API (requires FRED_API_KEY env var / free registration)
-  try {
-    const fredObs = await fetchFromFredApi(seriesId, limit)
-    if (fredObs) {
-      const series: FredSeries = { id: seriesId, title, observations: fredObs }
-      seriesCache.set(seriesId, { data: series, timestamp: Date.now() })
-      return series
-    }
-  } catch {
-    // Silently fall through
-  }
-
-  // 2. Try Treasury CSV for yield curve series (free, no key)
+  // 1. Treasury CSV for yield curve series (free, no key, daily updates)
   if (TREASURY_SERIES.has(seriesId)) {
     try {
       const rows = await fetchTreasuryCsv()
@@ -350,7 +342,7 @@ export async function getFredSeries(seriesId: string, limit = 10): Promise<FredS
     }
   }
 
-  // 3. Try World Bank for GDP/CPI/UNRATE
+  // 2. World Bank for GDP/CPI/Unemployment (free, no key, annual data)
   const wbMapping = WORLD_BANK_INDICATORS[seriesId]
   if (wbMapping) {
     try {
@@ -365,7 +357,35 @@ export async function getFredSeries(seriesId: string, limit = 10): Promise<FredS
     }
   }
 
-  // 4. No data available — return empty series
+  // 3. FRED API for remaining series (requires FRED_API_KEY env var)
+  if (!FREE_SERIES.has(seriesId)) {
+    try {
+      const fredObs = await fetchFromFredApi(seriesId, limit)
+      if (fredObs) {
+        const series: FredSeries = { id: seriesId, title, observations: fredObs }
+        seriesCache.set(seriesId, { data: series, timestamp: Date.now() })
+        return series
+      }
+    } catch {
+      // Silently fall through
+    }
+  }
+
+  // 4. FRED API fallback for free-source series if they returned empty
+  if (FREE_SERIES.has(seriesId) && FRED_API_KEY) {
+    try {
+      const fredObs = await fetchFromFredApi(seriesId, limit)
+      if (fredObs) {
+        const series: FredSeries = { id: seriesId, title, observations: fredObs }
+        seriesCache.set(seriesId, { data: series, timestamp: Date.now() })
+        return series
+      }
+    } catch {
+      // Silently fall through
+    }
+  }
+
+  // 5. No data available — return empty series
   const empty: FredSeries = { id: seriesId, title, observations: [] }
   seriesCache.set(seriesId, { data: empty, timestamp: Date.now() })
   return empty
