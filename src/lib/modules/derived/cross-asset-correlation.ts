@@ -139,8 +139,8 @@ async function fetchYahooReturns(symbol: string, days = 30): Promise<number[]> {
   try {
     const registry = await import('@/lib/modules').then(m => m.registerAllModules())
     const result = await registry.fetchOne('yahoo-finance', { symbol, action: 'chart', interval: '1d', range: '1mo' })
-    const chart = result?.data as ChartResponse | null
-    const closes = chart?.chart?.result?.[0]?.indicators?.quote?.[0]?.close ?? []
+    const chart = result?.data as { quote?: { close?: number[] } } | null
+    const closes = chart?.quote?.close ?? []
     const validCloses = closes.filter((c): c is number => c != null && c > 0)
     const returns: number[] = []
     for (let i = 1; i < validCloses.length; i++) {
