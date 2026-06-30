@@ -1,57 +1,35 @@
 // ─────────────────────────────────────────────────────────────
 // GET /api/v1/onchain-intel — Mempool + Bridge + Staking Intelligence
-// Zero API keys — all public endpoints
+// Reads from sharedCache (background-refreshed), falls back to live fetch
 // ─────────────────────────────────────────────────────────────
 
 import { NextRequest } from "next/server";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
 import { fetchMempoolEvents } from "@/lib/modules/chain/mempool-intel";
 import { fetchBridgeStats } from "@/lib/modules/chain/bridge-flow";
-import { fetchStakingQueue, persistStakingFlow } from "@/lib/modules/chain/staking-queue";
+import { fetchStakingQueue } from "@/lib/modules/chain/staking-queue";
+import { sharedCache } from "@/lib/data-refresher";
 
 export const dynamic = "force-dynamic";
-
-let cachedMempool: unknown = null;
-let cachedBridge: unknown = null;
-let cachedStaking: Awaited<ReturnType<typeof fetchStakingQueue>> | null = null;
-let cacheTs = 0;
-const CACHE_TTL = 60 * 1000; // 1 minute for mempool, longer for others
 
 export async function GET(request: NextRequest) {
   try {
     const action = request.nextUrl.searchParams.get("action") ?? "all";
-    const now = Date.now();
 
-    if (action === "mempool" || action === "all") {
-      if (!cachedMempool || now - cacheTs > CACHE_TTL) {
-        cachedMempool = await fetchMempoolEvents();
-      }
-    }
+    let mempool = sharedCache.get<Awaited<ReturnType<typeof fetchMempoolEvents>>>('onchain:mempool')
+    let bridge = sharedCache.get<Awaited<ReturnType<typeof fetchBridgeStats>>>('onchain:bridge')
+    let staking = sharedCache.get<Awaited<ReturnType<typeof fetchStakingQueue>>>('onchain:staking')
 
-    if (action === "bridge" || action === "all") {
-      if (!cachedBridge || now - cacheTs > CACHE_TTL * 5) {
-        cachedBridge = await fetchBridgeStats();
-      }
-    }
+    if (!mempool) mempool = await fetchMempoolEvents()
+    if (!bridge) bridge = await fetchBridgeStats()
+    if (!staking) staking = await fetchStakingQueue()
 
-    if (action === "staking" || action === "all") {
-      if (!cachedStaking || now - cacheTs > CACHE_TTL * 5) {
-        cachedStaking = await fetchStakingQueue();
-        persistStakingFlow(cachedStaking).catch(() => {})
-      }
-    }
+    const data: Record<string, unknown> = {}
+    if (action === "mempool" || action === "all") data.mempool = mempool
+    if (action === "bridge" || action === "all") data.bridge = bridge
+    if (action === "staking" || action === "all") data.staking = staking
 
-    cacheTs = now;
-
-    const data = action === "mempool"
-      ? { mempool: cachedMempool }
-      : action === "bridge"
-      ? { bridge: cachedBridge }
-      : action === "staking"
-      ? { staking: cachedStaking }
-      : { mempool: cachedMempool, bridge: cachedBridge, staking: cachedStaking };
-
-    return cacheHeaders(apiSuccess(data), 60);
+    return cacheHeaders(apiSuccess(data), 15);
   } catch (error) {
     console.error("GET /api/v1/onchain-intel error:", error);
     return apiError("Failed to fetch on-chain intelligence", 502);

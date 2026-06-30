@@ -1,46 +1,39 @@
 // ─────────────────────────────────────────────────────────────
 // GET /api/v1/derivatives-intel — Real derivatives intelligence
 // Binance, Bybit, OKX funding rates, OI, long/short ratios
-// Zero API keys — all public REST endpoints
+// Reads from sharedCache (background-refreshed), falls back to live fetch
 // ─────────────────────────────────────────────────────────────
 
 import { NextRequest } from "next/server";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
-import { fetchDerivativesSnapshot, fetchRecentLiquidations, persistDerivativesSnapshot, persistLiquidations } from "@/lib/modules/derived/derivatives-intel";
-
+import { fetchDerivativesSnapshot, fetchRecentLiquidations } from "@/lib/modules/derived/derivatives-intel";
+import { sharedCache } from "@/lib/data-refresher";
 
 export const dynamic = "force-dynamic";
-
-// Cache for 30 seconds (derivatives data is time-sensitive)
-let cachedData: unknown = null;
-let cacheTs = 0;
-const CACHE_TTL = 30 * 1000;
 
 export async function GET(request: NextRequest) {
   try {
     const action = request.nextUrl.searchParams.get("action") ?? "all";
-    const now = Date.now();
+
+    let snapshots = sharedCache.get<Awaited<ReturnType<typeof fetchDerivativesSnapshot>>>('derivatives:snapshots')
+    let liquidations = sharedCache.get<Awaited<ReturnType<typeof fetchRecentLiquidations>>>('derivatives:liquidations')
+
+    // Fallback to live fetch if cache empty (first request before refresher runs)
+    if (!snapshots) snapshots = await fetchDerivativesSnapshot()
+    if (!liquidations) liquidations = await fetchRecentLiquidations()
+
+    const data: Record<string, unknown> = {}
 
     if (action === "snapshot" || action === "all") {
-      if (!cachedData || now - cacheTs > CACHE_TTL) {
-        const snapshots = await fetchDerivativesSnapshot();
-        cachedData = {
-          snapshots,
-          summary: computeSummary(snapshots),
-        };
-        persistDerivativesSnapshot(snapshots).catch(() => {})
-        cacheTs = now;
-      }
+      data.snapshots = snapshots
+      data.summary = computeSummary(snapshots)
     }
 
     if (action === "liquidations" || action === "all") {
-      const liquidations = await fetchRecentLiquidations();
-      (cachedData as Record<string, unknown>).liquidations = liquidations;
-      persistLiquidations(liquidations).catch(() => {})
+      data.liquidations = liquidations
     }
 
-
-    return cacheHeaders(apiSuccess(cachedData), 30);
+    return cacheHeaders(apiSuccess(data), 15);
   } catch (error) {
     console.error("GET /api/v1/derivatives-intel error:", error);
     return apiError("Failed to fetch derivatives intelligence", 502);

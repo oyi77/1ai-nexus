@@ -1,7 +1,11 @@
 import { initTelegramBot, broadcastAlert } from '@/lib/telegram/bot'
+import { startDataRefresher } from '@/lib/data-refresher'
+
 
 export async function register() {
-  // Initialize Telegram bot polling on server startup
+  // Start background data refresher (pre-fetches all module data)
+  startDataRefresher()
+
   if (process.env.TELEGRAM_BOT_TOKEN) {
     initTelegramBot()
 

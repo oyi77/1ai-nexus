@@ -1,48 +1,31 @@
 // ─────────────────────────────────────────────────────────────
 // GET /api/v1/etf-flows — ETF Flow Intelligence + Premium Monitor
-// Spot BTC/ETH ETF flows + Coinbase/Korea premiums + futures basis
-// Zero API keys — all public endpoints
+// Reads from sharedCache (background-refreshed), falls back to live fetch
 // ─────────────────────────────────────────────────────────────
 
 import { NextRequest } from "next/server";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
-import { fetchETFSummary, persistETFFlows } from "@/lib/modules/tradfi/etf-flow";
-import { fetchPremiumSnapshots, persistPremiumSnapshots } from "@/lib/modules/tradfi/premium-monitor";
+import { fetchETFSummary } from "@/lib/modules/tradfi/etf-flow";
+import { fetchPremiumSnapshots } from "@/lib/modules/tradfi/premium-monitor";
+import { sharedCache } from "@/lib/data-refresher";
 
 export const dynamic = "force-dynamic";
-
-let cachedETF: Awaited<ReturnType<typeof fetchETFSummary>> | null = null;
-let cachedPremiums: Awaited<ReturnType<typeof fetchPremiumSnapshots>> | null = null;
-let cacheTs = 0;
-const CACHE_TTL = 5 * 60 * 1000;
 
 export async function GET(request: NextRequest) {
   try {
     const action = request.nextUrl.searchParams.get("action") ?? "all";
-    const now = Date.now();
 
-    if (action === "etf" || action === "all") {
-      if (!cachedETF || now - cacheTs > CACHE_TTL) {
-        cachedETF = await fetchETFSummary();
-        persistETFFlows(cachedETF.flows).catch(() => {})
-        cacheTs = now;
-      }
-    }
+    let etf = sharedCache.get<Awaited<ReturnType<typeof fetchETFSummary>>>('etf:summary')
+    let premiums = sharedCache.get<Awaited<ReturnType<typeof fetchPremiumSnapshots>>>('etf:premiums')
 
-    if (action === "premiums" || action === "all") {
-      if (!cachedPremiums || now - cacheTs > CACHE_TTL) {
-        cachedPremiums = await fetchPremiumSnapshots();
-        persistPremiumSnapshots(cachedPremiums).catch(() => {})
-      }
-    }
+    if (!etf) etf = await fetchETFSummary()
+    if (!premiums) premiums = await fetchPremiumSnapshots()
 
-    const data = action === "etf"
-      ? { etf: cachedETF }
-      : action === "premiums"
-      ? { premiums: cachedPremiums }
-      : { etf: cachedETF, premiums: cachedPremiums };
+    const data: Record<string, unknown> = {}
+    if (action === "etf" || action === "all") data.etf = etf
+    if (action === "premiums" || action === "all") data.premiums = premiums
 
-    return cacheHeaders(apiSuccess(data), 300);
+    return cacheHeaders(apiSuccess(data), 15);
   } catch (error) {
     console.error("GET /api/v1/etf-flows error:", error);
     return apiError("Failed to fetch ETF flow data", 502);
