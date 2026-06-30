@@ -13,16 +13,9 @@ interface Alert {
   lastTriggered: string | null
 }
 
-const DEFAULT_ALERTS: Alert[] = [
-  { id: '1', name: 'BTC Price Alert', condition: 'BTC-USD > $75,000 OR < $60,000', channel: 'whatsapp', enabled: true, lastTriggered: null },
-  { id: '2', name: 'IHSG Daily Close', condition: 'IHSG closes > 5,900 OR < 5,700', channel: 'whatsapp', enabled: true, lastTriggered: null },
-  { id: '3', name: 'USD/IDR Alert', condition: 'USD/IDR > 18,000 OR < 17,500', channel: 'whatsapp', enabled: true, lastTriggered: null },
-  { id: '4', name: 'Fed Rate Decision', condition: 'FEDFUNDS rate changes', channel: 'telegram', enabled: true, lastTriggered: '2026-06-15' },
-  { id: '5', name: 'Whale Alert > $10M', condition: 'Any whale transfer > $10M', channel: 'telegram', enabled: true, lastTriggered: '2026-06-29' },
-  { id: '6', name: 'Fear & Greed < 20', condition: 'Fear & Greed Index drops below 20', channel: 'email', enabled: false, lastTriggered: null },
-  { id: '7', name: 'Gold > $4,000', condition: 'Gold price exceeds $4,000/oz', channel: 'push', enabled: true, lastTriggered: null },
-  { id: '8', name: 'BBCA.JK Earnings', condition: 'BBCA.JK quarterly earnings release', channel: 'whatsapp', enabled: true, lastTriggered: '2026-04-28' },
-]
+// Alerts start empty — users create their own
+// In production, alerts are persisted to database
+
 
 const CHANNEL_INFO: Record<string, { name: string; icon: string; color: string; description: string }> = {
   whatsapp: { name: 'WhatsApp', icon: '📱', color: '#25d366', description: 'Instant delivery to your WhatsApp number' },
@@ -32,7 +25,8 @@ const CHANNEL_INFO: Record<string, { name: string; icon: string; color: string; 
 }
 
 export default function AlertsPage() {
-  const [alerts, setAlerts] = useState<Alert[]>(DEFAULT_ALERTS)
+
+  const [alerts, setAlerts] = useState<Alert[]>([])
   const [showCreate, setShowCreate] = useState(false)
   const [newAlert, setNewAlert] = useState({ name: '', condition: '', channel: 'whatsapp' as Alert['channel'] })
 
