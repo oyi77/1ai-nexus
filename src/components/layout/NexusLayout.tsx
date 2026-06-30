@@ -95,6 +95,8 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Analytics Hub', href: '/analytics',      icon: Zap },
       { label: 'Screener',      href: '/screener',       icon: BarChart3 },
       { label: 'Fundamentals',  href: '/fundamentals',   icon: Building2 },
+      { label: 'Financials',    href: '/financials',     icon: Building2 },
+      { label: 'DCF Model',     href: '/dcf',            icon: TrendingUp },
       { label: 'Heatmap',       href: '/heatmap',        icon: PieChart },
       { label: 'Compare',       href: '/compare',        icon: GitCompare },
       { label: 'Insider',       href: '/insider',        icon: Users },
