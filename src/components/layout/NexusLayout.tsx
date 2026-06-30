@@ -53,7 +53,8 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'On-Chain',
     items: [
       { label: 'On-Chain Hub',  href: '/onchain',        icon: Radio },
-      { label: 'Token Scanner', href: '/scanner',        icon: Eye },
+      { label: 'Top Traders',   href: '/top-traders',    icon: TrendingUp },
+      { label: 'On-Chain Intel', href: '/onchain-intel', icon: Radio },
       { label: 'Token God Mode', href: '/token-god-mode', icon: Target },
       { label: 'Knowledge Graph', href: '/graph',        icon: Eye },
       { label: 'Top Traders',   href: '/top-traders',    icon: TrendingUp },
