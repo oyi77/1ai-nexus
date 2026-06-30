@@ -4,6 +4,29 @@
 // No API keys required. Returns empty if live data unavailable.
 // ─────────────────────────────────────────────────────────
 
+
+const FRED_API_BASE = 'https://api.stlouisfed.org/fred/series/observations'
+
+function isFredObservations(value: unknown): value is Array<{ date: string; value: string }> {
+  if (!Array.isArray(value)) return false
+  return value.every(item =>
+    item &&
+    typeof item === 'object' &&
+    'date' in item &&
+    typeof (item as Record<string, unknown>).date === 'string' &&
+    'value' in item &&
+    typeof (item as Record<string, unknown>).value === 'string'
+  )
+}
+
+function isFredResponse(value: unknown): value is { observations: Array<{ date: string; value: string }> } {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    'observations' in value &&
+    isFredObservations((value as Record<string, unknown>).observations)
+  )
+}
 const WORLD_BANK_BASE = "https://api.worldbank.org/v2";
 
 // ─── Types ────────────────────────────────────────────────
@@ -134,7 +157,28 @@ export async function getFredSeries(seriesId: string, limit = 10): Promise<FredS
   const meta = FRED_SERIES[seriesId];
   const title = meta?.title ?? seriesId;
 
-  // Try World Bank for supported indicators
+  // Try real FRED API with DEMO_KEY (rate-limited but works for low volume)
+  try {
+    const url = `${FRED_API_BASE}?series_id=${seriesId}&api_key=DEMO_KEY&file_type=json&sort_order=desc&limit=${limit}`
+    const res = await fetch(url, { signal: AbortSignal.timeout(15_000) })
+    if (res.ok) {
+      const raw: unknown = await res.json()
+      if (isFredResponse(raw)) {
+        const observations: FredObservation[] = raw.observations
+          .filter(o => o.value !== '.')
+          .map(o => ({ date: o.date, value: o.value }))
+        if (observations.length > 0) {
+          const series: FredSeries = { id: seriesId, title, observations }
+          seriesCache.set(seriesId, { data: series, timestamp: Date.now() })
+          return series
+        }
+      }
+    }
+  } catch {
+    console.warn(`[fred-client] FRED API failed for ${seriesId}, trying World Bank fallback`)
+  }
+
+  // Fallback: World Bank for GDP/CPI/Unemployment indicators
   const wbMapping = WORLD_BANK_INDICATORS[seriesId];
   if (wbMapping) {
     try {
@@ -144,12 +188,12 @@ export async function getFredSeries(seriesId: string, limit = 10): Promise<FredS
         seriesCache.set(seriesId, { data: series, timestamp: Date.now() });
         return series;
       }
-    } catch (e) {
-      console.warn(`[fred-client] World Bank API failed for ${seriesId}:`, e);
+    } catch {
+      console.warn(`[fred-client] World Bank API failed for ${seriesId}`)
     }
   }
 
-  // No fallback data — return empty if World Bank didn't provide results
+  // No data available
   const series: FredSeries = { id: seriesId, title, observations: [] };
   seriesCache.set(seriesId, { data: series, timestamp: Date.now() });
   return series;

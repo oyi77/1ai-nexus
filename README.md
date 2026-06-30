@@ -22,6 +22,8 @@ NEXUS is an **open-source crypto intelligence platform** that monitors blockchai
 - **Real-Time Alerts** — Custom conditions with webhook delivery and HMAC signing
 - **Prediction Markets** — Crypto prediction market interface with order book and leaderboards
 - **DeFi Protocol Analytics** — Track TVL, yields, and protocol-level activity
+- **Meme Token Detection** — Real-time scanning for new Solana/EVM token creation (Pump.fun, Raydium) with hype scoring engine
+- **DEX Sniper Scanner** — `/scanner` page with sub-second WebSocket updates showing new liquidity pools with risk scoring
 
 ---
 
@@ -202,7 +204,7 @@ GET  /api/v1/data-sources      — Integration health & availability status
 
 ### WebSocket Events
 
-Connect to `ws://localhost:4401` with Bearer token:
+Connect to `ws://localhost:4401` with Bearer token (auth-protected namespaces require it; public namespaces don't):
 
 ```javascript
 import { io } from "socket.io-client";
@@ -221,6 +223,43 @@ socket.on("smart-money", (signal) => {
   console.log(`${signal.type}: ${signal.entity} score=${signal.score}`);
 });
 ```
+
+#### Public Namespaces (no auth required)
+
+**`/dexscreener`** — Real-time token boost data from DexScreener WebSocket
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `boost` | `ScoredToken` | Token boosted with enriched metadata (price, liquidity, volume, FDV) |
+| `token_update` | `ScoredToken` | Updated scoring after new data arrives |
+
+**`/memecoins`** — Raw DEX token activity (swap events + new token creation)
+
+| Event | Payload | Description |
+|-------|---------|-------------|
+| `memecoin` | `{ type, signature, chain, program, ... }` | Detected DEX swap or activity |
+| `new_token` | `{ type, signature, chain, program, tokenMint, scored }` | New token creation on Pump.fun or Raydium |
+| `token_update` | `ScoredToken` | Updated scoring after re-evaluation |
+
+**Scanner client example:**
+
+```javascript
+const ws = new WebSocket("wss://tracker-ws.aitradepulse.com/socket.io/?EIO=4&transport=websocket")
+ws.onopen = () => {
+  ws.send("40/dexscreener")  // subscribe to /dexscreener namespace
+  ws.send("40/memecoins")    // subscribe to /memecoins namespace
+}
+ws.onmessage = (event) => {
+  if (event.data.startsWith("42/dexscreener,")) {
+    const [, data] = JSON.parse(event.data.slice(16))
+    if (data[0] === "boost") console.log("Boosted token:", data[1])
+  }
+}
+```
+
+#### Auth-Protected Namespaces
+
+`/trades`, `/alerts`, `/prices`, `/flows`, `/orderbook`, `/derivatives`, `/liquidations` — require Bearer token.
 
 ---
 
@@ -257,9 +296,11 @@ nexus/
 │   ├── processors/             # Transaction decoding & smart money detection
 │   └── publisher.ts            # Redis event publisher
 ├── ws-server/                  # WebSocket sidecar (separate process)
-│   ├── server.ts               # Socket.io server
+│   ├── server.ts               # Socket.io server with DexScreener WS + token scoring
 │   ├── auth.ts                 # Bearer token authentication
-│   └── subscriber.ts           # Redis event subscriber
+│   ├── score.ts                # Token scoring engine (hype score 0-100)
+│   ├── subscriber.ts           # Redis event subscriber
+│   └── __tests__/              # Score engine unit tests
 ├── prisma/
 │   ├── schema.prisma           # Database schema (12 models)
 │   └── seed.ts                 # Seed script (50 entities, 500 markets)

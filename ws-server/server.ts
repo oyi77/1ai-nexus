@@ -3,7 +3,15 @@ import { createServer } from "http";
 import { Server } from "socket.io";
 import { authMiddleware } from "./auth";
 import WebSocket from "ws";
+import Redis from "ioredis";
 import { startSubscriber } from "./subscriber";
+import { scoreToken, tokenRegistry, ScoredToken } from './score'
+
+// Redis publisher for Telegram alert bridge
+const alertRedis = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
+  maxRetriesPerRequest: null,
+  retryStrategy(times) { return Math.min(times * 200, 5000) },
+})
 
 const PORT = parseInt(process.env.WS_PORT || "4401", 10);
 const ALLOWED_ORIGINS = [
@@ -435,6 +443,181 @@ const SOL_PROGRAMS: Record<string, string> = {
   'lifinity': '2wT8Yq49kHgDzXuPxZSaeLb4Liti6UWsCNrFhk8o773a',
 }
 
+// ═══════════════════════════════════════════════════════════════
+// DEXSCREENER WS: Real-time token boost events (no auth needed)
+// Provides enriched token metadata: price, liquidity, volume, FDV
+// ═══════════════════════════════════════════════════════════════
+interface DexScreenerBoost {
+  tokenAddress: string
+  chainId: string
+  name?: string
+  symbol?: string
+  priceUsd?: string
+  liquidity?: { usd?: number }
+  fdv?: number
+  volume?: { h24?: number; h6?: number; h1?: number; m5?: number }
+  url?: string
+  totalBoost?: number
+  mintAmount?: number
+}
+
+
+
+const TELEGRAM_HYPNOTIC_SCORE = 75 // score threshold for Telegram push alert
+
+function scheduleTelegramAlert(token: ScoredToken) {
+  if (token.score < TELEGRAM_HYPNOTIC_SCORE) return
+
+  const alertPayload = {
+    type: 'new_meme_token',
+    token: {
+      address: token.address,
+      chain: token.chain,
+      name: token.name,
+      symbol: token.symbol,
+      score: token.score,
+      risk: token.risk,
+      priceUsd: token.priceUsd,
+      liquidity: token.liquidity,
+      fdv: token.fdv,
+      boosts: token.boosts,
+      volume24h: token.volume24h,
+      sources: token.sources,
+    },
+    message: `🚀 *${token.name} (${token.symbol})* hype score: ${token.score}/100\n💰 Price: $${formatCompact(token.priceUsd)}\n💧 Liq: $${formatCompact(token.liquidity)}\n📊 FDV: $${formatCompact(token.fdv)}\n🔥 Boosts: ${token.boosts}\n⚠️ Risk: ${token.risk}`,
+    timestamp: new Date().toISOString(),
+  }
+
+  // Emit through Socket.IO alerts namespace
+  io.of('/alerts').emit('event', alertPayload)
+
+  // Publish to Redis for the Next.js Telegram bot to consume
+  alertRedis.publish('nexus:memecoin-alerts', JSON.stringify(alertPayload)).catch(() => {})
+}
+
+function formatCompact(n: number): string {
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B'
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M'
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K'
+  return n.toFixed(2)
+}
+
+// === DEXSCREENER WS ===
+let dexscreenerWs: WebSocket | null = null
+let dexWsReconnectAttempts = 0
+
+function connectDexScreenerWS() {
+  const url = 'wss://ws-api.dexscreener.com'
+  console.log('[dexscreener] connecting to ' + url)
+  dexscreenerWs = new WebSocket(url)
+  activeStreams++
+
+  dexscreenerWs.on('open', () => {
+    console.log('[dexscreener] connected — subscribing to token-boosts')
+    dexWsReconnectAttempts = 0
+    dexscreenerWs!.send(JSON.stringify({
+      type: 'subscribe',
+      channel: 'token-boosts',
+    }))
+  })
+
+  dexscreenerWs.on('message', (data) => {
+    try {
+      const msg = JSON.parse(data.toString())
+      if (!msg || !msg.pair) return
+
+      const pair = msg.pair ?? msg
+      const boost: DexScreenerBoost = {
+        tokenAddress: pair.baseToken?.address ?? pair.tokenAddress ?? '',
+        chainId: pair.chainId ?? pair.chain ?? 'solana',
+        name: pair.baseToken?.name ?? pair.name ?? 'Unknown',
+        symbol: pair.baseToken?.symbol ?? pair.symbol ?? '???',
+        priceUsd: pair.priceUsd,
+        liquidity: pair.liquidity,
+        fdv: pair.fdv,
+        volume: pair.volume,
+        totalBoost: msg.totalBoost ?? pair.boostCount ?? 0,
+      }
+
+      if (!boost.tokenAddress) return
+
+      const scored = scoreToken({
+        address: boost.tokenAddress,
+        chain: boost.chainId,
+        name: boost.name ?? 'Unknown',
+        symbol: boost.symbol ?? '???',
+        priceUsd: parseFloat(boost.priceUsd ?? '0'),
+        fdv: boost.fdv ?? 0,
+        liquidity: boost.liquidity?.usd ?? 0,
+        volume24h: boost.volume?.h24 ?? 0,
+        boosts: boost.totalBoost ?? 0,
+        sources: ['dexscreener'],
+      })
+
+      // Emit to dexscreener namespace (scanner listens here)
+      dexscreenerNs.emit('boost', scored)
+
+      // Also emit to memecoins namespace for unified view
+      memecoinsNs.emit('token_update', scored)
+
+      // Schedule Telegram alert if hype threshold crossed
+      if (scored.score >= TELEGRAM_HYPNOTIC_SCORE) {
+        scheduleTelegramAlert(scored)
+      }
+    } catch {}
+  })
+
+  dexscreenerWs.on('error', (err) => {
+    console.error('[dexscreener] error:', (err as Error).message)
+  })
+
+  dexscreenerWs.on('close', () => {
+    activeStreams--
+    dexscreenerWs = null
+    const delay = Math.min(1000 * Math.pow(2, dexWsReconnectAttempts++), 30000)
+    console.log(`[dexscreener] disconnected — reconnecting in ${delay}ms`)
+    setTimeout(connectDexScreenerWS, delay)
+  })
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DEXSCREENER SOCKET.IO NAMESPACE: Real-time token boosts for scanner
+// ═══════════════════════════════════════════════════════════════
+const dexscreenerNs = io.of('/dexscreener')
+dexscreenerNs.on('connection', (socket) => {
+  console.log('[dexscreener] Client: ' + socket.id)
+  socket.on('subscribe:chain', (chain: string) => {
+    socket.join('chain:' + chain)
+  })
+  socket.on('disconnect', () => {})
+})
+
+
+// Detect new token creation from raw Solana logs
+function detectNewTokenCreation(logs: string[], program: string, signature: string): { isNew: boolean; tokenMint?: string } {
+  // Pump.fun: "Instruction: Create" creates a new token
+  if (program === 'pumpfun') {
+    const hasCreate = logs.some((l: string) =>
+      l.includes('Instruction: Create') || l.includes('create') || l.includes('Create')
+    )
+    if (hasCreate) {
+      // Try to extract the token mint address from logs
+      const mintMatch = logs.join(' ').match(/mint:\s*([1-9A-HJ-NP-Za-km-z]{32,44})/)
+      return { isNew: true, tokenMint: mintMatch?.[1] }
+    }
+  }
+  // Raydium CPMM: Pool creation on initialize2
+  if (program === 'raydium-cpmm' || program === 'raydium-clmm') {
+    const hasInitialize = logs.some((l: string) =>
+      l.includes('initialize2') || l.includes('Initialize') || l.includes('createPool')
+    )
+    if (hasInitialize) {
+      return { isNew: true }
+    }
+  }
+  return { isNew: false }
+}
+
 // === EVM DEX ROUTERS ===
 const EVM_ROUTERS: Record<string, { chain: string; rpc: string; routers: string[] }> = {
   ethereum: {
@@ -497,11 +680,11 @@ function connectSolanaWS() {
       if (msg.method === 'logsNotification') {
         const log = msg.params?.result
         if (!log) return
-        
+
         const signature = log.signature as string
         const logs = (log.logs || []) as string[]
         const err = log.err
-        
+
         // Detect program from logs
         let program = 'unknown'
         for (const [name, addr] of Object.entries(SOL_PROGRAMS)) {
@@ -510,18 +693,55 @@ function connectSolanaWS() {
             break
           }
         }
-        
+
         // Detect swap pattern
-        const isSwap = logs.some((l: string) => 
-          l.includes('ray_log') || 
+        const isSwap = logs.some((l: string) =>
+          l.includes('ray_log') ||
           l.includes('Instruction: Swap') ||
           l.includes('Instruction: Buy') ||
           l.includes('Instruction: Sell') ||
           l.includes('Instruction: Create') ||
           l.includes('swap')
         )
-        
+
+        // === NEW TOKEN CREATION DETECTION ===
+        const { isNew, tokenMint } = detectNewTokenCreation(logs, program, signature)
+
+        if (isNew) {
+          const scored = scoreToken({
+            address: tokenMint ?? signature.slice(0, 44),
+            chain: 'solana',
+            name: tokenMint ?? `New@${signature.slice(0, 8)}`,
+            symbol: 'NEW',
+            sources: [program],
+            boosts: 0,
+            swapCount: 0,
+          })
+          memecoinsNs.emit('new_token', {
+            type: 'new_token',
+            signature,
+            chain: 'solana',
+            program,
+            tokenMint: tokenMint ?? null,
+            scored,
+            logSnippet: logs.slice(0, 3).join(' | ').slice(0, 200),
+            timestamp: Date.now(),
+          })
+          // Also emit to dexscreener namespace for unified scanner feed
+          dexscreenerNs.emit('boost', scored)
+          scheduleTelegramAlert(scored)
+        }
+
         if (isSwap || program === 'pumpfun') {
+          // Track swap count for scoring
+          const tokenAddress = signature.slice(0, 44)
+          const existing = tokenRegistry.get(tokenAddress)
+          if (existing) {
+            existing.swapCount = (existing.swapCount ?? 0) + 1
+            const rescored = scoreToken(existing)
+            memecoinsNs.emit('token_update', rescored)
+          }
+
           memecoinsNs.emit('memecoin', {
             type: isSwap ? 'swap' : 'activity',
             signature,
@@ -600,10 +820,11 @@ function connectEvmDex(name: string, config: { chain: string; rpc: string; route
 // === START ALL DEX STREAMS ===
 function startAllDexStreams() {
   connectSolanaWS()
+  connectDexScreenerWS()
   for (const [name, config] of Object.entries(EVM_ROUTERS)) {
     connectEvmDex(name, config)
   }
-  console.log('[memecoins] All DEX streams started: Solana(11 programs) + EVM(4 chains)')
+  console.log('[memecoins] All DEX streams started: Solana(11 programs) + EVM(4 chains) + DexScreener')
 }
 
 // Client connections

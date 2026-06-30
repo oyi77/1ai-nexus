@@ -111,8 +111,11 @@ graph TB
 - **Port**: 4401
 - **Role**: Real-time event delivery via Socket.IO. Subscribes to Redis Pub/Sub channels and fans out events to connected clients.
 - **Namespaces**: `/trades`, `/alerts`, `/prices`, `/flows` — each with independent auth and room-based filtering.
-- **Auth**: Bearer token validated against `NEXUS_API_KEYS`.
-- **Files**: `ws-server/server.ts`, `ws-server/auth.ts`, `ws-server/subscriber.ts`
+- **Real-time DEX**: `/memecoins` — raw Solana/EVM DEX swap & token creation events via public RPC WebSockets
+- **Enriched Boost Data**: `/dexscreener` — DexScreener WebSocket for real-time token boost metadata (price, liquidity, volume)
+- **Auth**: Bearer token validated against `NEXUS_API_KEYS` (on auth-protected namespaces). `/memecoins` and `/dexscreener` are public.
+- **Scoring**: In-memory token registry with hype scoring (0-100) based on boosts, volume, liquidity, FDV, swap count, age
+- **Telegram Bridge**: High-score tokens (≥75) published to Redis channel `nexus:memecoin-alerts` for Telegram bot broadcast
 
 ### Blockchain Indexer (`indexer`)
 

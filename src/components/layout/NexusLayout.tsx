@@ -7,7 +7,9 @@ import {
   LayoutDashboard, Coins, Building2, Zap, Bell,
   ChevronLeft, ChevronRight, ChevronDown, Globe,
   TrendingUp, BarChart3, Activity, Shield, Radio, Eye,
-  Menu, X, Target,
+  Menu, X, Target, DollarSign, Package, Calendar,
+  Cloud, GitCompare, PieChart, Users, ArrowUpDown,
+  Newspaper,
 } from 'lucide-react'
 import { LiveDot } from '../primitives/LiveDot'
 import { CommandBar } from './CommandBar'
@@ -34,19 +36,20 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
-    title: 'Market Intel',
+    title: 'Markets',
     items: [
-      { label: 'Order Book',    href: '/orderbook',      icon: BarChart3 },
+      { label: 'Equities',      href: '/equities',       icon: Building2 },
+      { label: 'Forex',         href: '/forex',          icon: DollarSign },
+      { label: 'Commodities',   href: '/commodities',    icon: Package },
       { label: 'Derivatives',   href: '/derivatives',    icon: TrendingUp },
-      { label: 'Basis Scanner', href: '/basis',          icon: Activity },
-      { label: 'Liquidations',  href: '/liquidations',   icon: Activity },
     ],
   },
   {
     title: 'On-Chain',
     items: [
       { label: 'On-Chain Hub',  href: '/onchain',        icon: Radio },
-      { label: 'Token God Mode', href: '/token-god-mode', icon: Eye },
+      { label: 'Token Scanner', href: '/scanner',        icon: Eye },
+      { label: 'Token God Mode', href: '/token-god-mode', icon: Target },
       { label: 'Knowledge Graph', href: '/graph',        icon: Eye },
       { label: 'Top Traders',   href: '/top-traders',    icon: TrendingUp },
     ],
@@ -54,28 +57,39 @@ const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Trading',
     items: [
-      { label: 'Live Trades',   href: '/trades',         icon: Activity },
-      { label: 'Trading Hub',   href: '/trading',        icon: Radio },
+      { label: 'Order Book',    href: '/orderbook',      icon: BarChart3 },
+      { label: 'Basis Scanner', href: '/basis',          icon: Activity },
+      { label: 'Liquidations',  href: '/liquidations',   icon: Activity },
       { label: 'Arbitrage',     href: '/arbitrage',      icon: Activity },
       { label: 'MEV Detector',  href: '/mev',            icon: Shield },
-    ],
-  },
-  {
-    title: 'DeFi',
-    items: [
-      { label: 'DeFi Hub',      href: '/defi-hub',       icon: Coins },
     ],
   },
   {
     title: 'Macro & News',
     items: [
       { label: 'Macro Hub',     href: '/macro-hub',      icon: Globe },
+      { label: 'Calendar',      href: '/calendar',       icon: Calendar },
+      { label: 'Fear & Greed',  href: '/fear-greed',     icon: Activity },
+      { label: 'Correlations',  href: '/correlations',   icon: GitCompare },
+      { label: 'Gaps',          href: '/gaps',            icon: ArrowUpDown },
+      { label: 'News Feed',     href: '/news',           icon: Newspaper },
+    ],
+  },
+  {
+    title: 'DeFi',
+    items: [
+      { label: 'DeFi Hub',      href: '/defi-hub',       icon: Coins },
+      { label: 'Stablecoins',   href: '/stablecoins',    icon: Coins },
+      { label: 'Sectors',       href: '/sectors',        icon: PieChart },
     ],
   },
   {
     title: 'Analytics',
     items: [
       { label: 'Analytics Hub', href: '/analytics',      icon: Zap },
+      { label: 'Compare',       href: '/compare',        icon: GitCompare },
+      { label: 'Insider',       href: '/insider',        icon: Users },
+      { label: 'Weather',       href: '/weather',        icon: Cloud },
     ],
   },
   {
@@ -85,6 +99,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Exchange Flow', href: '/exchange-flow',  icon: BarChart3 },
       { label: 'Gas Tracker',   href: '/gas',            icon: Activity },
       { label: 'Status',        href: '/status',         icon: Shield },
+      { label: 'Live Trades',   href: '/trades',         icon: Activity },
     ],
   },
 ]

@@ -2,6 +2,25 @@
 
 All notable changes to the NEXUS crypto intelligence platform are documented in this file.
 
+
+## v1.1.0 — Real-Time DEX Watcher
+
+### New Features
+
+- **DexScreener WebSocket** — Real-time token boost subscription via `wss://ws-api.dexscreener.com`. Live enriched metadata (price, liquidity, volume, FDV) pushed to `/dexscreener` Socket.IO namespace.
+- **New Token Creation Detection** — Solana DEX monitoring enhanced to detect `create` events on Pump.fun and `initialize2` on Raydium CPMM/CLMM. Emits `new_token` events on `/memecoins` namespace.
+- **Hype Scoring Engine** — Real-time token scoring (0-100) based on boosts, volume, liquidity, FDV, swap count, and age. Automatically classifies risk (low/medium/high/extreme). In-memory registry in `ws-server/score.ts`.
+- **Telegram Alert Bridge** — High-score tokens (≥75) automatically broadcast to all registered Telegram chat IDs via Redis channel `nexus:memecoin-alerts`. Bridge consumes alerts in `src/instrumentation.ts`.
+- **Scanner Real-Time WS** — Scanner UI (`/scanner`) now connects to both `/dexscreener` and `/memecoins` WebSocket namespaces for sub-second token detection. REST polling retained as fallback. Live indicator shows WS/REST status.
+
+### Changed Files
+
+- `ws-server/server.ts` — Added DexScreener WS connection, scoring engine, enhanced Solana new-token detection, `/dexscreener` namespace
+- `ws-server/score.ts` — New: extractable, testable scoring module with `scoreToken()` and `tokenRegistry`
+- `ws-server/__tests__/score.test.ts` — New: 18 unit tests for scoring engine
+- `src/app/scanner/page.tsx` — Added WebSocket connection to `/dexscreener` + `/memecoins` namespaces for real-time data
+- `src/instrumentation.ts` — Added Redis subscriber for `nexus:memecoin-alerts` channel, bridges to Telegram `broadcastAlert`
+- `docs/architecture.md` — Updated WS server section with new namespaces and features
 ## v1.0.0 — Initial Release
 
 ### Platform

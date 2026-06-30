@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { DataTable, type Column } from '@/components/shell/DataTable'
@@ -43,6 +43,9 @@ function DegenScannerPageInner() {
   const [network, setNetwork] = useState('solana')
   const [feedStatus, setFeedStatus] = useState<'live' | 'stale' | 'error'>('live')
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [wsConnected, setWsConnected] = useState(false)
+  const wsRef = useRef<WebSocket | null>(null)
+  const wsReconnectRef = useRef<NodeJS.Timeout | null>(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -79,6 +82,108 @@ function DegenScannerPageInner() {
     const interval = setInterval(fetchData, 10_000) // Fast 10s polling for sniper
     return () => clearInterval(interval)
   }, [fetchData])
+
+  // Real-time WebSocket connection to /dexscreener + /memecoins namespaces
+  useEffect(() => {
+    let mounted = true
+    const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'wss://tracker-ws.aitradepulse.com'
+
+    const connect = () => {
+      try {
+        const ws = new WebSocket(`${WS_URL}/socket.io/?EIO=4&transport=websocket`)
+        wsRef.current = ws
+
+        ws.onopen = () => {
+          if (!mounted) return
+          setWsConnected(true)
+          ws.send('40/dexscreener')
+          ws.send('40/memecoins')
+        }
+
+        ws.onmessage = (event) => {
+          if (!mounted) return
+          const raw = event.data as string
+
+          // /dexscreener namespace (boost events with enriched metadata)
+          if (raw.startsWith('42/dexscreener,')) {
+            try {
+              const payload = JSON.parse(raw.slice('42/dexscreener,'.length))
+              const ev = payload[0] as string
+              const d = payload[1] as Record<string, unknown>
+              if (ev !== 'boost' && ev !== 'token_update') return
+
+              setPairs(prev => {
+                const addr = String(d.address ?? '')
+                const existing = prev.find(p => p.address === addr)
+                const np: NewPair = {
+                  address: addr,
+                  name: String(d.name ?? 'Unknown'),
+                  priceUsd: Number(d.priceUsd ?? 0),
+                  fdv: Number(d.fdv ?? 0),
+                  liquidity: Number(d.liquidity ?? 0),
+                  ageMinutes: Math.round(Number(d.age ?? 0) / 60),
+                  volume5m: Number(d.volume24h ?? 0) / 288,
+                  buys5m: 0, sells5m: 0,
+                  rugRisk: String(d.risk ?? 'medium'),
+                  riskScore: Number(d.score ?? 50),
+                  network: String(d.chain ?? 'solana'),
+                }
+                if (existing) return prev.map(p => p.address === addr ? { ...p, ...np } : p)
+                return [np, ...prev].slice(0, 100)
+              })
+              setFeedStatus('live')
+              setLastUpdated(new Date())
+            } catch { /* ignore parse errors */ }
+          }
+
+          // /memecoins namespace (new_token creation events)
+          if (raw.startsWith('42/memecoins,')) {
+            try {
+              const payload = JSON.parse(raw.slice('42/memecoins,'.length))
+              const ev = payload[0] as string
+              const d = payload[1] as Record<string, unknown>
+              if (ev !== 'new_token' && ev !== 'token_update') return
+
+              const scored = (d.scored as Record<string, unknown>) ?? d
+              const addr = String(scored.address ?? '')
+              setPairs(prev => {
+                const existing = prev.find(p => p.address === addr)
+                const np: NewPair = {
+                  address: addr,
+                  name: `NEW ${String(scored.name ?? 'New Token')}`,
+                  priceUsd: Number(scored.priceUsd ?? 0),
+                  fdv: Number(scored.fdv ?? 0),
+                  liquidity: Number(scored.liquidity ?? 0),
+                  ageMinutes: Math.round(Number(scored.age ?? 0) / 60),
+                  volume5m: Number(scored.volume24h ?? 0) / 288,
+                  buys5m: 0, sells5m: 0,
+                  rugRisk: String(scored.risk ?? 'extreme'),
+                  riskScore: Number(scored.score ?? 50),
+                  network: String(scored.chain ?? 'solana'),
+                }
+                if (existing) return prev.map(p => p.address === addr ? { ...p, ...np } : p)
+                return [np, ...prev].slice(0, 100)
+              })
+            } catch { /* ignore parse errors */ }
+          }
+        }
+
+        ws.onclose = () => {
+          if (!mounted) return
+          setWsConnected(false)
+          wsReconnectRef.current = setTimeout(connect, 3000)
+        }
+        ws.onerror = () => { if (mounted) setWsConnected(false) }
+      } catch { /* connection error */ }
+    }
+
+    connect()
+    return () => {
+      mounted = false
+      if (wsReconnectRef.current) clearTimeout(wsReconnectRef.current)
+      if (wsRef.current) wsRef.current.close()
+    }
+  }, [])
 
   const columns: Column<NewPair>[] = [
     { key: 'name', header: 'Token Pair', width: 200, render: r => (
@@ -138,7 +243,9 @@ function DegenScannerPageInner() {
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">⚡</span> GMGN Degen Sniper
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">Live monitoring of newly created liquidity pools. Extreme volatility warning.</p>
+            <p className="text-[12px] text-text-muted font-mono mt-1">
+              {wsConnected ? '🟢 Real-time WS' : '🔴 REST polling'} — Live monitoring of newly created liquidity pools. Extreme volatility warning.
+            </p>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex bg-bg-raised p-1 rounded">
