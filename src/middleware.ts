@@ -106,6 +106,7 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/auth",
   "/api/v1/historical-financials",
   "/api/v1/cohorts",
+  "/api/v1/derivatives-intel",
   // New TradFi routes
   "/api/v1/forex",
   "/api/v1/commodities",
