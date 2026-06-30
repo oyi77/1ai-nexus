@@ -20,10 +20,10 @@
 |---------|:----:|:--:|:--:|:--:|:--:|:--:|:--:|----------|
 | US Equities (50+ stocks) | ✅ | ⭐ | ✅ | ⭐ | ✅ | ❌ | ❌ | — |
 | US Indices (SPX, DJI, IXIC, VIX) | ✅ | ⭐ | ✅ | ⭐ | ✅ | ❌ | ❌ | — |
-| IDX / IHSG (Indonesian stocks) | ❌ | ✅ | 🚧 | ✅ | ❌ | ❌ | ❌ | P0 |
-| IDX Blue Chips (BBCA, BBRI, BMRI) | ❌ | ✅ | 🚧 | ✅ | ❌ | ❌ | ❌ | P0 |
-| Forex Majors (EUR/USD, GBP/USD) | 🚧 | ⭐ | ✅ | ⭐ | ✅ | ❌ | ✅ | P1 |
-| Forex IDR (USD/IDR, EUR/IDR) | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | P0 |
+| IDX / IHSG (Indonesian stocks) | ✅ | ✅ | 🚧 | ✅ | ❌ | ❌ | ❌ | — |
+| IDX Blue Chips (BBCA, BBRI, BMRI) | ✅ | ✅ | 🚧 | ✅ | ❌ | ❌ | ❌ | — |
+| Forex Majors (EUR/USD, GBP/USD) | ✅ | ⭐ | ✅ | ⭐ | ✅ | ❌ | ✅ | — |
+| Forex IDR (USD/IDR, EUR/IDR) | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | — |
 | Commodities (Gold, Oil, Silver) | ✅ | ⭐ | ✅ | ⭐ | ✅ | ❌ | ✅ | — |
 | Indonesian Commodities (CPO, Tin) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ | P1 |
 | US Treasury Yields (2Y-30Y) | ⭐ | ⭐ | ❌ | ⭐ | ✅ | ❌ | ✅ | — |
@@ -35,7 +35,7 @@
 | Feature | Ours | C1 | C2 | C3 | C4 | C5 | C6 | Priority |
 |---------|:----:|:--:|:--:|:--:|:--:|:--:|:--:|----------|
 | US Macro (22 FRED series) | ⭐ | ⭐ | ❌ | ⭐ | ✅ | ❌ | ⭐ | — |
-| Indonesian Macro (BI Rate, CPI, GDP) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ | ⭐ | P0 |
+| Indonesian Macro (BI Rate, CPI, GDP) | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ | ⭐ | — |
 | Economic Calendar | ✅ | ⭐ | ✅ | ⭐ | ✅ | ❌ | ⭐ | — |
 | Central Bank Watch | ❌ | ⭐ | ❌ | ⭐ | ✅ | ❌ | ✅ | P1 |
 | Yield Curve Analysis | ✅ | ⭐ | ❌ | ⭐ | ✅ | ❌ | ✅ | — |
@@ -45,10 +45,10 @@
 | Feature | Ours | C1 | C2 | C3 | C4 | C5 | C6 | Priority |
 |---------|:----:|:--:|:--:|:--:|:--:|:--:|:--:|----------|
 | Professional Candlestick Charts | ✅ | ⭐ | ⭐ | ⭐ | ✅ | ❌ | ❌ | — |
-| Technical Indicators (50+) | ❌ | ⭐ | ⭐ | ⭐ | ✅ | ❌ | ❌ | P0 |
+| Technical Indicators (SMA, EMA, RSI, MACD, BB) | ✅ | ⭐ | ⭐ | ⭐ | ✅ | ❌ | ❌ | — |
 | Drawing Tools (trendlines, fibs) | ❌ | ⭐ | ⭐ | ⭐ | 🚧 | ❌ | ❌ | P1 |
 | Multi-Panel Layouts | ❌ | ⭐ | ⭐ | ⭐ | ✅ | ❌ | ❌ | P1 |
-| Screener (multi-asset) | ❌ | ⭐ | ✅ | ⭐ | ✅ | ❌ | ✅ | P0 |
+| Screener (multi-asset, 32 stocks) | ✅ | ⭐ | ✅ | ⭐ | ✅ | ❌ | ✅ | — |
 | Correlation Matrix | 🚧 | ⭐ | 🚧 | ⭐ | ✅ | ❌ | ✅ | P1 |
 | Heatmap (sector/asset) | ❌ | ⭐ | ✅ | ⭐ | ✅ | ❌ | ❌ | P1 |
 
@@ -86,13 +86,13 @@
 | Indonesian Language | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | P1 |
 | WhatsApp/Telegram Alerts | 🚧 | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | P1 |
 
-## Score Summary
+## Score Summary (Updated: 2026-06-30 — P0 gaps closed)
 | Category | Our Score | Bloomberg | Gap |
 |----------|-----------|-----------|-----|
-| Multi-Asset Data | 40% | 100% | 60% |
-| Macro/Economic | 55% | 100% | 45% |
-| Charting/Analysis | 25% | 100% | 75% |
+| Multi-Asset Data | 65% | 100% | 35% |
+| Macro/Economic | 70% | 100% | 30% |
+| Charting/Analysis | 40% | 100% | 60% |
 | Portfolio/Risk | 10% | 100% | 90% |
 | On-Chain Intelligence | 95% | 5% | ⭐ MOAT |
 | Infrastructure/UX | 60% | 90% | 30% |
-| **Overall** | **48%** | **83%** | **35%** |
+| **Overall** | **58%** | **83%** | **25%** |
