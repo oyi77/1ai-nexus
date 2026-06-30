@@ -1,11 +1,19 @@
 // NEXUS Service Worker — PWA + offline shell
-const CACHE_NAME = 'nexus-v2'
+const CACHE_NAME = 'nexus-v3'
 const STATIC_ASSETS = [
   '/',
+  '/dashboard',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
   '/icon-512.svg',
+]
+
+// API endpoints to cache for offline
+const CACHEABLE_API = [
+  '/api/v1/health',
+  '/api/v1/macro',
+  '/api/v1/fear-greed',
 ]
 
 // Install: cache static assets
@@ -28,14 +36,13 @@ self.addEventListener('activate', (event) => {
   )
 })
 
-// Fetch: network-first for pages, cache-first for assets
+// Fetch: network-first for pages, cache-first for assets, stale-while-revalidate for API
 self.addEventListener('fetch', (event) => {
   const { request } = event
   const url = new URL(request.url)
 
-  // Skip non-GET and API calls
+  // Skip non-GET
   if (request.method !== 'GET') return
-  if (url.pathname.startsWith('/api/')) return
 
   // Static assets: cache-first
   if (
@@ -52,6 +59,24 @@ self.addEventListener('fetch', (event) => {
           }
           return response
         })
+      })
+    )
+    return
+  }
+
+  // Cacheable API: stale-while-revalidate
+  if (CACHEABLE_API.some(api => url.pathname.startsWith(api))) {
+    event.respondWith(
+      caches.match(request).then(cached => {
+        const fetchPromise = fetch(request).then(response => {
+          if (response.ok) {
+            const clone = response.clone()
+            caches.open(CACHE_NAME).then(cache => cache.put(request, clone))
+          }
+          return response
+        }).catch(() => cached)
+
+        return cached || fetchPromise
       })
     )
     return
