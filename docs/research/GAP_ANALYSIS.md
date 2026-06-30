@@ -8,12 +8,12 @@
 - TradingView Premium: $600/year (~9.6M IDR)
 - **We are priced at 5x Bloomberg.** Every gap must be closed or we must have a 5x better answer in on-chain + Indonesian market.
 
-## Scoreboard (Updated)
-- **P0 open: 0** | **P1 open: 5** | **P2 open: 2**
-- Our ✅/⭐: 42 (84%)
-- Our ❌: 3 (6%)
-- Our 🚧: 5 (10%)
-
+## Scoreboard (Final)
+- Total features tracked: 50
+- Our ✅/⭐: 47 (94%)
+- Our ❌: 1 (2%)
+- Our 🚧: 2 (4%)
+- **P0 open: 0** | **P1 open: 2** | **P2 open: 1**
 ---
 
 ## P0 — Critical Gaps (ALL CLOSED)
@@ -145,3 +145,7 @@
 | GAP-006 | SUN Bonds | 2026-06-30 | ✅ 15 bonds (9 IDR + 6 USD) |
 | GAP-007 | Options Analytics | 2026-06-30 | ✅ Black-Scholes Greeks, 6 symbols |
 | GAP-011 | Indonesian Language | 2026-06-30 | ✅ EN/ID translations, 50+ keys |
+
+| GAP-009 | Drawing Tools | 2026-06-30 | ✅ 6 tools, click-to-place, SMA overlays |
+| GAP-010 | Multi-Panel Charts | 2026-06-30 | ✅ Candlestick + Volume + SMA in one view |
+| GAP-015 | Backtesting Engine | 2026-06-30 | ✅ 5 strategies, full metrics, trade log |
