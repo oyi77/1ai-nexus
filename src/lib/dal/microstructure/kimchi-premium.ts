@@ -80,9 +80,14 @@ export async function getKimchiPremium(): Promise<KimchiPremium[]> {
   // Fallback: approximate KRW/USD from Upbit BTC price vs Binance BTC price
   const upbitBtc = upbitData.find(t => t.market === 'KRW-BTC')
   const binanceBtcPrice = Number(binanceBtc.price)
+  // KRW/USD rate: from FX API, or computed from Upbit/Binance BTC prices
   const krwUsdRate = krwUsdRateRaw > 0
     ? krwUsdRateRaw
-    : (upbitBtc && binanceBtcPrice > 0 ? upbitBtc.trade_price / binanceBtcPrice : 1350) // ~1350 KRW/USD fallback
+    : (upbitBtc && binanceBtcPrice > 0 ? upbitBtc.trade_price / binanceBtcPrice : 0)
+
+  if (krwUsdRate <= 0) {
+    throw new Error('Unable to determine KRW/USD rate — FX API and price-derived rate both unavailable')
+  }
 
   const binanceMap: Record<string, number> = {
     'KRW-BTC': Number(binanceBtc.price),

@@ -57,14 +57,18 @@ export async function generateEdgeReport(): Promise<EdgeReport> {
     // 2. Whale activity
     try {
       const smartMoneyRes = await registry.fetchOne('nexus-internal', { action: 'smart-money' }).catch(() => null)
-      if (smartMoneyRes?.data) {
+      const smartData = smartMoneyRes?.data as { signals?: Array<{ action?: string; token?: string; amountUsd?: number }> } | null
+      const smSignals = smartData?.signals ?? []
+      const accumulations = smSignals.filter(s => s.action === 'Accumulated')
+      const totalAccum = accumulations.reduce((sum, s) => sum + (s.amountUsd ?? 0), 0)
+      if (smSignals.length > 0) {
         signals.push({
           asset: 'Smart Money',
-          direction: 'bullish',
-          signalType: 'Whale Accumulation',
-          confidence: 0.7,
-          explanation: 'Smart money wallets showing accumulation patterns. Monitor for follow-through.',
-          riskReward: '2:1 (favorable)',
+          direction: accumulations.length > smSignals.length / 2 ? 'bullish' : 'bearish',
+          signalType: 'Whale Activity',
+          confidence: Math.min(0.9, smSignals.length / 10),
+          explanation: `${smSignals.length} smart money signals detected — ${accumulations.length} accumulations totaling $${(totalAccum / 1e6).toFixed(1)}M.`,
+          riskReward: accumulations.length > smSignals.length / 2 ? '2:1 (favorable)' : '1:2 (unfavorable)',
           timestamp: new Date(),
         })
       }
@@ -74,15 +78,19 @@ export async function generateEdgeReport(): Promise<EdgeReport> {
 
     // 3. Derivatives
     try {
-      const derivRes = await registry.fetchOne('binance-futures', { action: 'tickers', limit: 1 }).catch(() => null)
-      if (derivRes?.data) {
+      const derivRes = await registry.fetchOne('binance-futures', { limit: 5 }).catch(() => null)
+      const topPairs = (derivRes?.data as { topPairs?: Array<{ symbol?: string; fundingRate?: number; priceChangePercent?: number }> } | null)?.topPairs ?? []
+      if (topPairs.length > 0) {
+        const avgFunding = topPairs.reduce((s, p) => s + (p.fundingRate ?? 0), 0) / topPairs.length
+        const btcPair = topPairs.find(p => p.symbol === 'BTCUSDT')
+        const btcChange = btcPair?.priceChangePercent ?? 0
         signals.push({
           asset: 'BTC Perpetuals',
-          direction: 'neutral',
+          direction: avgFunding > 0.001 ? 'bearish' : avgFunding < -0.001 ? 'bullish' : 'neutral',
           signalType: 'Derivatives',
-          confidence: 0.5,
-          explanation: 'Derivatives data available. Check funding rates for leverage sentiment.',
-          riskReward: '1:1 (neutral)',
+          confidence: Math.min(0.8, Math.abs(avgFunding) * 100),
+          explanation: `Avg funding ${(avgFunding * 100).toFixed(4)}% — ${avgFunding > 0.001 ? 'high long leverage, reversal risk' : avgFunding < -0.001 ? 'high short leverage, squeeze risk' : 'neutral leverage'}. BTC ${btcChange >= 0 ? '+' : ''}${btcChange.toFixed(2)}% 24h.`,
+          riskReward: Math.abs(avgFunding) > 0.001 ? '1:2 (unfavorable)' : '1:1 (neutral)',
           timestamp: new Date(),
         })
       }
@@ -93,14 +101,17 @@ export async function generateEdgeReport(): Promise<EdgeReport> {
     // 4. Macro
     try {
       const macroRes = await registry.fetchOne('fred', { series: 'FEDFUNDS' }).catch(() => null)
-      if (macroRes?.data) {
+      const macroData = macroRes?.data as { observations?: Array<{ value?: string }> } | null
+      const latestRate = macroData?.observations?.[0]?.value
+      if (latestRate) {
+        const rate = parseFloat(latestRate)
         signals.push({
           asset: 'Macro',
-          direction: 'neutral',
+          direction: rate > 5 ? 'bearish' : rate < 3 ? 'bullish' : 'neutral',
           signalType: 'Macro Environment',
           confidence: 0.6,
-          explanation: 'Macroeconomic data available. Fed policy affects crypto risk appetite.',
-          riskReward: 'N/A',
+          explanation: `Fed Funds Rate at ${rate.toFixed(2)}% — ${rate > 5 ? 'tight policy, risk-off environment' : rate < 3 ? 'accommodative policy, risk-on environment' : 'neutral monetary stance'}.`,
+          riskReward: rate > 5 ? '1:2 (unfavorable)' : rate < 3 ? '2:1 (favorable)' : '1:1 (neutral)',
           timestamp: new Date(),
         })
       }

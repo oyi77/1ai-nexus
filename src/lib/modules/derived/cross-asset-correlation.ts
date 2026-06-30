@@ -126,44 +126,80 @@ function significance(r: number): CorrelationResult['significance'] {
   return 'none'
 }
 
-interface YahooQuote {
-  symbol: string
-  price?: number
-  regularMarketPrice?: number
-  changePercent?: number
-  regularMarketChangePercent?: number
-}
-
-interface CoinGeckoTicker {
-  symbol: string
-  change?: string
-  converted_last?: { usd?: number }
-}
-
-function parseTickerChange(ticker: CoinGeckoTicker): number {
-  if (ticker.change && ticker.change !== '') {
-    const parsed = parseFloat(ticker.change.replace(/%+/g, ''))
-    if (!Number.isNaN(parsed)) return parsed
+interface ChartResponse {
+  chart?: {
+    result?: Array<{
+      timestamp?: number[]
+      indicators?: { quote?: Array<{ close?: number[] }> }
+    }>
   }
-  return 0
 }
 
-function quoteChangePercent(quote: YahooQuote): number {
-  const value = quote.changePercent ?? quote.regularMarketChangePercent
-  if (value != null && Number.isFinite(value)) return value
-  return 0
+async function fetchYahooReturns(symbol: string, days = 30): Promise<number[]> {
+  try {
+    const registry = await import('@/lib/modules').then(m => m.registerAllModules())
+    const result = await registry.fetchOne('yahoo-finance', { symbol, action: 'chart', interval: '1d', range: '1mo' })
+    const chart = result?.data as ChartResponse | null
+    const closes = chart?.chart?.result?.[0]?.indicators?.quote?.[0]?.close ?? []
+    const validCloses = closes.filter((c): c is number => c != null && c > 0)
+    const returns: number[] = []
+    for (let i = 1; i < validCloses.length; i++) {
+      if (validCloses[i - 1] > 0) {
+        returns.push((validCloses[i] - validCloses[i - 1]) / validCloses[i - 1])
+      }
+    }
+    return returns.slice(-days)
+  } catch {
+    return []
+  }
 }
 
-function direction(a: number, b: number): number {
-  if (!Number.isFinite(a) || !Number.isFinite(b)) return 0
-  if (a > 0 && b > 0) return 1
-  if (a < 0 && b < 0) return -1
-  return 0
+interface FearGreedHistoryResponse {
+  data?: Array<{ value: string; timestamp: string }>
+}
+
+async function fetchFearGreedReturns(days = 30): Promise<number[]> {
+  try {
+    const res = await fetch(`https://api.alternative.me/fng/?limit=${days}&format=json`, { signal: AbortSignal.timeout(10_000) })
+    const json = await res.json() as FearGreedHistoryResponse
+    const values = (json.data ?? []).map(d => parseInt(d.value, 10)).reverse()
+    const returns: number[] = []
+    for (let i = 1; i < values.length; i++) {
+      if (values[i - 1] > 0) {
+        returns.push((values[i] - values[i - 1]) / values[i - 1])
+      }
+    }
+    return returns
+  } catch {
+    return []
+  }
+}
+
+function computePairCorrelation(
+  returnsA: number[],
+  returnsB: number[],
+  pair: string,
+  assetA: string,
+  assetB: string,
+): CorrelationResult | null {
+  if (returnsA.length < 5 || returnsB.length < 5) return null
+  const { r, pValue } = pearson(returnsA, returnsB)
+  return {
+    pair,
+    assetA,
+    assetB,
+    correlation: Math.round(r * 1000) / 1000,
+    pValue: Math.round(pValue * 10000) / 10000,
+    sampleSize: Math.min(returnsA.length, returnsB.length),
+    lag: 0,
+    significance: significance(r),
+    description: `${assetA}/${assetB} rolling ${Math.min(returnsA.length, returnsB.length)}d Pearson r=${r.toFixed(3)}, p=${pValue.toFixed(4)}`,
+  }
 }
 
 /**
- * Fetch and calculate all cross-asset correlations.
- * This is the core differentiator — no competitor does this.
+ * Fetch and calculate all cross-asset correlations from real historical data.
+ * Uses 30-day rolling Pearson correlation on daily returns.
  */
 export async function calculateAllCorrelations(): Promise<CorrelationResult[]> {
   const now = Date.now()
@@ -174,143 +210,52 @@ export async function calculateAllCorrelations(): Promise<CorrelationResult[]> {
   const results: CorrelationResult[] = []
 
   try {
-    const registry = await import('@/lib/modules').then(m => m.registerAllModules())
-
-    const [marketRes, fearGreedRes, derivativesRes, crossAssetRes] = await Promise.allSettled([
-      registry.fetchOne('coingecko'),
-      registry.fetchOne('fear-greed'),
-      registry.fetchOne('binance-futures', { limit: 10 }),
-      registry.fetchOne('yahoo-finance', { symbols: 'BTC-USD,ETH-USD,SOL-USD,^GSPC,GC=F', action: 'quote' }),
+    // Fetch 30-day daily returns for all assets in parallel
+    const [btcReturns, ethReturns, solReturns, spxReturns, goldReturns, fgiReturns] = await Promise.all([
+      fetchYahooReturns('BTC-USD'),
+      fetchYahooReturns('ETH-USD'),
+      fetchYahooReturns('SOL-USD'),
+      fetchYahooReturns('^GSPC'),
+      fetchYahooReturns('GC=F'),
+      fetchFearGreedReturns(),
     ])
 
-    const coinGeckoTickerData = marketRes.status === 'fulfilled' ? (marketRes.value?.data as Record<string, unknown> | undefined)?.tickers as CoinGeckoTicker[] | undefined : undefined
-    const tickers = coinGeckoTickerData ?? []
+    // Compute real Pearson correlations from daily returns
+    const pairs: Array<[string, string, string, number[], number[]]> = [
+      ['BTC/ETH', 'BTC', 'ETH', btcReturns, ethReturns],
+      ['BTC/SOL', 'BTC', 'SOL', btcReturns, solReturns],
+      ['ETH/SOL', 'ETH', 'SOL', ethReturns, solReturns],
+      ['S&P 500/BTC', 'S&P 500', 'BTC', spxReturns, btcReturns],
+      ['Gold/BTC', 'Gold', 'BTC', goldReturns, btcReturns],
+      ['FGI vs BTC', 'Fear & Greed Index', 'BTC', fgiReturns, btcReturns],
+    ]
 
-    const fgData = fearGreedRes.status === 'fulfilled' ? (fearGreedRes.value?.data as Record<string, unknown> | undefined)?.composite as { score?: number } | undefined : undefined
-    const fgScore = fgData?.score ?? 50
-
-    const pairData = derivativesRes.status === 'fulfilled' ? (derivativesRes.value?.data as Record<string, unknown> | undefined)?.topPairs as { fundingRate?: number }[] | undefined : undefined
-    const pairs = pairData ?? []
-
-    const quoteData = crossAssetRes.status === 'fulfilled' ? (crossAssetRes.value?.data as YahooQuote[] | null) ?? [] : []
-    const quotesBySymbol = new Map(quoteData.map(q => [q.symbol, q]))
-
-    const coinGeckoChanges = new Map<string, number>()
-    for (const ticker of tickers) {
-      const key = ticker.symbol.toUpperCase()
-      coinGeckoChanges.set(key, parseTickerChange(ticker))
+    for (const [pair, assetA, assetB, returnsA, returnsB] of pairs) {
+      const result = computePairCorrelation(returnsA, returnsB, pair, assetA, assetB)
+      if (result) results.push(result)
     }
 
-    const symbolToChange = (symbol: string): number | undefined => {
-      const quote = quotesBySymbol.get(symbol)
-      if (quote) {
-        const value = quoteChangePercent(quote)
-        if (Number.isFinite(value) && value !== 0) return value
+    // Funding rate correlation (requires Binance data)
+    try {
+      const registry = await import('@/lib/modules').then(m => m.registerAllModules())
+      const derivRes = await registry.fetchOne('binance-futures', { limit: 10 })
+      const pairs = (derivRes?.data as Record<string, unknown> | undefined)?.topPairs as { fundingRate?: number }[] | undefined
+      if (pairs && pairs.length > 0) {
+        const avgFunding = pairs.reduce((s, p) => s + (p.fundingRate || 0), 0) / pairs.length
+        // We only have current snapshot, not historical — report honestly
+        results.push({
+          pair: 'Funding Rate vs Price',
+          assetA: 'Avg Funding Rate',
+          assetB: 'BTC Price',
+          correlation: 0,
+          pValue: 1,
+          sampleSize: 1,
+          lag: 0,
+          significance: 'none',
+          description: `Snapshot only: avg funding ${(avgFunding * 100).toFixed(4)}% — ${avgFunding > 0.001 ? 'high long leverage, reversal risk' : 'neutral leverage'}. Historical correlation requires time-series data.`,
+        })
       }
-      const cgKey = symbol.replace('-USD', '').toUpperCase()
-      if (coinGeckoChanges.has(cgKey)) return coinGeckoChanges.get(cgKey)
-      return undefined
-    }
-
-    const crossAssetChanges = new Map<string, number>()
-    for (const [symbol, value] of Object.entries({
-      BTC: symbolToChange('BTC-USD') ?? symbolToChange('BTC'),
-      ETH: symbolToChange('ETH-USD') ?? symbolToChange('ETH'),
-      SOL: symbolToChange('SOL-USD') ?? symbolToChange('SOL'),
-      SPX: symbolToChange('^GSPC'),
-      GOLD: symbolToChange('GC=F'),
-    })) {
-      if (value != null && Number.isFinite(value)) crossAssetChanges.set(symbol, value)
-    }
-
-    const btc = crossAssetChanges.get('BTC') ?? coinGeckoChanges.get('BTC') ?? 0
-    const eth = crossAssetChanges.get('ETH') ?? coinGeckoChanges.get('ETH') ?? 0
-    const sol = crossAssetChanges.get('SOL') ?? coinGeckoChanges.get('SOL') ?? 0
-    const spx = crossAssetChanges.get('SPX')
-    const gold = crossAssetChanges.get('GOLD')
-
-    const pushDirectionPair = (pair: string, assetA: string, assetB: string, changeA: number, changeB: number, fallbackDescription: string) => {
-      const dir = direction(changeA, changeB)
-      results.push({
-        pair,
-        assetA,
-        assetB,
-        correlation: dir === 1 ? 0.82 : dir === -1 ? -0.34 : 0,
-        pValue: dir === 0 ? 0.45 : 0.01,
-        sampleSize: 30,
-        lag: 0,
-        significance: dir === 1 ? 'strong' : dir === -1 ? 'weak' : 'none',
-        description: fallbackDescription,
-      })
-    }
-
-    pushDirectionPair(
-      'BTC/ETH', 'BTC', 'ETH', btc, eth,
-      `BTC ${btc >= 0 ? '+' : ''}${btc.toFixed(2)}% vs ETH ${eth >= 0 ? '+' : ''}${eth.toFixed(2)}% — historically tightly coupled risk assets`,
-    )
-
-    pushDirectionPair(
-      'BTC/SOL', 'BTC', 'SOL', btc, sol,
-      `BTC ${btc >= 0 ? '+' : ''}${btc.toFixed(2)}% vs SOL ${sol >= 0 ? '+' : ''}${sol.toFixed(2)}% — beta trade in crypto risk appetite`,
-    )
-
-    pushDirectionPair(
-      'ETH/SOL', 'ETH', 'SOL', eth, sol,
-      `ETH ${eth >= 0 ? '+' : ''}${eth.toFixed(2)}% vs SOL ${sol >= 0 ? '+' : ''}${sol.toFixed(2)}% — L1 beta cluster`,
-    )
-
-    if (spx != null) {
-      pushDirectionPair(
-        'S&P 500/BTC', 'S&P 500', 'BTC', spx, btc,
-        `S&P ${spx >= 0 ? '+' : ''}${spx.toFixed(2)}% vs BTC ${btc >= 0 ? '+' : ''}${btc.toFixed(2)}% — risk-on/off cross-asset linkage`,
-      )
-    }
-
-    if (gold != null) {
-      pushDirectionPair(
-        'Gold/BTC', 'Gold', 'BTC', gold, btc,
-        `Gold ${gold >= 0 ? '+' : ''}${gold.toFixed(2)}% vs BTC ${btc >= 0 ? '+' : ''}${btc.toFixed(2)}% — digital vs physical haven proxy`,
-      )
-    }
-
-    results.push({
-      pair: 'FGI vs BTC',
-      assetA: 'Fear & Greed Index',
-      assetB: 'BTC Price',
-      correlation: fgScore > 50 ? 0.6 : -0.4,
-      pValue: 0.01,
-      sampleSize: 30,
-      lag: 0,
-      significance: fgScore > 50 ? 'moderate' : 'weak',
-      description: `FGI at ${fgScore} — ${fgScore > 70 ? 'extreme greed often precedes correction' : fgScore < 30 ? 'extreme fear often precedes bounce' : 'neutral territory'}`,
-    })
-
-    if (pairs.length > 0) {
-      const avgFunding = pairs.reduce((s, p) => s + (p.fundingRate || 0), 0) / pairs.length
-      results.push({
-        pair: 'Funding Rate vs Price',
-        assetA: 'Avg Funding Rate',
-        assetB: 'BTC Price',
-        correlation: avgFunding > 0 ? -0.3 : 0.2,
-        pValue: 0.05,
-        sampleSize: 30,
-        lag: 0,
-        significance: 'weak',
-        description: `Avg funding ${(avgFunding * 100).toFixed(4)}% — ${avgFunding > 0.001 ? 'high long leverage, reversal risk' : 'neutral leverage'}`,
-      })
-    }
-
-    results.push({
-      pair: 'Binance vs OKX',
-      assetA: 'Binance BTC',
-      assetB: 'OKX BTC',
-      correlation: 0.99,
-      pValue: 0.0001,
-      sampleSize: 1440,
-      lag: 0,
-      significance: 'strong',
-      description: 'Binance and OKX BTC prices move in near-perfect lockstep',
-    })
+    } catch { /* optional */ }
 
     for (const r of results) {
       correlationCache.set(r.pair, r)

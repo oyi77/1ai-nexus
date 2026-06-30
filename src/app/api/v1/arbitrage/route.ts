@@ -7,11 +7,23 @@
 import { NextResponse } from 'next/server'
 import { getCached } from '@/lib/api/server-cache'
 
-const PAIRS = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'AVAX', 'LINK', 'ARB', 'OP', 'BNB', 'ADA', 'DOT', 'NEAR', 'FIL', 'ATOM', 'TRX', 'LTC', 'SUI', 'APT', 'SEI']
+// Fetch top pairs dynamically from Binance API — zero hardcoded symbols
+
+async function fetchTopPairs(count = 20): Promise<string[]> {
+  const res = await fetch('https://api.binance.com/api/v3/ticker/24hr', { signal: AbortSignal.timeout(10_000) })
+  if (!res.ok) return ['BTC', 'ETH', 'SOL'] // minimal fallback only if API fails
+  const data = await res.json() as Array<{ symbol: string; quoteVolume: string }>
+  return data
+    .filter(t => t.symbol.endsWith('USDT'))
+    .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
+    .slice(0, count)
+    .map(t => t.symbol.replace('USDT', ''))
+}
 
 async function fetchArbitrage() {
-  // Fetch spot + futures tickers + funding rates in parallel
-  const symbols = PAIRS.map(p => `${p}USDT`)
+  // Fetch top pairs dynamically from Binance by 24h volume
+  const pairs = await fetchTopPairs(20)
+  const symbols = pairs.map(p => `${p}USDT`)
   const [spotRes, futuresRes, fundingRes] = await Promise.all([
     fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=[${symbols.map(s => `"${s}"`).join(',')}]`, { signal: AbortSignal.timeout(15_000) }),
     fetch(`https://fapi.binance.com/fapi/v1/ticker/24hr?symbols=[${symbols.map(s => `"${s}"`).join(',')}]`, { signal: AbortSignal.timeout(15_000) }),
@@ -61,7 +73,7 @@ async function fetchArbitrage() {
     signal: string
   }> = []
 
-  for (const pair of PAIRS) {
+  for (const pair of pairs) {
     const spotSymbol = `${pair}USDT`
     const spot = spotMap.get(spotSymbol)
     const futures = futuresMap.get(spotSymbol)
@@ -144,7 +156,7 @@ async function fetchArbitrage() {
     fundingArbitrage: fundingArbitrage.sort((a, b) => Math.abs(b.fundingRate) - Math.abs(a.fundingRate)),
     spotPerpArbitrage: spotPerpArbitrage.sort((a, b) => Math.abs(b.annualizedYield) - Math.abs(a.annualizedYield)),
     summary: {
-      totalPairs: PAIRS.length,
+      totalPairs: pairs.length,
       totalOpportunities,
       avgSpreadBps: priceSpreads.reduce((s, p) => s + Math.abs(p.spreadBps), 0) / Math.max(1, priceSpreads.length),
       avgFundingRate: fundingArbitrage.reduce((s, f) => s + Math.abs(f.fundingRate), 0) / Math.max(1, fundingArbitrage.length),

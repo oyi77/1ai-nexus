@@ -3,50 +3,34 @@ export const dynamic = "force-dynamic";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { getTickers } from "@/lib/coinpaprika";
 
-const STABLECOIN_IDS = new Set([
-  "usdt-tether", "usdc-usd-coin", "dai-dai", "busd-binance-usd",
-  "tusd-trueusd", "frax-frax", "lusd-liquity-usd", "usdd-usdd",
-  "pyusd-paypal-usd", "fdusd-first-digital-usd",
-]);
-
-const STABLECOIN_META: Record<string, { name: string; symbol: string }> = {
-  "usdt-tether": { name: "Tether", symbol: "USDT" },
-  "usdc-usd-coin": { name: "USD Coin", symbol: "USDC" },
-  "dai-dai": { name: "Dai", symbol: "DAI" },
-  "busd-binance-usd": { name: "Binance USD", symbol: "BUSD" },
-  "tusd-trueusd": { name: "TrueUSD", symbol: "TUSD" },
-  "frax-frax": { name: "Frax", symbol: "FRAX" },
-  "lusd-liquity-usd": { name: "Liquity USD", symbol: "LUSD" },
-  "usdd-usdd": { name: "USDD", symbol: "USDD" },
-  "pyusd-paypal-usd": { name: "PayPal USD", symbol: "PYUSD" },
-  "fdusd-first-digital-usd": { name: "First Digital USD", symbol: "FDUSD" },
-};
-
 export async function GET() {
   try {
-    // Single bulk fetch via cached client — avoids per-coin rate limits
+    // Fetch all tickers and detect stablecoins dynamically
+    // Stablecoins = price within 2% of $1.00 AND market cap > $10M
     const allTickers = await getTickers(500);
-    const matched = allTickers.filter((t) => STABLECOIN_IDS.has(t.id));
-
-    const stablecoins = [...STABLECOIN_IDS].map((id) => {
-      const t = matched.find((m) => m.id === id);
-      const meta = STABLECOIN_META[id];
-      if (!t || !meta) {
+    const stablecoins = allTickers
+      .filter((t) => {
+        const price = t.price;
+        const deviation = Math.abs(price - 1.0);
+        return deviation < 0.02 && t.marketCap > 10_000_000;
+      })
+      .sort((a, b) => b.marketCap - a.marketCap)
+      .slice(0, 20)
+      .map((t) => {
+        const deviation = Math.abs(t.price - 1.0) * 100;
+        const pegStatus = deviation < 0.5 ? "ON PEG" : deviation < 2 ? "SLIGHT DEPEG" : "DEPEG";
         return {
-          id, name: meta?.name ?? id, symbol: meta?.symbol ?? "?",
-          price: 0, deviation: 100, pegStatus: "NO DATA",
-          change24h: 0, volume24h: 0, marketCap: 0,
+          id: t.id,
+          name: t.name,
+          symbol: t.symbol,
+          price: t.price,
+          deviation,
+          pegStatus,
+          change24h: t.change24h,
+          volume24h: t.volume24h,
+          marketCap: t.marketCap,
         };
-      }
-      const price = t.price;
-      const deviation = Math.abs(price - 1.0) * 100;
-      const pegStatus = deviation < 0.5 ? "ON PEG" : deviation < 2 ? "SLIGHT DEPEG" : "DEPEG";
-      return {
-        id: t.id, name: meta.name, symbol: meta.symbol,
-        price, deviation, pegStatus,
-        change24h: t.change24h, volume24h: t.volume24h, marketCap: t.marketCap,
-      };
-    });
+      });
 
     const totalMarketCap = stablecoins.reduce((s, c) => s + c.marketCap, 0);
     const totalVolume24h = stablecoins.reduce((s, c) => s + c.volume24h, 0);
