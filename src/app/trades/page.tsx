@@ -40,46 +40,39 @@ export default function TradesPage() {
   const [totalBuy, setTotalBuy] = useState(0)
   const [totalSell, setTotalSell] = useState(0)
   const [connected, setConnected] = useState(false)
-  const [wsRef] = useState<{ current: ReturnType<typeof setInterval> | null }>({ current: null })
+  const wsRef = useRef<WebSocket | null>(null)
 
 
-  // Fetch recent trades via our server API (no direct Binance connection)
+  // Connect to WS server /trade-stream for real-time trades
   useEffect(() => {
     let buyVol = 0
     let sellVol = 0
+    let reconnectTimeout: ReturnType<typeof setTimeout>
 
-    const fetchTrades = async () => {
-      try {
-        const res = await fetch('/api/v1/trades')
-        if (!res.ok) return
-        const d = await res.json()
-        const serverTrades = d.data?.trades ?? []
-        if (!serverTrades.length) return
+    const connect = () => {
+      const ws = new WebSocket('wss://tracker-ws.aitradepulse.com/trade-stream')
+      wsRef.current = ws
 
-        setConnected(true)
+      ws.onopen = () => setConnected(true)
 
-        const mapped: Trade[] = serverTrades.map((t: { exchange?: string; pair?: string; symbol?: string; price: number; size: number; side: string; timestamp: number }) => ({
-          exchange: t.exchange ?? 'Binance',
-          pair: (t.pair ?? t.symbol ?? '').replace('USDT', ''),
-          price: t.price,
-          size: t.size,
-          side: t.side as 'buy' | 'sell',
-          timestamp: t.timestamp,
-          usdValue: t.price * t.size,
-        }))
+      ws.onmessage = (event) => {
+        try {
+          const raw = event.data as string
+          // Socket.IO format: 42[event, payload]
+          if (!raw.startsWith('42')) return
+          const parsed = JSON.parse(raw.slice(2)) as [string, Trade]
+          if (parsed[0] !== 'trade') return
+          const t = parsed[1]
 
-        setTrades(prev => [...mapped, ...prev].slice(0, 200))
-
-        for (const t of mapped) {
           if (t.side === 'buy') buyVol += t.usdValue
           else sellVol += t.usdValue
-        }
-        setTotalBuy(buyVol)
-        setTotalSell(sellVol)
+          setTotalBuy(buyVol)
+          setTotalSell(sellVol)
 
-        setPrices(prev => {
-          const next = new Map(prev)
-          for (const t of mapped) {
+          setTrades(prev => [t, ...prev].slice(0, 200))
+
+          setPrices(prev => {
+            const next = new Map(prev)
             const existing = next.get(t.pair)
             next.set(t.pair, {
               symbol: t.pair,
@@ -90,17 +83,25 @@ export default function TradesPage() {
               low24h: Math.min(existing?.low24h ?? t.price, t.price),
               trades24h: (existing?.trades24h ?? 0) + 1,
             })
-          }
-          return next
-        })
-      } catch {}
+            return next
+          })
+        } catch {}
+      }
+
+      ws.onerror = () => setConnected(false)
+      ws.onclose = () => {
+        setConnected(false)
+        reconnectTimeout = setTimeout(connect, 3000)
+      }
     }
 
-    fetchTrades()
-    wsRef.current = setInterval(fetchTrades, 3000)
+    connect()
+    return () => {
+      clearTimeout(reconnectTimeout)
+      wsRef.current?.close()
+    }
+  }, [])
 
-    return () => { if (wsRef.current) clearInterval(wsRef.current) }
-  }, [wsRef])
 
 
   const totalVol = totalBuy + totalSell

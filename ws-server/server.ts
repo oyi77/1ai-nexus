@@ -142,6 +142,44 @@ pricesNs.on("connection", (socket) => {
 })
 
 // ═══════════════════════════════════════════════════════════
+// TRADE STREAM: Binance aggTrade → /trade-stream namespace
+// Real-time individual trades for all symbols
+// ═══════════════════════════════════════════════════════════
+const tradeStreamNs = io.of("/trade-stream")
+
+function connectTradeStream() {
+  const streams = DEPTH_SYMBOLS.map(s => `${s}@aggTrade`).join("/")
+  const ws = new WebSocket(`wss://stream.binance.com:9443/stream?streams=${streams}`)
+  activeStreams++
+  ws.on("open", () => console.log(`[trade-stream] aggTrade connected (${DEPTH_SYMBOLS.length} symbols)`))
+  ws.on("message", (data) => {
+    try {
+      const msg = JSON.parse(data.toString())
+      const d = msg.data
+      if (!d || !d.T) return
+      const trade = {
+        exchange: 'Binance',
+        pair: d.s.replace('USDT', ''),
+        price: parseFloat(d.p),
+        size: parseFloat(d.q),
+        side: d.m ? 'sell' : 'buy',
+        timestamp: d.T,
+        usdValue: parseFloat(d.p) * parseFloat(d.q),
+      }
+      tradeStreamNs.emit("trade", trade)
+    } catch {}
+  })
+  ws.on("error", () => {})
+  ws.on("close", () => { activeStreams--; setTimeout(connectTradeStream, 3000) })
+}
+
+tradeStreamNs.on("connection", (socket) => {
+  console.log(`[trade-stream] Client: ${socket.id}`)
+  socket.on("disconnect", () => {})
+})
+
+
+// ═══════════════════════════════════════════════════════════
 // FUTURES: Binance Futures ticker → /derivatives namespace
 // Funding rate, OI, mark price, basis
 // ═══════════════════════════════════════════════════════════
@@ -837,6 +875,7 @@ memecoinsNs.on('connection', (socket) => {
 // ═══════════════════════════════════════════════════════════
 for (const sym of DEPTH_SYMBOLS) connectDepth(sym)
 connectTicker()
+connectTradeStream()
 connectFuturesTicker()
 connectLiquidations()
 startAllDexStreams()
