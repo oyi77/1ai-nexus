@@ -122,7 +122,7 @@ describe('API Integration Tests', () => {
       expect(Array.isArray(d.indicators)).toBe(true)
     })
 
-    it('GET /api/v1/news returns articles or graceful failure', async () => {
+    it('GET /api/v1/news returns articles or graceful failure', { timeout: 30_000 }, async () => {
       const { status, data } = await api('/api/v1/news?limit=5')
       // RSS feeds may be slow — accept 200 or 504 timeout
       expect([200, 504]).toContain(status)

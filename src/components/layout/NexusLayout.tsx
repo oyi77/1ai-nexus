@@ -30,6 +30,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Overview',
     items: [
       { label: 'Dashboard',     href: '/dashboard',      icon: LayoutDashboard },
+      { label: 'AI Signals',    href: '/ai-signals',     icon: Zap },
       { label: 'AI Insights',   href: '/ai-insights',    icon: Zap },
       { label: 'Alpha Feed',    href: '/alpha',          icon: Zap },
       { label: 'Watchlist',     href: '/watchlist',      icon: Eye },
