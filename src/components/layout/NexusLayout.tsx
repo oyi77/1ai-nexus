@@ -73,11 +73,11 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Macro & News',
     items: [
       { label: 'Macro Hub',     href: '/macro-hub',      icon: Globe },
+      { label: 'Global Macro',  href: '/global-macro',   icon: Globe },
       { label: 'Indonesia',     href: '/indonesia-macro', icon: Globe },
       { label: 'Calendar',      href: '/calendar',       icon: Calendar },
       { label: 'Correlations',  href: '/correlations',   icon: GitCompare },
       { label: 'Corr Matrix',   href: '/correlation-matrix', icon: GitCompare },
-      { label: 'Gaps',          href: '/gaps',            icon: ArrowUpDown },
       { label: 'News Feed',     href: '/news',           icon: Newspaper },
     ],
   },
