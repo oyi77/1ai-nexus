@@ -8,7 +8,10 @@
 
 const FRED_API_KEY = process.env.FRED_API_KEY ?? ''
 const FRED_API_BASE = 'https://api.stlouisfed.org/fred/series/observations'
-const TREASURY_CSV_URL = 'https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/2026/all?type=daily_treasury_yield_curve&field_tdr_date_value=2026&page&_format=csv'
+function getTreasuryCsvUrl(): string {
+  const year = new Date().getFullYear()
+  return `https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/${year}/all?type=daily_treasury_yield_curve&field_tdr_date_value=${year}&page&_format=csv`
+}
 const WORLD_BANK_BASE = 'https://api.worldbank.org/v2'
 
 // ─── Types ────────────────────────────────────────────────
@@ -176,7 +179,7 @@ async function fetchTreasuryCsv(): Promise<TreasuryRow[]> {
     return treasuryCache.rows
   }
 
-  const res = await fetch(TREASURY_CSV_URL, { signal: AbortSignal.timeout(15_000) })
+  const res = await fetch(getTreasuryCsvUrl(), { signal: AbortSignal.timeout(15_000) })
   if (!res.ok) throw new Error(`Treasury CSV HTTP ${res.status}`)
 
   const text = await res.text()
@@ -307,6 +310,42 @@ async function fetchFromFredApi(
   return observations.length > 0 ? observations : null
 }
 
+// ─── Yahoo Finance fetcher (for commodities/indices) ──────
+
+const YAHOO_SYMBOLS: Record<string, string> = {
+  GOLDAMGBD228NLBM: 'GC=F',  // Gold futures
+}
+
+async function fetchFromYahoo(seriesId: string, _limit: number): Promise<FredObservation[] | null> {
+  const symbol = YAHOO_SYMBOLS[seriesId]
+  if (!symbol) return null
+
+  const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=3mo`
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(10_000),
+    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; nexus-tracker/1.0)' },
+  })
+  if (!res.ok) return null
+
+  const raw: unknown = await res.json()
+  const chart = raw as { chart?: { result?: Array<{ timestamp?: number[]; indicators?: { quote?: Array<{ close?: (number | null)[] }> } }> } }
+  const result = chart.chart?.result?.[0]
+  if (!result?.timestamp || !result.indicators?.quote?.[0]?.close) return null
+
+  const timestamps = result.timestamp
+  const closes = result.indicators.quote[0].close
+  const observations: FredObservation[] = []
+
+  for (let i = timestamps.length - 1; i >= 0 && observations.length < _limit; i--) {
+    const price = closes[i]
+    if (price == null || price <= 0) continue
+    const date = new Date(timestamps[i] * 1000).toISOString().split('T')[0]
+    observations.push({ date, value: price.toFixed(2) })
+  }
+
+  return observations.length > 0 ? observations : null
+}
+
 // ─── Client ───────────────────────────────────────────────
 
 /**
@@ -385,7 +424,19 @@ export async function getFredSeries(seriesId: string, limit = 10): Promise<FredS
     }
   }
 
-  // 5. No data available — return empty series
+  // 5. Yahoo Finance for commodities/indices (free, no key)
+  try {
+    const yahooObs = await fetchFromYahoo(seriesId, limit)
+    if (yahooObs) {
+      const series: FredSeries = { id: seriesId, title, observations: yahooObs }
+      seriesCache.set(seriesId, { data: series, timestamp: Date.now() })
+      return series
+    }
+  } catch {
+    // Silently fall through
+  }
+
+  // 6. No data available — return empty series
   const empty: FredSeries = { id: seriesId, title, observations: [] }
   seriesCache.set(seriesId, { data: empty, timestamp: Date.now() })
   return empty
