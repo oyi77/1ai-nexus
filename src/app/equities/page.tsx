@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { NexusLayout } from "@/components/layout/NexusLayout"
 
 // Major global indices
-const INDICES = ['^GSPC', '^IXIC', '^DJI', '^VIX', '^FTSE', '^N225', '^HSI', '^STOXX50E']
+const INDICES = ['^GSPC', '^IXIC', '^DJI', '^VIX', '^FTSE', '^N225', '^HSI', '^STOXX50E', '^JKSE']
 // Sector leaders + major global equities (US, EU, Asia, EM)
 const GLOBAL_STOCKS = [
   // US Tech
@@ -64,6 +64,23 @@ const GLOBAL_STOCKS = [
   { symbol: 'CLSK', name: 'CleanSpark', sector: 'Crypto' },
   { symbol: 'HOOD', name: 'Robinhood', sector: 'Crypto' },
   { symbol: 'ARKK', name: 'ARK Innovation', sector: 'Crypto' },
+  // IDX (Indonesia Stock Exchange)
+  { symbol: 'BBCA.JK', name: 'Bank Central Asia', sector: 'IDX' },
+  { symbol: 'BBRI.JK', name: 'Bank Rakyat Indonesia', sector: 'IDX' },
+  { symbol: 'BMRI.JK', name: 'Bank Mandiri', sector: 'IDX' },
+  { symbol: 'BBNI.JK', name: 'Bank Negara Indonesia', sector: 'IDX' },
+  { symbol: 'TLKM.JK', name: 'Telkom Indonesia', sector: 'IDX' },
+  { symbol: 'ASII.JK', name: 'Astra International', sector: 'IDX' },
+  { symbol: 'UNVR.JK', name: 'Unilever Indonesia', sector: 'IDX' },
+  { symbol: 'ICBP.JK', name: 'Indofood CBP', sector: 'IDX' },
+  { symbol: 'INDF.JK', name: 'Indofood Sukses Makmur', sector: 'IDX' },
+  { symbol: 'EXCL.JK', name: 'XL Axiata', sector: 'IDX' },
+  { symbol: 'ADRO.JK', name: 'Adaro Energy', sector: 'IDX' },
+  { symbol: 'PTBA.JK', name: 'Bukit Asam', sector: 'IDX' },
+  { symbol: 'ANTM.JK', name: 'Aneka Tambang', sector: 'IDX' },
+  { symbol: 'MDKA.JK', name: 'Merdeka Copper Gold', sector: 'IDX' },
+  { symbol: 'GOTO.JK', name: 'GoTo Gojek Tokopedia', sector: 'IDX' },
+  { symbol: 'EMTK.JK', name: 'Elang Mahkota Teknologi', sector: 'IDX' },
 ]
 export default function EquitiesPage() {
   const [quotes, setQuotes] = useState<Record<string, { price: number; change: number; name: string }>>({})

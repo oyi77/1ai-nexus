@@ -6,9 +6,11 @@ import { MacroCommandCenterContent } from '../macro/page'
 import { NewsPageContent } from '../news/page'
 import { CalendarPageContent } from '../calendar/page'
 import { CorrelationsPageContent } from '../correlations/page'
+import { IndonesiaMacroContent } from '../indonesia-macro/page'
 
 const TABS = [
   { key: 'macro', label: '🏛 Macro', content: MacroCommandCenterContent },
+  { key: 'indonesia', label: '🇮🇩 Indonesia', content: IndonesiaMacroContent },
   { key: 'news', label: '📰 News Feed', content: NewsPageContent },
   { key: 'calendar', label: '📅 Calendar', content: CalendarPageContent },
   { key: 'correlations', label: '🔗 Correlations', content: CorrelationsPageContent },

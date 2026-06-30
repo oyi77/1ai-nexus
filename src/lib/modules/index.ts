@@ -51,6 +51,7 @@ import openfema from './macro/openfema'
 import bankOfCanada from './macro/bank-of-canada'
 import ukOns from './macro/uk-ons'
 import imfSdmx from './macro/imf-sdmx'
+import indonesiaMacro from './macro/indonesia'
 import bisSdmx from './macro/bis-sdmx'
 import eurostat from './macro/eurostat'
 
@@ -118,11 +119,10 @@ export function registerAllModules() {
     blockscoutEth, arkhamRe, birdeyeRe, mempoolSpace, l2beat, blockchair, covalent,
     // Market (9)
     coingecko, binance, bybit, coinpaprika, coincap, indodax, sectorsApp, eastmoney, marketFlow,
-    // Macro (22)
     fred, fearGreed, frankfurter, exchangeRate, ecbSdw, worldbank,
     finnhubRe, secEdgar, dbnomics, usTreasury, usgsEarthquakes, gdacsAlerts,
     openMeteo, nasaEonet, reliefweb, adsbFlight, openfema, bankOfCanada,
-    ukOns, imfSdmx, bisSdmx, eurostat,
+    ukOns, imfSdmx, indonesiaMacro, bisSdmx, eurostat,
     // Derivatives (3)
     derivativesAggregate, deribitOptions, binanceFutures,
     manifold, polymarketGamma,

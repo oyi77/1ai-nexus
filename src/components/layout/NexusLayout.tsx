@@ -68,6 +68,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Macro & News',
     items: [
       { label: 'Macro Hub',     href: '/macro-hub',      icon: Globe },
+      { label: 'Indonesia',     href: '/indonesia-macro', icon: Globe },
       { label: 'Calendar',      href: '/calendar',       icon: Calendar },
       { label: 'Fear & Greed',  href: '/fear-greed',     icon: Activity },
       { label: 'Correlations',  href: '/correlations',   icon: GitCompare },
