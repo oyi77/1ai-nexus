@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell, Search, Wallet, User } from "lucide-react";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function TopNav() {
   return (
@@ -15,8 +16,8 @@ export function TopNav() {
           />
         </div>
       </div>
-
       <div className="flex items-center gap-2">
+        <LanguageSwitcher />
         <button className="relative flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-bg-elevated hover:text-text-primary transition-colors">
           <Bell className="h-4 w-4" />
           <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[9px] font-bold text-white">

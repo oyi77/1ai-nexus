@@ -41,6 +41,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Equities',      href: '/equities',       icon: Building2 },
       { label: 'Forex',         href: '/forex',          icon: DollarSign },
       { label: 'Commodities',   href: '/commodities',    icon: Package },
+      { label: 'Bonds',         href: '/bonds',          icon: TrendingUp },
       { label: 'Derivatives',   href: '/derivatives',    icon: TrendingUp },
     ],
   },
@@ -58,6 +59,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Trading',
     items: [
       { label: 'Order Book',    href: '/orderbook',      icon: BarChart3 },
+      { label: 'Options',       href: '/options',        icon: TrendingUp },
       { label: 'Basis Scanner', href: '/basis',          icon: Activity },
       { label: 'Liquidations',  href: '/liquidations',   icon: Activity },
       { label: 'Arbitrage',     href: '/arbitrage',      icon: Activity },
