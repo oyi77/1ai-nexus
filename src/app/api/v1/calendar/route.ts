@@ -210,31 +210,41 @@ async function fetchFredReleases(start: string, end: string): Promise<CalendarEv
 
 // ─── Build central bank events ────────────────────────────
 
+const CENTRAL_BANK_SERIES: Record<string, { seriesId: string; country: string }> = {
+  'FOMC Rate Decision': { seriesId: 'FEDFUNDS', country: 'US' },
+  'ECB Rate Decision': { seriesId: 'ECBMRRFR', country: 'EU' },
+  'BI Rate Decision (RDG)': { seriesId: 'IRSTCB01IDM156N', country: 'ID' },
+}
+
+async function resolveRateObservations(seriesId: string): Promise<{ actual: string | null; previous: string }> {
+  try {
+    const series = await getFredSeries(seriesId, 2)
+    return {
+      actual: series.observations[0]?.value ?? null,
+      previous: series.observations[1]?.value ?? '',
+    }
+  } catch {
+    return { actual: null, previous: '' }
+  }
+}
+
 async function buildCentralBankEvents(start: Date, end: Date): Promise<CalendarEvent[]> {
   const events: CalendarEvent[] = []
-  let fedFundsActual: string | null = null
-  let fedFundsPrevious = ''
 
-  try {
-    const fedFunds = await getFredSeries('FEDFUNDS', 2)
-    fedFundsActual = fedFunds.observations[0]?.value ?? null
-    fedFundsPrevious = fedFunds.observations[1]?.value ?? ''
-  } catch {
-    // best-effort only
-  }
+  const rateCache = new Map<string, { actual: string | null; previous: string }>()
+  const centralBankEventNames = new Set(Object.keys(CENTRAL_BANK_SERIES))
 
   function add(date: string, time: string, country: string, event: string, impact: CalendarEvent['impact'], category: string) {
     if (isInRange(date, start, end)) {
-      const isFomc = event === 'FOMC Rate Decision'
       events.push({
         date,
         time,
         country,
         event,
         impact,
-        previous: isFomc ? fedFundsPrevious : '',
+        previous: '',
         forecast: '',
-        actual: isFomc ? fedFundsActual : null,
+        actual: null,
         category,
       })
     }
@@ -250,6 +260,19 @@ async function buildCentralBankEvents(start: Date, end: Date): Promise<CalendarE
   for (const d of RBNZ_DATES) add(d, '02:00', 'NZ', 'RBNZ Rate Decision', 'medium', 'rates')
   for (const d of [...lprDates(2025), ...lprDates(2026)]) add(d, '02:00', 'CN', 'PBOC LPR Decision', 'medium', 'rates')
   for (const d of BCB_DATES) add(d, '18:30', 'BR', 'BCB Rate Decision', 'medium', 'rates')
+
+  for (const event of events) {
+    if (!centralBankEventNames.has(event.event)) continue
+    const meta = CENTRAL_BANK_SERIES[event.event]
+    if (!rateCache.has(meta.seriesId)) {
+      rateCache.set(meta.seriesId, await resolveRateObservations(meta.seriesId))
+    }
+    const obs = rateCache.get(meta.seriesId)
+    if (obs) {
+      event.actual = obs.actual
+      event.previous = obs.previous
+    }
+  }
 
   return events
 }
@@ -267,7 +290,7 @@ async function fetchCalendar(): Promise<CalendarEvent[]> {
   // Fetch in parallel: FRED releases + central bank schedules
   const [fredEvents, cbEvents] = await Promise.all([
     fetchFredReleases(startStr, endStr),
-    Promise.resolve(buildCentralBankEvents(start, end)),
+    buildCentralBankEvents(start, end),
   ])
 
   // Deduplicate by (date, event) — keep the one with more data

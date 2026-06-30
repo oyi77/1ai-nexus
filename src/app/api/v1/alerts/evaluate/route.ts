@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
       .then((j) => j.data?.events ?? [])
       .catch(() => [] as Array<{ date: string; event: string; country: string }>);
 
-    const results: Array<{ id: string; type: string; triggered: boolean; message: string }> = [];
+    const results: Array<{ id: string; type: string; triggered: boolean; message: string; fired: boolean; deliveryStatus: string; deliveryError?: string }> = [];
     let triggered = 0;
 
     for (const dbAlert of dbAlerts) {
@@ -38,14 +38,14 @@ export async function GET(request: NextRequest) {
 
       const parsed = AlertCondition.safeParse({ type, ...config });
       if (!parsed.success) {
-        results.push({ id: dbAlert.id, type, triggered: false, message: `Invalid config: ${parsed.error.issues.map((i) => i.message).join(", ")}` });
+        results.push({ id: dbAlert.id, type, triggered: false, message: `Invalid config: ${parsed.error.issues.map((i) => i.message).join(", ")}`, fired: false, deliveryStatus: 'skipped' });
         continue;
       }
 
       try {
         const event = await fetchEventForAlert(type, config, calendarEvents, today);
         if (!event) {
-          results.push({ id: dbAlert.id, type, triggered: false, message: "No event data available" });
+          results.push({ id: dbAlert.id, type, triggered: false, message: "No event data available", fired: false, deliveryStatus: 'skipped' });
           continue;
         }
 
@@ -53,15 +53,24 @@ export async function GET(request: NextRequest) {
         if (isTriggered) {
           triggered++;
           const message = buildTriggerMessage(type, config, event);
-          await fireAlert(dbAlert.id, event, message).catch((e) =>
+          const fireResult = await fireAlert(dbAlert.id, event, message).catch((e) => {
             console.error(`[ALERT] Failed to fire alert ${dbAlert.id}:`, e)
-          );
-          results.push({ id: dbAlert.id, type, triggered: true, message });
+            return { fired: false, deliveryStatus: 'failed', deliveryError: (e as Error).message } as const
+          })
+          results.push({
+            id: dbAlert.id,
+            type,
+            triggered: true,
+            message,
+            fired: fireResult.fired,
+            deliveryStatus: fireResult.deliveryStatus,
+            deliveryError: fireResult.deliveryError,
+          })
         } else {
-          results.push({ id: dbAlert.id, type, triggered: false, message: "Condition not met" });
+          results.push({ id: dbAlert.id, type, triggered: false, message: "Condition not met", fired: false, deliveryStatus: 'skipped' })
         }
       } catch (e) {
-        results.push({ id: dbAlert.id, type, triggered: false, message: `Error: ${(e as Error).message}` });
+        results.push({ id: dbAlert.id, type, triggered: false, message: `Error: ${(e as Error).message}`, fired: false, deliveryStatus: 'failed', deliveryError: (e as Error).message })
       }
     }
 
@@ -130,15 +139,15 @@ function buildTriggerMessage(type: string, config: Record<string, unknown>, even
   switch (type) {
     case "price_threshold": {
       const e = event as { price: number };
-      return `${config.symbol} at $${e.price.toFixed(2)} — ${config.direction} $${config.threshold}`;
+      return `${config.symbol} at $${e.price.toFixed(2)} — ${config.direction} $${config.threshold}`
     }
     case "forex_rate": {
       const e = event as { rate: number };
-      return `${config.pair} at ${e.rate.toFixed(4)} — ${config.direction} ${config.threshold}`;
+      return `${config.pair} at ${e.rate.toFixed(4)} — ${config.direction} ${config.threshold}`
     }
     case "macro_event":
-      return `Macro event: ${config.event}${config.country ? ` (${config.country})` : ""}`;
+      return `Macro event: ${config.event}${config.country ? ` (${config.country})` : ""}`
     default:
-      return `Alert triggered: ${type}`;
+      return `Alert triggered: ${type}`
   }
 }

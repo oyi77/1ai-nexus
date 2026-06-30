@@ -259,7 +259,7 @@ export default function AlertsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [evaluating, setEvaluating] = useState(false)
-  const [evalSummary, setEvalSummary] = useState<{ evaluated: number; triggered: number; results: Array<{ id: string; type: string; triggered: boolean; message: string }> } | null>(null)
+  const [evalSummary, setEvalSummary] = useState<{ evaluated: number; triggered: number; results: Array<{ id: string; type: string; triggered: boolean; message: string; fired: boolean; deliveryStatus: string; deliveryError?: string }> } | null>(null)
   const [alertLog, setAlertLog] = useState<AlertLogEntry[]>([])
 
   useEffect(() => {
@@ -471,14 +471,20 @@ export default function AlertsPage() {
             </div>
             <div className="space-y-1.5">
               {evalSummary.results.slice(0, 8).map((result) => (
-                <div key={result.id} className="flex items-start justify-between gap-3 text-[10px] font-mono">
-                  <div className="flex items-center gap-2">
-                    <span className={result.triggered ? 'text-accent-green' : 'text-text-dim'}>
-                      {result.triggered ? 'TRIGGERED' : 'SKIPPED'}
-                    </span>
-                    <span className="text-text-primary">{result.type}</span>
+                <div key={result.id} className="text-[10px] font-mono border-b border-border-dim/30 pb-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className={result.triggered ? 'text-accent-green' : 'text-text-dim'}>
+                        {result.triggered ? 'TRIGGERED' : 'SKIPPED'}
+                      </span>
+                      <span className="text-text-primary">{result.type}</span>
+                    </div>
+                    <span className="text-text-muted text-right">{result.message}</span>
                   </div>
-                  <span className="text-text-muted text-right">{result.message}</span>
+                  <div className="mt-0.5 text-text-dim">
+                    Delivery: {result.deliveryStatus}
+                    {result.deliveryError ? ` — ${result.deliveryError}` : ''}
+                  </div>
                 </div>
               ))}
             </div>

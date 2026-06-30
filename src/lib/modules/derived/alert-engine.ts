@@ -33,6 +33,12 @@ export interface AlertEvent {
   message: string
 }
 
+export interface AlertFireResult {
+  fired: boolean
+  deliveryStatus: 'skipped' | 'no-webhook' | 'rejected' | 'delivered' | 'failed'
+  deliveryError?: string
+}
+
 const alerts = new Map<string, Alert>()
 const alertLog: AlertEvent[] = []
 const MAX_LOG = 1000
@@ -182,7 +188,7 @@ export async function toggleAlert(id: string): Promise<Alert | undefined> {
   return updated
 }
 
-export async function fireAlert(alertId: string, value: unknown, message: string): Promise<void> {
+export async function fireAlert(alertId: string, value: unknown, message: string): Promise<AlertFireResult> {
   let alert = alerts.get(alertId)
 
   if (!alert) {
@@ -207,7 +213,9 @@ export async function fireAlert(alertId: string, value: unknown, message: string
     }
   }
 
-  if (!alert || !alert.enabled) return
+  if (!alert || !alert.enabled) {
+    return { fired: false, deliveryStatus: 'skipped' }
+  }
 
   const event: AlertEvent = {
     alertId,
@@ -229,28 +237,33 @@ export async function fireAlert(alertId: string, value: unknown, message: string
   const updatedAlert = alerts.get(alertId)
   if (updatedAlert) updatedAlert.lastFired = now.getTime()
 
-  if (alert.webhookUrl) {
-    const check = validateWebhookUrl(alert.webhookUrl)
-    if (!check.valid) {
-      console.error(`[ALERT] Rejected webhook delivery: ${check.error} for alert ${alertId}`)
-      return
-    }
+  if (!alert.webhookUrl) {
+    console.log(`[ALERT] ${alert.name || 'Unnamed alert'}: ${message}`)
+    return { fired: true, deliveryStatus: 'no-webhook' }
+  }
 
-    const secret = alert.webhookSecret || process.env.NEXUS_WEBHOOK_SECRET || 'nexus-default-secret'
-    const result = await deliverWebhook(alert.webhookUrl, {
-      id: event.alertId,
-      triggerType: alert.condition ?? alert.triggerType ?? "",
-      conditions: {},
-      event: event as unknown as Record<string, unknown>,
-      timestamp: new Date(event.triggeredAt).toISOString(),
-    }, secret)
+  const check = validateWebhookUrl(alert.webhookUrl)
+  if (!check.valid) {
+    console.error(`[ALERT] Rejected webhook delivery: ${check.error} for alert ${alertId}`)
+    return { fired: true, deliveryStatus: 'rejected', deliveryError: check.error }
+  }
 
-    if (!result.success) {
-      console.error(`[ALERT] Webhook delivery failed for ${alertId}: ${result.error} (${result.attempts} attempts)`)
-    }
+  const secret = alert.webhookSecret || process.env.NEXUS_WEBHOOK_SECRET || 'nexus-default-secret'
+  const result = await deliverWebhook(alert.webhookUrl, {
+    id: event.alertId,
+    triggerType: alert.condition ?? alert.triggerType ?? "",
+    conditions: {},
+    event: event as unknown as Record<string, unknown>,
+    timestamp: new Date(event.triggeredAt).toISOString(),
+  }, secret)
+
+  if (!result.success) {
+    console.error(`[ALERT] Webhook delivery failed for ${alertId}: ${result.error} (${result.attempts} attempts)`)
+    return { fired: true, deliveryStatus: 'failed', deliveryError: result.error }
   }
 
   console.log(`[ALERT] ${alert.name || 'Unnamed alert'}: ${message}`)
+  return { fired: true, deliveryStatus: 'delivered' }
 }
 
 export function getAlertLog(limit = 50): AlertEvent[] {
