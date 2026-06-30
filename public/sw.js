@@ -1,5 +1,5 @@
 // NEXUS Service Worker — PWA + offline shell
-const CACHE_NAME = 'nexus-v3'
+const CACHE_NAME = 'nexus-v4'
 const STATIC_ASSETS = [
   '/',
   '/dashboard',
