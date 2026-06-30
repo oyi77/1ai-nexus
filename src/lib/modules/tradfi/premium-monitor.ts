@@ -1,10 +1,12 @@
+import { prisma } from '@/lib/db'
+
 // ─────────────────────────────────────────────────────────────
 // Premium & Basis Monitor Module
 // Coinbase Premium, Korea Premium, Futures Basis
 // All free public exchange APIs, zero keys
 // ─────────────────────────────────────────────────────────────
 
-interface PremiumSnapshot {
+export interface PremiumSnapshot {
   venuePair: string
   asset: string
   premiumPct: number
@@ -125,4 +127,21 @@ export async function fetchPremiumSnapshots(): Promise<PremiumSnapshot[]> {
   if (basis.status === 'fulfilled' && basis.value) results.push(basis.value)
 
   return results
+}
+
+export async function persistPremiumSnapshots(snapshots: PremiumSnapshot[]): Promise<number> {
+  let persisted = 0
+  for (const snap of snapshots) {
+    try {
+      await prisma.premiumSnapshot.create({
+        data: {
+          venuePair: snap.venuePair,
+          asset: snap.asset,
+          premiumPct: snap.premiumPct,
+        },
+      })
+      persisted++
+    } catch { /* skip duplicates */ }
+  }
+  return persisted
 }

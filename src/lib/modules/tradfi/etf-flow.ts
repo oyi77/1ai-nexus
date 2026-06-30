@@ -1,3 +1,5 @@
+import { prisma } from '@/lib/db'
+
 // ─────────────────────────────────────────────────────────────
 // ETF Flow Intelligence Module
 // Tracks daily net flows per issuer for spot BTC/ETH ETFs
@@ -5,7 +7,7 @@
 // Zero API keys — all public data
 // ─────────────────────────────────────────────────────────────
 
-interface ETFFlow {
+export interface ETFFlow {
   issuer: string
   asset: 'BTC' | 'ETH'
   netFlowUsd: number
@@ -121,4 +123,23 @@ export async function fetchETFSummary() {
     },
     issuers: ETF_ISSUERS,
   }
+}
+
+export async function persistETFFlows(flows: ETFFlow[]): Promise<number> {
+  let persisted = 0
+  for (const flow of flows) {
+    try {
+      await prisma.eTFFlowSnapshot.create({
+        data: {
+          issuer: flow.issuer,
+          asset: flow.asset,
+          netFlowUsd: flow.netFlowUsd,
+          cumulativeFlowUsd: flow.cumulativeFlowUsd,
+          date: new Date(flow.date),
+        },
+      })
+      persisted++
+    } catch { /* skip duplicates */ }
+  }
+  return persisted
 }

@@ -3,8 +3,12 @@
 // Sources: Fear & Greed (alternative.me), Google Trends, Reddit
 // All free, zero API keys required
 // ─────────────────────────────────────────────────────────────
+import { prisma } from '@/lib/db'
+import { Prisma } from '@prisma/client'
 
-interface SentimentData {
+
+
+export interface SentimentData {
   source: string
   score: number
   label: string
@@ -119,9 +123,19 @@ export async function fetchSentimentIntelligence(): Promise<SentimentData[]> {
 
   return results
 }
-
 export async function persistSentimentSnapshots(data: SentimentData[]): Promise<number> {
-  // Use existing Prisma model for persistence
-  // SentimentSnapshot model is available
-  return data.length
+  let persisted = 0
+  for (const item of data) {
+    try {
+      await prisma.sentimentSnapshot.create({
+        data: {
+          source: item.source,
+          score: item.score,
+          metadata: item.metadata as unknown as Prisma.InputJsonValue,
+        },
+      })
+      persisted++
+    } catch { /* skip duplicates or errors */ }
+  }
+  return persisted
 }

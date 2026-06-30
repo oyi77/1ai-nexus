@@ -1,3 +1,5 @@
+import { prisma } from '@/lib/db'
+
 // ─────────────────────────────────────────────────────────────
 // DeFi Credit Stress Monitor Module
 // Tracks positions near liquidation in lending protocols
@@ -5,7 +7,7 @@
 // Zero API keys
 // ─────────────────────────────────────────────────────────────
 
-interface CreditRiskSnapshot {
+export interface CreditRiskSnapshot {
   protocol: string
   chain: string
   tvl: number
@@ -57,4 +59,22 @@ export async function fetchCreditRisk(): Promise<CreditRiskSnapshot[]> {
       .sort((a, b) => b.avgApy - a.avgApy)
       .slice(0, 20)
   } catch { return [] }
+}
+
+export async function persistCreditRisk(snapshots: CreditRiskSnapshot[]): Promise<number> {
+  let persisted = 0
+  for (const snap of snapshots) {
+    try {
+      await prisma.creditRiskSnapshot.create({
+        data: {
+          protocol: snap.protocol,
+          asset: snap.chain,
+          atRiskUsd: snap.tvl,
+          avgHealthFactor: snap.avgApy,
+        },
+      })
+      persisted++
+    } catch { /* skip */ }
+  }
+  return persisted
 }

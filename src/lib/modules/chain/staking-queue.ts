@@ -1,10 +1,12 @@
+import { prisma } from '@/lib/db'
+
 // ─────────────────────────────────────────────────────────────
 // Staking Queue Monitor Module
 // Tracks ETH staking entry/exit queue from beaconcha.in
 // Zero API keys — public beaconcha.in API
 // ─────────────────────────────────────────────────────────────
 
-interface StakingSnapshot {
+export interface StakingSnapshot {
   asset: string
   entryQueue: number | null
   exitQueue: number | null
@@ -66,4 +68,18 @@ export async function fetchStakingQueue(): Promise<StakingSnapshot> {
   } catch { /* optional */ }
 
   return result
+}
+
+export async function persistStakingFlow(snapshot: StakingSnapshot): Promise<boolean> {
+  try {
+    await prisma.stakingFlowSnapshot.create({
+      data: {
+        asset: snapshot.asset,
+        entryQueue: snapshot.entryQueue,
+        exitQueue: snapshot.exitQueue,
+        netStaked: snapshot.netStaked,
+      },
+    })
+    return true
+  } catch { return false }
 }

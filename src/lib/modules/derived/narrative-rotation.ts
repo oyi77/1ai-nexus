@@ -1,3 +1,5 @@
+import { prisma } from '@/lib/db'
+
 // ─────────────────────────────────────────────────────────────
 // Narrative / Sector Rotation Tracker Module
 // Detects capital rotation between crypto narratives
@@ -5,7 +7,7 @@
 // Zero API keys
 // ─────────────────────────────────────────────────────────────
 
-interface SectorFlow {
+export interface SectorFlow {
   sector: string
   marketCap: number
   volume24h: number
@@ -52,4 +54,21 @@ export async function fetchNarrativeRotation(): Promise<SectorFlow[]> {
       .sort((a, b) => Math.abs(b.change24h) - Math.abs(a.change24h))
       .slice(0, 30)
   } catch { return [] }
+}
+
+export async function persistSectorFlows(flows: SectorFlow[]): Promise<number> {
+  let persisted = 0
+  for (const flow of flows) {
+    try {
+      await prisma.sectorFlowSnapshot.create({
+        data: {
+          sector: flow.sector,
+          netSmartMoneyFlowUsd: flow.change24h, // Using change24h as flow proxy
+          tokenCount: flow.topCoins.length,
+        },
+      })
+      persisted++
+    } catch { /* skip */ }
+  }
+  return persisted
 }

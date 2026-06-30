@@ -1,10 +1,12 @@
+import { prisma } from '@/lib/db'
+
 // ─────────────────────────────────────────────────────────────
 // Miner Flow Monitor Module
 // Tracks Bitcoin miner wallet outflows + hash rate
 // Zero API keys — uses mempool.space public API
 // ─────────────────────────────────────────────────────────────
 
-interface MinerFlowSnapshot {
+export interface MinerFlowSnapshot {
   outflowToExchangesUsd: number | null
   hashRate: number | null
   hashRateUnit: string
@@ -60,4 +62,16 @@ export async function fetchMinerFlow(): Promise<MinerFlowSnapshot> {
   }
 
   return result
+}
+
+export async function persistMinerFlow(snapshot: MinerFlowSnapshot): Promise<boolean> {
+  try {
+    await prisma.minerFlowSnapshot.create({
+      data: {
+        outflowToExchangesUsd: 0, // No live outflow data yet
+        hashRate: snapshot.hashRate,
+      },
+    })
+    return true
+  } catch { return false }
 }

@@ -6,13 +6,13 @@
 
 import { NextRequest } from "next/server";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
-import { fetchETFSummary } from "@/lib/modules/tradfi/etf-flow";
-import { fetchPremiumSnapshots } from "@/lib/modules/tradfi/premium-monitor";
+import { fetchETFSummary, persistETFFlows } from "@/lib/modules/tradfi/etf-flow";
+import { fetchPremiumSnapshots, persistPremiumSnapshots } from "@/lib/modules/tradfi/premium-monitor";
 
 export const dynamic = "force-dynamic";
 
-let cachedETF: unknown = null;
-let cachedPremiums: unknown = null;
+let cachedETF: Awaited<ReturnType<typeof fetchETFSummary>> | null = null;
+let cachedPremiums: Awaited<ReturnType<typeof fetchPremiumSnapshots>> | null = null;
 let cacheTs = 0;
 const CACHE_TTL = 5 * 60 * 1000;
 
@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
     if (action === "etf" || action === "all") {
       if (!cachedETF || now - cacheTs > CACHE_TTL) {
         cachedETF = await fetchETFSummary();
+        persistETFFlows(cachedETF.flows).catch(() => {})
         cacheTs = now;
       }
     }
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
     if (action === "premiums" || action === "all") {
       if (!cachedPremiums || now - cacheTs > CACHE_TTL) {
         cachedPremiums = await fetchPremiumSnapshots();
+        persistPremiumSnapshots(cachedPremiums).catch(() => {})
       }
     }
 

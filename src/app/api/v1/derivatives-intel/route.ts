@@ -6,7 +6,8 @@
 
 import { NextRequest } from "next/server";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
-import { fetchDerivativesSnapshot, fetchRecentLiquidations } from "@/lib/modules/derived/derivatives-intel";
+import { fetchDerivativesSnapshot, fetchRecentLiquidations, persistDerivativesSnapshot, persistLiquidations } from "@/lib/modules/derived/derivatives-intel";
+
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
           snapshots,
           summary: computeSummary(snapshots),
         };
+        persistDerivativesSnapshot(snapshots).catch(() => {})
         cacheTs = now;
       }
     }
@@ -34,7 +36,9 @@ export async function GET(request: NextRequest) {
     if (action === "liquidations" || action === "all") {
       const liquidations = await fetchRecentLiquidations();
       (cachedData as Record<string, unknown>).liquidations = liquidations;
+      persistLiquidations(liquidations).catch(() => {})
     }
+
 
     return cacheHeaders(apiSuccess(cachedData), 30);
   } catch (error) {
