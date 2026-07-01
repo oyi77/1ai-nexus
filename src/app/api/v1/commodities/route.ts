@@ -1,8 +1,15 @@
+// ─────────────────────────────────────────────────────────────
+// GET /api/v1/commodities — Commodity futures data
+// Uses single-flight getCached Redis cache + backup fallback
+// ─────────────────────────────────────────────────────────────
+
 export const dynamic = "force-dynamic";
 
-import { type NextRequest } from "next/server";
-import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
+import { type NextRequest, NextResponse } from "next/server";
+import { apiSuccess, apiError } from "@/lib/api/response";
 import { registerAllModules } from "@/lib/modules";
+import { getCached } from "@/lib/api/server-cache";
+import { saveBackup, getBackup } from "@/lib/api/backup";
 
 const COMMODITY_GROUPS = {
   precious_metals: [
@@ -35,52 +42,67 @@ const COMMODITY_GROUPS = {
 } as const;
 
 const ALL_COMMODITIES = Object.values(COMMODITY_GROUPS).flat();
-const cache = new Map<string, { data: Record<string, unknown>; ts: number }>();
-const CACHE_TTL = 5 * 60 * 1000;
 
 export async function GET(_request: NextRequest) {
+  const cacheKey = "commodities:all";
+
   try {
-    const now = Date.now();
-    const cacheKey = "commodities:all";
-    const cached = cache.get(cacheKey);
-    if (cached && now - cached.ts < CACHE_TTL) {
-      return cacheHeaders(apiSuccess(cached.data), 300);
-    }
+    const { data, fromCache } = await getCached(cacheKey, 300_000, async () => {
+      const registry = registerAllModules();
+      const symbols = ALL_COMMODITIES.map((item) => item.symbol).join(",");
+      const result = await registry.fetchOne("yahoo-finance", { symbols, action: "quote" });
+      const quotes = (result?.data as Array<Record<string, unknown>> | null) ?? [];
 
-    const registry = registerAllModules();
-    const symbols = ALL_COMMODITIES.map((item) => item.symbol).join(",");
-    const result = await registry.fetchOne("yahoo-finance", { symbols, action: "quote" });
-    const quotes = (result?.data as Array<Record<string, unknown>> | null) ?? [];
+      const bySymbol = new Map(quotes.map((q) => [String(q.symbol), q]));
+      const commodities = ALL_COMMODITIES.map((meta) => {
+        const q = bySymbol.get(meta.symbol);
+        return {
+          symbol: meta.symbol,
+          name: meta.name,
+          unit: meta.unit,
+          price: (q?.price as number | undefined) ?? (q?.regularMarketPrice as number | undefined) ?? null,
+          change: (q?.change as number | undefined) ?? (q?.regularMarketChange as number | undefined) ?? null,
+          changePercent: (q?.changePercent as number | undefined) ?? (q?.regularMarketChangePercent as number | undefined) ?? null,
+          prevClose: (q?.regularMarketPreviousClose as number | undefined) ?? null,
+          volume: (q?.volume as number | undefined) ?? (q?.regularMarketVolume as number | undefined) ?? null,
+        };
+      });
 
-    const bySymbol = new Map(quotes.map((q) => [String(q.symbol), q]));
-    const commodities = ALL_COMMODITIES.map((meta) => {
-      const q = bySymbol.get(meta.symbol);
-      return {
-        symbol: meta.symbol,
-        name: meta.name,
-        unit: meta.unit,
-        price: (q?.price as number | undefined) ?? (q?.regularMarketPrice as number | undefined) ?? null,
-        change: (q?.change as number | undefined) ?? (q?.regularMarketChange as number | undefined) ?? null,
-        changePercent: (q?.changePercent as number | undefined) ?? (q?.regularMarketChangePercent as number | undefined) ?? null,
-        prevClose: (q?.regularMarketPreviousClose as number | undefined) ?? null,
-        volume: (q?.volume as number | undefined) ?? (q?.regularMarketVolume as number | undefined) ?? null,
+      const payload = {
+        commodities,
+        categories: COMMODITY_GROUPS,
+        summary: {
+          total: commodities.length,
+          live: commodities.filter((c) => c.price != null).length,
+        },
+        timestamp: new Date().toISOString(),
       };
+
+      // Save to permanent backup (fire-and-forget)
+      saveBackup("commodities", payload).catch(() => {});
+
+      return payload;
     });
 
-    const data = {
-      commodities,
-      categories: COMMODITY_GROUPS,
-      summary: {
-        total: commodities.length,
-        live: commodities.filter((c) => c.price != null).length,
-      },
-      timestamp: new Date().toISOString(),
-    };
-
-    cache.set(cacheKey, { data, ts: now });
-    return cacheHeaders(apiSuccess(data), 300);
+    const resp = NextResponse.json({ data, error: null }, {
+      headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=600" }
+    });
+    resp.headers.set("X-Cache", fromCache ? "HIT" : "MISS");
+    return resp;
   } catch (error) {
-    console.error("GET /api/v1/commodities error:", error);
-    return apiError("Internal server error", 500);
+    console.error("GET /api/v1/commodities error, loading from backup:", error);
+    try {
+      const backup = await getBackup("commodities");
+      if (backup) {
+        const resp = NextResponse.json({ data: backup, error: null, note: "Loaded from historical cache" }, {
+          headers: { "Cache-Control": "public, max-age=60" }
+        });
+        resp.headers.set("X-Cache", "HIT-BACKUP");
+        return resp;
+      }
+    } catch (dbErr) {
+      console.error("[commodities] DB Backup loading failed:", dbErr);
+    }
+    return apiError("Failed to fetch commodities data", 502);
   }
 }

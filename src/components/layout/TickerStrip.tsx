@@ -53,7 +53,8 @@ export function TickerStrip() {
     fetch('/api/v1/fear-greed')
       .then(r => r.json())
       .then(d => {
-        if (d.data?.value != null) setFgValue(d.data.value)
+        const val = d.data?.composite?.score ?? d.data?.value
+        if (val != null) setFgValue(val)
       })
       .catch(() => {})
   }, [])
