@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
-import { fetchETFSummary } from "@/lib/modules/tradfi/etf-flow";
-import { fetchPremiumSnapshots } from "@/lib/modules/tradfi/premium-monitor";
+import { fetchETFSummary, persistETFFlows } from "@/lib/modules/tradfi/etf-flow";
+import { fetchPremiumSnapshots, persistPremiumSnapshots } from "@/lib/modules/tradfi/premium-monitor";
 import { cacheGet } from "@/lib/data-refresher";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,10 @@ export async function GET(request: NextRequest) {
     let premiums = await cacheGet<Awaited<ReturnType<typeof fetchPremiumSnapshots>>>('etf:premiums')
     if (!etf) etf = await fetchETFSummary()
     if (!premiums) premiums = await fetchPremiumSnapshots()
+
+    // Persist to DB for backtesting (fire-and-forget)
+    if (etf?.flows?.length > 0) persistETFFlows(etf.flows).catch(() => {})
+    if (premiums?.length > 0) persistPremiumSnapshots(premiums).catch(() => {})
 
     const data: Record<string, unknown> = {}
     if (action === "etf" || action === "all") data.etf = etf

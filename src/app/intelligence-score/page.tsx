@@ -5,40 +5,61 @@ import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
 
-interface ModuleScore {
-  module: string
+interface ComponentScore {
   score: number
-  weight: number
-  weightedScore: number
-  signal: string
-  dataPoints: number
+  signals: string[]
 }
 
-interface IntelligenceScore {
-  composite: number
+interface CompositeSignal {
+  id: string
+  name: string
+  description: string
   direction: 'bullish' | 'bearish' | 'neutral'
-  confidence: number
-  modules: ModuleScore[]
-  compositeSignals: number
-  bullishSignals: number
-  bearishSignals: number
-  timestamp: string
+  strength: number
+  components: Array<{ module: string; metric: string; value: number | string; weight: number; contribution: number }>
 }
 
-function scoreColor(score: number): string {
-  if (score > 60) return 'text-data-bull'
-  if (score < 40) return 'text-data-bear'
-  return 'text-text-muted'
+interface IntelScore {
+  overall: number
+  grade: string
+  regime: string
+  components: {
+    derivatives: ComponentScore
+    macro: ComponentScore
+    sentiment: ComponentScore
+    onChain: ComponentScore
+  }
+  compositeSignals: CompositeSignal[]
 }
 
-function scoreBg(score: number): string {
-  if (score > 60) return 'bg-data-bull'
-  if (score < 40) return 'bg-data-bear'
-  return 'bg-text-muted'
+function ScoreGauge({ score, label, size = 120 }: { score: number; label: string; size?: number }) {
+  const radius = (size - 20) / 2
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference - (score / 100) * circumference
+  const color = score >= 70 ? '#22c55e' : score >= 40 ? '#eab308' : '#ef4444'
+
+  return (
+    <div className="flex flex-col items-center relative">
+      <svg width={size} height={size} className="transform -rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#1e293b" strokeWidth="8" />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth="8"
+          strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" />
+      </svg>
+      <div className="absolute flex flex-col items-center justify-center" style={{ width: size, height: size }}>
+        <span className="text-2xl font-mono font-bold" style={{ color }}>{score}</span>
+        <span className="text-[9px] text-text-muted font-mono">{label}</span>
+      </div>
+    </div>
+  )
+}
+
+function DirectionBadge({ direction }: { direction: string }) {
+  const color = direction === 'bullish' ? 'bg-data-bull/20 text-data-bull' : direction === 'bearish' ? 'bg-data-bear/20 text-data-bear' : 'bg-bg-raised text-text-muted'
+  return <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${color}`}>{direction}</span>
 }
 
 export default function IntelligenceScorePage() {
-  const [data, setData] = useState<IntelligenceScore | null>(null)
+  const [data, setData] = useState<IntelScore | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -51,9 +72,32 @@ export default function IntelligenceScorePage() {
       } catch { setLoading(false) }
     }
     fetchData()
-    const interval = setInterval(fetchData, 300_000)
+    const interval = setInterval(fetchData, 60_000)
     return () => clearInterval(interval)
   }, [])
+
+  if (loading) {
+    return (
+      <NexusLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-text-muted font-mono text-sm">Computing intelligence score...</div>
+        </div>
+      </NexusLayout>
+    )
+  }
+
+  if (!data) {
+    return (
+      <NexusLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-data-bear font-mono text-sm">Failed to compute intelligence score</div>
+        </div>
+      </NexusLayout>
+    )
+  }
+
+  const gradeColor = data.grade.startsWith('A') ? '#22c55e' : data.grade.startsWith('B') ? '#3b82f6' : data.grade.startsWith('C') ? '#eab308' : '#ef4444'
+  const regimeColor = data.regime === 'bullish' ? '#22c55e' : data.regime === 'bearish' ? '#ef4444' : '#eab308'
 
   return (
     <NexusLayout>
@@ -62,92 +106,94 @@ export default function IntelligenceScorePage() {
           <div>
             <h1 className="text-xl font-bold font-mono text-accent-cyan">INTELLIGENCE SCORE</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
-              Unified 0-100 composite from all 14 modules — 50 = neutral
+              Unified score combining all 14 intelligence modules
             </p>
           </div>
           <LiveDot status={loading ? 'stale' : 'live'} label />
         </div>
 
-        {data && (
-          <>
-            {/* Big score display */}
-            <div className="bg-bg-panel border border-border-dim rounded-lg p-6 text-center">
-              <p className="text-[10px] text-text-muted font-mono mb-2">COMPOSITE INTELLIGENCE SCORE</p>
-              <div className="flex items-center justify-center gap-6">
-                <div>
-                  <p className={`text-6xl font-mono font-bold ${scoreColor(data.composite)}`}>
-                    {data.composite.toFixed(1)}
-                  </p>
-                  <p className={`text-sm font-mono font-bold mt-1 ${
-                    data.direction === 'bullish' ? 'text-data-bull' : data.direction === 'bearish' ? 'text-data-bear' : 'text-text-muted'
-                  }`}>
-                    {data.direction.toUpperCase()}
-                  </p>
-                </div>
-                <div className="text-left space-y-2">
-                  <div>
-                    <p className="text-[10px] text-text-muted font-mono">CONFIDENCE</p>
-                    <p className="text-lg font-mono font-bold">{data.confidence}%</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-text-muted font-mono">SIGNALS</p>
-                    <p className="text-sm font-mono">
-                      <span className="text-data-bull">{data.bullishSignals} bullish</span>
-                      {' / '}
-                      <span className="text-data-bear">{data.bearishSignals} bearish</span>
-                    </p>
-                  </div>
-                </div>
-              </div>
+        {/* Main Score */}
+        <div className="bg-bg-panel border border-border-dim rounded-lg p-6">
+          <div className="flex items-center justify-center gap-8">
+            <div className="relative">
+              <ScoreGauge score={data.overall} label="OVERALL" size={160} />
             </div>
+            <div className="text-center">
+              <p className="text-6xl font-mono font-bold" style={{ color: gradeColor }}>{data.grade}</p>
+              <p className="text-sm font-mono mt-1" style={{ color: regimeColor }}>
+                {data.regime.toUpperCase()} REGIME
+              </p>
+            </div>
+          </div>
+        </div>
 
-            {/* Module breakdown */}
-            <Panel title="Module Breakdown" subtitle={`${data.modules.length} modules contributing`}>
-              <div className="space-y-2 p-3">
-                {data.modules.map((mod, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="w-32 text-xs font-mono text-text-dim truncate">{mod.module}</div>
-                    <div className="flex-1 h-2 bg-bg-raised rounded overflow-hidden">
-                      <div
-                        className={`h-full transition-all duration-500 ${scoreBg(mod.score)}`}
-                        style={{ width: `${mod.score}%` }}
-                      />
-                    </div>
-                    <div className="w-12 text-right text-xs font-mono font-bold">{mod.score.toFixed(0)}</div>
-                    <div className="w-10 text-right text-[10px] font-mono text-text-dim">w:{mod.weight}</div>
-                    <div className="w-48 text-[10px] text-text-dim truncate">{mod.signal}</div>
+        {/* Component Scores */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {([['derivatives', 'Derivatives'], ['macro', 'Macro'], ['sentiment', 'Sentiment'], ['onChain', 'On-Chain']] as const).map(([key, label]) => {
+            const comp = data.components[key]
+            return (
+              <Panel key={key} title={label} subtitle={`Score: ${comp.score}`}>
+                <div className="p-3">
+                  <div className="relative flex justify-center mb-2">
+                    <ScoreGauge score={comp.score} label={label} size={90} />
                   </div>
-                ))}
-              </div>
-            </Panel>
-
-            {/* Score gauge */}
-            <Panel title="Score Gauge" subtitle="Visual 0-100 scale">
-              <div className="p-4">
-                <div className="relative h-8 bg-bg-raised rounded overflow-hidden">
-                  <div className="absolute inset-0 flex">
-                    <div className="flex-1 bg-data-bear/20" />
-                    <div className="flex-1 bg-data-bear/10" />
-                    <div className="flex-1 bg-text-muted/10" />
-                    <div className="flex-1 bg-data-bull/10" />
-                    <div className="flex-1 bg-data-bull/20" />
-                  </div>
-                  <div
-                    className="absolute top-0 bottom-0 w-1 bg-white shadow-lg"
-                    style={{ left: `${data.composite}%`, transform: 'translateX(-50%)' }}
-                  />
-                  <div className="absolute inset-0 flex items-center justify-between px-2 text-[9px] font-mono text-text-dim">
-                    <span>0 BEARISH</span>
-                    <span>25</span>
-                    <span>50 NEUTRAL</span>
-                    <span>75</span>
-                    <span>100 BULLISH</span>
+                  <div className="space-y-1 mt-2">
+                    {comp.signals.length === 0 ? (
+                      <p className="text-[10px] text-text-dim">No signals detected</p>
+                    ) : (
+                      comp.signals.map((s, i) => (
+                        <p key={i} className="text-[10px] text-text-dim">{s}</p>
+                      ))
+                    )}
                   </div>
                 </div>
+              </Panel>
+            )
+          })}
+        </div>
+
+        {/* Composite Signals */}
+        <Panel title="Composite Signals" subtitle={`${data.compositeSignals.length} cross-module signals`}>
+          <div className="p-4 space-y-4">
+            {data.compositeSignals.map(signal => (
+              <div key={signal.id} className="bg-bg-elevated rounded-lg p-4 border border-border-dim/30">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-mono font-bold">{signal.name}</h3>
+                    <DirectionBadge direction={signal.direction} />
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs font-mono text-text-muted">Strength: {signal.strength}%</p>
+                  </div>
+                </div>
+                <p className="text-[10px] text-text-dim mb-3">{signal.description}</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {signal.components.map((c, i) => (
+                    <div key={i} className="bg-bg-panel rounded p-2 border border-border-dim/20">
+                      <p className="text-[9px] text-text-muted font-mono">{c.module} / {c.metric}</p>
+                      <p className="text-xs font-mono font-bold">{typeof c.value === 'number' ? c.value.toFixed(2) : c.value}</p>
+                      <p className={`text-[9px] font-mono ${c.contribution > 0 ? 'text-data-bull' : c.contribution < 0 ? 'text-data-bear' : 'text-text-dim'}`}>
+                        {c.contribution > 0 ? '+' : ''}{c.contribution.toFixed(0)} contribution
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </Panel>
-          </>
-        )}
+            ))}
+          </div>
+        </Panel>
+
+        {/* Score Methodology */}
+        <Panel title="Methodology" subtitle="How the intelligence score is computed">
+          <div className="p-4 text-xs text-text-dim space-y-2">
+            <p><strong className="text-text-primary">Overall Score:</strong> Weighted average of 4 components (each 25%): Derivatives, Macro, Sentiment, On-Chain.</p>
+            <p><strong className="text-text-primary">Derivatives:</strong> Funding rates, open interest, long/short ratios from Binance/Bybit/OKX.</p>
+            <p><strong className="text-text-primary">Macro:</strong> ETF flows (BTC/ETH spot ETFs), Coinbase/Korea premiums, futures basis.</p>
+            <p><strong className="text-text-primary">Sentiment:</strong> Fear &amp; Greed Index, Google Trends proxy, Reddit velocity, narrative rotation.</p>
+            <p><strong className="text-text-primary">On-Chain:</strong> ETH staking queue, miner hash rate, DeFi credit stress, whale activity.</p>
+            <p><strong className="text-text-primary">Composite Signals:</strong> Cross-module rules that combine multiple data points into actionable signals.</p>
+          </div>
+        </Panel>
       </div>
     </NexusLayout>
   )

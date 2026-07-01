@@ -9,7 +9,7 @@ import {
   TrendingUp, BarChart3, Activity, Shield, Radio, Eye,
   Menu, X, Target, DollarSign, Package, Calendar,
   Cloud, GitCompare, PieChart, Users, ArrowUpDown,
-  Newspaper,
+  Newspaper, Gauge,
 } from 'lucide-react'
 import { LiveDot } from '../primitives/LiveDot'
 import { CommandBar } from './CommandBar'
@@ -35,6 +35,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Alpha Feed',    href: '/alpha',          icon: Zap },
       { label: 'Watchlist',     href: '/watchlist',      icon: Eye },
       { label: 'Alerts',        href: '/alerts',         icon: Bell },
+      { label: 'Intelligence Score', href: '/intelligence-score', icon: Gauge },
     ],
   },
   {

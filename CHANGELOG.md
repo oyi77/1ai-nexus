@@ -2,6 +2,34 @@
 
 All notable changes to the NEXUS finance intelligence platform are documented in this file.
 
+## v1.5.0 — Intelligence Expansion: 14 New Modules + Unified Score
+
+### New Features (8 PRs, 14 modules)
+
+- **Derivatives Intelligence** — Funding rates, open interest, long/short ratios from Binance/Bybit/OKX. Liquidation feed from Binance allForceOrders.
+- **News Intelligence** — GDELT Project news (25 articles), SEC EDGAR 8-K filings, Binance system status, entity extraction, relevance/severity scoring.
+- **Sentiment Intelligence** — Fear & Greed (alternative.me), Google Trends proxy (CoinGecko trending), Reddit velocity (r/CryptoCurrency).
+- **Token Unlock Calendar** — 18 major token unlock events for 2026 with urgency color coding (red <=7d, amber <=30d).
+- **ETF Flow Intelligence** — 16 spot BTC/ETH ETF issuers, daily net flow aggregation, cumulative tracking.
+- **Premium Monitor** — Coinbase Premium (CB vs Binance), Korea Premium (Upbit vs Binance + FX), Futures Basis (perp vs spot).
+- **On-Chain Intelligence** — Bitcoin mempool congestion (mempool.space), bridge volume from DeFiLlama, ETH staking queue from beaconcha.in.
+- **Risk Intelligence** — DeFi credit stress from DeFiLlama yields, Bitcoin miner hash rate from mempool.space, narrative rotation from CoinGecko categories.
+- **Composite Signal Engine** — Cross-module signal rules combining ETF flows, premiums, derivatives, sentiment into actionable signals.
+- **Unified Intelligence Score** — 0-100 score with A+/A/B+/B/C+/C/D/F grade, regime detection (bullish/bearish/neutral), component breakdown.
+
+### Infrastructure
+
+- **Prisma Persistence** — All 14 new modules persist snapshots to PostgreSQL for backtesting. 12 new Prisma models added.
+- **Backtest Engine** — Historical signal accuracy replay using persisted snapshots vs actual BTC price outcomes.
+- **API Routes** — `/api/v1/derivatives-intel`, `/api/v1/news-intel`, `/api/v1/unlocks`, `/api/v1/etf-flows`, `/api/v1/onchain-intel`, `/api/v1/risk-intel`, `/api/v1/intelligence-score`, `/api/v1/composite-alerts`.
+- **Pages** — `/derivatives-intel`, `/news-intel`, `/unlocks`, `/etf-flows`, `/onchain-intel`, `/risk-intel`, `/intelligence-score`.
+- **Entity Database** — 21,342 entities, 20,787 wallets across 10 chains (ethereum, bsc, polygon, avalanche, arbitrum, bitcoin, base, solana, optimism, fantom).
+
+### Changed
+
+- **Sidebar** — Expanded to 8 sections: Overview, Markets, On-Chain, Analysis, Macro & News, DeFi, Analytics, Tools.
+- **Cross-Asset Correlation** — Real Pearson r from 30-day daily returns (BTC/ETH/SOL/S&P 500/Gold/FGI).
+
 ## v1.4.0 — Real Options Chain + Alert Pipeline + TradFi Route Cutover
 
 ### New Features

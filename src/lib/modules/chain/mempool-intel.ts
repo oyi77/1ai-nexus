@@ -92,3 +92,26 @@ export async function fetchMempoolEvents(): Promise<MempoolEvent[]> {
     ...(eth.status === 'fulfilled' ? eth.value : []),
   ].sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime())
 }
+
+import { prisma } from '@/lib/db'
+
+export async function persistMempoolEvents(events: MempoolEvent[]): Promise<number> {
+  let count = 0
+  for (const e of events) {
+    try {
+      await prisma.mempoolEvent.create({
+        data: {
+          chain: e.chain,
+          type: e.type,
+          asset: e.asset,
+          estUsd: e.estUsd,
+          detectedAt: new Date(e.detectedAt),
+          confirmedAt: e.confirmedAt ? new Date(e.confirmedAt) : null,
+          metadata: e.metadata ? JSON.parse(JSON.stringify(e.metadata)) : undefined,
+        },
+      })
+      count++
+    } catch { /* skip duplicates */ }
+  }
+  return count
+}

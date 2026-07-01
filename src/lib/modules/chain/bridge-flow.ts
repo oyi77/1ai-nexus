@@ -65,3 +65,24 @@ export async function fetchBridgeStats() {
     return { bridges, totalVolume24h }
   } catch { return { bridges: [], totalVolume24h: 0 } }
 }
+
+import { prisma } from '@/lib/db'
+
+export async function persistBridgeFlows(events: BridgeFlowEvent[]): Promise<number> {
+  let count = 0
+  for (const e of events) {
+    try {
+      await prisma.bridgeFlowEvent.create({
+        data: {
+          sourceChain: e.sourceChain,
+          destChain: e.destChain,
+          asset: e.asset,
+          amountUsd: e.amountUsd,
+          timestamp: new Date(e.timestamp),
+        },
+      })
+      count++
+    } catch { /* skip */ }
+  }
+  return count
+}

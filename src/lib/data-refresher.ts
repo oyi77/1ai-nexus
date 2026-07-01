@@ -153,7 +153,7 @@ async function refreshScore() {
   try {
     const score = await computeIntelligenceScore()
     await cacheSet('score:data', score, 600)
-    console.log(`[refresher] score: ${score.composite}/100 (${score.direction}), ${score.confidence}% confidence`)
+    console.log(`[refresher] score: ${score.overall}/100 (${score.grade}), regime: ${score.regime}`)
   } catch (e) { console.error('[refresher] score failed:', (e as Error).message) }
 }
 

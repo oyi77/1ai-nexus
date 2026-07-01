@@ -48,7 +48,10 @@ graph TB
         Etherscan["Etherscan<br/>Tx History"]
         YahooFinance["Yahoo Finance<br/>Equities, Indices, Commodities"]
         Deribit["Deribit<br/>Options Chain, IV, Greeks"]
-    end
+        Mempool["mempool.space<br/>BTC Mempool, Hash Rate"]
+        Beaconchain["beaconcha.in<br/>ETH Staking Queue"]
+        GDELT["GDELT Project<br/>Global News"]
+        AlternativeMe["alternative.me<br/>Fear & Greed Index"]
 
     CFTunnel --> NextJS
     CFTunnel --> WSServer
@@ -79,7 +82,11 @@ graph TB
     NextJS --> Blockstream
     NextJS --> Reservoir
     NextJS --> RSSFeeds
-    NextJS --> FRED
+    NextJS --> Deribit
+    NextJS --> Mempool
+    NextJS --> Beaconchain
+    NextJS --> GDELT
+    NextJS --> AlternativeMe
     NextJS --> ExchangeRates
     NextJS --> YahooFinance
     NextJS --> Deribit
@@ -198,7 +205,7 @@ Error responses:
 }
 ```
 
-## External Integrations (17 Data Sources)
+## External Integrations (21+ Data Sources)
 
 ### Always Free (No API Key)
 
@@ -216,7 +223,12 @@ Error responses:
 | RSS Feeds | News | 30+ curated crypto news feeds |
 | FRED | Macro | GDP, CPI, interest rates, employment, yield curve |
 | Exchange Rates | Forex | Major forex pairs (EUR/USD, GBP/USD, etc.) |
-
+| mempool.space | Bitcoin | Mempool congestion, hash rate, block data |
+| beaconcha.in | Ethereum | Staking queue, validator data |
+| GDELT | News | Global news articles (25 per fetch) |
+| alternative.me | Sentiment | Fear & Greed Index |
+| Binance | Derivatives | Funding rates, OI, long/short, liquidations |
+| SEC EDGAR | Filings | 8-K filings, institutional holdings |
 ### Optional API Keys (Free Tiers)
 
 | Source | Category | Free Tier | Use Case |
@@ -224,12 +236,7 @@ Error responses:
 | Alchemy | RPC | 30M CU/month | Token balances, transfers, NFT data, enhanced RPC |
 | Helius | Solana | 100K credits/day | Enriched Solana transactions, DAS API, webhooks |
 | Etherscan | Explorer | 5 calls/sec | Transaction history, gas prices, contract data |
-| CryptoCompare | Market | Free tier | News articles, market data |
-| LunarCrush | Social | Free tier | Social sentiment, Galaxy Score, Alt Rank |
-
-## Database Schema
-
-14 Prisma models across the intelligence stack:
+26 Prisma models across the intelligence stack:
 
 | Model | Purpose |
 |-------|---------|
@@ -246,6 +253,20 @@ Error responses:
 | `NFTCollection` | NFT collection floor price, volume, and wash trade score |
 | `User` | Authentication and API key management |
 | `IndexerCheckpoint` | Blockchain sync state per chain (resumable) |
+| `DerivativesSnapshot` | Funding rates, OI, L/S ratios per exchange/symbol |
+| `LiquidationEvent` | Forced liquidation events from exchanges |
+| `SentimentSnapshot` | Fear & Greed, Reddit velocity, Google Trends |
+| `NewsArticle` | GDELT news, SEC filings, exchange status |
+| `UnlockEvent` | Token unlock/vesting schedule events |
+| `ETFFlowSnapshot` | Spot BTC/ETH ETF daily net flows |
+| `PremiumSnapshot` | Coinbase/Korea/futures basis premiums |
+| `MempoolEvent` | Bitcoin/Ethereum mempool congestion events |
+| `BridgeFlowEvent` | Cross-chain bridge volume events |
+| `StakingFlowSnapshot` | ETH staking entry/exit queue snapshots |
+| `CreditRiskSnapshot` | DeFi credit stress (unsustainable APY protocols) |
+| `MinerFlowSnapshot` | Bitcoin miner hash rate and behavior |
+| `SectorFlowSnapshot` | Narrative/sector rotation from CoinGecko categories |
+| `CorrelationSnapshot` | Cross-asset Pearson r correlation matrix |
 
 ## Project Structure
 

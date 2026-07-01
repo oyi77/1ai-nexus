@@ -5,7 +5,7 @@
 
 import { NextRequest } from "next/server";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
-import { fetchDerivativesSnapshot, fetchRecentLiquidations } from "@/lib/modules/derived/derivatives-intel";
+import { fetchDerivativesSnapshot, fetchRecentLiquidations, persistDerivativesSnapshot, persistLiquidations } from "@/lib/modules/derived/derivatives-intel";
 import { cacheGet } from "@/lib/data-refresher";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +19,10 @@ export async function GET(request: NextRequest) {
 
     if (!snapshots) snapshots = await fetchDerivativesSnapshot()
     if (!liquidations) liquidations = await fetchRecentLiquidations()
+
+    // Persist to DB for backtesting (fire-and-forget)
+    if (snapshots.length > 0) persistDerivativesSnapshot(snapshots).catch(() => {})
+    if (liquidations.length > 0) persistLiquidations(liquidations).catch(() => {})
 
     const data: Record<string, unknown> = {}
     if (action === "snapshot" || action === "all") {
