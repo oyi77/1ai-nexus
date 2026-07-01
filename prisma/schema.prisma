@@ -604,3 +604,55 @@ model DevActivitySnapshot {
   @@index([ecosystem, timestamp(sort: Desc)])
   @@index([timestamp(sort: Desc)])
 }
+
+model AttentionSnapshot {
+  id        String   @id @default(cuid())
+  source    String   // github, google_trends, composite
+  metric    String   // stars, forks, commits, search_index
+  repo      String?  // github repo name
+  value     Float
+  timestamp DateTime @default(now())
+
+  @@index([source, metric, timestamp(sort: Desc)])
+}
+
+model StablecoinSnapshot {
+  id        String   @id @default(cuid())
+  coin      String
+  marketCap Float
+  dominance Float?
+  change24h Float?
+  timestamp DateTime @default(now())
+
+  @@index([coin, timestamp(sort: Desc)])
+}
+model CycleIndicatorSnapshot {
+  id        String   @id @default(cuid())
+  indicator String   // mvrv, nupl, ssr, dominance
+  value     Float
+  zone      String   // euphoria, bull, neutral, accumulation, capitulation
+  timestamp DateTime @default(now())
+
+  @@index([indicator, timestamp(sort: Desc)])
+}
+model InfraSignalSnapshot {
+  id        String   @id @default(cuid())
+  metric    String   // lightning_capacity, lightning_nodes, mempool_congestion, mempool_fee, hashrate, adoption_composite
+  value     Float
+  unit      String   // BTC, nodes, txs, sat/vB, EH/s, score
+  metadata  Json?
+  timestamp DateTime @default(now())
+
+  @@index([metric, timestamp(sort: Desc)])
+}
+
+model DerivativesIntelSnapshot {
+  id        String   @id @default(cuid())
+  metric    String   // max_pain, term_structure, funding_heatmap
+  asset     String   // BTC, ETH
+  value     Float
+  metadata  Json?
+  timestamp DateTime @default(now())
+
+  @@index([metric, asset, timestamp(sort: Desc)])
+}

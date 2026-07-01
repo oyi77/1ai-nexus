@@ -18,6 +18,7 @@ import mempoolSpace from './onchain/mempool'
 import l2beat from './onchain/l2beat'
 import blockchair from './onchain/blockchair'
 import covalent from './onchain/covalent'
+import cycleIndicators from './chain/cycle-indicators'
 
 // Market
 import coingecko from './market/coingecko'
@@ -117,9 +118,10 @@ export function registerAllModules() {
   }
 
   registry.registerAll([
-    // On-chain (12)
+    // On-chain (13)
     geckoterminal, defillama, dexscreener, hyperliquid, polymarket,
     blockscoutEth, arkhamRe, birdeyeRe, mempoolSpace, l2beat, blockchair, covalent,
+    cycleIndicators,
     // Market (9)
     coingecko, binance, bybit, coinpaprika, coincap, indodax, sectorsApp, eastmoney, marketFlow,
     fred, fearGreed, frankfurter, exchangeRate, ecbSdw, worldbank,

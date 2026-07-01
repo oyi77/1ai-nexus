@@ -59,6 +59,10 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Token God Mode', href: '/token-god-mode', icon: Target },
       { label: 'Risk Intel',     href: '/risk-intel',     icon: Shield },
       { label: 'Dev Activity',   href: '/dev-activity',   icon: Code },
+      { label: 'Attention Index', href: '/attention-index', icon: Eye },
+      { label: 'Stablecoin Intel', href: '/stablecoin-intel', icon: DollarSign },
+      { label: 'Infra Signals',    href: '/infra-signals',    icon: Radio },
+      { label: 'Cycle Indicators', href: '/cycle-indicators', icon: Activity },
     ],
   },
   {
@@ -73,7 +77,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'MEV Detector',  href: '/mev',            icon: Shield },
       { label: 'Composite Signals', href: '/composite-alerts', icon: Activity },
       { label: 'Intel Score',      href: '/intelligence-score', icon: Activity },
-
+      { label: 'Options Intel',    href: '/options-intel',      icon: Activity },
     ],
   },
   {

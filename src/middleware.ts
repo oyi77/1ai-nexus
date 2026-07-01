@@ -107,6 +107,7 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/historical-financials",
   "/api/v1/cohorts",
   "/api/v1/derivatives-intel",
+  "/api/v1/options-intel",
   "/api/v1/news-intel",
   "/api/v1/unlocks",
   "/api/v1/etf-flows",
@@ -118,6 +119,7 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/bonds",
   "/api/v1/ohlcv",
   "/api/v1/dev-activity",
+  "/api/v1/cycle-indicators",
 ]);
 
 // ─── Rate Limiting (in-memory, per-edge instance) ──────────
