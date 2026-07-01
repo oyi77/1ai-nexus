@@ -590,3 +590,17 @@ model SectorFlowSnapshot {
   @@index([sector, timestamp(sort: Desc)])
   @@index([netSmartMoneyFlowUsd(sort: Desc)])
 }
+
+model DevActivitySnapshot {
+  id          String   @id @default(cuid())
+  package     String
+  ecosystem   String
+  category    String
+  downloads   Int
+  period      String   @default("last-month")
+  timestamp   DateTime @default(now())
+
+  @@index([package, timestamp(sort: Desc)])
+  @@index([ecosystem, timestamp(sort: Desc)])
+  @@index([timestamp(sort: Desc)])
+}
