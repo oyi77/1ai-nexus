@@ -123,6 +123,9 @@ const PUBLIC_API_ROUTES = new Set([
   "/api/v1/infra-signals",
   "/api/v1/dev-activity",
   "/api/v1/attention-index",
+  "/api/v1/equities",
+  "/api/v1/forex",
+  "/api/v1/commodities",
 ]);
 
 // ─── Rate Limiting (in-memory, per-edge instance) ──────────

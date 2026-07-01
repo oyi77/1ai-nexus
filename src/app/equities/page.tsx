@@ -159,24 +159,54 @@ export default function EquitiesPage() {
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
           <h2 className="text-xs font-mono text-accent-cyan mb-3">MAJOR INDICES</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {INDICES.map(sym => {
-              const q = quotes[sym]
-              return (
-                <div key={sym} className="p-2">
-                  <p className="text-[10px] text-text-muted">{q?.name ?? sym}</p>
-                  <p className="text-lg font-mono font-bold">{q?.price?.toFixed(2) ?? '—'}</p>
-                  <p className={`text-xs font-mono ${(q?.change ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
-                    {q?.change != null ? `${q.change >= 0 ? '+' : ''}${q.change.toFixed(2)}%` : '—'}
-                  </p>
+            {loading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="p-2 animate-pulse space-y-1.5">
+                  <div className="h-3 bg-bg-raised rounded w-16" />
+                  <div className="h-6 bg-bg-raised rounded w-24" />
+                  <div className="h-4 bg-bg-raised rounded w-12" />
                 </div>
-              )
-            })}
+              ))
+            ) : (
+              INDICES.map(sym => {
+                const q = quotes[sym]
+                return (
+                  <div key={sym} className="p-2">
+                    <p className="text-[10px] text-text-muted">{q?.name ?? sym}</p>
+                    <p className="text-lg font-mono font-bold">{q?.price?.toFixed(2) ?? '—'}</p>
+                    <p className={`text-xs font-mono ${(q?.change ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                      {q?.change != null ? `${q.change >= 0 ? '+' : ''}${q.change.toFixed(2)}%` : '—'}
+                    </p>
+                  </div>
+                )
+              })
+            )}
           </div>
         </div>
 
         {/* All Stocks by Sector */}
         {loading ? (
-          <div className="text-text-dim text-xs p-8 text-center">Loading Yahoo Finance data for {GLOBAL_STOCKS.length} symbols...</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-bg-panel border border-border-dim rounded-lg p-4 animate-pulse space-y-3">
+                <div className="h-4 bg-bg-raised rounded w-32" />
+                <div className="space-y-2">
+                  <div className="flex justify-between border-b border-border-dim/20 pb-1">
+                    <div className="h-3 bg-bg-raised rounded w-24" />
+                    <div className="h-3 bg-bg-raised rounded w-12" />
+                  </div>
+                  <div className="flex justify-between border-b border-border-dim/20 pb-1">
+                    <div className="h-3 bg-bg-raised rounded w-16" />
+                    <div className="h-3 bg-bg-raised rounded w-10" />
+                  </div>
+                  <div className="flex justify-between">
+                    <div className="h-3 bg-bg-raised rounded w-20" />
+                    <div className="h-3 bg-bg-raised rounded w-8" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           sectors.map(sector => {
             const stocks = GLOBAL_STOCKS.filter(s => s.sector === sector).filter(s => quotes[s.symbol])
