@@ -50,11 +50,17 @@ async function fetchSearchAttention() {
     fetch('https://api.coingecko.com/api/v3/search/trending', {
       signal: AbortSignal.timeout(10_000),
       headers: { Accept: 'application/json' },
-    }).then(r => r.json() as Promise<{ coins: TrendingCoin[] }>),
+    }).then(async r => {
+      if (!r.ok) throw new Error(`CoinGecko trending: ${r.status}`)
+      return r.json() as Promise<{ coins: TrendingCoin[] }>
+    }),
     fetch('https://api.coingecko.com/api/v3/global', {
       signal: AbortSignal.timeout(10_000),
       headers: { Accept: 'application/json' },
-    }).then(r => r.json() as Promise<{ data: { market_cap_change_percentage_24h_usd: number; active_cryptocurrencies: number } }>),
+    }).then(async r => {
+      if (!r.ok) throw new Error(`CoinGecko global: ${r.status}`)
+      return r.json() as Promise<{ data: { market_cap_change_percentage_24h_usd: number; active_cryptocurrencies: number } }>
+    }),
   ])
 
   const trendingCoins = trendingRes.status === 'fulfilled'
@@ -76,8 +82,8 @@ async function fetchSearchAttention() {
     ? trendingCoins.reduce((sum, c) => sum + c.score, 0) / trendingCoins.length
     : 0
 
-  // Map trending scores to 0-100 (CoinGecko scores typically 0-10000)
-  const normalize = (score: number) => Math.min(100, Math.max(0, (score / 100) * 100))
+  // Normalize trending scores to 0-100 scale
+  const normalize = (score: number) => Math.min(100, Math.max(0, score))
 
   return {
     trendingCoins: trendingCoins.slice(0, 10),

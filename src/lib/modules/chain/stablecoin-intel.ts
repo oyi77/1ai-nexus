@@ -106,7 +106,9 @@ export async function fetchStablecoinIntel(): Promise<StablecoinIntelResult> {
 
   // Supply change: sum individual weighted changes
   const supplyChange24h = coins.reduce((s, c) => {
-    const prev = c.marketCap / (1 + c.change24h / 100)
+    const denom = 1 + c.change24h / 100
+    if (denom === 0 || !isFinite(denom)) return s
+    const prev = c.marketCap / denom
     return s + (c.marketCap - prev)
   }, 0)
 

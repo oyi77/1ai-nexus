@@ -42,7 +42,7 @@ interface ApiResponse {
 const COIN_COLORS: Record<string, string> = {
   USDT: '#26a17b',
   USDC: '#2775ca',
-  DAIA: '#f5ac37',
+  DAI: '#f5ac37',
   FDUSD: '#3b82f6',
   TUSD: '#00bfff',
 }

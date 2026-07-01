@@ -181,7 +181,7 @@ export async function getAttentionHistory(
   if (repo) where.repo = repo
 
   return prisma.attentionSnapshot.findMany({
-    where: where as never,
+    where: { source, metric, timestamp: { gte: since }, ...(repo ? { repo } : {}) },
     orderBy: { timestamp: 'asc' },
     select: { value: true, timestamp: true, repo: true },
   })
