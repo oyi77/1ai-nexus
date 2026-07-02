@@ -3,20 +3,25 @@
 // Fuses multiple signals into a single composite score per asset
 // ─────────────────────────────────────────────────────────────
 
+
 import type { NormalizedSignal, SignalTier, MarketVertical } from '@/lib/modules/market/types'
 import { DEFAULT_TIER_WEIGHTS } from '@/lib/modules/market/types'
-import { getEnabledProviders, getProviderConfig } from '@/lib/config/market-sources'
+import { getEnabledProviders } from '@/lib/config/market-sources'
 import { binanceFundingProvider } from '@/lib/modules/market/provider/binance-funding'
+import { binanceOIProvider } from '@/lib/modules/market/provider/binance-oi'
+import { binanceLiquidationsProvider } from '@/lib/modules/market/provider/binance-liquidations'
+import { binanceLsRatioProvider } from '@/lib/modules/market/provider/binance-ls-ratio'
 import { deribitOptionsProvider } from '@/lib/modules/market/provider/deribit-options'
+import { alternativeMeProvider } from '@/lib/modules/market/provider/alternative-me'
 
 // Provider registry
 const PROVIDERS: Record<string, { fetch: (symbol: string, market: MarketVertical) => Promise<NormalizedSignal | null> }> = {
   'binance-funding': { fetch: (s, m) => binanceFundingProvider.fetchSignal(s, m) },
+  'binance-oi': { fetch: (s, m) => binanceOIProvider.fetchSignal(s, m) },
+  'binance-liquidations': { fetch: (s, m) => binanceLiquidationsProvider.fetchSignal(s, m) },
+  'binance-ls-ratio': { fetch: (s, m) => binanceLsRatioProvider.fetchSignal(s, m) },
   'deribit-options': { fetch: (s, m) => deribitOptionsProvider.fetchSignal(s, m) },
-  // Add more as they're created:
-  // 'binance-oi': { fetch: (s, m) => binanceOiProvider.fetchSignal(s, m) },
-  // 'binance-liquidations': { fetch: (s, m) => binanceLiquidationsProvider.fetchSignal(s, m) },
-  // 'binance-ls-ratio': { fetch: (s, m) => binanceLsRatioProvider.fetchSignal(s, m) },
+  'alternative-me': { fetch: (s, m) => alternativeMeProvider.fetchSignal(s, m) },
 }
 
 export interface TierScore {
