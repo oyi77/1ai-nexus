@@ -37,7 +37,7 @@ const features = [
 
 const stats = [
   { value: '30+', label: 'Active Signals' },
-  { value: '21+', label: 'Data Sources' },
+  { value: '30+', label: 'Data Sources' },
   { value: '24/7', label: 'Monitoring' },
   { value: '<1s', label: 'Latency' },
 ]
@@ -164,36 +164,49 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 py-16">
           <div className="text-center mb-12">
             <h2 className="text-2xl font-bold font-mono text-text-primary mb-4">
-              21+ Data Sources
+              30+ Data Sources
             </h2>
             <p className="text-text-secondary font-mono">
               Cross-correlated from the best free and premium data providers
             </p>
           </div>
 
-          <div className="grid grid-cols-4 md:grid-cols-7 gap-4">
+          <div className="grid grid-cols-4 md:grid-cols-6 gap-4">
             {[
-              { name: 'Binance', cat: 'Derivatives' },
+              // Exchanges (Real-time WebSocket)
+              { name: 'Binance', cat: 'Exchange' },
+              { name: 'OKX', cat: 'Exchange' },
+              { name: 'Bybit', cat: 'Exchange' },
+              { name: 'Bitfinex', cat: 'Exchange' },
+              { name: 'Kraken', cat: 'Exchange' },
+              { name: 'Gate.io', cat: 'Exchange' },
+              { name: 'Indodax', cat: 'Exchange' },
+              // Market Data
               { name: 'CoinGecko', cat: 'Market' },
+              { name: 'CoinPaprika', cat: 'Market' },
+              { name: 'Yahoo Finance', cat: 'Equities' },
+              { name: 'ExchangeRate', cat: 'Forex' },
+              // Blockchain
               { name: 'DeFiLlama', cat: 'DeFi' },
-              { name: 'FRED', cat: 'Macro' },
               { name: 'DexScreener', cat: 'DEX' },
               { name: 'GeckoTerminal', cat: 'DEX' },
-              { name: 'CoinPaprika', cat: 'Market' },
               { name: 'Blockstream', cat: 'Bitcoin' },
-              { name: 'Polymarket', cat: 'Predictions' },
-              { name: 'Reservoir', cat: 'NFT' },
-              { name: 'RSS Feeds', cat: 'News' },
-              { name: 'GDELT', cat: 'News' },
-              { name: 'SEC EDGAR', cat: 'Filings' },
+              { name: 'Mempool', cat: 'Bitcoin' },
+              { name: 'Beaconcha.in', cat: 'Ethereum' },
               { name: 'Alchemy', cat: 'RPC' },
               { name: 'Helius', cat: 'Solana' },
               { name: 'Etherscan', cat: 'Explorer' },
-              { name: 'ExchangeRate', cat: 'Forex' },
-              { name: 'Yahoo Finance', cat: 'Equities' },
+              // Analytics
               { name: 'Deribit', cat: 'Options' },
-              { name: 'Mempool', cat: 'Bitcoin' },
-              { name: 'Beaconcha.in', cat: 'Ethereum' },
+              { name: 'Polymarket', cat: 'Predictions' },
+              { name: 'Reservoir', cat: 'NFT' },
+              // Macro
+              { name: 'FRED', cat: 'Macro' },
+              { name: 'SEC EDGAR', cat: 'Filings' },
+              // News/Sentiment
+              { name: 'RSS Feeds', cat: 'News' },
+              { name: 'GDELT', cat: 'News' },
+              { name: 'Fear & Greed', cat: 'Sentiment' },
             ].map((src) => (
               <div key={src.name} className="text-center p-3 bg-bg-base rounded-lg border border-border-dim">
                 <p className="text-xs font-mono font-bold text-text-primary">{src.name}</p>
