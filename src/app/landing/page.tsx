@@ -108,7 +108,7 @@ export default function LandingPage() {
             className="w-full"
             poster="/promo-hero.jpg"
           >
-            <source src="/promo-video.mp4" type="video/mp4" />
+            <source src="/promo-video-remotion.mp4" type="video/mp4" />
           </video>
           <div className="absolute inset-0 bg-gradient-to-t from-bg-base/80 via-transparent to-transparent" />
           <div className="absolute bottom-6 left-6 right-6 text-center">
