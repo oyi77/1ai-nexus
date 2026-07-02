@@ -3,7 +3,7 @@
 // Global account ratio, normalized to sentiment extremes
 // ─────────────────────────────────────────────────────────────
 
-import type { MarketDataProvider, NormalizedSignal, MarketVertical } from '../../types'
+import type { MarketDataProvider, NormalizedSignal, MarketVertical } from '../../../types'
 import { getCached } from '@/lib/api/server-cache'
 import { getProviderConfig, isProviderEnabledForVertical } from '@/lib/config/market-sources'
 

@@ -3,7 +3,7 @@
 // Current rate, delta over 8h/24h, cross-exchange spread
 // ─────────────────────────────────────────────────────────────
 
-import type { MarketDataProvider, NormalizedSignal, MarketVertical } from '../../types'
+import type { MarketDataProvider, NormalizedSignal, MarketVertical } from '../../../types'
 import { getCached } from '@/lib/api/server-cache'
 import { getProviderConfig, isProviderEnabledForVertical } from '@/lib/config/market-sources'
 

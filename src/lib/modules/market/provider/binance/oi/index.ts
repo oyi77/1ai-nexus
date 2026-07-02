@@ -3,7 +3,7 @@
 // OI level, % change (1h/4h/24h), OI-to-volume ratio
 // ─────────────────────────────────────────────────────────────
 
-import type { MarketDataProvider, NormalizedSignal, MarketVertical } from '../../types'
+import type { MarketDataProvider, NormalizedSignal, MarketVertical } from '../../../types'
 import { getCached } from '@/lib/api/server-cache'
 import { getProviderConfig, isProviderEnabledForVertical } from '@/lib/config/market-sources'
 

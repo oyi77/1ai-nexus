@@ -3,7 +3,7 @@
 // Rolling liquidation volume by side, cascade detection
 // ─────────────────────────────────────────────────────────────
 
-import type { MarketDataProvider, NormalizedSignal, MarketVertical } from '../../types'
+import type { MarketDataProvider, NormalizedSignal, MarketVertical } from '../../../types'
 import { getCached } from '@/lib/api/server-cache'
 import { getProviderConfig, isProviderEnabledForVertical } from '@/lib/config/market-sources'
 

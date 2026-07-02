@@ -3,7 +3,7 @@
 // Bid/ask volume imbalance ratio — measures buying vs selling pressure
 // ─────────────────────────────────────────────────────────────
 
-import type { MarketDataProvider, NormalizedSignal, MarketVertical } from '../../types'
+import type { MarketDataProvider, NormalizedSignal, MarketVertical } from '../../../types'
 import { getCached } from '@/lib/api/server-cache'
 import { getProviderConfig, isProviderEnabledForVertical } from '@/lib/config/market-sources'
 
