@@ -51,3 +51,4 @@ indexer/node_modules/
 ws-server/node_modules/
 dump.rdb
 __pycache__/
+videos/
