@@ -37,8 +37,8 @@ const features = [
 
 const stats = [
   { value: '30+', label: 'Active Signals' },
-  { value: '30+', label: 'Data Sources' },
-  { value: '24/7', label: 'Monitoring' },
+  { value: '12', label: 'Score Providers' },
+  { value: '56%', label: 'Backtest Win Rate' },
   { value: '<1s', label: 'Latency' },
 ]
 

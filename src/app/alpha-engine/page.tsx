@@ -100,12 +100,14 @@ function AlphaEnginePageInner() {
   const [predictions, setPredictions] = useState<{ open: Prediction[]; closed: Prediction[]; accuracy: Accuracy }>({ open: [], closed: [], accuracy: { total: 0, wins: 0, losses: 0, winRate: 0, avgPnl: 0 } })
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
   const [tab, setTab] = useState<'signals' | 'history' | 'predictions' | 'accuracy'>('signals')
+  const [marketScore, setMarketScore] = useState<{compositeScore: number; direction: string; confidence: number; topSignals: string[]} | null>(null)
   const fetchData = useCallback(async () => {
     try {
-      const [alphaRes, predRes, historyRes] = await Promise.allSettled([
+      const [alphaRes, predRes, historyRes, scoreRes] = await Promise.allSettled([
         fetch('/api/v1/alpha-engine').then(r => r.json()),
         fetch('/api/v1/paper-trading').then(r => r.json()),
         fetch('/api/v1/signals/history?limit=50').then(r => r.json()),
+        fetch('/api/v1/market-score?symbol=BTC').then(r => r.json()),
       ])
 
       if (alphaRes.status === 'fulfilled' && alphaRes.value?.data) {
@@ -117,6 +119,9 @@ function AlphaEnginePageInner() {
       if (historyRes.status === 'fulfilled' && historyRes.value?.data) {
         setHistory(historyRes.value.data.signals ?? [])
         setSignalStats(historyRes.value.data.stats ?? { active: 0, completed: 0, wins: 0, losses: 0, winRate: 0, totalPnl: 0, avgPnl: 0 })
+      }
+      if (scoreRes.status === 'fulfilled' && scoreRes.value?.data?.score) {
+        setMarketScore(scoreRes.value.data.score)
       }
       setStatus('live')
     } catch {
@@ -158,6 +163,38 @@ function AlphaEnginePageInner() {
           <KPI label="W / L" value={`${signalStats.wins} / ${signalStats.losses}`} />
           <KPI label="Avg PnL" value={`${signalStats.avgPnl > 0 ? '+' : ''}${signalStats.avgPnl.toFixed(2)}%`} color={signalStats.avgPnl >= 0 ? 'text-data-bull' : 'text-data-bear'} />
         </div>
+
+        {/* Market-Moving Score */}
+        {marketScore && (
+          <div className="bg-bg-panel border border-border-dim rounded-lg p-3 flex items-center gap-6">
+            <div>
+              <span className="text-[10px] font-mono text-text-muted">MARKET SCORE</span>
+              <span className={`ml-2 text-[20px] font-mono font-bold ${
+                marketScore.compositeScore >= 60 ? 'text-data-bull' : marketScore.compositeScore <= 40 ? 'text-data-bear' : 'text-data-orange'
+              }`}>
+                {marketScore.compositeScore}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-mono text-text-muted">DIRECTION</span>
+              <span className={`ml-2 text-[12px] font-mono font-bold ${
+                marketScore.direction === 'bullish' ? 'text-data-bull' : marketScore.direction === 'bearish' ? 'text-data-bear' : 'text-text-muted'
+              }`}>
+                {marketScore.direction.toUpperCase()}
+              </span>
+            </div>
+            <div>
+              <span className="text-[10px] font-mono text-text-muted">CONF</span>
+              <span className="ml-2 text-[12px] font-mono text-text-primary">{(marketScore.confidence * 100).toFixed(0)}%</span>
+            </div>
+            <div className="flex-1">
+              <span className="text-[10px] font-mono text-text-muted">TOP SIGNALS</span>
+              <span className="ml-2 text-[10px] font-mono text-text-secondary">
+                {marketScore.topSignals.slice(0, 2).join(' · ')}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex items-center gap-1">
