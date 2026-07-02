@@ -19,6 +19,7 @@ const PROVIDER_CONFIGS: Record<string, Partial<ProviderConfig>> = {
   'cryptoquant-flow': { ttlMs: 900_000 },      // 15 min
   'stablecoin-flow': { ttlMs: 900_000 },       // 15 min
   'whale-alert': { ttlMs: 60_000 },            // 1 min
+  'coingecko-trending': { ttlMs: 300_000 },    // 5 min
 }
 
 // Which providers are relevant to which verticals
@@ -28,6 +29,7 @@ const VERTICAL_PROVIDERS: Record<MarketVertical, string[]> = {
     'binance-ls-ratio', 'binance-orderbook', 'deribit-options',
     'alternative-me', 'cryptoquant-flow', 'stablecoin-supply',
     'dex-volume', 'whale-transfers', 'fred-calendar',
+    'coingecko-trending',
   ],
   forex: ['fred-calendar'],
   idx_bonds: ['fred-calendar'],

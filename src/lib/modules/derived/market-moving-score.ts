@@ -16,6 +16,7 @@ import { stablecoinSupplyProvider } from '@/lib/modules/market/provider/stableco
 import { dexVolumeProvider } from '@/lib/modules/market/provider/dex-volume'
 import { fredCalendarProvider } from '@/lib/modules/market/provider/fred-calendar'
 import { whaleTransfersProvider } from '@/lib/modules/market/provider/whale-transfers'
+import { coingeckoTrendingProvider } from '@/lib/modules/market/provider/coingecko-trending'
 
 // Provider registry — all implemented providers
 const PROVIDERS: Record<string, { fetch: (symbol: string, market: MarketVertical) => Promise<NormalizedSignal | null> }> = {
@@ -33,6 +34,8 @@ const PROVIDERS: Record<string, { fetch: (symbol: string, market: MarketVertical
   'whale-transfers': { fetch: (s, m) => whaleTransfersProvider.fetchSignal(s, m) },
   // Tier 4: Macro
   'fred-calendar': { fetch: (s, m) => fredCalendarProvider.fetchSignal(s, m) },
+  // Sentiment (free)
+  'coingecko-trending': { fetch: (s, m) => coingeckoTrendingProvider.fetchSignal(s, m) },
 }
 
 export interface TierScore {
