@@ -129,7 +129,7 @@ async function fetchAlphaSignals(): Promise<AlphaSignal[]> {
   const symbols = new Set<string>()
   const now = Date.now()
 
-  // Source 1: Trade Flow
+  // ── Source 1: Trade Flow (aggr.trade style) ──────────────────
   const flow = getFlowData()
   for (const f of flow.flows) {
     const totalVol = f.buyVolume + f.sellVolume
@@ -165,7 +165,7 @@ async function fetchAlphaSignals(): Promise<AlphaSignal[]> {
     }
   }
 
-  // Source 2: Funding Rates (Binance)
+  // ── Source 2: Funding Rates (Binance Futures) ─────────────────
   try {
     const fundingRes = await fetch('https://fapi.binance.com/fapi/v1/premiumIndex', {
       signal: AbortSignal.timeout(10_000),
@@ -205,7 +205,32 @@ async function fetchAlphaSignals(): Promise<AlphaSignal[]> {
     }
   } catch { /* silent */ }
 
-  // Source 3: Fear & Greed (contrarian)
+  // ── Source 3: Open Interest Changes ───────────────────────────
+  try {
+    const oiRes = await fetch('https://fapi.binance.com/fapi/v1/openInterest?symbol=BTCUSDT', {
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (oiRes.ok) {
+      const oi = (await oiRes.json()) as { openInterest: string }
+      const oiValue = parseFloat(oi.openInterest)
+      // High OI + high funding = crowded trade
+      if (oiValue > 100000) { // >100K BTC
+        symbols.add('BTC')
+        signals.push({
+          id: `oi-high-${now}`,
+          symbol: 'BTC',
+          direction: 'neutral',
+          strength: 50,
+          confidence: 45,
+          sources: ['open-interest'],
+          reasoning: `High open interest: ${oiValue.toFixed(0)} BTC — increased volatility likely`,
+          timestamp: now,
+        })
+      }
+    }
+  } catch { /* silent */ }
+
+  // ── Source 4: Fear & Greed (contrarian) ──────────────────────
   try {
     const fgRes = await fetch('https://api.alternative.me/fng/?limit=1', {
       signal: AbortSignal.timeout(10_000),
@@ -242,7 +267,7 @@ async function fetchAlphaSignals(): Promise<AlphaSignal[]> {
     }
   } catch { /* silent */ }
 
-  // Source 4: Whale Alerts
+  // ── Source 5: Whale Alerts ────────────────────────────────────
   try {
     const whaleRes = await fetch('http://localhost:4400/api/v1/whale-alert', {
       signal: AbortSignal.timeout(10_000),
@@ -286,6 +311,140 @@ async function fetchAlphaSignals(): Promise<AlphaSignal[]> {
     }
   } catch { /* silent */ }
 
+  // ── Source 6: Liquidation Data ────────────────────────────────
+  try {
+    const liqRes = await fetch('http://localhost:4400/api/v1/liquidations', {
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (liqRes.ok) {
+      const liqData = (await liqRes.json()) as { data?: { total?: number; longs?: number; shorts?: number } }
+      const total = liqData.data?.total ?? 0
+      const longs = liqData.data?.longs ?? 0
+      const shorts = liqData.data?.shorts ?? 0
+
+      if (total > 100_000_000) { // >$100M liquidations
+        const longRatio = longs / total
+        symbols.add('BTC')
+        signals.push({
+          id: `liq-cascade-${now}`,
+          symbol: 'BTC',
+          direction: longRatio > 0.7 ? 'bullish' : 'bearish', // Contrarian
+          strength: Math.min(75, Math.round(total / 10_000_000)),
+          confidence: 50,
+          sources: ['liquidations'],
+          reasoning: `$${(total / 1e6).toFixed(0)}M liquidations — ${longRatio > 0.7 ? 'longs liquidated, potential bounce' : 'shorts squeezed, momentum up'}`,
+          timestamp: now,
+        })
+      }
+    }
+  } catch { /* silent */ }
+
+  // ── Source 7: Exchange Flows ──────────────────────────────────
+  try {
+    const flowRes = await fetch('http://localhost:4400/api/v1/exchange-flow', {
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (flowRes.ok) {
+      const flowData = (await flowRes.json()) as { data?: { inflow?: number; outflow?: number; net?: number } }
+      const net = flowData.data?.net ?? 0
+
+      if (Math.abs(net) > 10_000_000) { // >$10M net flow
+        symbols.add('BTC')
+        signals.push({
+          id: `exflow-${net > 0 ? 'in' : 'out'}-${now}`,
+          symbol: 'BTC',
+          direction: net > 0 ? 'bearish' : 'bullish', // Inflow to exchange = sell pressure
+          strength: Math.min(70, Math.round(Math.abs(net) / 5_000_000)),
+          confidence: 50,
+          sources: ['exchange-flow'],
+          reasoning: `$${(Math.abs(net) / 1e6).toFixed(0)}M net ${net > 0 ? 'inflow to' : 'outflow from'} exchanges — ${net > 0 ? 'potential sell pressure' : 'accumulation signal'}`,
+          timestamp: now,
+        })
+      }
+    }
+  } catch { /* silent */ }
+
+  // ── Source 8: Gas Tracker (Ethereum) ──────────────────────────
+  try {
+    const gasRes = await fetch('http://localhost:4400/api/v1/gas', {
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (gasRes.ok) {
+      const gasData = (await gasRes.json()) as { data?: { standard?: number; fast?: number } }
+      const gas = gasData.data?.standard ?? 0
+
+      if (gas > 100) { // High gas = network congestion
+        symbols.add('ETH')
+        signals.push({
+          id: `gas-high-${now}`,
+          symbol: 'ETH',
+          direction: 'neutral',
+          strength: 40,
+          confidence: 35,
+          sources: ['gas-tracker'],
+          reasoning: `High gas: ${gas} gwei — network congested, DeFi activity elevated`,
+          timestamp: now,
+        })
+      }
+    }
+  } catch { /* silent */ }
+
+  // ── Source 9: Stablecoin Flows ────────────────────────────────
+  try {
+    const stableRes = await fetch('http://localhost:4400/api/v1/stablecoin-flow', {
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (stableRes.ok) {
+      const stableData = (await stableRes.json()) as { data?: { minted?: number; redeemed?: number } }
+      const minted = stableData.data?.minted ?? 0
+      const redeemed = stableData.data?.redeemed ?? 0
+      const net = minted - redeemed
+
+      if (Math.abs(net) > 50_000_000) { // >$50M net mint/redeem
+        symbols.add('BTC')
+        signals.push({
+          id: `stable-${net > 0 ? 'mint' : 'redeem'}-${now}`,
+          symbol: 'BTC',
+          direction: net > 0 ? 'bullish' : 'bearish', // Minting = buying power
+          strength: Math.min(65, Math.round(Math.abs(net) / 25_000_000)),
+          confidence: 45,
+          sources: ['stablecoin-flow'],
+          reasoning: `$${(Math.abs(net) / 1e6).toFixed(0)}M net ${net > 0 ? 'USDT minted' : 'stablecoins redeemed'} — ${net > 0 ? 'new capital entering' : 'capital leaving'}`,
+          timestamp: now,
+        })
+      }
+    }
+  } catch { /* silent */ }
+
+  // ── Source 10: Derivatives Intel ──────────────────────────────
+  try {
+    const derivRes = await fetch('http://localhost:4400/api/v1/derivatives-intel', {
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (derivRes.ok) {
+      const derivData = (await derivRes.json()) as { data?: { maxPain?: number; currentPrice?: number } }
+      const maxPain = derivData.data?.maxPain ?? 0
+      const currentPrice = derivData.data?.currentPrice ?? 0
+
+      if (maxPain > 0 && currentPrice > 0) {
+        const diff = ((currentPrice - maxPain) / maxPain) * 100
+        if (Math.abs(diff) > 5) {
+          symbols.add('BTC')
+          signals.push({
+            id: `deriv-maxpain-${now}`,
+            symbol: 'BTC',
+            direction: diff > 0 ? 'bearish' : 'bullish', // Price tends toward max pain
+            strength: Math.min(60, Math.round(Math.abs(diff) * 3)),
+            confidence: 40,
+            sources: ['derivatives-intel'],
+            reasoning: `BTC ${diff > 0 ? 'above' : 'below'} max pain ($${maxPain.toLocaleString()}) by ${Math.abs(diff).toFixed(1)}% — likely to gravitate toward max pain`,
+            timestamp: now,
+          })
+        }
+      }
+    }
+  } catch { /* silent */ }
+
   // Fetch current prices for all symbols with signals
   const prices = await fetchCurrentPrices(Array.from(symbols))
 
@@ -320,7 +479,7 @@ async function fetchAlphaSignals(): Promise<AlphaSignal[]> {
   // Sort by strength * confidence
   enriched.sort((a, b) => (b.strength * b.confidence) - (a.strength * a.confidence))
 
-  return enriched.slice(0, 30)
+  return enriched.slice(0, 50)
 }
 
 export async function getAlphaSignals(): Promise<{ signals: AlphaSignal[]; sourceCount: number; timestamp: number }> {
