@@ -325,3 +325,92 @@ export async function getBacktestStats(symbol?: string, periodDays?: number): Pr
   const results = await getBacktestResults(symbol, periodDays, 10000)
   return calculateStats(results)
 }
+
+// Check and update expired signal outcomes (run hourly via cron)
+export async function checkExpiredSignals(): Promise<{ checked: number; updated: number; wins: number; losses: number }> {
+  // Get pending signals older than 24 hours
+  const minAge = new Date(Date.now() - 24 * 60 * 60 * 1000)
+  const pending = await prisma.backtestResult.findMany({
+    where: {
+      outcome: 'pending',
+      backtestDate: { lte: minAge },
+    },
+    take: 100,
+  })
+
+  if (pending.length === 0) return { checked: 0, updated: 0, wins: 0, losses: 0 }
+
+  // Group by symbol for efficient price fetching
+  const bySymbol = new Map<string, typeof pending>()
+  for (const s of pending) {
+    const existing = bySymbol.get(s.symbol) ?? []
+    existing.push(s)
+    bySymbol.set(s.symbol, existing)
+  }
+
+  let wins = 0, losses = 0, updated = 0
+
+  for (const [symbol, signals] of bySymbol) {
+    const earliest = Math.min(...signals.map(s => s.backtestDate.getTime()))
+    const candles = await fetchHistoricalPrices(symbol, earliest, Date.now())
+    if (candles.length === 0) continue
+
+    for (const signal of signals) {
+      const backtestSignal: BacktestSignal = {
+        id: signal.signalId ?? signal.id,
+        symbol: signal.symbol,
+        direction: signal.direction as 'bullish' | 'bearish',
+        entry: signal.entryPrice,
+        tp1: signal.tp1,
+        tp2: signal.tp2,
+        tp3: signal.tp3,
+        sl: signal.sl,
+        timestamp: signal.backtestDate.getTime(),
+        source: signal.source,
+      }
+
+      const { outcome, exitPrice, hitTarget, durationHours } = checkOutcome(candles, backtestSignal)
+
+      // Only update if we have a definitive outcome (win/loss)
+      if (outcome === 'win' || outcome === 'loss') {
+        const pnlPercent = backtestSignal.direction === 'bullish'
+          ? ((exitPrice! - signal.entryPrice) / signal.entryPrice) * 100
+          : ((signal.entryPrice - exitPrice!) / signal.entryPrice) * 100
+
+        await prisma.backtestResult.update({
+          where: { id: signal.id },
+          data: { outcome, exitPrice, pnlPercent, hitTarget, durationHours },
+        })
+
+        if (outcome === 'win') wins++
+        else losses++
+        updated++
+      }
+    }
+  }
+
+  return { checked: pending.length, updated, wins, losses }
+}
+
+// Get pending signals count
+export async function getPendingSignalsCount(): Promise<number> {
+  return prisma.backtestResult.count({ where: { outcome: 'pending' } })
+}
+
+// Get signal outcomes summary
+export async function getSignalOutcomesSummary(): Promise<{
+  total: number
+  pending: number
+  wins: number
+  losses: number
+  expired: number
+}> {
+  const [total, pending, wins, losses, expired] = await Promise.all([
+    prisma.backtestResult.count(),
+    prisma.backtestResult.count({ where: { outcome: 'pending' } }),
+    prisma.backtestResult.count({ where: { outcome: 'win' } }),
+    prisma.backtestResult.count({ where: { outcome: 'loss' } }),
+    prisma.backtestResult.count({ where: { outcome: 'expired' } }),
+  ])
+  return { total, pending, wins, losses, expired }
+}
