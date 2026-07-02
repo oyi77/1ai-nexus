@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
 
+type ValidPeriod = '4h' | '24h' | '7d'
+
 interface ComputedSignal {
   id: string
   symbol: string
@@ -16,6 +18,14 @@ interface ComputedSignal {
   change: number
   signals: string[]
   timestamp: string
+  // Trading levels
+  entry: number | null
+  tp1: number | null
+  tp2: number | null
+  tp3: number | null
+  sl: number | null
+  validPeriod: ValidPeriod
+  expiresAt: number
 }
 
 interface MacroData {
@@ -104,18 +114,41 @@ export default function AiSignalsPage() {
           const direction = bullish >= bearish ? 'LONG' : 'SHORT'
           const confidence = Math.min(95, Math.round(50 + (total * 5)))
 
+          // Calculate trading levels using 52-week range as volatility proxy
+          const range52w = high52w - low52w
+          const atrProxy = range52w * 0.05 // Use 5% of 52-week range as ATR proxy
+          const directionTyped = direction as 'LONG' | 'SHORT'
+
+          const entry = price
+          const tp1 = directionTyped === 'LONG' ? entry + atrProxy * 0.5 : entry - atrProxy * 0.5
+          const tp2 = directionTyped === 'LONG' ? entry + atrProxy * 1.0 : entry - atrProxy * 1.0
+          const tp3 = directionTyped === 'LONG' ? entry + atrProxy * 1.5 : entry - atrProxy * 1.5
+          const sl = directionTyped === 'LONG' ? entry - atrProxy * 0.75 : entry + atrProxy * 0.75
+
+          // Determine valid period based on strength
+          const validPeriod: ValidPeriod = strength >= 80 ? '7d' : strength >= 60 ? '24h' : '4h'
+          const periodMs: Record<ValidPeriod, number> = { '4h': 4 * 3600000, '24h': 86400000, '7d': 604800000 }
+          const expiresAt = Date.now() + periodMs[validPeriod]
+
           computed.push({
             id: q.symbol,
             symbol: q.symbol,
             name: meta.name,
             assetClass: meta.class,
-            direction,
+            direction: directionTyped,
             strength,
             confidence,
             price,
             change,
             signals,
             timestamp: new Date().toISOString(),
+            entry,
+            tp1,
+            tp2,
+            tp3,
+            sl,
+            validPeriod,
+            expiresAt,
           })
         }
 
@@ -277,6 +310,46 @@ export default function AiSignalsPage() {
                     ))}
                   </ul>
                 </div>
+
+                {/* Trading Levels */}
+                {signal.entry && (
+                  <div className="mt-2 pt-2 border-t border-border-dim">
+                    <div className="flex items-center gap-4 text-[11px] font-mono">
+                      <span className="text-text-muted">VALID</span>
+                      <span className={`px-1.5 py-0.5 rounded ${
+                        signal.expiresAt < Date.now() ? 'bg-data-bear/20 text-data-bear' : 'bg-data-bull/20 text-data-bull'
+                      }`}>
+                        {signal.expiresAt < Date.now() ? 'EXPIRED' : signal.validPeriod}
+                      </span>
+                      <span className="text-text-muted">ENTRY</span>
+                      <span className="text-text-primary font-bold">${signal.entry.toFixed(2)}</span>
+                      {signal.tp1 && (
+                        <>
+                          <span className="text-data-bull">TP1</span>
+                          <span className="text-data-bull">${signal.tp1.toFixed(2)}</span>
+                        </>
+                      )}
+                      {signal.tp2 && (
+                        <>
+                          <span className="text-data-bull">TP2</span>
+                          <span className="text-data-bull">${signal.tp2.toFixed(2)}</span>
+                        </>
+                      )}
+                      {signal.tp3 && (
+                        <>
+                          <span className="text-data-bull">TP3</span>
+                          <span className="text-data-bull">${signal.tp3.toFixed(2)}</span>
+                        </>
+                      )}
+                      {signal.sl && (
+                        <>
+                          <span className="text-data-bear">SL</span>
+                          <span className="text-data-bear">${signal.sl.toFixed(2)}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

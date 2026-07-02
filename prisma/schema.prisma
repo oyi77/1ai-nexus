@@ -656,3 +656,27 @@ model DerivativesIntelSnapshot {
 
   @@index([metric, asset, timestamp(sort: Desc)])
 }
+
+model BacktestResult {
+  id            String   @id @default(cuid())
+  symbol        String
+  direction     String
+  entryPrice    Float
+  tp1           Float?
+  tp2           Float?
+  tp3           Float?
+  sl            Float?
+  outcome       String   // win, loss, expired
+  exitPrice     Float?
+  pnlPercent    Float?
+  hitTarget     String?  // tp1, tp2, tp3, sl, none
+  durationHours Float?
+  source        String   // funding-rate, whale-alert, fear-greed, trade-flow
+  signalId      String?
+  backtestDate  DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([symbol, backtestDate(sort: Desc)])
+  @@index([outcome])
+  @@index([source])
+}
