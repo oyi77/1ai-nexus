@@ -18,7 +18,8 @@ import { fetchMempoolEvents } from '@/lib/modules/chain/mempool/intel'
 import { fetchBridgeStats } from '@/lib/modules/chain/bridge/flows'
 import { evaluateCompositeSignals } from '@/lib/modules/derived/composite-signals'
 import { computeIntelligenceScore } from '@/lib/modules/derived/intelligence-score'
-
+import { storeSignal, checkExpiredSignals } from '@/lib/modules/derived/backtest-engine'
+import { getAlphaSignals } from '@/lib/modules/derived/alpha-engine'
 // ─── Redis Cache (cross-worker) ─────────────────────────────
 
 let redis: ReturnType<typeof createRedis> | null = null
@@ -157,11 +158,51 @@ async function refreshScore() {
   } catch (e) { console.error('[refresher] score failed:', (e as Error).message) }
 }
 
+// Store alpha signals to DB for history tracking
+async function refreshSignalStore() {
+  try {
+    const { signals } = await getAlphaSignals()
+    let stored = 0
+    for (const s of signals) {
+      if (!s.entry || !s.sl || s.direction === 'neutral') continue
+      await storeSignal({
+        id: s.id,
+        symbol: s.symbol,
+        direction: s.direction,
+        entry: s.entry,
+        tp1: s.tp1,
+        tp2: s.tp2,
+        tp3: s.tp3,
+        sl: s.sl,
+        timestamp: s.timestamp,
+        source: s.sources[0] ?? 'unknown',
+      })
+      stored++
+    }
+    if (stored > 0) console.log(`[refresher] Stored ${stored} signals for history`)
+  } catch (err) {
+    console.error('[refresher] Signal store error:', (err as Error).message)
+  }
+}
+
+// Check expired signals and calculate PnL
+async function refreshSignalOutcomes() {
+  try {
+    const result = await checkExpiredSignals()
+    if (result.updated > 0) {
+      console.log(`[refresher] Signal outcomes: ${result.checked} checked, ${result.updated} updated (${result.wins}W/${result.losses}L)`)
+    }
+  } catch (err) {
+    console.error('[refresher] Signal outcomes error:', (err as Error).message)
+  }
+}
+
 // ─── Orchestrator ───────────────────────────────────────────
 
 const FAST_INTERVAL = 60 * 1000      // 1 min for time-sensitive data
 const MEDIUM_INTERVAL = 5 * 60 * 1000 // 5 min for moderately fresh data
 const SLOW_INTERVAL = 15 * 60 * 1000  // 15 min for slow-changing data
+const SIGNAL_INTERVAL = 60 * 60 * 1000 // 1 hour for signal storage
 
 let initialized = false
 
@@ -180,6 +221,8 @@ export function startDataRefresher() {
   setTimeout(() => refreshOnchain(), 11_000)
   setTimeout(() => refreshComposite(), 15_000)
   setTimeout(() => refreshScore(), 20_000)
+  setTimeout(() => refreshSignalStore(), 25_000)
+  setTimeout(() => refreshSignalOutcomes(), 30_000)
 
   // Recurring intervals
   setInterval(refreshDerivatives, FAST_INTERVAL)
@@ -190,6 +233,8 @@ export function startDataRefresher() {
   setInterval(refreshOnchain, FAST_INTERVAL)
   setInterval(refreshComposite, MEDIUM_INTERVAL)
   setInterval(refreshScore, MEDIUM_INTERVAL)
+  setInterval(refreshSignalStore, SIGNAL_INTERVAL)      // Store signals hourly
+  setInterval(refreshSignalOutcomes, SIGNAL_INTERVAL)    // Check outcomes hourly
 
-  console.log('[refresher] Scheduled: derivatives(1m), etf(5m), sentiment(5m), news(15m), risk(5m), onchain(1m), composite(5m), score(5m)')
+  console.log('[refresher] Scheduled: derivatives(1m), etf(5m), sentiment(5m), news(15m), risk(5m), onchain(1m), composite(5m), score(5m), signals(1h)')
 }

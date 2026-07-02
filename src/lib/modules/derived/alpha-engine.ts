@@ -486,10 +486,23 @@ async function fetchAlphaSignals(): Promise<AlphaSignal[]> {
     }
   })
 
-  // Sort by strength * confidence
-  enriched.sort((a, b) => (b.strength * b.confidence) - (a.strength * a.confidence))
+  // Deduplicate: keep highest strength per symbol+direction
+  const deduped = new Map<string, AlphaSignal>()
+  for (const s of enriched) {
+    const key = `${s.symbol}-${s.direction}`
+    const existing = deduped.get(key)
+    if (!existing || (s.strength * s.confidence) > (existing.strength * existing.confidence)) {
+      deduped.set(key, s)
+    }
+  }
 
-  return enriched.slice(0, 50)
+  // Filter: only return signals with valid trading levels
+  const valid = Array.from(deduped.values()).filter(s => s.entry && s.sl && s.tp1)
+
+  // Sort by strength * confidence
+  valid.sort((a, b) => (b.strength * b.confidence) - (a.strength * a.confidence))
+
+  return valid.slice(0, 50)
 }
 
 export async function getAlphaSignals(): Promise<{ signals: AlphaSignal[]; sourceCount: number; timestamp: number }> {
