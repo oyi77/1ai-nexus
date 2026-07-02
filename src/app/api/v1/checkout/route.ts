@@ -32,8 +32,9 @@ export async function POST(request: Request) {
       })
     }
 
-    // Dynamic import only when Stripe is configured
-    const { default: Stripe } = await import('stripe')
+    // Stripe must be installed: npm install stripe
+    // Dynamic import to avoid build errors when not installed
+    const Stripe = (await import('stripe')).default
     const stripe = new Stripe(stripeKey)
 
     const session = await stripe.checkout.sessions.create({
