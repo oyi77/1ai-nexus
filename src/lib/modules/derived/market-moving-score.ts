@@ -3,7 +3,6 @@
 // Fuses multiple signals into a single composite score per asset
 // ─────────────────────────────────────────────────────────────
 
-
 import type { NormalizedSignal, SignalTier, MarketVertical } from '@/lib/modules/market/types'
 import { DEFAULT_TIER_WEIGHTS } from '@/lib/modules/market/types'
 import { getEnabledProviders } from '@/lib/config/market-sources'
@@ -13,6 +12,8 @@ import { binanceLiquidationsProvider } from '@/lib/modules/market/provider/binan
 import { binanceLsRatioProvider } from '@/lib/modules/market/provider/binance-ls-ratio'
 import { deribitOptionsProvider } from '@/lib/modules/market/provider/deribit-options'
 import { alternativeMeProvider } from '@/lib/modules/market/provider/alternative-me'
+import { stablecoinSupplyProvider } from '@/lib/modules/market/provider/stablecoin-supply'
+import { dexVolumeProvider } from '@/lib/modules/market/provider/dex-volume'
 
 // Provider registry
 const PROVIDERS: Record<string, { fetch: (symbol: string, market: MarketVertical) => Promise<NormalizedSignal | null> }> = {
@@ -22,52 +23,39 @@ const PROVIDERS: Record<string, { fetch: (symbol: string, market: MarketVertical
   'binance-ls-ratio': { fetch: (s, m) => binanceLsRatioProvider.fetchSignal(s, m) },
   'deribit-options': { fetch: (s, m) => deribitOptionsProvider.fetchSignal(s, m) },
   'alternative-me': { fetch: (s, m) => alternativeMeProvider.fetchSignal(s, m) },
+  'stablecoin-supply': { fetch: (s, m) => stablecoinSupplyProvider.fetchSignal(s, m) },
+  'dex-volume': { fetch: (s, m) => dexVolumeProvider.fetchSignal(s, m) },
 }
 
 export interface TierScore {
   tier: SignalTier
-  score: number          // 0-100 weighted average
-  confidence: number     // 0-1
+  score: number
+  confidence: number
   signalCount: number
-  topSignal: string      // Human-readable top contributor
+  topSignal: string
 }
 
 export interface MarketMovingScore {
   symbol: string
   market: MarketVertical
-  compositeScore: number     // 0-100
+  compositeScore: number
   direction: 'bullish' | 'bearish' | 'neutral'
-  confidence: number         // 0-1
+  confidence: number
   tierScores: TierScore[]
-  topSignals: string[]       // Top 3 human-readable signals
+  topSignals: string[]
   fetchedAt: string
   signals: NormalizedSignal[]
 }
 
-/**
- * Normalize a raw value to 0-100 using z-score against trailing window
- * For now, uses simple percentile mapping; can be enhanced with historical data
- */
-function normalizeToPercentile(rawValue: number, min: number, max: number): number {
-  if (max === min) return 50
-  return Math.max(0, Math.min(100, ((rawValue - min) / (max - min)) * 100))
-}
-
-/**
- * Compute tier sub-score from signals in that tier
- */
 function computeTierScore(signals: NormalizedSignal[], tier: SignalTier): TierScore {
   const tierSignals = signals.filter(s => s.tier === tier)
   if (tierSignals.length === 0) {
     return { tier, score: 50, confidence: 0, signalCount: 0, topSignal: 'No data' }
   }
 
-  // Weighted average of normalized scores
   const totalWeight = tierSignals.reduce((sum, s) => sum + s.confidence, 0)
   const weightedScore = tierSignals.reduce((sum, s) => sum + (s.normalizedScore * s.confidence), 0) / totalWeight
   const avgConfidence = tierSignals.reduce((sum, s) => sum + s.confidence, 0) / tierSignals.length
-
-  // Find top signal by confidence
   const topSignal = tierSignals.reduce((best, s) => s.confidence > best.confidence ? s : best)
 
   return {
@@ -79,9 +67,6 @@ function computeTierScore(signals: NormalizedSignal[], tier: SignalTier): TierSc
   }
 }
 
-/**
- * Compute composite Market-Moving Score for a symbol
- */
 export async function computeMarketMovingScore(
   symbol: string,
   market: MarketVertical = 'crypto_cex'
@@ -89,7 +74,6 @@ export async function computeMarketMovingScore(
   const enabledProviders = getEnabledProviders(market)
   const signals: NormalizedSignal[] = []
 
-  // Fetch signals from all enabled providers in parallel
   const fetchPromises = enabledProviders.map(async (providerId) => {
     const provider = PROVIDERS[providerId]
     if (!provider) return null
@@ -107,24 +91,18 @@ export async function computeMarketMovingScore(
     }
   }
 
-  // Compute tier scores
   const tiers: SignalTier[] = ['positioning', 'onchain', 'sentiment', 'macro', 'structure']
   const tierScores = tiers.map(t => computeTierScore(signals, t))
 
-  // Compute composite score (weighted average of tier scores)
   const totalWeight = tierScores.reduce((sum, t) => sum + (DEFAULT_TIER_WEIGHTS[t.tier] * t.confidence), 0)
   const compositeScore = totalWeight > 0
     ? tierScores.reduce((sum, t) => sum + (t.score * DEFAULT_TIER_WEIGHTS[t.tier] * t.confidence), 0) / totalWeight
     : 50
 
-  // Determine direction
   const direction = compositeScore > 60 ? 'bullish' : compositeScore < 40 ? 'bearish' : 'neutral'
-
-  // Overall confidence (average of tier confidences, weighted by tier importance)
   const confidence = tierScores.reduce((sum, t) => sum + (t.confidence * DEFAULT_TIER_WEIGHTS[t.tier]), 0) /
     tierScores.reduce((sum, t) => sum + DEFAULT_TIER_WEIGHTS[t.tier], 0)
 
-  // Top 3 human-readable signals
   const topSignals = signals
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, 3)
@@ -143,9 +121,6 @@ export async function computeMarketMovingScore(
   }
 }
 
-/**
- * Compute scores for multiple symbols
- */
 export async function computeBatchScores(
   symbols: string[],
   market: MarketVertical = 'crypto_cex'
