@@ -113,21 +113,20 @@ export function middleware(request: NextRequest) {
     return addCorsHeaders(response, request);
   }
 
-  // Check if request is from browser (frontend) or external API
-  const referer = request.headers.get("referer") ?? "";
-  const origin = request.headers.get("origin") ?? "";
-  const isBrowserRequest = referer.includes("tracker.aitradepulse.com") || 
-                           referer.includes("localhost") ||
-                           origin.includes("tracker.aitradepulse.com") ||
-                           origin.includes("localhost");
-
   // Always public routes
   if (ALWAYS_PUBLIC.has(pathname) || pathname.startsWith("/api/auth/")) {
     return addCorsHeaders(NextResponse.next(), request);
   }
 
-  // Browser requests from our frontend — allow without API key
-  if (isBrowserRequest) {
+  // Check for browser CSRF token (set by frontend on page load)
+  const csrfToken = request.headers.get("x-csrf-token");
+  const sessionCookie = request.cookies.get("nexus-session");
+  
+  // Valid browser session = allow without API key
+  const isBrowserSession = csrfToken && csrfToken.length > 0;
+
+  // Browser requests — allow without API key, rate limit per IP
+  if (isBrowserSession) {
     const ip = getClientIp(request);
     const { allowed, remaining } = checkRateLimit(`browser:${ip}`, 600, 60_000);
     if (!allowed) {
