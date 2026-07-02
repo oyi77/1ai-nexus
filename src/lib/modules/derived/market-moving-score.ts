@@ -14,17 +14,25 @@ import { deribitOptionsProvider } from '@/lib/modules/market/provider/deribit-op
 import { alternativeMeProvider } from '@/lib/modules/market/provider/alternative-me'
 import { stablecoinSupplyProvider } from '@/lib/modules/market/provider/stablecoin-supply'
 import { dexVolumeProvider } from '@/lib/modules/market/provider/dex-volume'
+import { fredCalendarProvider } from '@/lib/modules/market/provider/fred-calendar'
+import { whaleTransfersProvider } from '@/lib/modules/market/provider/whale-transfers'
 
-// Provider registry
+// Provider registry — all implemented providers
 const PROVIDERS: Record<string, { fetch: (symbol: string, market: MarketVertical) => Promise<NormalizedSignal | null> }> = {
+  // Tier 1: Positioning
   'binance-funding': { fetch: (s, m) => binanceFundingProvider.fetchSignal(s, m) },
   'binance-oi': { fetch: (s, m) => binanceOIProvider.fetchSignal(s, m) },
   'binance-liquidations': { fetch: (s, m) => binanceLiquidationsProvider.fetchSignal(s, m) },
   'binance-ls-ratio': { fetch: (s, m) => binanceLsRatioProvider.fetchSignal(s, m) },
   'deribit-options': { fetch: (s, m) => deribitOptionsProvider.fetchSignal(s, m) },
+  // Tier 1: Sentiment
   'alternative-me': { fetch: (s, m) => alternativeMeProvider.fetchSignal(s, m) },
+  // Tier 2: On-chain
   'stablecoin-supply': { fetch: (s, m) => stablecoinSupplyProvider.fetchSignal(s, m) },
   'dex-volume': { fetch: (s, m) => dexVolumeProvider.fetchSignal(s, m) },
+  'whale-transfers': { fetch: (s, m) => whaleTransfersProvider.fetchSignal(s, m) },
+  // Tier 4: Macro
+  'fred-calendar': { fetch: (s, m) => fredCalendarProvider.fetchSignal(s, m) },
 }
 
 export interface TierScore {

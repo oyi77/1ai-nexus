@@ -26,7 +26,8 @@ const VERTICAL_PROVIDERS: Record<MarketVertical, string[]> = {
   crypto_cex: [
     'binance-funding', 'binance-oi', 'binance-liquidations',
     'binance-ls-ratio', 'binance-orderbook', 'deribit-options',
-    'alternative-me', 'cryptoquant-flow', 'stablecoin-flow', 'whale-alert',
+    'alternative-me', 'cryptoquant-flow', 'stablecoin-supply',
+    'dex-volume', 'whale-transfers', 'fred-calendar',
   ],
   forex: ['fred-calendar'],
   idx_bonds: ['fred-calendar'],
