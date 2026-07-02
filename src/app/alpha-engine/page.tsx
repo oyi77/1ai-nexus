@@ -5,6 +5,8 @@ import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
 
+type ValidPeriod = '4h' | '24h' | '7d'
+
 interface AlphaSignal {
   id: string
   symbol: string
@@ -14,6 +16,14 @@ interface AlphaSignal {
   sources: string[]
   reasoning: string
   timestamp: number
+  // Trading levels
+  entry: number | null
+  tp1: number | null
+  tp2: number | null
+  tp3: number | null
+  sl: number | null
+  validPeriod: ValidPeriod
+  expiresAt: number
 }
 
 interface Prediction {
@@ -124,40 +134,85 @@ function AlphaEnginePageInner() {
         {tab === 'signals' && (
           <Panel title="Alpha Signals" subtitle={`${signals.length} cross-correlated signals`} liveStatus={status} onRefresh={fetchData}>
             <div className="space-y-1 p-2">
-              {signals.map((s, i) => (
-                <div key={i} className="flex items-start gap-3 py-2 px-3 border-b border-bg-border/50 hover:bg-bg-raised transition-colors">
-                  <span className={`text-[16px] mt-0.5 ${s.direction === 'bullish' ? 'text-data-bull' : s.direction === 'bearish' ? 'text-data-bear' : 'text-text-muted'}`}>
-                    {s.direction === 'bullish' ? '🟢' : s.direction === 'bearish' ? '🔴' : '⚪'}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[12px] font-mono font-bold text-teal-vivid">{s.symbol}</span>
-                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                        s.direction === 'bullish' ? 'bg-data-bull/20 text-data-bull' :
-                        s.direction === 'bearish' ? 'bg-data-bear/20 text-data-bear' :
-                        'bg-bg-raised text-text-muted'
-                      }`}>
-                        {s.direction.toUpperCase()}
+              {signals.map((s, i) => {
+                const isExpired = s.expiresAt < Date.now()
+                const periodLabel: Record<ValidPeriod, string> = { '4h': '4H', '24h': '24H', '7d': '7D' }
+
+                return (
+                  <div key={i} className={`flex flex-col gap-2 py-3 px-3 border-b border-bg-border/50 hover:bg-bg-raised transition-colors ${isExpired ? 'opacity-50' : ''}`}>
+                    {/* Header row */}
+                    <div className="flex items-start gap-3">
+                      <span className={`text-[16px] mt-0.5 ${s.direction === 'bullish' ? 'text-data-bull' : s.direction === 'bearish' ? 'text-data-bear' : 'text-text-muted'}`}>
+                        {s.direction === 'bullish' ? '🟢' : s.direction === 'bearish' ? '🔴' : '⚪'}
                       </span>
-                      {s.sources.map((src, j) => (
-                        <span key={j} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted">{src}</span>
-                      ))}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[12px] font-mono font-bold text-teal-vivid">{s.symbol}</span>
+                          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                            s.direction === 'bullish' ? 'bg-data-bull/20 text-data-bull' :
+                            s.direction === 'bearish' ? 'bg-data-bear/20 text-data-bear' :
+                            'bg-bg-raised text-text-muted'
+                          }`}>
+                            {s.direction.toUpperCase()}
+                          </span>
+                          {s.sources.map((src, j) => (
+                            <span key={j} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted">{src}</span>
+                          ))}
+                          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                            isExpired ? 'bg-data-bear/20 text-data-bear' : 'bg-data-bull/20 text-data-bull'
+                          }`}>
+                            {isExpired ? 'EXPIRED' : periodLabel[s.validPeriod]}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-text-secondary mt-1">{s.reasoning}</div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-mono text-text-muted">STR</span>
+                          <span className="text-[12px] font-mono font-bold text-text-primary">{s.strength}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-mono text-text-muted">CONF</span>
+                          <span className="text-[12px] font-mono font-bold text-text-primary">{s.confidence}%</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-[11px] text-text-secondary mt-1">{s.reasoning}</div>
+
+                    {/* Trading levels row */}
+                    {s.entry && (
+                      <div className="flex items-center gap-3 ml-8 text-[10px] font-mono">
+                        <span className="text-text-muted">ENTRY</span>
+                        <span className="text-text-primary font-bold">${s.entry.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        {s.tp1 && (
+                          <>
+                            <span className="text-data-bull">TP1</span>
+                            <span className="text-data-bull">${s.tp1.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </>
+                        )}
+                        {s.tp2 && (
+                          <>
+                            <span className="text-data-bull">TP2</span>
+                            <span className="text-data-bull">${s.tp2.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </>
+                        )}
+                        {s.tp3 && (
+                          <>
+                            <span className="text-data-bull">TP3</span>
+                            <span className="text-data-bull">${s.tp3.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </>
+                        )}
+                        {s.sl && (
+                          <>
+                            <span className="text-data-bear">SL</span>
+                            <span className="text-data-bear">${s.sl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                          </>
+                        )}
+                        <span className="text-text-muted ml-auto">{new Date(s.timestamp).toLocaleTimeString()}</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-mono text-text-muted">STR</span>
-                      <span className="text-[12px] font-mono font-bold text-text-primary">{s.strength}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-mono text-text-muted">CONF</span>
-                      <span className="text-[12px] font-mono font-bold text-text-primary">{s.confidence}%</span>
-                    </div>
-                    <span className="text-[9px] font-mono text-text-muted">{new Date(s.timestamp).toLocaleTimeString()}</span>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
               {signals.length === 0 && (
                 <div className="p-8 text-center text-text-muted text-[12px] font-mono">Alpha engine is warming up...</div>
               )}
