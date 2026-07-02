@@ -8,34 +8,12 @@ const API_KEYS = new Set(
   (process.env.NEXUS_API_KEYS || "").split(",").filter(Boolean)
 );
 
-// Routes that don't require API key auth (public — used by frontend pages)
-// MINIMAL set: only routes absolutely needed for frontend rendering
-const PUBLIC_API_ROUTES = new Set([
-  // Health & Status
+// Routes that are always public (health checks, auth)
+const ALWAYS_PUBLIC = new Set([
   "/api/v1/health",
   "/api/v1/status",
   "/api/v1/status/cache",
-  // Auth (login/register)
   "/api/auth",
-  // Essential market data for dashboard
-  "/api/v1/market/prices",
-  "/api/v1/fear-greed",
-  // Public pages data
-  "/api/v1/data-sources",
-  "/api/v1/modules",
-  // Frontend pages (alpha-engine, signals)
-  "/api/v1/alpha-engine",
-  "/api/v1/paper-trading",
-  "/api/v1/signals/history",
-  "/api/v1/signals/outcomes",
-  "/api/v1/signals/stats",
-  // Landing page data sources
-  "/api/v1/whale-alert",
-  "/api/v1/exchange-flow",
-  "/api/v1/gas",
-  "/api/v1/stablecoin-flow",
-  "/api/v1/derivatives-intel",
-  "/api/v1/liquidations",
 ]);
 
 // ─── Rate Limiting (in-memory, per-edge instance) ──────────
@@ -116,21 +94,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Public routes — rate limit per IP but don't require API key
-  if (PUBLIC_API_ROUTES.has(pathname) || pathname.startsWith("/api/auth/")) {
-    const ip = getClientIp(request);
-    const { allowed, remaining } = checkRateLimit(`public:${ip}`, 300, 60_000); // 300 req/min per IP
-    if (!allowed) {
-      return NextResponse.json(
-        { data: null, error: "Rate limit exceeded. Slow down." },
-        { status: 429, headers: { "X-RateLimit-Remaining": "0", "Retry-After": "60" } }
-      );
-    }
-    const response = addCorsHeaders(NextResponse.next(), request);
-    response.headers.set("X-RateLimit-Remaining", String(remaining));
-    response.headers.set("X-RateLimit-Limit", "300");
-    return response;
-  }
+
   // Legacy routes (used by frontend) — rate limit + deprecation warning
   if (!pathname.startsWith("/api/v1/")) {
     console.warn(`[AUTH] Legacy API route accessed: ${pathname}. Migrate to /api/v1/ endpoints.`);
@@ -149,7 +113,36 @@ export function middleware(request: NextRequest) {
     return addCorsHeaders(response, request);
   }
 
-  // v1 routes require API key
+  // Check if request is from browser (frontend) or external API
+  const referer = request.headers.get("referer") ?? "";
+  const origin = request.headers.get("origin") ?? "";
+  const isBrowserRequest = referer.includes("tracker.aitradepulse.com") || 
+                           referer.includes("localhost") ||
+                           origin.includes("tracker.aitradepulse.com") ||
+                           origin.includes("localhost");
+
+  // Always public routes
+  if (ALWAYS_PUBLIC.has(pathname) || pathname.startsWith("/api/auth/")) {
+    return addCorsHeaders(NextResponse.next(), request);
+  }
+
+  // Browser requests from our frontend — allow without API key
+  if (isBrowserRequest) {
+    const ip = getClientIp(request);
+    const { allowed, remaining } = checkRateLimit(`browser:${ip}`, 600, 60_000);
+    if (!allowed) {
+      return NextResponse.json(
+        { data: null, error: "Rate limit exceeded" },
+        { status: 429, headers: { "X-RateLimit-Remaining": "0" } }
+      );
+    }
+    const response = addCorsHeaders(NextResponse.next(), request);
+    response.headers.set("X-RateLimit-Remaining", String(remaining));
+    response.headers.set("X-RateLimit-Limit", "600");
+    return response;
+  }
+
+  // External API requests — require API key
   if (API_KEYS.size > 0) {
     const authHeader = request.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
