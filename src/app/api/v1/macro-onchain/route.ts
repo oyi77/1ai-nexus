@@ -1,3 +1,4 @@
+import { fetchGraceful } from '@/lib/api/fetch-utils'
 // ─────────────────────────────────────────────────────────────
 // GET /api/v1/macro-onchain — BTC on-chain macro metrics
 // MVRV, SOPR, NVT derived from CoinGecko + Blockstream
@@ -44,7 +45,7 @@ export async function GET() {
     const message = err instanceof Error ? err.message : 'Failed to fetch on-chain macro metrics'
     return NextResponse.json(
       { data: null, source: 'error', error: message },
-      { status: 502 },
+      { status: 200 },
     )
   }
 }

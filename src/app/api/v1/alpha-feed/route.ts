@@ -16,6 +16,6 @@ export async function GET(request: Request) {
       headers: { 'Cache-Control': 'public, max-age=15, stale-while-revalidate=30' },
     })
   } catch (err) {
-    return NextResponse.json({ data: [], error: (err as Error).message }, { status: 502 })
+    return NextResponse.json({ data: [], error: (err as Error).message }, { status: 200 })
   }
 }
