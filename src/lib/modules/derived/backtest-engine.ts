@@ -326,19 +326,22 @@ export async function getBacktestStats(symbol?: string, periodDays?: number): Pr
   return calculateStats(results)
 }
 
+// Valid period durations in milliseconds
+const VALID_PERIOD_MS: Record<string, number> = {
+  '4h': 4 * 60 * 60 * 1000,
+  '24h': 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+}
+
 // Check and update expired signal outcomes (run hourly via cron)
-export async function checkExpiredSignals(): Promise<{ checked: number; updated: number; wins: number; losses: number }> {
-  // Get pending signals older than 24 hours
-  const minAge = new Date(Date.now() - 24 * 60 * 60 * 1000)
+export async function checkExpiredSignals(): Promise<{ checked: number; updated: number; wins: number; losses: number; expired: number }> {
+  // Get all pending signals
   const pending = await prisma.backtestResult.findMany({
-    where: {
-      outcome: 'pending',
-      backtestDate: { lte: minAge },
-    },
-    take: 100,
+    where: { outcome: 'pending' },
+    take: 200,
   })
 
-  if (pending.length === 0) return { checked: 0, updated: 0, wins: 0, losses: 0 }
+  if (pending.length === 0) return { checked: 0, updated: 0, wins: 0, losses: 0, expired: 0 }
 
   // Group by symbol for efficient price fetching
   const bySymbol = new Map<string, typeof pending>()
@@ -348,14 +351,25 @@ export async function checkExpiredSignals(): Promise<{ checked: number; updated:
     bySymbol.set(s.symbol, existing)
   }
 
-  let wins = 0, losses = 0, updated = 0
+  let wins = 0, losses = 0, expired = 0, updated = 0
+  const now = Date.now()
 
   for (const [symbol, signals] of bySymbol) {
     const earliest = Math.min(...signals.map(s => s.backtestDate.getTime()))
-    const candles = await fetchHistoricalPrices(symbol, earliest, Date.now())
+    const candles = await fetchHistoricalPrices(symbol, earliest, now)
     if (candles.length === 0) continue
 
     for (const signal of signals) {
+      const signalTime = signal.backtestDate.getTime()
+      const ageHours = (now - signalTime) / (1000 * 60 * 60)
+
+      // Determine valid period from source
+      const validPeriod = signal.source === 'funding-rate' ? '24h' :
+                          signal.source === 'whale-alert' ? '24h' :
+                          signal.source === 'fear-greed' ? '4h' : '24h'
+      const validMs = VALID_PERIOD_MS[validPeriod] ?? VALID_PERIOD_MS['24h']
+      const expiryTime = signalTime + validMs
+
       const backtestSignal: BacktestSignal = {
         id: signal.signalId ?? signal.id,
         symbol: signal.symbol,
@@ -365,13 +379,13 @@ export async function checkExpiredSignals(): Promise<{ checked: number; updated:
         tp2: signal.tp2,
         tp3: signal.tp3,
         sl: signal.sl,
-        timestamp: signal.backtestDate.getTime(),
+        timestamp: signalTime,
         source: signal.source,
       }
 
+      // Check if TP/SL was hit
       const { outcome, exitPrice, hitTarget, durationHours } = checkOutcome(candles, backtestSignal)
 
-      // Only update if we have a definitive outcome (win/loss)
       if (outcome === 'win' || outcome === 'loss') {
         const pnlPercent = backtestSignal.direction === 'bullish'
           ? ((exitPrice! - signal.entryPrice) / signal.entryPrice) * 100
@@ -381,15 +395,35 @@ export async function checkExpiredSignals(): Promise<{ checked: number; updated:
           where: { id: signal.id },
           data: { outcome, exitPrice, pnlPercent, hitTarget, durationHours },
         })
-
         if (outcome === 'win') wins++
         else losses++
+        updated++
+
+      } else if (now > expiryTime) {
+        // Valid period expired without TP/SL hit
+        const lastCandle = candles[candles.length - 1]
+        const exitP = lastCandle?.close ?? signal.entryPrice
+        const pnlPercent = backtestSignal.direction === 'bullish'
+          ? ((exitP - signal.entryPrice) / signal.entryPrice) * 100
+          : ((signal.entryPrice - exitP) / signal.entryPrice) * 100
+
+        await prisma.backtestResult.update({
+          where: { id: signal.id },
+          data: {
+            outcome: 'expired',
+            exitPrice: exitP,
+            pnlPercent,
+            hitTarget: null,
+            durationHours: (now - signalTime) / (1000 * 60 * 60),
+          },
+        })
+        expired++
         updated++
       }
     }
   }
 
-  return { checked: pending.length, updated, wins, losses }
+  return { checked: pending.length, updated, wins, losses, expired }
 }
 
 // Get pending signals count
