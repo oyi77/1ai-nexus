@@ -3,7 +3,7 @@ import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
 import { fetchMempoolEvents, persistMempoolEvents } from "@/lib/modules/chain/mempool/intel";
 import { fetchBridgeStats, persistBridgeFlows } from "@/lib/modules/chain/bridge/flows";
 import { fetchStakingQueue, persistStakingFlow } from "@/lib/modules/chain/ethereum/staking-queue";
-import { cacheGet } from "@/lib/data-refresher";
+import { cacheGet } from "@/lib/cache"
 
 export const dynamic = "force-dynamic";
 

@@ -8,7 +8,7 @@ import {
   getStablecoinHistory,
   type StablecoinIntelResult,
 } from "@/lib/modules/chain/stablecoin-intel";
-import { cacheGet, cacheSet } from "@/lib/data-refresher";
+import { cacheGet, cacheSet } from "@/lib/cache"
 
 export async function GET(request: NextRequest) {
   try {

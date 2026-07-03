@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // Background Data Refresher
 // Pre-fetches all module data on a schedule so API routes return instantly
-// Uses Redis for cross-worker cache (Next.js isolates route workers)
+// Cache layer lives in ./cache.ts (edge-safe, no Prisma dep)
 // Runs via setInterval in instrumentation.ts on server startup
 // ─────────────────────────────────────────────────────────────
 
@@ -20,46 +20,9 @@ import { evaluateCompositeSignals } from '@/lib/modules/derived/composite-signal
 import { computeIntelligenceScore } from '@/lib/modules/derived/intelligence-score'
 import { storeSignal, checkExpiredSignals } from '@/lib/modules/derived/backtest-engine'
 import { getAlphaSignals } from '@/lib/modules/derived/alpha-engine'
-// ─── Redis Cache (cross-worker) ─────────────────────────────
-
-let redis: ReturnType<typeof createRedis> | null = null
-
-function createRedis() {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Redis = require('ioredis')
-  return new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
-    maxRetriesPerRequest: 1,
-    retryStrategy(times: number) { return Math.min(times * 200, 2000) },
-    lazyConnect: true,
-  })
-}
-
-function getRedis() {
-  if (!redis) {
-    try {
-      redis = createRedis()
-    } catch { return null }
-  }
-  return redis
-}
-
-export async function cacheGet<T>(key: string): Promise<T | null> {
-  const r = getRedis()
-  if (!r) return null
-  try {
-    const raw = await r.get(`nexus:cache:${key}`)
-    return raw ? JSON.parse(raw) as T : null
-  } catch { return null }
-}
-
-export async function cacheSet(key: string, data: unknown, ttlSeconds = 300): Promise<void> {
-  const r = getRedis()
-  if (!r) return
-  try {
-    await r.set(`nexus:cache:${key}`, JSON.stringify(data), 'EX', ttlSeconds)
-  } catch { /* non-fatal */ }
-}
-
+// Cache layer in ./cache.ts (edge-safe, no Prisma dep)
+import { cacheGet, cacheSet } from '@/lib/cache'
+export { cacheGet, cacheSet }
 // ─── Refresh Functions ──────────────────────────────────────
 
 async function refreshDerivatives() {

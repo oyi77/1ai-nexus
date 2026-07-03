@@ -13,7 +13,7 @@ import {
   fetchFundingHeatmap,
   persistOptionsIntelSnapshot,
 } from "@/lib/modules/derivatives/options-intel";
-import { cacheGet, cacheSet } from "@/lib/data-refresher";
+import { cacheGet, cacheSet } from "@/lib/cache"
 
 export const dynamic = "force-dynamic";
 

@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
 import { fetchETFSummary, persistETFFlows } from "@/lib/modules/tradfi/etf/flows";
 import { fetchPremiumSnapshots, persistPremiumSnapshots } from "@/lib/modules/tradfi/premium/monitor";
-import { cacheGet } from "@/lib/data-refresher";
+import { cacheGet } from "@/lib/cache"
 
 export const dynamic = "force-dynamic";
 

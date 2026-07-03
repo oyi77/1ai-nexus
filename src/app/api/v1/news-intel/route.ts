@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
 import { fetchNewsIntelligence, persistNewsEvents } from "@/lib/modules/news/news-intel";
 import { fetchSentimentIntelligence, persistSentimentSnapshots } from "@/lib/modules/sentiment/sentiment-intel";
-import { cacheGet } from "@/lib/data-refresher";
+import { cacheGet } from "@/lib/cache"
 
 export const dynamic = "force-dynamic";
 

@@ -1,6 +1,6 @@
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
 import { evaluateCompositeSignals } from "@/lib/modules/derived/composite-signals";
-import { cacheGet } from "@/lib/data-refresher";
+import { cacheGet } from "@/lib/cache"
 
 export const dynamic = "force-dynamic";
 
