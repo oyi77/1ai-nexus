@@ -432,23 +432,27 @@ export async function checkExpiredSignals(): Promise<{ checked: number; updated:
 
       } else if (now > expiryTime) {
         // Entry hit but TP/SL not hit within valid period
+        // Determine outcome based on PnL at expiry
         const lastCandle = candles[candles.length - 1]
         const exitP = lastCandle?.close ?? signal.entryPrice
         const pnlPercent = backtestSignal.direction === 'bullish'
           ? ((exitP - signal.entryPrice) / signal.entryPrice) * 100
           : ((signal.entryPrice - exitP) / signal.entryPrice) * 100
 
+        const finalOutcome = pnlPercent >= 0 ? 'win' : 'loss'
+        if (finalOutcome === 'win') wins++
+        else losses++
+
         await prisma.backtestResult.update({
           where: { id: signal.id },
           data: {
-            outcome: 'expired',
+            outcome: finalOutcome,
             exitPrice: exitP,
             pnlPercent,
             hitTarget: null,
             durationHours: (now - signalTime) / (1000 * 60 * 60),
           },
         })
-        expired++
         updated++
       }
     }
