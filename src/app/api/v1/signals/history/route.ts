@@ -1,10 +1,13 @@
 // ─────────────────────────────────────────────────────────────
 // GET /api/v1/signals/history — Signal history with PnL
-// ?status=active|completed|all&symbol=BTC&limit=50
+// Pagination: ?cursor=<id>&limit=30
+// Filter:     ?outcome=win|loss|expired|all&q=BTC
+// Sort:       ?sort=date|pnl|outcome (default: date desc)
 // ─────────────────────────────────────────────────────────────
 
 import { apiJson, apiError } from '@/lib/api/response'
 import { prisma } from '@/lib/db'
+import { Prisma } from '@prisma/client'
 
 interface SignalHistoryItem {
   id: string
@@ -16,7 +19,7 @@ interface SignalHistoryItem {
   tp3: number | null
   sl: number | null
   status: 'active' | 'completed'
-  outcome: 'win' | 'loss' | 'expired' | null
+  outcome: 'win' | 'loss' | 'expired' | 'not_triggered' | null
   exitPrice: number | null
   pnlPercent: number | null
   hitTarget: string | null
@@ -29,65 +32,108 @@ interface SignalHistoryItem {
   durationHours: number | null
 }
 
+// Global stats (not paginated, cached per request)
+async function getGlobalStats() {
+  const [total, wins, losses, expired, pending] = await Promise.all([
+    prisma.backtestResult.count({ where: { outcome: { not: 'pending' } } }),
+    prisma.backtestResult.count({ where: { outcome: 'win' } }),
+    prisma.backtestResult.count({ where: { outcome: 'loss' } }),
+    prisma.backtestResult.count({ where: { outcome: 'expired' } }),
+    prisma.backtestResult.count({ where: { outcome: 'pending' } }),
+  ])
+  const completed = wins + losses
+  const winRate = completed > 0 ? Math.round((wins / completed) * 10000) / 100 : 0
+
+  // Avg PnL from DB aggregates (faster than fetching all rows)
+  const aggResult = await prisma.$queryRaw<{ avg_win: number | null; avg_loss: number | null; total_pnl: number | null }[]>`
+    SELECT
+      AVG(CASE WHEN outcome = 'win' THEN "pnlPercent" END) as avg_win,
+      AVG(CASE WHEN outcome = 'loss' THEN "pnlPercent" END) as avg_loss,
+      SUM("pnlPercent") as total_pnl
+    FROM "BacktestResult"
+    WHERE outcome IN ('win', 'loss')
+  `
+  const agg = aggResult[0]
+
+  return {
+    total,
+    pending,
+    wins,
+    losses,
+    expired,
+    winRate,
+    totalPnl: Math.round((agg?.total_pnl ?? 0) * 100) / 100,
+    avgWin: Math.round((agg?.avg_win ?? 0) * 100) / 100,
+    avgLoss: Math.round((agg?.avg_loss ?? 0) * 100) / 100,
+  }
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const status = searchParams.get('status') ?? 'all'
-  const symbol = searchParams.get('symbol') ?? undefined
-  const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50') || 50))
+
+  // Pagination
+  const cursor = searchParams.get('cursor') ?? undefined
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') ?? '30') || 30))
+
+  // Filters
+  const outcomeParam = searchParams.get('outcome') ?? 'all'
+  const query = searchParams.get('q')?.trim().toUpperCase() ?? ''
+
+  // Sort
+  const sort = searchParams.get('sort') ?? 'date'
 
   try {
-    // Get active signals from alpha engine
-    const activeRes = await fetch('http://localhost:4400/api/v1/alpha-engine', {
-      signal: AbortSignal.timeout(10_000),
-    })
-    const activeData = await activeRes.json() as { data?: { signals?: Array<{
-      id: string; symbol: string; direction: string;
-      entry: number | null; tp1: number | null; tp2: number | null; tp3: number | null; sl: number | null;
-      sources: string[]; strength: number; confidence: number; validPeriod: string; expiresAt: number; timestamp: number;
-    }> } }
-    const activeSignals = activeData.data?.signals ?? []
+    // Build where clause for completed signals
+    const where: Prisma.BacktestResultWhereInput = {}
 
-    // Get completed signals from backtest results
-    const completedWhere: Record<string, unknown> = {
-      outcome: { in: ['win', 'loss', 'expired', 'not_triggered'] },
+    // Outcome filter
+    if (outcomeParam === 'all') {
+      where.outcome = { in: ['win', 'loss', 'expired', 'not_triggered'] }
+    } else if (['win', 'loss', 'expired', 'not_triggered'].includes(outcomeParam)) {
+      where.outcome = outcomeParam
+    } else {
+      where.outcome = { in: ['win', 'loss', 'expired', 'not_triggered'] }
     }
-    if (symbol) completedWhere.symbol = symbol
 
-    const completedResults = await prisma.backtestResult.findMany({
-      where: completedWhere,
-      orderBy: { backtestDate: 'desc' },
-      take: limit,
-    })
+    // Symbol search (case-insensitive prefix match)
+    if (query) {
+      where.symbol = { startsWith: query, mode: 'insensitive' }
+    }
 
-    // Format active signals
-    const active: SignalHistoryItem[] = activeSignals
-      .filter(s => !symbol || s.symbol === symbol)
-      .filter(s => s.entry && s.sl) // Only signals with trading levels
-      .map(s => ({
-        id: s.id,
-        symbol: s.symbol,
-        direction: s.direction,
-        entry: s.entry!,
-        tp1: s.tp1,
-        tp2: s.tp2,
-        tp3: s.tp3,
-        sl: s.sl,
-        status: 'active' as const,
-        outcome: null,
-        exitPrice: null,
-        pnlPercent: null,
-        hitTarget: null,
-        source: s.sources[0] ?? 'unknown',
-        strength: s.strength,
-        confidence: s.confidence,
-        validPeriod: s.validPeriod,
-        createdAt: new Date(s.timestamp).toISOString(),
-        closedAt: null,
-        durationHours: null,
-      }))
+    // Build order by
+    let orderBy: Prisma.BacktestResultOrderByWithRelationInput
+    switch (sort) {
+      case 'pnl':
+        orderBy = { pnlPercent: 'desc' }
+        break
+      case 'outcome':
+        // Custom ordering: win > expired > loss
+        orderBy = { outcome: 'asc' }
+        break
+      case 'date':
+      default:
+        orderBy = { backtestDate: 'desc' }
+        break
+    }
+
+    // Cursor-based pagination
+    const findArgs: Prisma.BacktestResultFindManyArgs = {
+      where,
+      orderBy,
+      take: limit + 1, // fetch one extra to detect if there's more
+    }
+    if (cursor) {
+      findArgs.cursor = { id: cursor }
+      findArgs.skip = 1 // skip the cursor itself
+    }
+
+    const rows = await prisma.backtestResult.findMany(findArgs)
+    const hasMore = rows.length > limit
+    const pageRows = hasMore ? rows.slice(0, limit) : rows
+    const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null
 
     // Format completed signals
-    const completed: SignalHistoryItem[] = completedResults.map(r => ({
+    const signals: SignalHistoryItem[] = pageRows.map(r => ({
       id: r.id,
       symbol: r.symbol,
       direction: r.direction,
@@ -97,7 +143,7 @@ export async function GET(request: Request) {
       tp3: r.tp3,
       sl: r.sl,
       status: 'completed' as const,
-      outcome: r.outcome as 'win' | 'loss' | 'expired',
+      outcome: r.outcome as 'win' | 'loss' | 'expired' | 'not_triggered',
       exitPrice: r.exitPrice,
       pnlPercent: r.pnlPercent,
       hitTarget: r.hitTarget,
@@ -110,35 +156,15 @@ export async function GET(request: Request) {
       durationHours: r.durationHours,
     }))
 
-    // Calculate stats
-    const wins = completed.filter(c => c.outcome === 'win')
-    const losses = completed.filter(c => c.outcome === 'loss')
-    const totalPnl = completed.reduce((sum, c) => sum + (c.pnlPercent ?? 0), 0)
-    const avgPnl = completed.length > 0 ? totalPnl / completed.length : 0
-    const winRate = completed.length > 0 ? (wins.length / completed.length) * 100 : 0
-
-    // Return based on status filter
-    let results: SignalHistoryItem[]
-    if (status === 'active') {
-      results = active
-    } else if (status === 'completed') {
-      results = completed
-    } else {
-      results = [...active, ...completed].slice(0, limit)
-    }
+    // Fetch global stats in parallel (only on first page)
+    const stats = cursor ? null : await getGlobalStats()
 
     return apiJson({
-      signals: results,
-      stats: {
-        active: active.length,
-        completed: completed.length,
-        wins: wins.length,
-        losses: losses.length,
-        winRate: Math.round(winRate * 100) / 100,
-        totalPnl: Math.round(totalPnl * 100) / 100,
-        avgPnl: Math.round(avgPnl * 100) / 100,
-      },
-      count: results.length,
+      signals,
+      nextCursor,
+      hasMore,
+      count: signals.length,
+      ...(stats ? { stats } : {}),
     })
 
   } catch (err) {

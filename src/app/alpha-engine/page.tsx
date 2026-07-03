@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
@@ -17,7 +17,6 @@ interface AlphaSignal {
   sources: string[]
   reasoning: string
   timestamp: number
-  // Trading levels
   entry: number | null
   tp1: number | null
   tp2: number | null
@@ -37,7 +36,7 @@ interface SignalHistory {
   tp3: number | null
   sl: number | null
   status: 'active' | 'completed'
-  outcome: 'win' | 'loss' | 'expired' | null
+  outcome: 'win' | 'loss' | 'expired' | 'not_triggered' | null
   exitPrice: number | null
   pnlPercent: number | null
   hitTarget: string | null
@@ -51,13 +50,15 @@ interface SignalHistory {
 }
 
 interface SignalStats {
-  active: number
-  completed: number
+  total: number
+  pending: number
   wins: number
   losses: number
+  expired: number
   winRate: number
   totalPnl: number
-  avgPnl: number
+  avgWin: number
+  avgLoss: number
 }
 
 interface Prediction {
@@ -85,6 +86,8 @@ interface Accuracy {
   avgPnl: number
 }
 
+const HISTORY_PAGE_SIZE = 30
+
 export function AlphaEnginePageContent() {
   return <AlphaEnginePageInner />
 }
@@ -96,17 +99,108 @@ export default function AlphaEnginePage() {
 function AlphaEnginePageInner() {
   const [signals, setSignals] = useState<AlphaSignal[]>([])
   const [history, setHistory] = useState<SignalHistory[]>([])
-  const [signalStats, setSignalStats] = useState<SignalStats>({ active: 0, completed: 0, wins: 0, losses: 0, winRate: 0, totalPnl: 0, avgPnl: 0 })
+  const [signalStats, setSignalStats] = useState<SignalStats>({ total: 0, pending: 0, wins: 0, losses: 0, expired: 0, winRate: 0, totalPnl: 0, avgWin: 0, avgLoss: 0 })
   const [predictions, setPredictions] = useState<{ open: Prediction[]; closed: Prediction[]; accuracy: Accuracy }>({ open: [], closed: [], accuracy: { total: 0, wins: 0, losses: 0, winRate: 0, avgPnl: 0 } })
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
   const [tab, setTab] = useState<'signals' | 'history' | 'predictions' | 'accuracy'>('signals')
   const [marketScore, setMarketScore] = useState<{compositeScore: number; direction: string; confidence: number; topSignals: string[]} | null>(null)
-  const fetchData = useCallback(async () => {
+
+  // ─── Signal history pagination/filter/sort state ───
+  const [historyOutcome, setHistoryOutcome] = useState<string>('all')
+  const [historySort, setHistorySort] = useState<string>('date')
+  const [historySearch, setHistorySearch] = useState<string>('')
+  const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null)
+  const [historyHasMore, setHistoryHasMore] = useState<boolean>(false)
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false)
+  const [historyInitialLoaded, setHistoryInitialLoaded] = useState<boolean>(false)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+
+  // Build history API URL
+  const buildHistoryUrl = useCallback((cursor?: string | null) => {
+    const params = new URLSearchParams()
+    params.set('limit', String(HISTORY_PAGE_SIZE))
+    if (cursor) params.set('cursor', cursor)
+    if (historyOutcome !== 'all') params.set('outcome', historyOutcome)
+    if (historySort !== 'date') params.set('sort', historySort)
+    if (historySearch.trim()) params.set('q', historySearch.trim())
+    return `/api/v1/signals/history?${params.toString()}`
+  }, [historyOutcome, historySort, historySearch])
+
+  // Fetch initial history page (re-runs when filters change)
+  const fetchHistoryPage = useCallback(async (reset: boolean) => {
+    if (historyLoading) return
+    setHistoryLoading(true)
     try {
-      const [alphaRes, predRes, historyRes, scoreRes] = await Promise.allSettled([
+      const url = buildHistoryUrl(reset ? null : historyNextCursor)
+      const res = await fetch(url)
+      const data = await res.json()
+      const newSignals = data?.data?.signals ?? []
+      const nextCursor = data?.data?.nextCursor ?? null
+      const hasMore = data?.data?.hasMore ?? false
+      const stats = data?.data?.stats
+
+      setHistory(prev => reset ? newSignals : [...prev, ...newSignals])
+      setHistoryNextCursor(nextCursor)
+      setHistoryHasMore(hasMore)
+      if (stats) setSignalStats(stats)
+      setHistoryInitialLoaded(true)
+    } catch {
+      // silent
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [historyLoading, buildHistoryUrl, historyNextCursor])
+
+  // Reset & refetch when filters change
+  useEffect(() => {
+    setHistory([])
+    setHistoryNextCursor(null)
+    setHistoryHasMore(false)
+    setHistoryInitialLoaded(false)
+    // Immediate fetch with reset=true
+    const run = async () => {
+      setHistoryLoading(true)
+      try {
+        const url = buildHistoryUrl(null)
+        const res = await fetch(url)
+        const data = await res.json()
+        const newSignals = data?.data?.signals ?? []
+        const nextCursor = data?.data?.nextCursor ?? null
+        const hasMore = data?.data?.hasMore ?? false
+        const stats = data?.data?.stats
+        setHistory(newSignals)
+        setHistoryNextCursor(nextCursor)
+        setHistoryHasMore(hasMore)
+        if (stats) setSignalStats(stats)
+        setHistoryInitialLoaded(true)
+      } catch { /* silent */ }
+      finally { setHistoryLoading(false) }
+    }
+    run()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyOutcome, historySort, historySearch])
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    if (!sentinelRef.current) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && historyHasMore && !historyLoading) {
+          fetchHistoryPage(false)
+        }
+      },
+      { rootMargin: '200px' }
+    )
+    observer.observe(sentinelRef.current)
+    return () => observer.disconnect()
+  }, [historyHasMore, historyLoading, fetchHistoryPage])
+
+  // Fetch live data (signals, predictions, market score)
+  const fetchLiveData = useCallback(async () => {
+    try {
+      const [alphaRes, predRes, scoreRes] = await Promise.allSettled([
         fetch('/api/v1/alpha-engine').then(r => r.json()),
         fetch('/api/v1/paper-trading').then(r => r.json()),
-        fetch('/api/v1/signals/history?limit=50').then(r => r.json()),
         fetch('/api/v1/market-score?symbol=BTC').then(r => r.json()),
       ])
 
@@ -115,10 +209,6 @@ function AlphaEnginePageInner() {
       }
       if (predRes.status === 'fulfilled' && predRes.value?.data) {
         setPredictions(predRes.value.data)
-      }
-      if (historyRes.status === 'fulfilled' && historyRes.value?.data) {
-        setHistory(historyRes.value.data.signals ?? [])
-        setSignalStats(historyRes.value.data.stats ?? { active: 0, completed: 0, wins: 0, losses: 0, winRate: 0, totalPnl: 0, avgPnl: 0 })
       }
       if (scoreRes.status === 'fulfilled' && scoreRes.value?.data?.score) {
         setMarketScore(scoreRes.value.data.score)
@@ -130,10 +220,10 @@ function AlphaEnginePageInner() {
   }, [])
 
   useEffect(() => {
-    fetchData()
-    const id = setInterval(fetchData, 15_000)
+    fetchLiveData()
+    const id = setInterval(fetchLiveData, 15_000)
     return () => clearInterval(id)
-  }, [fetchData])
+  }, [fetchLiveData])
 
   const acc = predictions.accuracy
 
@@ -156,12 +246,12 @@ function AlphaEnginePageInner() {
 
         {/* KPI Strip */}
         <div className="grid grid-cols-6 gap-2">
-          <KPI label="Active Signals" value={String(signalStats.active)} />
-          <KPI label="Completed" value={String(signalStats.completed)} />
+          <KPI label="Active Signals" value={String(signalStats.pending)} />
+          <KPI label="Completed" value={String(signalStats.wins + signalStats.losses)} />
           <KPI label="Win Rate" value={`${signalStats.winRate.toFixed(1)}%`} color={signalStats.winRate > 50 ? 'text-data-bull' : signalStats.winRate > 0 ? 'text-data-bear' : 'text-text-muted'} />
           <KPI label="Total PnL" value={`${signalStats.totalPnl > 0 ? '+' : ''}${signalStats.totalPnl.toFixed(2)}%`} color={signalStats.totalPnl >= 0 ? 'text-data-bull' : 'text-data-bear'} />
           <KPI label="W / L" value={`${signalStats.wins} / ${signalStats.losses}`} />
-          <KPI label="Avg PnL" value={`${signalStats.avgPnl > 0 ? '+' : ''}${signalStats.avgPnl.toFixed(2)}%`} color={signalStats.avgPnl >= 0 ? 'text-data-bull' : 'text-data-bear'} />
+          <KPI label="Avg Win" value={`${signalStats.avgWin > 0 ? '+' : ''}${signalStats.avgWin.toFixed(2)}%`} color={signalStats.avgWin >= 0 ? 'text-data-bull' : 'text-data-bear'} />
         </div>
 
         {/* Market-Moving Score */}
@@ -210,7 +300,7 @@ function AlphaEnginePageInner() {
         </div>
 
         {tab === 'signals' && (
-          <Panel title="Alpha Signals" subtitle={`${signals.length} cross-correlated signals`} liveStatus={status} onRefresh={fetchData}>
+          <Panel title="Alpha Signals" subtitle={`${signals.length} cross-correlated signals`} liveStatus={status} onRefresh={fetchLiveData}>
             <div className="space-y-1 p-2">
               {signals.map((s, i) => {
                 const isExpired = s.expiresAt < Date.now()
@@ -311,15 +401,58 @@ function AlphaEnginePageInner() {
         )}
 
         {tab === 'history' && (
-          <Panel title="Signal History" subtitle={`${history.length} signals with PnL tracking`} liveStatus={status} onRefresh={fetchData}>
+          <Panel
+            title="Signal History"
+            subtitle={historyInitialLoaded ? `${signalStats.wins + signalStats.losses + signalStats.expired} completed · pg ${Math.ceil(history.length / HISTORY_PAGE_SIZE)}` : 'Loading...'}
+            liveStatus={status}
+            onRefresh={() => fetchHistoryPage(true)}
+          >
+            {/* ─── Filter / Sort / Search Bar ─── */}
+            <div className="flex items-center gap-2 p-2 border-b border-bg-border/50">
+              {/* Search */}
+              <input
+                type="text"
+                value={historySearch}
+                onChange={e => setHistorySearch(e.target.value)}
+                placeholder="Search symbol..."
+                className="flex-1 max-w-[200px] bg-bg-base border border-bg-border rounded px-2 py-1.5 text-[11px] font-mono text-text-primary placeholder-text-muted focus:outline-none focus:border-teal-vivid"
+              />
+              {/* Outcome filter */}
+              <select
+                value={historyOutcome}
+                onChange={e => setHistoryOutcome(e.target.value)}
+                className="bg-bg-base border border-bg-border rounded px-2 py-1.5 text-[11px] font-mono text-text-primary focus:outline-none focus:border-teal-vivid cursor-pointer"
+              >
+                <option value="all">All Outcomes</option>
+                <option value="win">✅ Wins</option>
+                <option value="loss">❌ Losses</option>
+                <option value="expired">⏰ Expired</option>
+              </select>
+              {/* Sort */}
+              <select
+                value={historySort}
+                onChange={e => setHistorySort(e.target.value)}
+                className="bg-bg-base border border-bg-border rounded px-2 py-1.5 text-[11px] font-mono text-text-primary focus:outline-none focus:border-teal-vivid cursor-pointer"
+              >
+                <option value="date">📅 Newest</option>
+                <option value="pnl">💰 Best PnL</option>
+                <option value="outcome">📊 By Outcome</option>
+              </select>
+              {/* Result count */}
+              <span className="text-[10px] font-mono text-text-muted ml-auto">
+                {history.length} loaded{historyHasMore ? ' · scroll for more' : ''}
+              </span>
+            </div>
+
+            {/* ─── Signal List ─── */}
             <div className="space-y-1 p-2">
-              {history.map((s, i) => {
+              {history.map((s) => {
                 const isWin = s.outcome === 'win'
                 const isLoss = s.outcome === 'loss'
                 const isActive = s.status === 'active'
 
                 return (
-                  <div key={i} className="flex items-center gap-4 py-2 px-3 border-b border-bg-border/50 hover:bg-bg-raised transition-colors">
+                  <div key={s.id} className="flex items-center gap-4 py-2 px-3 border-b border-bg-border/50 hover:bg-bg-raised transition-colors">
                     {/* Status indicator */}
                     <span className={`text-[16px] ${isActive ? 'text-teal-vivid' : isWin ? 'text-data-bull' : isLoss ? 'text-data-bear' : 'text-text-muted'}`}>
                       {isActive ? '🔵' : isWin ? '✅' : isLoss ? '❌' : '⏰'}
@@ -377,9 +510,18 @@ function AlphaEnginePageInner() {
                   </div>
                 )
               })}
-              {history.length === 0 && (
+              {/* Infinite scroll sentinel */}
+              {historyHasMore && <div ref={sentinelRef} className="h-4" />}
+              {/* Loading spinner */}
+              {historyLoading && (
+                <div className="p-4 text-center text-text-muted text-[11px] font-mono animate-pulse">
+                  Loading more signals...
+                </div>
+              )}
+              {/* Empty state */}
+              {historyInitialLoaded && history.length === 0 && (
                 <div className="p-8 text-center text-text-muted text-[12px] font-mono">
-                  No signal history yet. Signals will appear here after they expire or hit TP/SL.
+                  No signals match your filters.
                 </div>
               )}
             </div>
