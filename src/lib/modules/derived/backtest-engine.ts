@@ -334,14 +334,14 @@ const VALID_PERIOD_MS: Record<string, number> = {
 }
 
 // Check and update expired signal outcomes (run hourly via cron)
-export async function checkExpiredSignals(): Promise<{ checked: number; updated: number; wins: number; losses: number; expired: number }> {
+export async function checkExpiredSignals(): Promise<{ checked: number; updated: number; wins: number; losses: number; expired: number; notTriggered: number }> {
   // Get all pending signals
   const pending = await prisma.backtestResult.findMany({
     where: { outcome: 'pending' },
     take: 200,
   })
 
-  if (pending.length === 0) return { checked: 0, updated: 0, wins: 0, losses: 0, expired: 0 }
+  if (pending.length === 0) return { checked: 0, updated: 0, wins: 0, losses: 0, expired: 0, notTriggered: 0 }
 
   // Group by symbol for efficient price fetching
   const bySymbol = new Map<string, typeof pending>()
@@ -351,7 +351,7 @@ export async function checkExpiredSignals(): Promise<{ checked: number; updated:
     bySymbol.set(s.symbol, existing)
   }
 
-  let wins = 0, losses = 0, expired = 0, updated = 0
+  let wins = 0, losses = 0, expired = 0, notTriggered = 0, updated = 0
   const now = Date.now()
 
   for (const [symbol, signals] of bySymbol) {
@@ -370,6 +370,38 @@ export async function checkExpiredSignals(): Promise<{ checked: number; updated:
       const validMs = VALID_PERIOD_MS[validPeriod] ?? VALID_PERIOD_MS['24h']
       const expiryTime = signalTime + validMs
 
+      // Check if entry was hit
+      const entryHit = candles.some(c => {
+        if (signal.direction === 'bullish') {
+          return c.low <= signal.entryPrice && c.time > signalTime
+        } else {
+          return c.high >= signal.entryPrice && c.time > signalTime
+        }
+      })
+
+      if (!entryHit && now > expiryTime) {
+        // Entry never hit within valid period
+        await prisma.backtestResult.update({
+          where: { id: signal.id },
+          data: {
+            outcome: 'not_triggered',
+            exitPrice: null,
+            pnlPercent: 0,
+            hitTarget: null,
+            durationHours: ageHours,
+          },
+        })
+        notTriggered++
+        updated++
+        continue
+      }
+
+      if (!entryHit) {
+        // Entry not hit yet, still within valid period
+        continue
+      }
+
+      // Entry was hit - check TP/SL
       const backtestSignal: BacktestSignal = {
         id: signal.signalId ?? signal.id,
         symbol: signal.symbol,
@@ -383,7 +415,6 @@ export async function checkExpiredSignals(): Promise<{ checked: number; updated:
         source: signal.source,
       }
 
-      // Check if TP/SL was hit
       const { outcome, exitPrice, hitTarget, durationHours } = checkOutcome(candles, backtestSignal)
 
       if (outcome === 'win' || outcome === 'loss') {
@@ -400,7 +431,7 @@ export async function checkExpiredSignals(): Promise<{ checked: number; updated:
         updated++
 
       } else if (now > expiryTime) {
-        // Valid period expired without TP/SL hit
+        // Entry hit but TP/SL not hit within valid period
         const lastCandle = candles[candles.length - 1]
         const exitP = lastCandle?.close ?? signal.entryPrice
         const pnlPercent = backtestSignal.direction === 'bullish'
@@ -423,7 +454,7 @@ export async function checkExpiredSignals(): Promise<{ checked: number; updated:
     }
   }
 
-  return { checked: pending.length, updated, wins, losses, expired }
+  return { checked: pending.length, updated, wins, losses, expired, notTriggered }
 }
 
 // Get pending signals count
@@ -438,13 +469,15 @@ export async function getSignalOutcomesSummary(): Promise<{
   wins: number
   losses: number
   expired: number
+  notTriggered: number
 }> {
-  const [total, pending, wins, losses, expired] = await Promise.all([
+  const [total, pending, wins, losses, expired, notTriggered] = await Promise.all([
     prisma.backtestResult.count(),
     prisma.backtestResult.count({ where: { outcome: 'pending' } }),
     prisma.backtestResult.count({ where: { outcome: 'win' } }),
     prisma.backtestResult.count({ where: { outcome: 'loss' } }),
     prisma.backtestResult.count({ where: { outcome: 'expired' } }),
+    prisma.backtestResult.count({ where: { outcome: 'not_triggered' } }),
   ])
-  return { total, pending, wins, losses, expired }
+  return { total, pending, wins, losses, expired, notTriggered }
 }
