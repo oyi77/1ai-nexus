@@ -151,19 +151,30 @@ function AlphaEnginePageInner() {
     }
   }, [historyLoading, buildHistoryUrl, historyNextCursor])
 
-  // Reset & refetch when filters change
+  // Reset & refetch when filters change — with retry on auth failure
   useEffect(() => {
+    let cancelled = false
     setHistory([])
     setHistoryNextCursor(null)
     setHistoryHasMore(false)
     setHistoryInitialLoaded(false)
-    // Immediate fetch with reset=true
-    const run = async () => {
+
+    const fetchPage = async (attempt = 0): Promise<void> => {
+      if (cancelled) return
       setHistoryLoading(true)
       try {
         const url = buildHistoryUrl(null)
         const res = await fetch(url)
+
+        // If 401 (CSRF not ready yet), retry after a short delay
+        if (res.status === 401 && attempt < 2) {
+          await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
+          if (!cancelled) return fetchPage(attempt + 1)
+          return
+        }
+
         const data = await res.json()
+        if (cancelled) return
         const newSignals = data?.data?.signals ?? []
         const nextCursor = data?.data?.nextCursor ?? null
         const hasMore = data?.data?.hasMore ?? false
@@ -173,10 +184,15 @@ function AlphaEnginePageInner() {
         setHistoryHasMore(hasMore)
         if (stats) setSignalStats(stats)
         setHistoryInitialLoaded(true)
-      } catch { /* silent */ }
-      finally { setHistoryLoading(false) }
+      } catch (e) {
+        console.error('[history] fetch failed:', e)
+      } finally {
+        if (!cancelled) setHistoryLoading(false)
+      }
     }
-    run()
+    fetchPage()
+
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyOutcome, historySort, historySearch])
 
