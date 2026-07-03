@@ -338,7 +338,7 @@ export async function checkExpiredSignals(): Promise<{ checked: number; updated:
   // Get all pending signals
   const pending = await prisma.backtestResult.findMany({
     where: { outcome: 'pending' },
-    take: 200,
+    take: 500,
   })
 
   if (pending.length === 0) return { checked: 0, updated: 0, wins: 0, losses: 0, expired: 0, notTriggered: 0 }

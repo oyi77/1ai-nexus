@@ -49,7 +49,7 @@ export async function GET(request: Request) {
 
     // Get completed signals from backtest results
     const completedWhere: Record<string, unknown> = {
-      outcome: { in: ['win', 'loss', 'expired', 'pending'] },
+      outcome: { in: ['win', 'loss', 'expired', 'not_triggered'] },
     }
     if (symbol) completedWhere.symbol = symbol
 

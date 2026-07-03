@@ -166,6 +166,7 @@ const FAST_INTERVAL = 60 * 1000      // 1 min for time-sensitive data
 const MEDIUM_INTERVAL = 5 * 60 * 1000 // 5 min for moderately fresh data
 const SLOW_INTERVAL = 15 * 60 * 1000  // 15 min for slow-changing data
 const SIGNAL_INTERVAL = 60 * 60 * 1000 // 1 hour for signal storage
+const OUTCOME_INTERVAL = 15 * 60 * 1000 // 15 min for signal outcome checking
 
 let initialized = false
 
@@ -197,7 +198,7 @@ export function startDataRefresher() {
   setInterval(refreshComposite, MEDIUM_INTERVAL)
   setInterval(refreshScore, MEDIUM_INTERVAL)
   setInterval(refreshSignalStore, SIGNAL_INTERVAL)      // Store signals hourly
-  setInterval(refreshSignalOutcomes, SIGNAL_INTERVAL)    // Check outcomes hourly
+  setInterval(refreshSignalOutcomes, OUTCOME_INTERVAL)  // Check outcomes every 15 min
 
-  console.log('[refresher] Scheduled: derivatives(1m), etf(5m), sentiment(5m), news(15m), risk(5m), onchain(1m), composite(5m), score(5m), signals(1h)')
+  console.log('[refresher] Scheduled: derivatives(1m), etf(5m), sentiment(5m), news(15m), risk(5m), onchain(1m), composite(5m), score(5m), signals(1h), outcomes(15m)')
 }
