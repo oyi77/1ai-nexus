@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { FinancialDisclaimer } from '@/components/FinancialDisclaimer'
 
 type ValidPeriod = '4h' | '24h' | '7d'
 
@@ -213,6 +214,7 @@ export default function AiSignalsPage() {
   return (
     <NexusLayout>
       <div className="p-6 space-y-4">
+      <FinancialDisclaimer variant="banner" />
         <div className="flex items-end justify-between">
           <div>
             <h1 className="text-xl font-bold font-mono text-accent-cyan">AI TRADING SIGNALS</h1>
