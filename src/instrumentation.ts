@@ -14,6 +14,7 @@ export async function register() {
     initTelegramBot()
 
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const Redis = require('ioredis')
 
       const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
