@@ -2,16 +2,21 @@
  * Smart price formatter — adapts decimal places to price magnitude.
  * Small prices (< $1) get more precision; large prices get fewer.
  * Returns number string WITHOUT $ prefix (use formatPriceUSD for prefix).
+ * 
+ * Crypto-focused: shows 4-6 decimals for sub-$1 tokens.
  */
 export function formatPrice(price: number): string {
   if (price === 0) return '0.00'
   
   const abs = Math.abs(price)
   
+  // Micro prices (< 0.0001): show up to 8 decimals (meme coins, etc.)
+  if (abs < 0.0001) return price.toFixed(8).replace(/\.?0+$/, '') || '0'
+  
   // Very small prices (< 0.01): show up to 6 decimals
   if (abs < 0.01) return price.toFixed(6).replace(/\.?0+$/, '') || '0'
   
-  // Small prices (< 1): show up to 4 decimals
+  // Small prices (< 1): show up to 4 decimals (crypto under $1)
   if (abs < 1) return price.toFixed(4).replace(/\.?0+$/, '') || '0'
   
   // Medium prices (< 100): 2 decimals

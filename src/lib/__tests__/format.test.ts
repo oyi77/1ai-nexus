@@ -6,17 +6,24 @@ describe('formatPrice', () => {
     expect(formatPrice(0)).toBe('0.00')
   })
 
+  it('formats micro prices (< 0.0001) with up to 8 decimals', () => {
+    expect(formatPrice(0.00001234)).toBe('0.00001234')
+    expect(formatPrice(0.00000001)).toBe('0.00000001')
+    // 0.000000001 rounds to 0 at 8 decimals
+    expect(formatPrice(0.000000001)).toBe('0')
+  })
+
   it('formats very small prices (< 0.01) with up to 6 decimals', () => {
     expect(formatPrice(0.001234)).toBe('0.001234')
     expect(formatPrice(0.000001)).toBe('0.000001')
-    // 0.0000001 rounds to 0 at 6 decimals
-    expect(formatPrice(0.0000001)).toBe('0')
+    expect(formatPrice(0.005)).toBe('0.005')
   })
 
   it('formats small prices (< 1) with up to 4 decimals', () => {
     expect(formatPrice(0.2345)).toBe('0.2345')
     expect(formatPrice(0.1)).toBe('0.1')
     expect(formatPrice(0.99)).toBe('0.99')
+    expect(formatPrice(0.123456789)).toBe('0.1235')
   })
 
   it('formats medium prices (< 100) with 2 decimals', () => {
@@ -38,6 +45,7 @@ describe('formatPrice', () => {
 
   it('handles negative prices', () => {
     expect(formatPrice(-0.2345)).toBe('-0.2345')
+    expect(formatPrice(-0.00001234)).toBe('-0.00001234')
     expect(formatPrice(-1234.56)).toBe('-1,234.56')
   })
 })
@@ -46,6 +54,7 @@ describe('formatPriceUSD', () => {
   it('adds $ prefix to formatPrice output', () => {
     expect(formatPriceUSD(0)).toBe('$0.00')
     expect(formatPriceUSD(0.2345)).toBe('$0.2345')
+    expect(formatPriceUSD(0.00001234)).toBe('$0.00001234')
     expect(formatPriceUSD(1234.56)).toBe('$1,234.56')
     expect(formatPriceUSD(10000)).toBe('$10,000')
   })
