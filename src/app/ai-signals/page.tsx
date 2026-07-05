@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { FinancialDisclaimer } from '@/components/FinancialDisclaimer'
+import { formatPriceUSD } from '@/lib/format'
 
 type ValidPeriod = '4h' | '24h' | '7d'
 
@@ -329,7 +330,7 @@ export default function AiSignalsPage() {
                       <div className="flex items-center gap-4">
                         <div className="text-right">
                           <p className="text-[10px] text-text-muted font-mono">PRICE</p>
-                          <p className="text-sm font-mono font-bold text-text-primary">${signal.price.toFixed(2)}</p>
+                          <p className="text-sm font-mono font-bold text-text-primary">{formatPriceUSD(signal.price)}</p>
                         </div>
                         <div className="text-right">
                           <p className="text-[10px] text-text-muted font-mono">CHG</p>
@@ -371,29 +372,29 @@ export default function AiSignalsPage() {
                             {signal.expiresAt < Date.now() ? 'EXPIRED' : signal.validPeriod}
                           </span>
                           <span className="text-text-muted">ENTRY</span>
-                          <span className="text-text-primary font-bold">${signal.entry.toFixed(2)}</span>
+                          <span className="text-text-primary font-bold">{formatPriceUSD(signal.entry)}</span>
                           {signal.tp1 && (
                             <>
                               <span className="text-data-bull">TP1</span>
-                              <span className="text-data-bull">${signal.tp1.toFixed(2)}</span>
+                              <span className="text-data-bull">{formatPriceUSD(signal.tp1)}</span>
                             </>
                           )}
                           {signal.tp2 && (
                             <>
                               <span className="text-data-bull">TP2</span>
-                              <span className="text-data-bull">${signal.tp2.toFixed(2)}</span>
+                              <span className="text-data-bull">{formatPriceUSD(signal.tp2)}</span>
                             </>
                           )}
                           {signal.tp3 && (
                             <>
                               <span className="text-data-bull">TP3</span>
-                              <span className="text-data-bull">${signal.tp3.toFixed(2)}</span>
+                              <span className="text-data-bull">{formatPriceUSD(signal.tp3)}</span>
                             </>
                           )}
                           {signal.sl && (
                             <>
                               <span className="text-data-bear">SL</span>
-                              <span className="text-data-bear">${signal.sl.toFixed(2)}</span>
+                              <span className="text-data-bear">{formatPriceUSD(signal.sl)}</span>
                             </>
                           )}
                         </div>
@@ -440,17 +441,17 @@ export default function AiSignalsPage() {
 
                       <div className="flex items-center gap-3 text-[10px] font-mono">
                         <span className="text-text-muted">ENTRY</span>
-                        <span className="text-text-primary">${s.entry.toLocaleString()}</span>
+                        <span className="text-text-primary">{formatPriceUSD(s.entry)}</span>
                         {s.tp1 && (
                           <>
                             <span className="text-data-bull">TP1</span>
-                            <span className="text-data-bull">${s.tp1.toLocaleString()}</span>
+                            <span className="text-data-bull">{formatPriceUSD(s.tp1)}</span>
                           </>
                         )}
                         {s.sl && (
                           <>
                             <span className="text-data-bear">SL</span>
-                            <span className="text-data-bear">${s.sl.toLocaleString()}</span>
+                            <span className="text-data-bear">{formatPriceUSD(s.sl)}</span>
                           </>
                         )}
                       </div>

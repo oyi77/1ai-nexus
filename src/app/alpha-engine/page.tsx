@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { formatPriceUSD } from '@/lib/format'
 import { FinancialDisclaimer } from '@/components/FinancialDisclaimer'
 
 type ValidPeriod = '4h' | '24h' | '7d'
@@ -378,29 +379,29 @@ function AlphaEnginePageInner() {
                     {s.entry && (
                       <div className="flex items-center gap-3 ml-8 text-[10px] font-mono">
                         <span className="text-text-muted">ENTRY</span>
-                        <span className="text-text-primary font-bold">${s.entry.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        <span className="text-text-primary font-bold">{formatPriceUSD(s.entry)}</span>
                         {s.tp1 && (
                           <>
                             <span className="text-data-bull">TP1</span>
-                            <span className="text-data-bull">${s.tp1.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="text-data-bull">{formatPriceUSD(s.tp1)}</span>
                           </>
                         )}
                         {s.tp2 && (
                           <>
                             <span className="text-data-bull">TP2</span>
-                            <span className="text-data-bull">${s.tp2.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="text-data-bull">{formatPriceUSD(s.tp2)}</span>
                           </>
                         )}
                         {s.tp3 && (
                           <>
                             <span className="text-data-bull">TP3</span>
-                            <span className="text-data-bull">${s.tp3.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="text-data-bull">{formatPriceUSD(s.tp3)}</span>
                           </>
                         )}
                         {s.sl && (
                           <>
                             <span className="text-data-bear">SL</span>
-                            <span className="text-data-bear">${s.sl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                            <span className="text-data-bear">{formatPriceUSD(s.sl)}</span>
                           </>
                         )}
                         <span className="text-text-muted ml-auto">{new Date(s.timestamp).toLocaleTimeString()}</span>
@@ -487,17 +488,17 @@ function AlphaEnginePageInner() {
                     {/* Trading Levels */}
                     <div className="flex items-center gap-3 text-[10px] font-mono">
                       <span className="text-text-muted">ENTRY</span>
-                      <span className="text-text-primary">${s.entry.toLocaleString()}</span>
+                      <span className="text-text-primary">{formatPriceUSD(s.entry)}</span>
                       {s.tp1 && (
                         <>
                           <span className="text-data-bull">TP1</span>
-                          <span className="text-data-bull">${s.tp1.toLocaleString()}</span>
+                          <span className="text-data-bull">{formatPriceUSD(s.tp1)}</span>
                         </>
                       )}
                       {s.sl && (
                         <>
                           <span className="text-data-bear">SL</span>
-                          <span className="text-data-bear">${s.sl.toLocaleString()}</span>
+                          <span className="text-data-bear">{formatPriceUSD(s.sl)}</span>
                         </>
                       )}
                     </div>
@@ -556,9 +557,9 @@ function AlphaEnginePageInner() {
                       {p.direction.toUpperCase()}
                     </span>
                     <span className="text-[12px] font-mono font-bold text-teal-vivid">{p.symbol}</span>
-                    <span className="text-[11px] font-mono text-text-primary tabular-nums">Entry: ${p.entryPrice.toLocaleString()}</span>
-                    {p.targetPrice && <span className="text-[11px] font-mono text-data-bull tabular-nums">Target: ${p.targetPrice.toLocaleString()}</span>}
-                    {p.stopLoss && <span className="text-[11px] font-mono text-data-bear tabular-nums">SL: ${p.stopLoss.toLocaleString()}</span>}
+                    <span className="text-[11px] font-mono text-text-primary tabular-nums">Entry: {formatPriceUSD(p.entryPrice)}</span>
+                    {p.targetPrice && <span className="text-[11px] font-mono text-data-bull tabular-nums">Target: {formatPriceUSD(p.targetPrice)}</span>}
+                    {p.stopLoss && <span className="text-[11px] font-mono text-data-bear tabular-nums">SL: {formatPriceUSD(p.stopLoss)}</span>}
                     <span className="text-[10px] font-mono text-text-muted">Conf: {p.confidence}%</span>
                     <span className="text-[9px] font-mono text-text-muted ml-auto">{p.source}</span>
                   </div>
@@ -581,7 +582,7 @@ function AlphaEnginePageInner() {
                       {p.outcome?.toUpperCase()}
                     </span>
                     <span className="text-[11px] font-mono font-bold text-teal-vivid">{p.symbol}</span>
-                    <span className="text-[11px] font-mono text-text-primary tabular-nums">${p.entryPrice.toLocaleString()} → ${p.exitPrice?.toLocaleString()}</span>
+                    <span className="text-[11px] font-mono text-text-primary tabular-nums">{formatPriceUSD(p.entryPrice)} → {formatPriceUSD(p.exitPrice ?? 0)}</span>
                     <span className={`text-[11px] font-mono font-bold tabular-nums ${(p.pnlPercent ?? 0) >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                       {(p.pnlPercent ?? 0) > 0 ? '+' : ''}{(p.pnlPercent ?? 0).toFixed(2)}%
                     </span>
