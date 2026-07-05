@@ -51,15 +51,15 @@ export async function runBackfillChain(chain: Chain, force = false): Promise<voi
   const topics = ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"]; // Transfer
   const addresses = await trackedAddresses(chain);
 
-  const payload: any = {
+  const payload: Record<string, unknown> = {
     fromBlock: `0x${start.toString(16)}`,
     toBlock: `0x${end.toString(16)}`,
     topics,
-  };
+  }
   if (addresses.length > 0) payload.address = addresses;
 
   const result = await rpcCall(PUBLIC_WS_URLS[chain].replace("wss://", "https://"), "eth_getLogs", [payload]);
-  const logs: any[] = Array.isArray(result?.result) ? result.result : [];
+  const logs: Record<string, unknown>[] = Array.isArray(result?.result) ? result.result : []
 
   console.log(`[backfill:${chain}] retrieved ${logs.length} logs`);
 
@@ -96,7 +96,7 @@ async function headBlock(chain: Chain): Promise<bigint> {
     ws.on("open", () => {
       ws.send(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_subscribe", params: ["newHeads"] }));
       ws.on("message", (raw) => {
-        const msg = JSON.parse((raw as any).toString?.() ?? raw.toString?.());
+        const msg = JSON.parse((raw as Buffer).toString() ?? raw.toString?.());
         if (msg.method === "eth_subscription" && msg.params?.result?.number) {
           clearTimeout(t);
           ws.close();
@@ -116,12 +116,10 @@ async function trackedAddresses(chain: string): Promise<string[]> {
   return rows.map((r) => r.address.toLowerCase());
 }
 
-async function rpcCall(url: string, method: string, params: any[]): Promise<any> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  });
-  if (!res.ok) throw new Error(`rpc ${res.status}`);
-  return res.json();
-}
+async function rpcCall(url: string, method: string, params: unknown[]): Promise<unknown> { const res = await fetch(url, {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+});
+if (!res.ok) throw new Error(`rpc ${res.status}`);
+return res.json(); }

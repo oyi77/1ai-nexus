@@ -1,5 +1,5 @@
 import { prisma } from '../db';
-import { EventEnvelope, IEventBus } from './event-contract';
+import { EventEnvelope } from './event-contract';
 import { publishEvent } from '../publisher';
 
 export type Chain = 'eth' | 'arb' | 'base' | 'op' | 'sol';
@@ -23,7 +23,7 @@ export interface EnrichedTx {
   slippagePct?: number;
   smcScore?: number;
   whaleTier?: 'low'|'mid'|'high'|'mega';
-  raw?: any;
+  raw?: unknown;
   priceUsd?: number;
   tokenName?: string;
   tokenLogo?: string;
@@ -33,7 +33,7 @@ export interface EnrichedTx {
 }
 
 export async function handleIncomingTx(envelope: EventEnvelope) {
-  const data = envelope.payload as any;
+  const data = envelope.payload as Record<string, unknown>;
   const enriched = await enrichTx({
     chain: data.chain as Chain,
     txHash: data.hash ?? data.transactionHash,
@@ -65,7 +65,7 @@ export async function handleIncomingTx(envelope: EventEnvelope) {
     eventId: envelope.eventId ?? `${enriched.chain}:${enriched.txHash}`,
     schemaVersion: 'tx.v2',
     occurredAt: new Date(),
-    payload: { ...enriched, signals, whale, mev, approval } as any,
+    payload: { ...enriched, signals, whale, mev, approval },
   };
 
   await publishEvent('nexus:trades', enrichmentEnv.payload);

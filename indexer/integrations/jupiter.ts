@@ -10,11 +10,6 @@ import { fetchJson } from "./http-client";
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const CACHE_TTL_MS = 30_000; // 30 seconds
 
-interface JupiterPriceEntry {
-  id: string;
-  type: string;
-  price: string;
-}
 
 interface PriceCacheEntry {
   price: number;

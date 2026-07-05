@@ -21,29 +21,25 @@ export const clickhouse = createClient({
   pool: { min: 1, max: 4 },
 });
 
-export async function clickhouseQuery<T = any>(sql: string, params?: Record<string, any>): Promise<T[]> {
-  const resultSet = await clickhouse.query({ query: sql, format: "JSONEachRow", query_params: params });
-  const rows: T[] = [];
-  for await (const row of resultSet) {
-    rows.push(row as T);
-  }
-  return rows;
+export async function clickhouseQuery<T = unknown>(sql: string, params?: Record<string, unknown>): Promise<T[]> { const resultSet = await clickhouse.query({ query: sql, format: "JSONEachRow", query_params: params });
+const rows: T[] = [];
+for await (const row of resultSet) {
+  rows.push(row as T);
 }
+return rows; }
 
-export async function clickhouseInsert(table: string, rows: Record<string, any>[]): Promise<void> {
-  if (rows.length === 0) return;
-  await clickhouse.insert({
-    table,
-    format: "JSONEachRow",
-    values: rows,
-  });
-}
+export async function clickhouseInsert(table: string, rows: Record<string, unknown>[]): Promise<void> { if (rows.length === 0) return;
+await clickhouse.insert({
+  table,
+  format: "JSONEachRow",
+  values: rows,
+}); }
 
 export async function pingClickHouse(): Promise<boolean> {
   try {
     await clickhouse.query({ query: "SELECT 1", format: "TabSeparated" });
     return true;
-  } catch (e) {
+  } catch {
     return false;
   }
 }

@@ -5,6 +5,7 @@
 // Runs via setInterval in instrumentation.ts on server startup
 // ─────────────────────────────────────────────────────────────
 
+import { logger } from '@/lib/logger'
 import { fetchDerivativesSnapshot, fetchRecentLiquidations, persistDerivativesSnapshot, persistLiquidations } from '@/lib/modules/derived/derivatives-intel'
 import { fetchETFSummary, persistETFFlows } from '@/lib/modules/tradfi/etf/flows'
 import { fetchPremiumSnapshots, persistPremiumSnapshots } from '@/lib/modules/tradfi/premium/monitor'
@@ -35,8 +36,8 @@ async function refreshDerivatives() {
     await cacheSet('derivatives:liquidations', liquidations, 120)
     persistLiquidations(liquidations).catch(() => {})
 
-    console.log(`[refresher] derivatives: ${snapshots.length} snapshots, ${liquidations.length} liquidations`)
-  } catch (e) { console.error('[refresher] derivatives failed:', (e as Error).message) }
+    logger.info("derivatives: ${snapshots.length} snapshots, ${liquidations.length} liquidations", "refresher")
+  } catch (e) { logger.error("derivatives failed:", "refresher", { error: (e as Error).message }) }
 }
 
 async function refreshETF() {
@@ -49,8 +50,8 @@ async function refreshETF() {
     await cacheSet('etf:premiums', premiums, 600)
     persistPremiumSnapshots(premiums).catch(() => {})
 
-    console.log(`[refresher] etf: ${etf.flows.length} flows, ${premiums.length} premiums`)
-  } catch (e) { console.error('[refresher] etf failed:', (e as Error).message) }
+    logger.info("etf: ${etf.flows.length} flows, ${premiums.length} premiums", "refresher")
+  } catch (e) { logger.error("etf failed:", "refresher", { error: (e as Error).message }) }
 }
 
 async function refreshSentiment() {
@@ -58,8 +59,8 @@ async function refreshSentiment() {
     const sentiment = await fetchSentimentIntelligence()
     await cacheSet('sentiment:data', sentiment, 600)
     persistSentimentSnapshots(sentiment).catch(() => {})
-    console.log(`[refresher] sentiment: ${sentiment.length} items`)
-  } catch (e) { console.error('[refresher] sentiment failed:', (e as Error).message) }
+    logger.info("sentiment: ${sentiment.length} items", "refresher")
+  } catch (e) { logger.error("sentiment failed:", "refresher", { error: (e as Error).message }) }
 }
 
 async function refreshNews() {
@@ -67,8 +68,8 @@ async function refreshNews() {
     const news = await fetchNewsIntelligence()
     await cacheSet('news:data', news, 900)
     if (news.events?.length) persistNewsEvents(news.events).catch(() => {})
-    console.log(`[refresher] news: ${news.events?.length ?? 0} events`)
-  } catch (e) { console.error('[refresher] news failed:', (e as Error).message) }
+    logger.info("news: ${news.events?.length ?? 0} events", "refresher")
+  } catch (e) { logger.error("news failed:", "refresher", { error: (e as Error).message }) }
 }
 
 async function refreshRisk() {
@@ -85,8 +86,8 @@ async function refreshRisk() {
     await cacheSet('risk:narrative', narrative, 600)
     persistSectorFlows(narrative).catch(() => {})
 
-    console.log(`[refresher] risk: ${credit.length} credit, miner hr=${miner.hashRate}, ${narrative.length} sectors`)
-  } catch (e) { console.error('[refresher] risk failed:', (e as Error).message) }
+    logger.info("risk: ${credit.length} credit, miner hr=${miner.hashRate}, ${narrative.length} sectors", "refresher")
+  } catch (e) { logger.error("risk failed:", "refresher", { error: (e as Error).message }) }
 }
 
 async function refreshOnchain() {
@@ -101,24 +102,24 @@ async function refreshOnchain() {
     await cacheSet('onchain:staking', staking, 300)
     persistStakingFlow(staking).catch(() => {})
 
-    console.log(`[refresher] onchain: ${mempool.length} mempool, ${bridge.bridges.length} bridges, staking entry=${staking.entryQueue}`)
-  } catch (e) { console.error('[refresher] onchain failed:', (e as Error).message) }
+    logger.info("onchain: ${mempool.length} mempool, ${bridge.bridges.length} bridges, staking entry=${staking.entryQueue}", "refresher")
+  } catch (e) { logger.error("onchain failed:", "refresher", { error: (e as Error).message }) }
 }
 
 async function refreshComposite() {
   try {
     const signals = await evaluateCompositeSignals()
     await cacheSet('composite:signals', signals, 600)
-    console.log(`[refresher] composite: ${signals.length} signals`)
-  } catch (e) { console.error('[refresher] composite failed:', (e as Error).message) }
+    logger.info("composite: ${signals.length} signals", "refresher")
+  } catch (e) { logger.error("composite failed:", "refresher", { error: (e as Error).message }) }
 }
 
 async function refreshScore() {
   try {
     const score = await computeIntelligenceScore()
     await cacheSet('score:data', score, 600)
-    console.log(`[refresher] score: ${score.overall}/100 (${score.grade}), regime: ${score.regime}`)
-  } catch (e) { console.error('[refresher] score failed:', (e as Error).message) }
+    logger.info("score: ${score.overall}/100 (${score.grade}), regime: ${score.regime}", "refresher")
+  } catch (e) { logger.error("score failed:", "refresher", { error: (e as Error).message }) }
 }
 
 // Store alpha signals to DB for history tracking
@@ -142,9 +143,9 @@ async function refreshSignalStore() {
       })
       stored++
     }
-    if (stored > 0) console.log(`[refresher] Stored ${stored} signals for history`)
+    if (stored > 0) logger.info(`Stored ${stored} signals for history`, "refresher")
   } catch (err) {
-    console.error('[refresher] Signal store error:', (err as Error).message)
+    logger.error("Signal store error:", "refresher", { error: (err as Error).message })
   }
 }
 
@@ -153,10 +154,10 @@ async function refreshSignalOutcomes() {
   try {
     const result = await checkExpiredSignals()
     if (result.updated > 0) {
-      console.log(`[refresher] Signal outcomes: ${result.checked} checked, ${result.updated} updated (${result.wins}W/${result.losses}L)`)
+      logger.info("Signal outcomes: ${result.checked} checked, ${result.updated} updated (${result.wins}W/${result.losses}L)", "refresher")
     }
   } catch (err) {
-    console.error('[refresher] Signal outcomes error:', (err as Error).message)
+    logger.error("Signal outcomes error:", "refresher", { error: (err as Error).message })
   }
 }
 
@@ -174,7 +175,7 @@ export function startDataRefresher() {
   if (initialized) return
   initialized = true
 
-  console.log('[refresher] Starting background data refresher (Redis-backed)...')
+  logger.info("Starting background data refresher (Redis-backed)...", "refresher")
 
   // Run immediately on startup (stagger to avoid thundering herd)
   setTimeout(() => refreshDerivatives(), 1_000)
@@ -200,5 +201,5 @@ export function startDataRefresher() {
   setInterval(refreshSignalStore, SIGNAL_INTERVAL)      // Store signals hourly
   setInterval(refreshSignalOutcomes, OUTCOME_INTERVAL)  // Check outcomes every 15 min
 
-  console.log('[refresher] Scheduled: derivatives(1m), etf(5m), sentiment(5m), news(15m), risk(5m), onchain(1m), composite(5m), score(5m), signals(1h), outcomes(15m)')
+  logger.info("Scheduled: derivatives(1m), etf(5m), sentiment(5m), news(15m), risk(5m), onchain(1m), composite(5m), score(5m), signals(1h), outcomes(15m)", "refresher")
 }

@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { verifyWebhook, type PaymentMethod } from '@/lib/payments'
+import { logger } from '@/lib/logger'
 
 const VALID_METHODS: PaymentMethod[] = ['tripay', 'midtrans', 'duitku', 'nowpayments']
 
@@ -31,15 +32,15 @@ export async function POST(
     }
 
     // Process payment status
-    console.log(`[Webhook] ${gateway}: Order ${payload.orderId} = ${payload.status}`)
+    logger.info(`Order ${payload.orderId} = ${payload.status}`, 'webhook', { gateway })
 
-    // TODO: Update order in database
-    // await updateOrderStatus(payload.orderId, payload.status)
+    // NOTE: Order persistence not yet implemented — no Order model in schema.
+    // When implementing: create Order model, add updateOrderStatus(), handle idempotency.
 
     return new Response('OK', { status: 200 })
 
   } catch (err) {
-    console.error(`[Webhook] ${gateway} error:`, err)
+    logger.error(`${gateway} webhook error`, 'webhook', { error: (err as Error).message })
     return new Response('Error', { status: 500 })
   }
 }

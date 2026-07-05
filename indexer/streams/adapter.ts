@@ -36,7 +36,7 @@ export async function startStreamsAdapter(): Promise<Redis> {
         for (const [, entries] of res) {
           for (const entry of entries) {
             const [id, ...kvs] = entry;
-            const payload = kvs.find((v: any, i: number) => i % 2 === 1);
+            const payload = kvs.find((_v, i) => i % 2 === 1);
             if (!payload) continue;
             try {
               const env = JSON.parse(payload as string) as EventEnvelope;

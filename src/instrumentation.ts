@@ -4,6 +4,7 @@ export async function register() {
   // chains into the Edge Instrumentation build.
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
 
+  const { logger } = await import('@/lib/logger')
   const { startDataRefresher } = await import('@/lib/data-refresher');
   const { initTelegramBot, broadcastAlert } = await import('@/lib/telegram/bot');
 
@@ -22,9 +23,9 @@ export async function register() {
 
       redis.subscribe('nexus:memecoin-alerts', (err: Error | null, count: number) => {
         if (err) {
-          console.error('[memecoin-alerts] Redis subscribe failed:', err.message)
+          logger.error('Redis subscribe failed', 'memecoin-alerts', { error: err.message })
         } else {
-          console.log(`[memecoin-alerts] Subscribed to ${count} channel(s)`)
+          logger.info(`Subscribed to ${count} channel(s)`, 'memecoin-alerts')
         }
       })
 
@@ -35,15 +36,15 @@ export async function register() {
             broadcastAlert(alert.message)
           }
         } catch (err) {
-          console.error('[memecoin-alerts] Failed to process alert:', (err as Error).message)
+          logger.error('Failed to process alert', 'memecoin-alerts', { error: (err as Error).message })
         }
       })
 
       redis.on('error', (err: Error) => {
-          console.error('[memecoin-alerts] Redis error:', err.message)
+          logger.error('Redis error', 'memecoin-alerts', { error: err.message })
       })
     } catch {
-      console.warn('[instrumentation] ioredis not available, skipping Redis subscriptions')
+      logger.warn('ioredis not available, skipping Redis subscriptions', 'instrumentation')
     }
   }
 }

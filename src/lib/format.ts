@@ -1,9 +1,10 @@
 /**
  * Smart price formatter — adapts decimal places to price magnitude.
  * Small prices (< $1) get more precision; large prices get fewer.
+ * Returns number string WITHOUT $ prefix (use formatPriceUSD for prefix).
  */
 export function formatPrice(price: number): string {
-  if (price === 0) return '$0.00'
+  if (price === 0) return '0.00'
   
   const abs = Math.abs(price)
   

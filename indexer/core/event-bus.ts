@@ -1,5 +1,5 @@
 import Redis from "ioredis";
-import { ulid } from "ulid";
+
 import { EventEnvelope, IEventBus } from "./event-contract";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
@@ -34,7 +34,7 @@ export class RedisStreamsBus implements IEventBus {
     await this.client.xgroup("CREATE", stream, group, "0", "MKSTREAM").catch(() => {});
 
     const read = async () => {
-      const res: any = await this.client.xreadgroup(
+      const res = await this.client.xreadgroup(
         "GROUP",
         group,
         consumer,
@@ -45,7 +45,7 @@ export class RedisStreamsBus implements IEventBus {
         "STREAMS",
         stream,
         ">",
-      );
+      )
 
       if (!res) return;
 
@@ -86,12 +86,8 @@ export function subscribe<T>(
 
 export const eventBus = new RedisStreamsBus();
 
-function toMap(kvs: any[]): Record<string, string> {
-  const out: Record<string, string> = {};
-  for (let i = 0; i < kvs.length; i += 2) out[kvs[i]] = kvs[i + 1];
-  return out;
-}
+function toMap(kvs: string[]): Record<string, string> { const out: Record<string, string> = {};
+for (let i = 0; i < kvs.length; i += 2) out[kvs[i]] = kvs[i + 1];
+return out; }
 
-function safeJson(v: any) {
-  try { return JSON.parse(v); } catch { return v; }
-}
+function safeJson(v: unknown) { try { return JSON.parse(v); } catch { return v; } }
