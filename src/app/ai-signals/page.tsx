@@ -211,6 +211,14 @@ export default function AiSignalsPage() {
   const filtered = filter === 'All' ? signals : signals.filter(s => s.assetClass === filter.toLowerCase())
   const longCount = signals.filter(s => s.direction === 'LONG').length
   const shortCount = signals.filter(s => s.direction === 'SHORT').length
+  
+  // History stats
+  const historyTotal = history.length
+  const historyWins = history.filter(s => s.outcome === 'win').length
+  const historyLosses = history.filter(s => s.outcome === 'loss').length
+  const historyActive = history.filter(s => s.status === 'active').length
+  const historyWinRate = historyTotal > 0 ? (historyWins / (historyWins + historyLosses) * 100) : 0
+  const historyAvgPnl = history.filter(s => s.pnlPercent !== null).reduce((sum, s) => sum + (s.pnlPercent || 0), 0) / Math.max(1, history.filter(s => s.pnlPercent !== null).length)
 
   return (
     <NexusLayout>
@@ -245,6 +253,8 @@ export default function AiSignalsPage() {
           ))}
         </div>
 
+        {tab === 'signals' && (
+          <>
         {/* Signal Summary */}
         <div className="grid grid-cols-6 gap-4">
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
@@ -289,6 +299,8 @@ export default function AiSignalsPage() {
               ))}
             </div>
           </div>
+        )}
+          </>
         )}
 
         {tab === 'signals' && (
@@ -408,11 +420,42 @@ export default function AiSignalsPage() {
         )}
 
         {tab === 'history' && (
-          <div className="bg-bg-panel border border-border-dim rounded-lg">
-            <div className="p-4 border-b border-border-dim">
-              <h2 className="text-sm font-mono text-accent-cyan">Signal History</h2>
-              <p className="text-[10px] text-text-muted font-mono mt-1">{history.length} signals tracked</p>
+          <>
+            {/* History Summary */}
+            <div className="grid grid-cols-6 gap-4">
+              <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+                <p className="text-[10px] text-text-muted font-mono">TOTAL</p>
+                <p className="text-xl font-bold font-mono text-text-primary">{historyTotal}</p>
+              </div>
+              <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+                <p className="text-[10px] text-text-muted font-mono">WINS</p>
+                <p className="text-xl font-bold font-mono text-data-bull">{historyWins}</p>
+              </div>
+              <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+                <p className="text-[10px] text-text-muted font-mono">LOSSES</p>
+                <p className="text-xl font-bold font-mono text-data-bear">{historyLosses}</p>
+              </div>
+              <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+                <p className="text-[10px] text-text-muted font-mono">ACTIVE</p>
+                <p className="text-xl font-bold font-mono text-teal-vivid">{historyActive}</p>
+              </div>
+              <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+                <p className="text-[10px] text-text-muted font-mono">WIN RATE</p>
+                <p className="text-xl font-bold font-mono text-text-primary">{historyWinRate.toFixed(1)}%</p>
+              </div>
+              <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+                <p className="text-[10px] text-text-muted font-mono">AVG PNL</p>
+                <p className={`text-xl font-bold font-mono ${historyAvgPnl >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                  {historyAvgPnl >= 0 ? '+' : ''}{historyAvgPnl.toFixed(2)}%
+                </p>
+              </div>
             </div>
+
+            <div className="bg-bg-panel border border-border-dim rounded-lg">
+              <div className="p-4 border-b border-border-dim">
+                <h2 className="text-sm font-mono text-accent-cyan">Signal History</h2>
+                <p className="text-[10px] text-text-muted font-mono mt-1">{historyTotal} signals tracked</p>
+              </div>
             <div className="divide-y divide-border-dim">
               {history.length === 0 ? (
                 <div className="p-8 text-center text-text-muted text-[12px] font-mono">
