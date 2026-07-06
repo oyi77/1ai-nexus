@@ -36,7 +36,7 @@ async function refreshDerivatives() {
     await cacheSet('derivatives:liquidations', liquidations, 120)
     persistLiquidations(liquidations).catch(() => {})
 
-    logger.info("derivatives: ${snapshots.length} snapshots, ${liquidations.length} liquidations", "refresher")
+    logger.info(`derivatives: ${snapshots.length} snapshots, ${liquidations.length} liquidations`, "refresher")
   } catch (e) { logger.error("derivatives failed:", "refresher", { error: (e as Error).message }) }
 }
 
@@ -50,7 +50,7 @@ async function refreshETF() {
     await cacheSet('etf:premiums', premiums, 600)
     persistPremiumSnapshots(premiums).catch(() => {})
 
-    logger.info("etf: ${etf.flows.length} flows, ${premiums.length} premiums", "refresher")
+    logger.info(`etf: ${etf.flows.length} flows, ${premiums.length} premiums`, "refresher")
   } catch (e) { logger.error("etf failed:", "refresher", { error: (e as Error).message }) }
 }
 
@@ -59,7 +59,7 @@ async function refreshSentiment() {
     const sentiment = await fetchSentimentIntelligence()
     await cacheSet('sentiment:data', sentiment, 600)
     persistSentimentSnapshots(sentiment).catch(() => {})
-    logger.info("sentiment: ${sentiment.length} items", "refresher")
+    logger.info(`sentiment: ${sentiment.length} items`, "refresher")
   } catch (e) { logger.error("sentiment failed:", "refresher", { error: (e as Error).message }) }
 }
 
@@ -68,7 +68,7 @@ async function refreshNews() {
     const news = await fetchNewsIntelligence()
     await cacheSet('news:data', news, 900)
     if (news.events?.length) persistNewsEvents(news.events).catch(() => {})
-    logger.info("news: ${news.events?.length ?? 0} events", "refresher")
+    logger.info(`news: ${news.events?.length ?? 0} events`, "refresher")
   } catch (e) { logger.error("news failed:", "refresher", { error: (e as Error).message }) }
 }
 
@@ -86,7 +86,7 @@ async function refreshRisk() {
     await cacheSet('risk:narrative', narrative, 600)
     persistSectorFlows(narrative).catch(() => {})
 
-    logger.info("risk: ${credit.length} credit, miner hr=${miner.hashRate}, ${narrative.length} sectors", "refresher")
+    logger.info(`risk: ${credit.length} credit, miner hr=${miner.hashRate}, ${narrative.length} sectors`, "refresher")
   } catch (e) { logger.error("risk failed:", "refresher", { error: (e as Error).message }) }
 }
 
@@ -102,7 +102,7 @@ async function refreshOnchain() {
     await cacheSet('onchain:staking', staking, 300)
     persistStakingFlow(staking).catch(() => {})
 
-    logger.info("onchain: ${mempool.length} mempool, ${bridge.bridges.length} bridges, staking entry=${staking.entryQueue}", "refresher")
+    logger.info(`onchain: ${mempool.length} mempool, ${bridge.bridges.length} bridges, staking entry=${staking.entryQueue}`, "refresher")
   } catch (e) { logger.error("onchain failed:", "refresher", { error: (e as Error).message }) }
 }
 
@@ -110,7 +110,7 @@ async function refreshComposite() {
   try {
     const signals = await evaluateCompositeSignals()
     await cacheSet('composite:signals', signals, 600)
-    logger.info("composite: ${signals.length} signals", "refresher")
+    logger.info(`composite: ${signals.length} signals`, "refresher")
   } catch (e) { logger.error("composite failed:", "refresher", { error: (e as Error).message }) }
 }
 
@@ -118,7 +118,7 @@ async function refreshScore() {
   try {
     const score = await computeIntelligenceScore()
     await cacheSet('score:data', score, 600)
-    logger.info("score: ${score.overall}/100 (${score.grade}), regime: ${score.regime}", "refresher")
+    logger.info(`score: ${score.overall}/100 (${score.grade}), regime: ${score.regime}`, "refresher")
   } catch (e) { logger.error("score failed:", "refresher", { error: (e as Error).message }) }
 }
 
@@ -154,7 +154,7 @@ async function refreshSignalOutcomes() {
   try {
     const result = await checkExpiredSignals()
     if (result.updated > 0) {
-      logger.info("Signal outcomes: ${result.checked} checked, ${result.updated} updated (${result.wins}W/${result.losses}L)", "refresher")
+      logger.info(`Signal outcomes: ${result.checked} checked, ${result.updated} updated (${result.wins}W/${result.losses}L)`, "refresher")
     }
   } catch (err) {
     logger.error("Signal outcomes error:", "refresher", { error: (err as Error).message })

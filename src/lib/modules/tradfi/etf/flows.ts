@@ -128,18 +128,27 @@ export async function fetchETFSummary() {
 export async function persistETFFlows(flows: ETFFlow[]): Promise<number> {
   let persisted = 0
   for (const flow of flows) {
-    try {
-      await prisma.eTFFlowSnapshot.create({
-        data: {
+    await prisma.eTFFlowSnapshot.upsert({
+      where: {
+        issuer_asset_date: {
           issuer: flow.issuer,
           asset: flow.asset,
-          netFlowUsd: flow.netFlowUsd,
-          cumulativeFlowUsd: flow.cumulativeFlowUsd,
           date: new Date(flow.date),
         },
-      })
-      persisted++
-    } catch { /* skip duplicates */ }
+      },
+      update: {
+        netFlowUsd: flow.netFlowUsd,
+        cumulativeFlowUsd: flow.cumulativeFlowUsd,
+      },
+      create: {
+        issuer: flow.issuer,
+        asset: flow.asset,
+        netFlowUsd: flow.netFlowUsd,
+        cumulativeFlowUsd: flow.cumulativeFlowUsd,
+        date: new Date(flow.date),
+      },
+    })
+    persisted++
   }
   return persisted
 }
