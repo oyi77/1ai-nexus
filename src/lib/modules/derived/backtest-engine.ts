@@ -93,7 +93,9 @@ async function fetchHistoricalPrices(
 }
 
 // Check if a signal hit TP or SL
-// Note: When both SL and TP fall within same candle, SL is checked first (conservative)
+// Strategy: SL checked first (conservative). For TP, find the FARTHEST target
+// reached within the candle's range — a gap-up candle that blows past all 3 TPs
+// should record tp3, not tp1.
 function checkOutcome(
   candles: Array<{ time: number; high: number; low: number; close: number }>,
   signal: BacktestSignal
@@ -105,46 +107,53 @@ function checkOutcome(
   const isBullish = signal.direction === 'bullish'
   const entryTime = signal.timestamp
 
+  // Targets sorted closest → farthest from entry so we can find the max hit
+  const targets = [
+    { price: signal.tp1, name: 'tp1' },
+    { price: signal.tp2, name: 'tp2' },
+    { price: signal.tp3, name: 'tp3' },
+  ].filter((t): t is { price: number; name: string } => t.price !== null && t.price !== undefined)
+
   for (const candle of candles) {
-    // Skip candles before or at signal time
     if (candle.time <= entryTime) continue
 
-    // Check SL first (conservative: if both in same candle, SL wins)
-    if (isBullish) {
-      if (candle.low <= signal.sl) {
-        return { outcome: 'loss', exitPrice: signal.sl, hitTarget: 'sl', durationHours: (candle.time - entryTime) / 3600000 }
-      }
-    } else {
-      if (candle.high >= signal.sl) {
-        return { outcome: 'loss', exitPrice: signal.sl, hitTarget: 'sl', durationHours: (candle.time - entryTime) / 3600000 }
-      }
+    const durationHours = (candle.time - entryTime) / 3_600_000
+
+    // Check SL first (conservative: if both SL and TP in same candle, SL wins)
+    if (isBullish && candle.low <= signal.sl) {
+      return { outcome: 'loss', exitPrice: signal.sl, hitTarget: 'sl', durationHours }
+    }
+    if (!isBullish && candle.high >= signal.sl) {
+      return { outcome: 'loss', exitPrice: signal.sl, hitTarget: 'sl', durationHours }
     }
 
-    // Check TP targets (closest first)
-    const targets = [
-      { price: signal.tp1, name: 'tp1' },
-      { price: signal.tp2, name: 'tp2' },
-      { price: signal.tp3, name: 'tp3' },
-    ].filter(t => t.price !== null)
-
-    for (const target of targets) {
-      if (isBullish && candle.high >= target.price!) {
-        return { outcome: 'win', exitPrice: target.price!, hitTarget: target.name, durationHours: (candle.time - entryTime) / 3600000 }
+    // Find the FARTHEST TP reached within this candle's range.
+    // For bullish: candle.high must reach the target price (higher = farther).
+    // For bearish: candle.low must reach the target price (lower = farther).
+    // Targets are in tp1→tp3 order; iterate in reverse to find farthest first.
+    if (isBullish) {
+      for (let i = targets.length - 1; i >= 0; i--) {
+        if (candle.high >= targets[i].price) {
+          return { outcome: 'win', exitPrice: targets[i].price, hitTarget: targets[i].name, durationHours }
+        }
       }
-      if (!isBullish && candle.low <= target.price!) {
-        return { outcome: 'win', exitPrice: target.price!, hitTarget: target.name, durationHours: (candle.time - entryTime) / 3600000 }
+    } else {
+      for (let i = targets.length - 1; i >= 0; i--) {
+        if (candle.low <= targets[i].price) {
+          return { outcome: 'win', exitPrice: targets[i].price, hitTarget: targets[i].name, durationHours }
+        }
       }
     }
   }
 
-  // No TP or SL hit - use last candle close as exit
+  // No TP or SL hit — expired
   const lastCandle = candles[candles.length - 1]
   if (lastCandle) {
     return {
       outcome: 'expired',
       exitPrice: lastCandle.close,
       hitTarget: null,
-      durationHours: (lastCandle.time - entryTime) / 3600000,
+      durationHours: (lastCandle.time - entryTime) / 3_600_000,
     }
   }
 
