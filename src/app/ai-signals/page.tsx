@@ -74,7 +74,7 @@ const WATCHLIST = [
 export default function AiSignalsPage() {
   const [signals, setSignals] = useState<ComputedSignal[]>([])
   const [history, setHistory] = useState<SignalHistory[]>([])
-  const [signalStats, setSignalStats] = useState({ active: 0, completed: 0, wins: 0, losses: 0, winRate: 0, totalPnl: 0, avgPnl: 0 })
+  const [signalStats, setSignalStats] = useState({ active: 0, completed: 0, wins: 0, losses: 0, expired: 0, winRate: 0, totalPnl: 0, avgWin: 0, avgLoss: 0 })
   const [macro, setMacro] = useState<MacroData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -193,7 +193,18 @@ export default function AiSignalsPage() {
         if (historyRes.status === 'fulfilled') {
           const historyData = await historyRes.value.json()
           setHistory(historyData.data?.signals ?? [])
-          setSignalStats(historyData.data?.stats ?? { active: 0, completed: 0, wins: 0, losses: 0, winRate: 0, totalPnl: 0, avgPnl: 0 })
+          const s = historyData.data?.stats
+          setSignalStats({
+            active:    s?.pending   ?? 0,
+            completed: (s?.wins ?? 0) + (s?.losses ?? 0),
+            wins:      s?.wins      ?? 0,
+            losses:    s?.losses    ?? 0,
+            expired:   s?.expired   ?? 0,
+            winRate:   s?.winRate   ?? 0,
+            totalPnl:  s?.totalPnl  ?? 0,
+            avgWin:    s?.avgWin    ?? 0,
+            avgLoss:   s?.avgLoss   ?? 0,
+          })
         }
 
         setLoading(false)
@@ -212,13 +223,13 @@ export default function AiSignalsPage() {
   const longCount = signals.filter(s => s.direction === 'LONG').length
   const shortCount = signals.filter(s => s.direction === 'SHORT').length
   
-  // History stats
-  const historyTotal = history.length
-  const historyWins = history.filter(s => s.outcome === 'win').length
-  const historyLosses = history.filter(s => s.outcome === 'loss').length
-  const historyActive = history.filter(s => s.status === 'active').length
-  const historyWinRate = historyTotal > 0 ? (historyWins / (historyWins + historyLosses) * 100) : 0
-  const historyAvgPnl = history.filter(s => s.pnlPercent !== null).reduce((sum, s) => sum + (s.pnlPercent || 0), 0) / Math.max(1, history.filter(s => s.pnlPercent !== null).length)
+  // History stats — use global signalStats (same source as signals tab) so numbers are consistent
+  const historyTotal = signalStats.active + signalStats.completed
+  const historyWins = signalStats.wins
+  const historyLosses = signalStats.losses
+  const historyActive = signalStats.active
+  const historyWinRate = signalStats.winRate
+  const historyAvgPnl = signalStats.avgWin
 
   return (
     <NexusLayout>
