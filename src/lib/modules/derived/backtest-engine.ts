@@ -92,79 +92,173 @@ async function fetchHistoricalPrices(
   return allCandles
 }
 
-// Check if a signal hit TP or SL
-// Strategy: SL checked first (conservative). For TP, find the FARTHEST target
-// reached within the candle's range — a gap-up candle that blows past all 3 TPs
-// should record tp3, not tp1.
+// Partial TP exit sizes — industry standard 50/25/25
+const TP_SIZES: Record<string, number> = { tp1: 0.5, tp2: 0.25, tp3: 0.25 }
+
+interface PartialExit {
+  target: string   // 'tp1' | 'tp2' | 'tp3'
+  price: number
+  size: number     // fraction of position (0–1)
+}
+
+interface CheckResult {
+  outcome: 'win' | 'loss' | 'expired'
+  exits: PartialExit[]         // all partial exits executed
+  finalSl: number              // trailing SL at close
+  hitTarget: string | null     // farthest TP hit (or 'sl')
+  durationHours: number | null
+  exitPrice: number | null     // blended avg exit price for DB compat
+}
+
+// Simulate partial TP execution with trailing SL.
+//
+// Rules:
+//   • Before TP1: SL stays at original signal.sl
+//   • After TP1 hit: SL moves to entry (breakeven)
+//   • After TP2 hit: SL moves to TP1 price
+//   • TP3 hit: full position closed
+//   • SL check runs BEFORE TP check each candle (conservative)
+//
+// Returns all partial exits so caller can compute blended PnL.
 function checkOutcome(
   candles: Array<{ time: number; high: number; low: number; close: number }>,
   signal: BacktestSignal
-): { outcome: 'win' | 'loss' | 'expired'; exitPrice: number | null; hitTarget: string | null; durationHours: number | null } {
-  if (!signal.entry || !signal.sl) {
-    return { outcome: 'expired', exitPrice: null, hitTarget: null, durationHours: null }
-  }
+): CheckResult {
+  const empty = (outcome: 'expired'): CheckResult => ({
+    outcome, exits: [], finalSl: signal.sl ?? 0,
+    hitTarget: null, durationHours: null, exitPrice: null,
+  })
+
+  if (!signal.entry || !signal.sl) return empty('expired')
 
   const isBullish = signal.direction === 'bullish'
   const entryTime = signal.timestamp
 
-  // Targets sorted closest → farthest from entry so we can find the max hit
   const targets = [
     { price: signal.tp1, name: 'tp1' },
     { price: signal.tp2, name: 'tp2' },
     { price: signal.tp3, name: 'tp3' },
-  ].filter((t): t is { price: number; name: string } => t.price !== null && t.price !== undefined)
+  ].filter((t): t is { price: number; name: string } =>
+    t.price !== null && t.price !== undefined
+  )
+
+  if (targets.length === 0) return empty('expired')
+
+  // Mutable state across candles
+  let currentSl = signal.sl
+  let remainingSize = 1.0
+  const exits: PartialExit[] = []
+  const hitTargetSet = new Set<string>()
 
   for (const candle of candles) {
     if (candle.time <= entryTime) continue
 
     const durationHours = (candle.time - entryTime) / 3_600_000
 
-    // Check SL first (conservative: if both SL and TP in same candle, SL wins)
-    if (isBullish && candle.low <= signal.sl) {
-      return { outcome: 'loss', exitPrice: signal.sl, hitTarget: 'sl', durationHours }
-    }
-    if (!isBullish && candle.high >= signal.sl) {
-      return { outcome: 'loss', exitPrice: signal.sl, hitTarget: 'sl', durationHours }
+    // ── SL check (before TP — conservative) ──────────────────
+    const slHit = isBullish
+      ? candle.low <= currentSl
+      : candle.high >= currentSl
+
+    if (slHit) {
+      if (remainingSize > 0) {
+        exits.push({ target: 'sl', price: currentSl, size: remainingSize })
+      }
+      const farthest = [...hitTargetSet].pop() ?? null
+      const outcome = exits.some(e => e.target !== 'sl') ? 'win' : 'loss'
+      return {
+        outcome,
+        exits,
+        finalSl: currentSl,
+        hitTarget: farthest ?? 'sl',
+        durationHours,
+        exitPrice: blendedExitPrice(exits),
+      }
     }
 
-    // Find the FARTHEST TP reached within this candle's range.
-    // For bullish: candle.high must reach the target price (higher = farther).
-    // For bearish: candle.low must reach the target price (lower = farther).
-    // Targets are in tp1→tp3 order; iterate in reverse to find farthest first.
-    if (isBullish) {
-      for (let i = targets.length - 1; i >= 0; i--) {
-        if (candle.high >= targets[i].price) {
-          return { outcome: 'win', exitPrice: targets[i].price, hitTarget: targets[i].name, durationHours }
-        }
-      }
-    } else {
-      for (let i = targets.length - 1; i >= 0; i--) {
-        if (candle.low <= targets[i].price) {
-          return { outcome: 'win', exitPrice: targets[i].price, hitTarget: targets[i].name, durationHours }
+    // ── TP checks — advance through unmet targets ─────────────
+    for (const t of targets) {
+      if (hitTargetSet.has(t.name)) continue
+
+      const reached = isBullish
+        ? candle.high >= t.price
+        : candle.low <= t.price
+
+      if (!reached) break // targets are ordered; if this one not hit, next won't be either
+
+      const size = TP_SIZES[t.name] ?? 0
+      exits.push({ target: t.name, price: t.price, size })
+      remainingSize -= size
+      hitTargetSet.add(t.name)
+
+      // Advance trailing SL
+      if (t.name === 'tp1') currentSl = signal.entry         // breakeven
+      if (t.name === 'tp2') currentSl = signal.tp1 ?? signal.entry // lock tp1
+
+      if (remainingSize <= 0) {
+        return {
+          outcome: 'win',
+          exits,
+          finalSl: currentSl,
+          hitTarget: t.name,
+          durationHours,
+          exitPrice: blendedExitPrice(exits),
         }
       }
     }
   }
 
-  // No TP or SL hit — expired
+  // Time ran out — expire remaining position at last close
   const lastCandle = candles[candles.length - 1]
-  if (lastCandle) {
-    return {
-      outcome: 'expired',
-      exitPrice: lastCandle.close,
-      hitTarget: null,
-      durationHours: (lastCandle.time - entryTime) / 3_600_000,
-    }
+  if (!lastCandle) return empty('expired')
+
+  if (remainingSize > 0) {
+    exits.push({ target: 'expired', price: lastCandle.close, size: remainingSize })
   }
 
-  return { outcome: 'expired', exitPrice: null, hitTarget: null, durationHours: null }
+  // If any TPs were hit before expiry → still a win
+  const tpHits = exits.filter(e => e.target.startsWith('tp'))
+  const outcome = tpHits.length > 0 ? 'win' : 'expired'
+  const farthest = [...hitTargetSet].pop() ?? null
+  return {
+    outcome,
+    exits,
+    finalSl: currentSl,
+    hitTarget: farthest,
+    durationHours: (lastCandle.time - entryTime) / 3_600_000,
+    exitPrice: blendedExitPrice(exits),
+  }
 }
 
-// Store a signal for future backtesting
+// Weighted average exit price across all partial exits
+function blendedExitPrice(exits: PartialExit[]): number | null {
+  const totalSize = exits.reduce((s, e) => s + e.size, 0)
+  if (totalSize === 0) return null
+  return exits.reduce((s, e) => s + e.price * e.size, 0) / totalSize
+}
+
+// Compute blended PnL% given partial exits and entry
+function calcBlendedPnl(
+  exits: PartialExit[],
+  entry: number,
+  direction: 'bullish' | 'bearish'
+): number {
+  return exits.reduce((total, e) => {
+    const legPnl = direction === 'bullish'
+      ? ((e.price - entry) / entry) * 100
+      : ((entry - e.price) / entry) * 100
+    return total + legPnl * e.size
+  }, 0)
+}
+
+// Store a signal for future backtesting — idempotent; same signal_id is a no-op
 export async function storeSignal(signal: BacktestSignal): Promise<void> {
-  await prisma.backtestResult.create({
-    data: {
-      id: `signal-${signal.id}`,
+  const id = `signal-${signal.id}`
+  await prisma.backtestResult.upsert({
+    where: { id },
+    update: {}, // already stored — do nothing
+    create: {
+      id,
       symbol: signal.symbol,
       direction: signal.direction,
       entryPrice: signal.entry,
@@ -173,6 +267,10 @@ export async function storeSignal(signal: BacktestSignal): Promise<void> {
       tp3: signal.tp3,
       sl: signal.sl,
       outcome: 'pending',
+      exitPrice: null,
+      pnlPercent: null,
+      hitTarget: null,
+      durationHours: null,
       source: signal.source,
       signalId: signal.id,
       backtestDate: new Date(signal.timestamp),
@@ -184,13 +282,11 @@ export async function storeSignal(signal: BacktestSignal): Promise<void> {
 export async function runBacktest(
   periodDays: number = 30
 ): Promise<{ results: BacktestResult[]; stats: BacktestStats }> {
-  // Clamp period to valid range
   const clampedDays = Math.min(90, Math.max(7, periodDays))
   const now = Date.now()
   const startTime = now - clampedDays * 24 * 60 * 60 * 1000
-
-  // Get stored signals that are old enough to backtest (at least 24h old)
   const minSignalAge = now - 24 * 60 * 60 * 1000
+
   const storedSignals = await prisma.backtestResult.findMany({
     where: {
       outcome: 'pending',
@@ -203,11 +299,8 @@ export async function runBacktest(
     take: 500,
   })
 
-  if (storedSignals.length === 0) {
-    return { results: [], stats: emptyStats() }
-  }
+  if (storedSignals.length === 0) return { results: [], stats: emptyStats() }
 
-  // Group by symbol for efficient price fetching
   const bySymbol = new Map<string, typeof storedSignals>()
   for (const s of storedSignals) {
     const existing = bySymbol.get(s.symbol) ?? []
@@ -218,9 +311,8 @@ export async function runBacktest(
   const results: BacktestResult[] = []
 
   for (const [symbol, signals] of bySymbol) {
-    // Fetch price data from signal time to now
-    const earliestSignal = Math.min(...signals.map(s => s.backtestDate.getTime()))
-    const candles = await fetchHistoricalPrices(symbol, earliestSignal, now)
+    const earliest = Math.min(...signals.map(s => s.backtestDate.getTime()))
+    const candles = await fetchHistoricalPrices(symbol, earliest, now)
     if (candles.length === 0) continue
 
     for (const signal of signals) {
@@ -237,14 +329,11 @@ export async function runBacktest(
         source: signal.source,
       }
 
-      const { outcome, exitPrice, hitTarget, durationHours } = checkOutcome(candles, backtestSignal)
+      const { outcome, exits, hitTarget, durationHours, exitPrice } = checkOutcome(candles, backtestSignal)
 
-      let pnlPercent: number | null = null
-      if (exitPrice && signal.entryPrice) {
-        pnlPercent = backtestSignal.direction === 'bullish'
-          ? ((exitPrice - signal.entryPrice) / signal.entryPrice) * 100
-          : ((signal.entryPrice - exitPrice) / signal.entryPrice) * 100
-      }
+      const pnlPercent = exits.length > 0 && signal.entryPrice
+        ? calcBlendedPnl(exits, signal.entryPrice, backtestSignal.direction)
+        : null
 
       results.push({
         id: signal.id,
@@ -267,7 +356,7 @@ export async function runBacktest(
     }
   }
 
-  // Update outcomes in DB (batch update)
+  // Batch update DB
   for (const result of results) {
     await prisma.backtestResult.update({
       where: { id: result.id },
@@ -424,12 +513,16 @@ export async function checkExpiredSignals(): Promise<{ checked: number; updated:
         source: signal.source,
       }
 
-      const { outcome, exitPrice, hitTarget, durationHours } = checkOutcome(candles, backtestSignal)
+      const { outcome, exits, exitPrice, hitTarget, durationHours } = checkOutcome(candles, backtestSignal)
 
       if (outcome === 'win' || outcome === 'loss') {
-        const pnlPercent = backtestSignal.direction === 'bullish'
-          ? ((exitPrice! - signal.entryPrice) / signal.entryPrice) * 100
-          : ((signal.entryPrice - exitPrice!) / signal.entryPrice) * 100
+        const pnlPercent = exits.length > 0
+          ? calcBlendedPnl(exits, signal.entryPrice, backtestSignal.direction)
+          : exitPrice !== null
+            ? backtestSignal.direction === 'bullish'
+              ? ((exitPrice - signal.entryPrice) / signal.entryPrice) * 100
+              : ((signal.entryPrice - exitPrice) / signal.entryPrice) * 100
+            : 0
 
         await prisma.backtestResult.update({
           where: { id: signal.id },
