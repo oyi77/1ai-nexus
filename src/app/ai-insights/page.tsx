@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { formatPriceUSD } from '@/lib/format'
 
 interface Insight {
   id: string
@@ -54,7 +55,7 @@ export default function AiInsightsPage() {
               id: `market-${q.symbol}`,
               timestamp: now.toISOString(),
               category: 'market',
-              title: `${q.shortName ?? q.symbol}: $${price.toFixed(2)}`,
+              title: `${q.shortName ?? q.symbol}: ${formatPriceUSD(price)}`,
               data: `${change >= 0 ? '+' : ''}${change.toFixed(2)}% today`,
               source: 'Yahoo Finance',
             })

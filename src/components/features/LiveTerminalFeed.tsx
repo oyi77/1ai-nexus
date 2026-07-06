@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
+import { formatCompact } from '@/lib/format'
 
 interface FeedItem {
   id: string
@@ -13,6 +14,13 @@ interface FeedItem {
   usd?: number
 }
 
+
+function fmtCryptoAmount(amount: number): string {
+  if (amount >= 1) return amount.toLocaleString('en-US', { maximumFractionDigits: 2 })
+  if (amount >= 0.01) return amount.toFixed(4)
+  if (amount >= 0.0001) return amount.toFixed(6)
+  return amount.toFixed(8)
+}
 function typeIcon(type: FeedItem['type']): string {
   switch (type) {
     case 'whale': return '🐋'
@@ -62,7 +70,7 @@ export function LiveTerminalFeed() {
               timestamp: new Date().toLocaleTimeString(),
               source: 'Whale Alert',
               type: 'whale',
-              headline: `${Number(w.amount ?? 0).toLocaleString()} ${String(w.symbol ?? '')} ($${(Number(w.usd ?? 0) / 1e6).toFixed(1)}M): ${String(w.from ?? '')} → ${String(w.to ?? '')}`,
+              headline: `${fmtCryptoAmount(Number(w.amount ?? 0))} ${String(w.symbol ?? '')} ($${(Number(w.usd ?? 0) / 1e6).toFixed(1)}M): ${String(w.from ?? '')} → ${String(w.to ?? '')}`,
               link: w.link ? String(w.link) : undefined,
               usd: Number(w.usd ?? 0),
             })

@@ -2,6 +2,16 @@
 
 import { useRef, useEffect, useCallback, useState } from "react"
 
+// Dynamic price format for canvas rendering
+function fmtPrice(n: number): string {
+  const abs = Math.abs(n)
+  if (abs < 0.0001) return n.toFixed(8)
+  if (abs < 0.01) return n.toFixed(6)
+  if (abs < 1) return n.toFixed(4)
+  if (abs < 100) return n.toFixed(2)
+  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 interface OhlcvCandle {
   time: number
   open: number
@@ -106,7 +116,7 @@ export function CanvasChart({
       ctx.fillStyle = COLORS.gridLabel
       ctx.font = '9px JetBrains Mono, monospace'
       ctx.textAlign = 'left'
-      ctx.fillText(price.toFixed(price >= 1000 ? 0 : 2), cw - PAD.r + 4, y + 3)
+      ctx.fillText(fmtPrice(price), cw - PAD.r + 4, y + 3)
     }
 
     // Layer 3: Volume bars (max 12% chart height)
@@ -230,7 +240,7 @@ export function CanvasChart({
         ctx.fillStyle = 'rgba(0,200,255,0.8)'
         ctx.font = '10px JetBrains Mono, monospace'
         ctx.textAlign = 'left'
-        ctx.fillText(hoverPrice.toFixed(hoverPrice >= 1000 ? 0 : 2), cw - PAD.r + 4, hover.y + 3)
+        ctx.fillText(fmtPrice(hoverPrice), cw - PAD.r + 4, hover.y + 3)
       }
       ctx.setLineDash([])
     }
@@ -267,15 +277,15 @@ export function CanvasChart({
         <div className="absolute top-1 left-2 text-[10px] font-mono pointer-events-none z-10">
           <span className="text-text-dim">O</span>
           <span className={hover.candle.close >= hover.candle.open ? 'text-accent-green' : 'text-accent-red'}>
-            {hover.candle.open.toFixed(2)}
+            {fmtPrice(hover.candle.open)}
           </span>
           <span className="text-text-dim ml-2">H</span>
-          <span className="text-text-primary">{hover.candle.high.toFixed(2)}</span>
+          <span className="text-text-primary">{fmtPrice(hover.candle.high)}</span>
           <span className="text-text-dim ml-2">L</span>
-          <span className="text-text-primary">{hover.candle.low.toFixed(2)}</span>
+          <span className="text-text-primary">{fmtPrice(hover.candle.low)}</span>
           <span className="text-text-dim ml-2">C</span>
           <span className={hover.candle.close >= hover.candle.open ? 'text-accent-green' : 'text-accent-red'}>
-            {hover.candle.close.toFixed(2)}
+            {fmtPrice(hover.candle.close)}
           </span>
           {hover.candle.volume != null && (
             <>

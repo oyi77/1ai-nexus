@@ -525,6 +525,7 @@ export default function AiSignalsPage() {
               )}
             </div>
           </div>
+          </>
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">

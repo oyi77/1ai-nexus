@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
+import { formatPriceUSD } from '@/lib/format'
 
 interface PriceTagProps {
   value: number
-  currency?: string
-  decimals?: number
   size?: 'xs' | 'sm' | 'md' | 'lg'
   showFlash?: boolean
   className?: string
@@ -13,8 +12,6 @@ interface PriceTagProps {
 
 export function PriceTag({
   value,
-  currency = '$',
-  decimals = 2,
   size = 'md',
   showFlash = true,
   className = '',
@@ -48,10 +45,7 @@ export function PriceTag({
       className={`font-mono tabular-nums text-right ${sizeClass} ${flashClass} ${className}`}
       style={{ fontVariantNumeric: 'tabular-nums' }}
     >
-      {currency}{value.toLocaleString('en-US', {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals,
-      })}
+      {formatPriceUSD(value)}
     </span>
   )
 }

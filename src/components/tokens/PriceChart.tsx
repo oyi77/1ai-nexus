@@ -13,6 +13,7 @@ import {
   Scatter,
 } from "recharts";
 import { cn } from "@/lib/utils";
+import { formatPriceUSD } from "@/lib/format";
 export interface CandlestickPoint {
   time: string;
   open: number;
@@ -130,7 +131,7 @@ export function PriceChart({ data, markers = [], className }: PriceChartProps) {
               tick={{ fontSize: 10, fill: "#6B7280" }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v: number) => `$${v.toLocaleString()}`}
+              tickFormatter={(v: number) => formatPriceUSD(v)}
               width={70}
             />
             <Tooltip
@@ -145,7 +146,7 @@ export function PriceChart({ data, markers = [], className }: PriceChartProps) {
                 const v = Number(value);
                 const n = String(name);
                 if (n === "volume") return [`${(v / 1e6).toFixed(0)}M`, "Volume"];
-                return [`$${v.toLocaleString()}`, n];
+                return [formatPriceUSD(v), n];
               }}
               labelFormatter={(label: unknown) => String(label)}
             />

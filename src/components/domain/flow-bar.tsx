@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { formatPriceUSD } from "@/lib/format";
 
 interface FlowBarProps {
   inflow: number;
@@ -34,7 +35,7 @@ export function FlowBar({ inflow, outflow, className }: FlowBarProps) {
           isNetPositive ? "text-accent-green" : "text-danger"
         )}
       >
-        {isNetPositive ? "+" : "-"}${Math.abs(inflow - outflow).toLocaleString()}
+        {isNetPositive ? "+" : "-"}${formatPriceUSD(Math.abs(inflow - outflow)).replace("$", "")}
       </span>
     </div>
   );

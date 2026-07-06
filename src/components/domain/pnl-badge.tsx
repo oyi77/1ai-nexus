@@ -7,6 +7,14 @@ interface PnlBadgeProps {
 
 export function PnlBadge({ value, className }: PnlBadgeProps) {
   const isPositive = value >= 0;
+  const abs = Math.abs(value);
+
+  // Adapt decimals to magnitude: micro PnL gets more precision
+  let decimals = 2;
+  if (abs < 0.01) decimals = 4;
+  else if (abs < 1) decimals = 3;
+  else if (abs >= 100) decimals = 1;
+
   return (
     <span
       className={cn(
@@ -18,7 +26,7 @@ export function PnlBadge({ value, className }: PnlBadgeProps) {
       )}
     >
       {isPositive ? "+" : ""}
-      {value.toFixed(2)}%
+      {value.toFixed(decimals)}%
     </span>
   );
 }
