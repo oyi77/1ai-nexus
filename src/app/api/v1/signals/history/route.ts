@@ -44,16 +44,43 @@ async function getGlobalStats() {
   const completed = wins + losses
   const winRate = completed > 0 ? Math.round((wins / completed) * 10000) / 100 : 0
 
-  // Avg PnL from DB aggregates (faster than fetching all rows)
-  const aggResult = await prisma.$queryRaw<{ avg_win: number | null; avg_loss: number | null; total_pnl: number | null }[]>`
-    SELECT
-      AVG(CASE WHEN outcome = 'win' THEN "pnlPercent" END) as avg_win,
-      AVG(CASE WHEN outcome = 'loss' THEN "pnlPercent" END) as avg_loss,
-      SUM("pnlPercent") as total_pnl
-    FROM "BacktestResult"
-    WHERE outcome IN ('win', 'loss')
-  `
+  // PnL aggregates + ordered trade list for compound simulation — single round-trip
+  const [aggResult, simTrades] = await Promise.all([
+    prisma.$queryRaw<{ avg_win: number | null; avg_loss: number | null; total_pnl: number | null }[]>`
+      SELECT
+        AVG(CASE WHEN outcome = 'win' THEN "pnlPercent" END) as avg_win,
+        AVG(CASE WHEN outcome = 'loss' THEN "pnlPercent" END) as avg_loss,
+        SUM("pnlPercent") as total_pnl
+      FROM "BacktestResult"
+      WHERE outcome IN ('win', 'loss')
+    `,
+    prisma.$queryRaw<{ pnl: number }[]>`
+      SELECT "pnlPercent" as pnl
+      FROM "BacktestResult"
+      WHERE outcome IN ('win', 'loss') AND "pnlPercent" IS NOT NULL
+      ORDER BY "backtestDate" ASC
+    `,
+  ])
   const agg = aggResult[0]
+
+  // Compound simulation: 10% position sizing on $100 initial capital
+  // pnlPercent is price-move %; we invest 10% of current equity per trade
+  const SIM_INITIAL = 100
+  const POSITION_PCT = 0.10
+  let simEquity = SIM_INITIAL
+  let simPeak = SIM_INITIAL
+  let simMaxDrawdown = 0
+  let simBestTrade = 0
+  let simWorstTrade = 0
+  for (const { pnl } of simTrades) {
+    simEquity += simEquity * POSITION_PCT * (pnl / 100)
+    if (simEquity > simPeak) simPeak = simEquity
+    const dd = (simPeak - simEquity) / simPeak * 100
+    if (dd > simMaxDrawdown) simMaxDrawdown = dd
+    if (pnl > simBestTrade) simBestTrade = pnl
+    if (pnl < simWorstTrade) simWorstTrade = pnl
+  }
+  const round2 = (n: number) => Math.round(n * 100) / 100
 
   return {
     total,
@@ -62,9 +89,20 @@ async function getGlobalStats() {
     losses,
     expired,
     winRate,
-    totalPnl: Math.round((agg?.total_pnl ?? 0) * 100) / 100,
-    avgWin: Math.round((agg?.avg_win ?? 0) * 100) / 100,
-    avgLoss: Math.round((agg?.avg_loss ?? 0) * 100) / 100,
+    totalPnl:  round2(agg?.total_pnl ?? 0),
+    avgWin:    round2(agg?.avg_win   ?? 0),
+    avgLoss:   round2(agg?.avg_loss  ?? 0),
+    sim: {
+      initialCapital:   SIM_INITIAL,
+      positionSizePct:  POSITION_PCT * 100,
+      finalEquity:      round2(simEquity),
+      totalReturnPct:   round2((simEquity - SIM_INITIAL) / SIM_INITIAL * 100),
+      totalReturnUsd:   round2(simEquity - SIM_INITIAL),
+      maxDrawdownPct:   round2(simMaxDrawdown),
+      bestTradePct:     round2(simBestTrade),
+      worstTradePct:    round2(simWorstTrade),
+      tradeCount:       simTrades.length,
+    },
   }
 }
 

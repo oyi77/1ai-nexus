@@ -74,7 +74,7 @@ const WATCHLIST = [
 export default function AiSignalsPage() {
   const [signals, setSignals] = useState<ComputedSignal[]>([])
   const [history, setHistory] = useState<SignalHistory[]>([])
-  const [signalStats, setSignalStats] = useState({ active: 0, completed: 0, wins: 0, losses: 0, expired: 0, winRate: 0, totalPnl: 0, avgWin: 0, avgLoss: 0 })
+  const [signalStats, setSignalStats] = useState({ active: 0, completed: 0, wins: 0, losses: 0, expired: 0, winRate: 0, totalPnl: 0, avgWin: 0, avgLoss: 0, sim: { initialCapital: 100, positionSizePct: 10, finalEquity: 100, totalReturnPct: 0, totalReturnUsd: 0, maxDrawdownPct: 0, bestTradePct: 0, worstTradePct: 0, tradeCount: 0 } })
   const [macro, setMacro] = useState<MacroData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -204,6 +204,7 @@ export default function AiSignalsPage() {
             totalPnl:  s?.totalPnl  ?? 0,
             avgWin:    s?.avgWin    ?? 0,
             avgLoss:   s?.avgLoss   ?? 0,
+            sim: s?.sim ?? { initialCapital: 100, positionSizePct: 10, finalEquity: 100, totalReturnPct: 0, totalReturnUsd: 0, maxDrawdownPct: 0, bestTradePct: 0, worstTradePct: 0, tradeCount: 0 },
           })
         }
 
@@ -460,6 +461,40 @@ export default function AiSignalsPage() {
                   {historyAvgPnl >= 0 ? '+' : ''}{historyAvgPnl.toFixed(2)}%
                 </p>
               </div>
+            </div>
+
+            {/* Simulation Panel */}
+            <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-xs font-mono text-accent-cyan">COMPOUND SIMULATION</h2>
+                <span className="text-[9px] font-mono text-text-muted">{signalStats.sim.positionSizePct}% position sizing · ${signalStats.sim.initialCapital} initial capital · {signalStats.sim.tradeCount} trades</span>
+              </div>
+              <div className="grid grid-cols-4 gap-3">
+                <div>
+                  <p className="text-[10px] text-text-muted font-mono">FINAL EQUITY</p>
+                  <p className="text-lg font-bold font-mono text-text-primary">${signalStats.sim.finalEquity.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-text-muted font-mono">TOTAL RETURN</p>
+                  <p className={`text-lg font-bold font-mono ${signalStats.sim.totalReturnPct >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                    {signalStats.sim.totalReturnPct >= 0 ? '+' : ''}{signalStats.sim.totalReturnPct.toFixed(2)}%
+                    <span className="text-[10px] ml-1 opacity-70">(${signalStats.sim.totalReturnUsd >= 0 ? '+' : ''}{signalStats.sim.totalReturnUsd.toFixed(2)})</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-text-muted font-mono">MAX DRAWDOWN</p>
+                  <p className="text-lg font-bold font-mono text-data-bear">-{signalStats.sim.maxDrawdownPct.toFixed(2)}%</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-text-muted font-mono">BEST / WORST</p>
+                  <p className="text-sm font-mono">
+                    <span className="text-data-bull">+{signalStats.sim.bestTradePct.toFixed(2)}%</span>
+                    <span className="text-text-muted mx-1">/</span>
+                    <span className="text-data-bear">{signalStats.sim.worstTradePct.toFixed(2)}%</span>
+                  </p>
+                </div>
+              </div>
+              <p className="text-[9px] text-text-muted font-mono mt-3 opacity-60">Simulated performance. Not financial advice. Past results do not guarantee future returns.</p>
             </div>
 
             <div className="bg-bg-panel border border-border-dim rounded-lg">
