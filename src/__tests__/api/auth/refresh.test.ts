@@ -23,15 +23,20 @@ vi.mock('@/lib/db', () => ({
 }));
 
 describe('POST /api/v1/auth/refresh', () => {
-  const mockUser = {
-    id: 'test-user-id',
-    email: 'test-refresh@example.com',
-    role: 'user' as const,
-    plan: 'free' as const,
-    passwordHash: 'hash',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
+ const mockUser = {
+   id: 'test-user-id',
+   email: 'test@example.com',
+   passwordHash: 'hash',
+   role: 'free' as const,
+   plan: 'free' as const,
+   planStartedAt: null,
+   planExpiresAt: null,
+   stripeCustomerId: null,
+   apiUsageCount: 0,
+   lastApiUsageReset: new Date(),
+   createdAt: new Date(),
+   updatedAt: new Date(),
+ };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -214,7 +219,12 @@ describe('POST /api/v1/auth/refresh', () => {
 
     it('should return 404 when user not found', async () => {
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue('valid-token');
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({ userId: 'nonexistent-user' });
+      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+        userId: 'nonexistent-user',
+        email: 'nonexistent@example.com',
+        role: 'free' as const,
+        plan: 'free' as const,
+      });
       vi.mocked(prisma.user.findUnique).mockResolvedValue(null);
 
       const request = new NextRequest('http://localhost:3000/api/v1/auth/refresh', {
@@ -234,7 +244,12 @@ describe('POST /api/v1/auth/refresh', () => {
 
     it('should return 500 on database error', async () => {
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue('valid-token');
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({ userId: mockUser.id });
+      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+        userId: mockUser.id,
+        email: mockUser.email,
+        role: mockUser.role,
+        plan: mockUser.plan,
+      });
       vi.mocked(prisma.user.findUnique).mockRejectedValue(new Error('Database error'));
 
       const request = new NextRequest('http://localhost:3000/api/v1/auth/refresh', {
@@ -259,7 +274,12 @@ describe('POST /api/v1/auth/refresh', () => {
       const bodyToken = 'body-token';
       
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue(cookieToken);
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({ userId: mockUser.id });
+      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+        userId: mockUser.id,
+        email: mockUser.email,
+        role: mockUser.role,
+        plan: mockUser.plan,
+      });
       vi.mocked(jwtLib.signToken).mockReturnValue('access-token');
       vi.mocked(jwtLib.generateRefreshToken).mockReturnValue('refresh-token');
       vi.mocked(jwtLib.createRefreshCookie).mockReturnValue('cookie');
@@ -286,7 +306,12 @@ describe('POST /api/v1/auth/refresh', () => {
       const userId = 'specific-user-id';
       
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue('token');
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({ userId });
+      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+        userId,
+        email: mockUser.email,
+        role: mockUser.role,
+        plan: mockUser.plan,
+      });
       vi.mocked(jwtLib.signToken).mockReturnValue('access');
       vi.mocked(jwtLib.generateRefreshToken).mockReturnValue('refresh');
       vi.mocked(jwtLib.createRefreshCookie).mockReturnValue('cookie');
@@ -318,7 +343,12 @@ describe('POST /api/v1/auth/refresh', () => {
       };
 
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue('token');
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({ userId: mockUser.id });
+      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+        userId: mockUser.id,
+        email: mockUser.email,
+        role: mockUser.role,
+        plan: mockUser.plan,
+      });
       vi.mocked(jwtLib.signToken).mockReturnValue('access');
       vi.mocked(jwtLib.generateRefreshToken).mockReturnValue('refresh');
       vi.mocked(jwtLib.createRefreshCookie).mockReturnValue('cookie');
@@ -344,7 +374,12 @@ describe('POST /api/v1/auth/refresh', () => {
   describe('Security Headers', () => {
     it('should include HttpOnly flag in cookies', async () => {
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue('token');
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({ userId: mockUser.id });
+      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+        userId: mockUser.id,
+        email: mockUser.email,
+        role: mockUser.role,
+        plan: mockUser.plan,
+      });
       vi.mocked(jwtLib.signToken).mockReturnValue('access');
       vi.mocked(jwtLib.generateRefreshToken).mockReturnValue('refresh');
       vi.mocked(jwtLib.createRefreshCookie).mockReturnValue('cookie');

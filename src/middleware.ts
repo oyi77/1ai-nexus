@@ -1,20 +1,64 @@
 import { NextResponse, type NextRequest } from "next/server";
-const ALLOWED_ORIGINS = [
-  'https://tracker.aitradepulse.com',
-  'http://localhost:4400',
-  'http://localhost:3000',
-];
-const API_KEYS = new Set(
-  (process.env.NEXUS_API_KEYS || "").split(",").filter(Boolean)
-);
+import { extractJwtSession, checkSubscriptionRateLimit } from "@/lib/jwt-middleware";
+ const ALLOWED_ORIGINS = [
+   "http://localhost:3000",
+   "http://localhost:4400",
+   "https://tracker.aitradepulse.com",
+ ];
+ 
+ // Routes that are always public (health checks, auth, public data APIs)
+ const ALWAYS_PUBLIC = new Set([
+   "/api/v1/health",
+   "/api/v1/status",
+   "/api/v1/status/cache",
+   "/api/v1/auth",
+   "/api/v1/signals/outcomes",
+   "/api/v1/signals/summary",
+   "/api/v1/signals/current",
+   "/api/v1/signals/latest",
+   "/api/v1/data/economic",
+   "/api/v1/data/forex",
+   "/api/v1/data/crypto",
+   "/api/v1/data/stocks",
+   "/api/v1/data/combined",
+   "/api/v1/data/alpha",
+   "/api/v1/analysis/metrics",
+   "/api/v1/whale-alert",
+   "/api/v1/entities",
+   "/api/v1/social-volume",
+   "/api/v1/fear-greed",
+   "/api/v1/market-cap",
+   "/api/v1/on-chain",
+   "/api/v1/dex/trending",
+   "/api/v1/dex/trades",
+   "/api/v1/correlation",
+   "/api/v1/volume-profile",
+   "/api/v1/volatility",
+  '/api/v1/derivatives',
+  '/api/v1/market/prices',
+  '/api/v1/entities/graph',
+  '/api/v1/smart-money',
+  '/api/v1/dex/new-pairs',
+  '/api/v1/macro',
+  '/api/v1/news',
+  '/api/v1/calendar',
+  '/api/v1/yields',
+  '/api/v1/revenue',
+  '/api/v1/token/god-mode',
+  '/api/v1/mempool',
+ ]);
 
-// Routes that are always public (health checks, auth)
-const ALWAYS_PUBLIC = new Set([
-  "/api/v1/health",
-  "/api/v1/status",
-  "/api/v1/status/cache",
-  "/api/auth",
+// Routes that require JWT authentication (premium features)
+const PROTECTED_ROUTES = new Set([
+  "/api/v1/signals/history",
+  "/api/v1/backtest",
+  "/api/v1/alpha-engine",
 ]);
+ 
+ // Parse API keys from env
+ const API_KEYS = new Set(
+   process.env.NEXUS_API_KEYS?.split(",").map(k => k.trim()) ?? []
+ );
 
 // ─── Rate Limiting (in-memory, per-edge instance) ──────────
 
@@ -22,6 +66,7 @@ interface RateLimitEntry {
   count: number;
   resetAt: number;
 }
+
 
 const rateLimitMap = new Map<string, RateLimitEntry>();
 
@@ -85,7 +130,7 @@ export function getAllUsage(): Record<string, UsageEntry> {
 
 // ─── Middleware ─────────────────────────────────────────────
 
-export function middleware(request: NextRequest) {
+ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const startTime = Date.now();
 
@@ -118,39 +163,72 @@ export function middleware(request: NextRequest) {
     return addCorsHeaders(NextResponse.next(), request);
   }
 
-  // Check for browser CSRF token (set by frontend on page load)
-  const csrfToken = request.headers.get("x-csrf-token");
-  const sessionCookie = request.cookies.get("nexus-session");
-  
-  // Valid browser session = allow without API key
-  const isBrowserSession = csrfToken && csrfToken.length > 0;
-
-  // Browser requests — allow without API key, rate limit per IP
-  if (isBrowserSession) {
-    const ip = getClientIp(request);
-    const { allowed, remaining } = checkRateLimit(`browser:${ip}`, 600, 60_000);
-    if (!allowed) {
-      return NextResponse.json(
-        { data: null, error: "Rate limit exceeded" },
-        { status: 429, headers: { "X-RateLimit-Remaining": "0" } }
+  // Protected routes — require JWT
+  if (PROTECTED_ROUTES.has(pathname)) {
+    const jwtSession = await extractJwtSession(request);
+    if (!jwtSession) {
+      return addCorsHeaders(
+        NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+        request
       );
     }
-    const response = addCorsHeaders(NextResponse.next(), request);
-    response.headers.set("X-RateLimit-Remaining", String(remaining));
-    response.headers.set("X-RateLimit-Limit", "600");
-    return response;
+
+    // Check subscription rate limits
+    const rateLimitResult = await checkSubscriptionRateLimit(
+      jwtSession.userId,
+      jwtSession.plan || "free"
+    );
+
+    if (!rateLimitResult.allowed) {
+      return addCorsHeaders(
+        NextResponse.json(
+          {
+            error: "Rate limit exceeded",
+            limit: rateLimitResult.limit,
+          },
+          { status: 429 }
+        ),
+        request
+      );
+    }
+
+    // Attach user session to headers for downstream use
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set("x-user-id", jwtSession.userId);
+    requestHeaders.set("x-user-plan", jwtSession.plan || "free");
+
+    return addCorsHeaders(
+      NextResponse.next({
+        request: {
+          headers: requestHeaders,
+        },
+      }),
+      request
+    );
   }
 
+  
+  // Check for browser CSRF token or API key for non-protected routes
+  const csrfToken = request.headers.get("x-csrf-token");
+  
+  // Browser requests with valid CSRF token
+  if (csrfToken) {
+    const sessionCookie = request.cookies.get("nexus-session");
+    if (sessionCookie) {
+      // CSRF token exists + session cookie exists → allow browser request
+      return addCorsHeaders(NextResponse.next(), request);
+    }
+  }
+  
   // External API requests — require API key
   if (API_KEYS.size > 0) {
     const authHeader = request.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return NextResponse.json(
-        { data: null, error: "Missing API key. Use Authorization: Bearer <key>" },
+        { data: null, error: "Missing authentication. Use x-csrf-token header (browser) or Authorization: Bearer <key> (API)" },
         { status: 401 }
       );
     }
-
     const key = authHeader.slice(7);
     if (!API_KEYS.has(key)) {
       return NextResponse.json(

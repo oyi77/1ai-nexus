@@ -43,3 +43,50 @@ export async function cacheSet(key: string, data: unknown, ttlSeconds = 300): Pr
     await r.set(`nexus:cache:${key}`, JSON.stringify(data), 'EX', ttlSeconds)
   } catch { /* non-fatal */ }
 }
+ 
+ /**
+  * Sliding window rate limiter using Redis.
+  * @param key - Unique identifier for the rate limit bucket (e.g., "user:123:free")
+  * @param limit - Maximum number of requests allowed in the window
+  * @param windowMs - Time window in milliseconds (e.g., 3600000 for 1 hour)
+  * @returns Object with allowed (boolean) and remaining (number) fields
+  */
+ export async function checkRateLimit(
+   key: string,
+   limit: number,
+   windowMs: number
+ ): Promise<{ allowed: boolean; remaining: number }> {
+   const r = getRedis()
+   
+   // If Redis is unavailable, allow the request (fail open)
+   if (!r) return { allowed: true, remaining: limit }
+ 
+   const redisKey = `nexus:ratelimit:${key}`
+   const now = Date.now()
+   const windowStart = now - windowMs
+ 
+   try {
+     // Use Redis sorted set with timestamps as scores for sliding window
+     // Remove old entries outside the current window
+     await r.zremrangebyscore(redisKey, 0, windowStart)
+     
+     // Count current requests in the window
+     const currentCount = await r.zcard(redisKey)
+     
+     if (currentCount >= limit) {
+       return { allowed: false, remaining: 0 }
+     }
+     
+     // Add current request with timestamp as score
+     await r.zadd(redisKey, now, `${now}:${Math.random()}`)
+     
+     // Set expiration to window + 1 second (cleanup)
+     await r.expire(redisKey, Math.ceil(windowMs / 1000) + 1)
+     
+     return { allowed: true, remaining: limit - currentCount - 1 }
+   } catch (err) {
+     // On Redis error, fail open to avoid blocking legitimate traffic
+     console.error('[checkRateLimit] Redis error:', err)
+     return { allowed: true, remaining: limit }
+   }
+ }

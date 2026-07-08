@@ -604,7 +604,6 @@ export default function AiSignalsPage() {
                 })
               )}
             </div>
-          </div>
           </>
         )}
 
