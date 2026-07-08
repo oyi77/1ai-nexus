@@ -2,8 +2,8 @@ module.exports = {
   apps: [
     {
       name: 'nexus-web',
-      script: 'npx',
-      args: 'next start -p 4400',
+      script: './node_modules/.bin/next',
+      args: 'start -p 4400',
       cwd: '/home/openclaw/projects/1ai-tracker',
       env: {
         DATABASE_URL: 'postgresql://postgres:postgres@localhost:5432/nexus',
@@ -11,10 +11,11 @@ module.exports = {
         NODE_ENV: 'production',
         PORT: '4400',
       },
+      exec_mode: 'fork',
       instances: 1,
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G',
+      max_memory_restart: '2G',
       exp_backoff_restart_delay: 100,
       max_restarts: 100,
       min_uptime: '10s',

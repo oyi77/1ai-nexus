@@ -7,6 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Subscription enums
+enum UserRole {
+  free
+  pro
+  enterprise
+  admin
+}
+
+enum SubscriptionPlan {
+  free
+  pro
+  enterprise
+}
+
+enum SubscriptionStatus {
+  active
+  canceled
+  expired
+  trial
+}
+enum PaymentStatus {
+  pending
+  completed
+  failed
+  refunded
+}
+
+
 model Entity {
   id            String   @id @default(cuid())
   name          String
@@ -203,9 +231,23 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   passwordHash String?
-  role         String   @default("free")
+  role         UserRole @default(free)
+  
+  // Subscription fields
+  plan              SubscriptionPlan   @default(free)
+  planStartedAt     DateTime?
+  planExpiresAt     DateTime?
+  stripeCustomerId  String?           @unique
+  apiUsageCount     Int               @default(0)
+  lastApiUsageReset DateTime          @default(now())
+  
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  
+  subscriptions Subscription[]
+  
+  @@index([email])
+  @@index([plan])
 }
 
 model IndexerCheckpoint {
@@ -679,4 +721,42 @@ model BacktestResult {
   @@index([symbol, backtestDate(sort: Desc)])
   @@index([outcome])
   @@index([source])
+}
+
+model Subscription {
+  id        String             @id @default(cuid())
+  userId    String             @unique
+  plan      SubscriptionPlan   @default(free)
+  status    SubscriptionStatus @default(expired)
+  startDate DateTime?
+  endDate   DateTime?
+  canceledAt DateTime?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([plan])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  subscriptionId String
+  amount         Float
+  currency       String        @default("USD")
+  status         PaymentStatus @default(pending)
+  provider       String
+  externalId     String?
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([externalId])
 }

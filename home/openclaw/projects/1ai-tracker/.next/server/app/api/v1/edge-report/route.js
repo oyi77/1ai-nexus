@@ -1,0 +1,11 @@
+var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/v1/edge-report/route.js")
+R.c("server/chunks/[root-of-the-server]__083-c.7._.js")
+R.c("server/chunks/src_lib_modules_index_ts_0t-2wbd._.js")
+R.c("server/chunks/src_lib_02hsyde._.js")
+R.c("server/chunks/[root-of-the-server]__0op9af~._.js")
+R.c("server/chunks/node_modules_0fvg1zc._.js")
+R.c("server/chunks/node_modules_next_dist_0npcise._.js")
+R.c("server/chunks/node_modules_next_11synfn._.js")
+R.c("server/chunks/_next-internal_server_app_api_v1_edge-report_route_actions_0-yl-2l.js")
+R.m(10203)
+module.exports=R.m(10203).exports

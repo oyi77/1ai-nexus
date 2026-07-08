@@ -1,0 +1,10 @@
+var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/v1/prediction-markets/route.js")
+R.c("server/chunks/[root-of-the-server]__0jj18u5._.js")
+R.c("server/chunks/node_modules_next_dist_0npcise._.js")
+R.c("server/chunks/node_modules_next_dist_esm_build_templates_app-route_11xx.cj.js")
+R.c("server/chunks/node_modules_0fvg1zc._.js")
+R.c("server/chunks/[root-of-the-server]__0op9af~._.js")
+R.c("server/chunks/node_modules_next_11synfn._.js")
+R.c("server/chunks/_next-internal_server_app_api_v1_prediction-markets_route_actions_0ljaa7k.js")
+R.m(94735)
+module.exports=R.m(94735).exports

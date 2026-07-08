@@ -1,0 +1,3 @@
+{
+  "/api/v1/intelligence-score/route": "app/api/v1/intelligence-score/route.js"
+}

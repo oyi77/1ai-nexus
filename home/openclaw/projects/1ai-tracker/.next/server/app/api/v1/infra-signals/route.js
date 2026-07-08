@@ -1,0 +1,10 @@
+var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/v1/infra-signals/route.js")
+R.c("server/chunks/[root-of-the-server]__0w9.hqq._.js")
+R.c("server/chunks/node_modules_next_dist_0npcise._.js")
+R.c("server/chunks/node_modules_next_dist_esm_build_templates_app-route_0ufyx07.js")
+R.c("server/chunks/node_modules_0fvg1zc._.js")
+R.c("server/chunks/[root-of-the-server]__0op9af~._.js")
+R.c("server/chunks/node_modules_next_11synfn._.js")
+R.c("server/chunks/_next-internal_server_app_api_v1_infra-signals_route_actions_0dhcs7k.js")
+R.m(99091)
+module.exports=R.m(99091).exports

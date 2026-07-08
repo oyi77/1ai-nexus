@@ -1,0 +1,3 @@
+module.exports=[37848,r=>{"use strict";let e={debug:0,info:1,warn:2,error:3},o=process.env.LOG_LEVEL||"info";function n(r,n,t,s){if(!(e[r]>=e[o]))return;let a=function(r){let{level:e,message:o,timestamp:n,context:t,data:s}=r,a=t?`[${t}]`:"",i=s?` ${JSON.stringify(s)}`:"";return`${n} ${e.toUpperCase()} ${a} ${o}${i}`}({level:r,message:n,timestamp:new Date().toISOString(),context:t,data:s});switch(r){case"error":console.error(a);break;case"warn":console.warn(a);break;default:console.log(a)}}r.s(["logger",0,{debug:(r,e,o)=>n("debug",r,e,o),info:(r,e,o)=>n("info",r,e,o),warn:(r,e,o)=>n("warn",r,e,o),error:(r,e,o)=>n("error",r,e,o)}])}];
+
+//# sourceMappingURL=src_lib_logger_ts_0rcnous._.js.map

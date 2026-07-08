@@ -112,11 +112,11 @@ export default function AiSignalsPage() {
             let bullish = 0
             let bearish = 0
 
-            if (price > sma50) { bullish++; signals.push(`Price above SMA50 (${sma50.toFixed(2)})`) }
-            else { bearish++; signals.push(`Price below SMA50 (${sma50.toFixed(2)})`) }
+            if (price > sma50) { bullish++; signals.push(`Price above SMA50 (${formatPriceUSD(sma50)})`) }
+            else { bearish++; signals.push(`Price below SMA50 (${formatPriceUSD(sma50)})`) }
 
-            if (price > sma200) { bullish++; signals.push(`Price above SMA200 (${sma200.toFixed(2)})`) }
-            else { bearish++; signals.push(`Price below SMA200 (${sma200.toFixed(2)})`) }
+            if (price > sma200) { bullish++; signals.push(`Price above SMA200 (${formatPriceUSD(sma200)})`) }
+            else { bearish++; signals.push(`Price below SMA200 (${formatPriceUSD(sma200)})`) }
 
             if (sma50 > sma200) { bullish++; signals.push('Golden cross: SMA50 > SMA200') }
             else { bearish++; signals.push('Death cross: SMA50 < SMA200') }
@@ -181,7 +181,7 @@ export default function AiSignalsPage() {
             for (const ind of macroData.data.indicators.slice(0, 8)) {
               macroIndicators.push({
                 indicator: ind.name ?? ind.id,
-                value: `${ind.latestValue?.toLocaleString() ?? '—'} ${ind.unit ?? ''}`,
+                value: `${typeof ind.latestValue === 'number' && ind.latestValue < 1 ? ind.latestValue.toFixed(2) : ind.latestValue?.toLocaleString() ?? '—'} ${ind.unit ?? ''}`,
                 date: ind.latestDate ?? '',
               })
             }
@@ -225,12 +225,26 @@ export default function AiSignalsPage() {
   const shortCount = signals.filter(s => s.direction === 'SHORT').length
   
   // History stats — use global signalStats (same source as signals tab) so numbers are consistent
-  const historyTotal = signalStats.active + signalStats.completed
+  const historyTotal = signalStats.active + signalStats.wins + signalStats.losses + signalStats.expired
   const historyWins = signalStats.wins
   const historyLosses = signalStats.losses
   const historyActive = signalStats.active
   const historyWinRate = signalStats.winRate
-  const historyAvgPnl = signalStats.avgWin
+  const historyAvgPnl = (signalStats.wins > 0 && signalStats.losses > 0) 
+    ? ((signalStats.wins * signalStats.avgWin) + (signalStats.losses * signalStats.avgLoss)) / (signalStats.wins + signalStats.losses)
+    : signalStats.avgWin
+
+  // History outcome filter
+  const [historyOutcomeFilter, setHistoryOutcomeFilter] = useState<'All' | 'Win' | 'Loss' | 'Expired' | 'Active'>('All')
+  const filteredHistory = historyOutcomeFilter === 'All' 
+    ? history 
+    : history.filter(s => {
+        if (historyOutcomeFilter === 'Win') return s.outcome === 'win'
+        if (historyOutcomeFilter === 'Loss') return s.outcome === 'loss'
+        if (historyOutcomeFilter === 'Expired') return s.outcome === 'expired'
+        if (historyOutcomeFilter === 'Active') return s.status === 'active'
+        return true
+      })
 
   return (
     <NexusLayout>
@@ -496,19 +510,39 @@ export default function AiSignalsPage() {
               </div>
               <p className="text-[9px] text-text-muted font-mono mt-3 opacity-60">Simulated performance. Not financial advice. Past results do not guarantee future returns.</p>
             </div>
-
-            <div className="bg-bg-panel border border-border-dim rounded-lg">
-              <div className="p-4 border-b border-border-dim">
-                <h2 className="text-sm font-mono text-accent-cyan">Signal History</h2>
-                <p className="text-[10px] text-text-muted font-mono mt-1">{historyTotal} signals tracked</p>
+            {/* History Outcome Filter */}
+            <div className="p-4 border-b border-border-dim">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-sm font-mono text-accent-cyan">Signal History</h2>
+                  <p className="text-[10px] text-text-muted font-mono mt-1">{filteredHistory.length} of {historyTotal} signals</p>
+                </div>
+                <div className="flex gap-2">
+                  {(['All', 'Win', 'Loss', 'Expired', 'Active'] as const).map(outcome => (
+                    <button
+                      key={outcome}
+                      onClick={() => setHistoryOutcomeFilter(outcome)}
+                      className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+                        historyOutcomeFilter === outcome
+                          ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
+                          : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
+                      }`}
+                    >
+                      {outcome}
+                    </button>
+                  ))}
+                </div>
               </div>
+            </div>
             <div className="divide-y divide-border-dim">
-              {history.length === 0 ? (
+              {filteredHistory.length === 0 ? (
                 <div className="p-8 text-center text-text-muted text-[12px] font-mono">
-                  No signal history yet. Signals will appear after 24h+ when they expire or hit TP/SL.
+                  {historyOutcomeFilter === 'All' 
+                    ? 'No signal history yet. Signals will appear after 24h+ when they expire or hit TP/SL.'
+                    : `No ${historyOutcomeFilter.toLowerCase()} signals found.`}
                 </div>
               ) : (
-                history.map((s, i) => {
+                filteredHistory.map((s, i) => {
                   const isWin = s.outcome === 'win'
                   const isLoss = s.outcome === 'loss'
                   const isActive = s.status === 'active'

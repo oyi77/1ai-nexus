@@ -1,0 +1,11 @@
+var R=require("../../../../../chunks/[turbopack]_runtime.js")("server/app/api/v1/defi/yields/route.js")
+R.c("server/chunks/[root-of-the-server]__0fdoo1z._.js")
+R.c("server/chunks/node_modules_next_dist_0npcise._.js")
+R.c("server/chunks/src_lib_02hsyde._.js")
+R.c("server/chunks/node_modules_0fvg1zc._.js")
+R.c("server/chunks/[root-of-the-server]__0op9af~._.js")
+R.c("server/chunks/src_lib_modules_index_ts_0t-2wbd._.js")
+R.c("server/chunks/node_modules_next_11synfn._.js")
+R.c("server/chunks/_next-internal_server_app_api_v1_defi_yields_route_actions_0-1g19-.js")
+R.m(35122)
+module.exports=R.m(35122).exports
