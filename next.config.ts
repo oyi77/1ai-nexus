@@ -4,7 +4,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // output: "standalone",
   outputFileTracingRoot: path.join(__dirname),
-  serverExternalPackages: ['prisma', '@prisma/client', 'ioredis'],
+  serverExternalPackages: ['prisma', '@prisma/client', 'ioredis', 'jsonwebtoken'],
   async headers() {
     return [
       {
