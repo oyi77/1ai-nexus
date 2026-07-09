@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { type NextRequest } from "next/server";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
-import { getUsage } from "@/middleware";
+import { getUsage } from "@/lib/usage-tracking";
 
 export async function GET(request: NextRequest) {
   try {
