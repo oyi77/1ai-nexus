@@ -4,7 +4,17 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // output: "standalone",
   outputFileTracingRoot: path.join(__dirname),
-  serverExternalPackages: ['prisma', '@prisma/client', 'ioredis', 'jsonwebtoken'],
+  serverExternalPackages: ['prisma', '@prisma/client', 'ioredis', 'jsonwebtoken', 'bcryptjs', 'stripe'],
+  
+  // Turbopack: treat native modules as external during build
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push('jsonwebtoken', 'bcryptjs');
+    }
+    return config;
+  },
+  
   async headers() {
     return [
       {

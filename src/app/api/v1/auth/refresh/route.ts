@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { verifyToken, signToken, generateRefreshToken, createRefreshCookie, extractRefreshToken } from '@/lib/jwt';
@@ -27,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify refresh token
-    const decoded = verifyToken(refreshToken);
+    const decoded = await verifyToken(refreshToken);
     if (!decoded) {
       return NextResponse.json(
         { success: false, error: 'Invalid or expired refresh token' },
@@ -54,14 +56,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate new tokens
-    const accessToken = signToken({
+    const accessToken = await signToken({
       userId: user.id,
       email: user.email,
       role: user.role,
       plan: user.plan,
     });
 
-    const newRefreshToken = generateRefreshToken({
+    const newRefreshToken = await generateRefreshToken({
       userId: user.id,
       email: user.email,
       role: user.role,
@@ -85,7 +87,7 @@ export async function POST(request: NextRequest) {
     response.cookies.set('nexus-session', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: '/',
     });

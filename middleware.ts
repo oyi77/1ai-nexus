@@ -1,5 +1,4 @@
 import { NextResponse, type NextRequest } from "next/server";
- import { extractJwtSession, checkSubscriptionRateLimit } from "@/lib/jwt-middleware";
  import { trackUsage } from "@/lib/usage-tracking";
  const ALLOWED_ORIGINS = [
    "http://localhost:3000",
@@ -126,49 +125,6 @@ function checkRateLimit(key: string, maxRequests = 100, windowMs = 60_000): { al
     return addCorsHeaders(NextResponse.next(), request);
   }
 
-  // Protected routes — require JWT
-  if (PROTECTED_ROUTES.has(pathname)) {
-    const jwtSession = await extractJwtSession(request);
-    if (!jwtSession) {
-      return addCorsHeaders(
-        NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-        request
-      );
-    }
-
-    // Check subscription rate limits
-    const rateLimitResult = await checkSubscriptionRateLimit(
-      jwtSession.userId,
-      jwtSession.plan || "free"
-    );
-
-    if (!rateLimitResult.allowed) {
-      return addCorsHeaders(
-        NextResponse.json(
-          {
-            error: "Rate limit exceeded",
-            limit: rateLimitResult.limit,
-          },
-          { status: 429 }
-        ),
-        request
-      );
-    }
-
-    // Attach user session to headers for downstream use
-    const requestHeaders = new Headers(request.headers);
-    requestHeaders.set("x-user-id", jwtSession.userId);
-    requestHeaders.set("x-user-plan", jwtSession.plan || "free");
-
-    return addCorsHeaders(
-      NextResponse.next({
-        request: {
-          headers: requestHeaders,
-        },
-      }),
-      request
-    );
-  }
 
   
   // Check for browser CSRF token or API key for non-protected routes

@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
@@ -65,14 +67,14 @@ export async function POST(request: NextRequest) {
     });
 
     // Generate JWT tokens
-    const accessToken = signToken({
+    const accessToken = await signToken({
       userId: user.id,
       email: user.email,
       role: user.role,
       plan: user.plan,
     });
 
-    const refreshToken = generateRefreshToken({
+    const refreshToken = await generateRefreshToken({
       userId: user.id,
       email: user.email,
       role: user.role,

@@ -92,13 +92,13 @@ export default function PricingPage() {
     setError(null)
 
     try {
-      const res = await fetch('/api/v1/payments', {
+      const res = await fetch('/api/v1/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          method: selectedMethod,
-          tier: tierId,
+          plan: tierId,
           email,
+          gateway: selectedMethod,
         }),
       })
 

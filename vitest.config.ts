@@ -1,3 +1,7 @@
+import { config } from 'dotenv';
+import { resolve } from 'path';
+config({ path: resolve(__dirname, '.env.local') });
+
 import { defineConfig } from 'vitest/config';
 import path from 'path';
 
@@ -18,11 +22,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),
-    },
-  },
-  server: {
-    deps: {
-      external: ['jsonwebtoken', 'bcryptjs'],
     },
   },
 });
