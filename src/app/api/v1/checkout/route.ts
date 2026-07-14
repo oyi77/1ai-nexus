@@ -20,13 +20,16 @@ const PLAN_PRICING: Record<string, { amount: number; currency: string }> = {
 interface CheckoutRequest {
   plan: string
   email?: string
+  gateway?: string
+  returnUrl?: string
+  cancelUrl?: string
 }
 
 export async function POST(request: Request) {
   try {
     // Parse request body
     const body = await request.json() as CheckoutRequest & { customerEmail?: string }
-    const { plan, email, customerEmail } = body
+    const { plan, email, customerEmail, gateway, returnUrl, cancelUrl } = body
 
     // Validate plan
     if (!plan) {
@@ -49,7 +52,6 @@ export async function POST(request: Request) {
       )
     }
 
-
     // Extract user from JWT (optional - allow unauthenticated checkout)
     let userId: string | undefined
     let userEmail: string | undefined
@@ -60,8 +62,10 @@ export async function POST(request: Request) {
     if (token) {
       try {
         const payload = await verifyToken(token)
-        userId = payload.userId
-        userEmail = payload.email || undefined
+        if (payload) {
+          userId = payload.userId
+          userEmail = payload.email || undefined
+        }
       } catch {
         // Continue without userId - allow guest checkout
       }
@@ -77,12 +81,34 @@ export async function POST(request: Request) {
     // Get customer email (from request body or JWT)
     const finalEmail = email || customerEmail || userEmail
 
+    // Get pricing for selected plan
+    const pricing = PLAN_PRICING[plan]
+    if (!pricing) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid plan' },
+        { status: 400 }
+      )
+    }
+
+    // Determine gateway, defaults to midtrans
+    const selectedGateway = gateway || 'midtrans'
+
+    // Determine return/cancel URLs from request headers or env
+    const origin = request.headers.get('origin') || request.headers.get('referer') || process.env.NEXT_PUBLIC_APP_URL || ''
+    const returnDestination = returnUrl || `${origin}/account/payments`
+    const cancelDestination = cancelUrl || `${origin}/checkout`
+
     // Create payment order
     const paymentService = getPaymentService()
     const order = await paymentService.createSubscriptionPayment({
-      userId,
+      userId: userId || 'guest',
       plan: plan as UserRole,
-      customerEmail: finalEmail,
+      amount: pricing.amount,
+      currency: pricing.currency,
+      gateway: selectedGateway,
+      customerEmail: finalEmail || '',
+      returnUrl: returnDestination,
+      cancelUrl: cancelDestination,
     })
     return NextResponse.json({
       success: true,
@@ -94,25 +120,9 @@ export async function POST(request: Request) {
 
   } catch (err) {
     console.error('Checkout error:', err)
-
-    // Handle specific payment service errors
-    if (err instanceof Error) {
-      if (err.message.includes('Payment service not configured')) {
-        return NextResponse.json(
-          { success: false, error: 'Payment service not available. Please contact support.' },
-          { status: 503 }
-        )
-      }
-      if (err.message.includes('Failed to create payment')) {
-        return NextResponse.json(
-          { success: false, error: 'Failed to create payment order. Please try again.' },
-          { status: 502 }
-        )
-      }
-    }
-
+    const message = err instanceof Error ? err.message : 'Failed to create checkout session'
     return NextResponse.json(
-      { success: false, error: 'Failed to create payment session' },
+      { success: false, error: message },
       { status: 500 }
     )
   }

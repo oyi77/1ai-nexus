@@ -7,7 +7,8 @@ export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
-import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
+import { prisma } from '@/lib/db'
 
 interface WebhookPayload {
   order_id: string
@@ -74,32 +75,45 @@ export async function POST(request: Request) {
 
     // Only process successful payments
     if (payload.status === 'paid' && userId && plan) {
-      // Update or create subscription
+      // Upsert subscription
+      const startDate = new Date()
+      const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+
       const subscription = await prisma.subscription.upsert({
-        where: {
-          userId,
-        },
+        where: { userId },
         update: {
-          plan,
-          status: 'active',
-          currentPeriodStart: new Date(),
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-          cancelAtPeriodEnd: false,
+          plan: plan as any,
+          status: 'active' as any,
+          startDate,
+          endDate,
+          canceledAt: null,
         },
         create: {
           userId,
-          plan,
-          status: 'active',
-          currentPeriodStart: new Date(),
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-          cancelAtPeriodEnd: false,
+          plan: plan as any,
+          status: 'active' as any,
+          startDate,
+          endDate,
         },
       })
 
       // Update user role
       await prisma.user.update({
         where: { id: userId },
-        data: { role: plan },
+        data: { role: plan as any },
+      })
+
+      // Create Payment record
+      await prisma.payment.create({
+        data: {
+          subscriptionId: subscription.id,
+          amount: payload.amount,
+          currency: payload.currency,
+          status: 'completed',
+          provider: payload.gateway,
+          externalId: payload.order_id,
+          metadata: payload.metadata as unknown as Prisma.InputJsonValue,
+        },
       })
 
       console.log('Subscription activated:', {
@@ -108,7 +122,24 @@ export async function POST(request: Request) {
         subscriptionId: subscription.id,
       })
     } else if (payload.status === 'failed' || payload.status === 'expired') {
-      // Log failed/expired payments for monitoring
+      // Create failed Payment record if we have enough info
+      if (userId) {
+        const sub = await prisma.subscription.findUnique({ where: { userId } })
+        if (sub) {
+          await prisma.payment.create({
+            data: {
+              subscriptionId: sub.id,
+              amount: payload.amount,
+              currency: payload.currency,
+              status: 'failed',
+              provider: payload.gateway,
+              externalId: payload.order_id,
+              metadata: payload.metadata as unknown as Prisma.InputJsonValue,
+            },
+          })
+        }
+      }
+
       console.warn('Payment not completed:', {
         orderId: payload.order_id,
         status: payload.status,

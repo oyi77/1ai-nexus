@@ -62,7 +62,12 @@ describe('POST /api/v1/checkout', () => {
     expect(mockPaymentService.createSubscriptionPayment).toHaveBeenCalledWith({
       userId: 'user-123',
       plan: 'pro',
+      amount: 4900,
+      currency: 'USD',
+      gateway: 'midtrans',
       customerEmail: 'test@example.com',
+      returnUrl: 'http://localhost:4400/account/payments',
+      cancelUrl: 'http://localhost:4400/checkout',
     })
   })
 
@@ -103,9 +108,14 @@ describe('POST /api/v1/checkout', () => {
     })
 
     expect(mockPaymentService.createSubscriptionPayment).toHaveBeenCalledWith({
-      userId: undefined,
+      userId: 'guest',
       plan: 'enterprise',
+      amount: 19900,
+      currency: 'USD',
+      gateway: 'midtrans',
       customerEmail: 'guest@example.com',
+      returnUrl: 'http://localhost:4400/account/payments',
+      cancelUrl: 'http://localhost:4400/checkout',
     })
   })
 
@@ -185,7 +195,7 @@ describe('POST /api/v1/checkout', () => {
     const data = await response.json()
 
     expect(response.status).toBe(500)
-    expect(data.error).toBe('Failed to create payment session')
+    expect(data.error).toBe('Gateway unavailable')
   })
 
   it('should handle malformed JSON body', async () => {
@@ -201,7 +211,7 @@ describe('POST /api/v1/checkout', () => {
     const data = await response.json()
 
     expect(response.status).toBe(500)
-    expect(data.error).toBe('Failed to create payment session')
+    expect(data.error).toBe('Unexpected token \'i\', "invalid-json" is not valid JSON')
     expect(mockPaymentService.createSubscriptionPayment).not.toHaveBeenCalled()
   })
 })
