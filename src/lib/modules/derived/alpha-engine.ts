@@ -4,6 +4,7 @@
 // Includes: Entry, TP1, TP2, TP3, SL, Valid Period
 // ─────────────────────────────────────────────────────────────
 
+import { prisma } from '@/lib/db'
 import { getCached } from '@/lib/api/server-cache'
 import { getFlowData } from '@/lib/modules/market/trade-aggregator'
 
@@ -78,39 +79,99 @@ async function fetchCurrentPrices(symbols: string[]): Promise<Record<string, Pri
   return priceMap
 }
 
-// Calculate trading levels based on ATR-like volatility
+// ── ATR 14-Period & Regime Detection ────────────────────────
+interface KlinesData {
+  symbol: string
+  closes: number[]
+  highs: number[]
+  lows: number[]
+}
+
+type Regime = 'trend-bull' | 'trend-bear' | 'chop'
+
+async function fetchKlines(symbols: string[]): Promise<Map<string, KlinesData>> {
+  const map = new Map<string, KlinesData>()
+  const valid = symbols.filter(s => /^[A-Z0-9]+$/.test(s))
+  const batchSize = 10
+  for (let i = 0; i < valid.length; i += batchSize) {
+    const batch = valid.slice(i, i + batchSize)
+    await Promise.all(batch.map(async (symbol) => {
+      try {
+        const res = await fetch(
+          `https://api.binance.com/api/v3/klines?symbol=${symbol}USDT&interval=1d&limit=15`,
+          { signal: AbortSignal.timeout(5000) }
+        )
+        if (!res.ok) return
+        const raw = (await res.json()) as string[][]
+        if (raw.length < 2) return
+        map.set(symbol, {
+          symbol,
+          closes: raw.map(k => parseFloat(k[4])),
+          highs: raw.map(k => parseFloat(k[2])),
+          lows: raw.map(k => parseFloat(k[3])),
+        })
+      } catch { /* skip */ }
+    }))
+  }
+  return map
+}
+
+function computeATR14(kd: KlinesData): number {
+  const { closes, highs, lows } = kd
+  if (closes.length < 15) return 0
+  const trs: number[] = []
+  for (let i = 1; i < closes.length; i++) {
+    trs.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])))
+  }
+  // ATR = EMA of TR
+  let atr = trs.slice(0, 14).reduce((a, b) => a + b, 0) / 14
+  const k = 2 / 15
+  for (let i = 14; i < trs.length; i++) atr += (trs[i] - atr) * k
+  return atr
+}
+
+function detectRegime(kd: KlinesData): { regime: Regime; sma14: number } {
+  const { closes } = kd
+  if (closes.length < 14) return { regime: 'chop', sma14: closes[closes.length - 1] ?? 0 }
+  const sma14 = closes.reduce((a, b) => a + b, 0) / closes.length
+  const price = closes[closes.length - 1]
+  const trend = (price - sma14) / sma14
+  return { regime: Math.abs(trend) > 0.03 ? (trend > 0 ? 'trend-bull' : 'trend-bear') : 'chop', sma14 }
+}
+
+// Calculate trading levels with ATR 14-period and regime awareness
 function calculateLevels(
   price: number,
-  high24h: number,
-  low24h: number,
-  direction: 'bullish' | 'bearish' | 'neutral'
+  atr14: number,
+  direction: 'bullish' | 'bearish' | 'neutral',
+  regime: Regime = 'chop'
 ): { entry: number; tp1: number; tp2: number; tp3: number; sl: number } | null {
-  if (!price || price <= 0) return null
+  if (!price || price <= 0 || atr14 <= 0) return null
 
-  // ATR approximation using 24h range
-  const atr = high24h - low24h
-  if (atr <= 0) return null
-
-  const entry = price
+  // Regime-aware multipliers
+  // In trend: wider SL (allow breathing room), TP extended
+  // In chop: tighter SL, take profits faster
+  const [tpMul, slMul] = regime.startsWith('trend')
+    ? [1.0, 0.6]   // trend: TP 1.0×ATR, SL 0.6×ATR → R:R 1.67:1
+    : [0.65, 0.4]  // chop: TP 0.65×ATR, SL 0.4×ATR → R:R 1.625:1
 
   if (direction === 'bullish') {
     return {
-      entry,
-      tp1: entry + atr * 0.5,   // Conservative target
-      tp2: entry + atr * 1.0,   // Moderate target
-      tp3: entry + atr * 1.5,   // Aggressive target
-      sl: entry - atr * 0.75,   // Stop loss below entry
+      entry: price,
+      tp1: price + atr14 * tpMul,
+      tp2: price + atr14 * tpMul * 2,
+      tp3: price + atr14 * tpMul * 4,
+      sl: price - atr14 * slMul,
     }
   } else if (direction === 'bearish') {
     return {
-      entry,
-      tp1: entry - atr * 0.5,   // Conservative target
-      tp2: entry - atr * 1.0,   // Moderate target
-      tp3: entry - atr * 1.5,   // Aggressive target
-      sl: entry + atr * 0.75,   // Stop loss above entry
+      entry: price,
+      tp1: price - atr14 * tpMul,
+      tp2: price - atr14 * tpMul * 2,
+      tp3: price - atr14 * tpMul * 4,
+      sl: price + atr14 * slMul,
     }
   }
-
   return null
 }
 
@@ -450,28 +511,45 @@ async function fetchAlphaSignals(): Promise<AlphaSignal[]> {
             reasoning: `Extreme ${(snap.fundingRate * 100).toFixed(2)}% funding on ${snap.symbol} — crowded ${snap.fundingRate > 0 ? 'longs' : 'shorts'}`,
             timestamp: now,
           })
-        }
-      }
-    }
+        } // if >1% funding
+      } // for snapshots
+    } // if derivRes.ok
   } catch { /* silent */ }
 
-  // Fetch current prices for all symbols with signals
-  const prices = await fetchCurrentPrices(Array.from(symbols))
+  // ── Fetch Market Data & Enrich Signals ──────────────────────
+  // Prices + klines for ATR 14-period and regime detection
+  const symArray = Array.from(symbols)
+  const prices = await fetchCurrentPrices(symArray)
+  const klines = await fetchKlines(symArray)
+
+  // Compute regime per symbol
+  const regimeMap = new Map<string, { regime: Regime; atr14: number }>()
+  klines.forEach((kd, sym) => {
+    const atr14 = computeATR14(kd)
+    const { regime } = detectRegime(kd)
+    regimeMap.set(sym, { regime, atr14 })
+  })
 
   // Enrich signals with trading levels
   const enriched: AlphaSignal[] = signals.map(s => {
     const priceData = prices[s.symbol]
     const primarySource = s.sources[0] ?? 'trade-flow'
     const validPeriod = determineValidPeriod(primarySource, s.strength)
-
-    // Calculate expiration time
     const periodMs: Record<ValidPeriod, number> = { '4h': 4 * 60 * 60 * 1000, '24h': 24 * 60 * 60 * 1000, '7d': 7 * 24 * 60 * 60 * 1000 }
     const expiresAt = now + periodMs[validPeriod]
 
-    // Calculate trading levels if price data available
     let levels = null
     if (priceData) {
-      levels = calculateLevels(priceData.price, priceData.high24h, priceData.low24h, s.direction)
+      const rm = regimeMap.get(s.symbol)
+      const atr14 = rm?.atr14 ?? (priceData.high24h - priceData.low24h)
+      const regime = rm?.regime ?? 'chop'
+      const range = priceData.high24h - priceData.low24h
+      if (atr14 > 0 && range > 0) {
+        const pos = (priceData.price - priceData.low24h) / range
+        if (!(s.direction === 'bullish' && pos > 0.85) && !(s.direction === 'bearish' && pos < 0.15)) {
+          levels = calculateLevels(priceData.price, atr14, s.direction, regime)
+        }
+      }
     }
 
     return {
@@ -486,10 +564,79 @@ async function fetchAlphaSignals(): Promise<AlphaSignal[]> {
     }
   })
 
-  // Deduplicate: keep highest strength per symbol+direction
-  const deduped = new Map<string, AlphaSignal>()
-  for (const s of enriched) {
+  // ── Source Performance Filtering ──────────────────────────
+  // Query historical win rates for each signal source
+  // Drop signals from chronically underperforming sources
+  const perfMap = new Map<string, { total: number; winRate: number }>()
+  try {
+    const rows = await prisma.$queryRaw<
+      Array<{ source: string; wins: bigint; losses: bigint }>
+    >`
+      SELECT source, COUNT(*)FILTER(WHERE outcome='win')as wins, COUNT(*)FILTER(WHERE outcome='loss')as losses
+      FROM "BacktestResult" WHERE outcome IN ('win','loss') GROUP BY source
+    `
+    for (const r of rows) {
+      const total = Number(r.wins) + Number(r.losses)
+      perfMap.set(r.source, { total, winRate: total > 0 ? Number(r.wins) / total : 0.5 })
+    }
+  } catch { /* silent — keep all signals if query fails */ }
+
+  const filtered = enriched.filter(s => {
+    const src = s.sources[0] ?? ''
+    const perf = perfMap.get(src)
+    if (!perf) return true
+    // Reliable: ≥100 samples with ≥48% win rate, or ≥40 samples with ≥40%
+    if (perf.total >= 100) return perf.winRate >= 0.48
+    if (perf.total >= 40) return perf.winRate >= 0.40
+    return true // too few samples to judge
+  })
+
+  // ── Proportional Source Weighting ──────────────────────────
+  // Scale strength by historical win rate (weighted by sample confidence)
+  const boosted = filtered.map(s => {
+    const src = s.sources[0] ?? ''
+    const perf = perfMap.get(src)
+    if (!perf || perf.total < 20) return s
+    const sampleConfidence = Math.min(1, perf.total / 100)
+    const adjustment = (perf.winRate - 0.5) * 2 * sampleConfidence * 30
+    return {
+      ...s,
+      strength: Math.max(5, Math.min(100, Math.round(s.strength + adjustment))),
+      confidence: Math.max(5, Math.min(95, Math.round(s.confidence + adjustment * 0.5))),
+    }
+  })
+
+  // ── Correlation Filter ──────────────────────────────────────
+  // If BTC has a strong trend, kill non-aligned signals to prevent drawdown pileup
+  // Cap same-direction signals to top 5 to avoid concentration
+  let bcFiltered = boosted
+  const btcRegime = regimeMap.get('BTC')
+  if (btcRegime && btcRegime.regime !== 'chop') {
+    const btcBullish = btcRegime.regime === 'trend-bull'
+    bcFiltered = boosted.filter(s => s.symbol === 'BTC' || (btcBullish ? s.direction === 'bullish' : s.direction === 'bearish'))
+  }
+  bcFiltered.sort((a, b) => b.strength * b.confidence - a.strength * a.confidence)
+  const caps = { bullish: 0, bearish: 0 }
+  const correlated = bcFiltered.filter(s => {
+    if ((caps.bullish + caps.bearish) >= 15) return false
+    const dir = s.direction as 'bullish' | 'bearish'
+    return ++caps[dir] <= 5
+  })
+
+  // ── Signal Confirmation Check ─────────────────────────────
+  // Count agreeing sources per symbol+direction (only among correlated, filtered signals)
+  const agreeCount = new Map<string, number>()
+  for (const s of correlated) {
     const key = `${s.symbol}-${s.direction}`
+    agreeCount.set(key, (agreeCount.get(key) ?? 0) + 1)
+  }
+  // Deduplicate: keep highest strength per symbol+direction
+  // Require either multiple agreeing sources OR high individual confidence
+  const deduped = new Map<string, AlphaSignal>()
+  for (const s of correlated) {
+    const key = `${s.symbol}-${s.direction}`
+    const agree = agreeCount.get(key) ?? 0
+    if (agree < 2 && s.confidence < 65) continue // need confirmation
     const existing = deduped.get(key)
     if (!existing || (s.strength * s.confidence) > (existing.strength * existing.confidence)) {
       deduped.set(key, s)
@@ -503,6 +650,7 @@ async function fetchAlphaSignals(): Promise<AlphaSignal[]> {
   valid.sort((a, b) => (b.strength * b.confidence) - (a.strength * a.confidence))
 
   return valid.slice(0, 50)
+
 }
 
 export async function getAlphaSignals(): Promise<{ signals: AlphaSignal[]; sourceCount: number; timestamp: number }> {
