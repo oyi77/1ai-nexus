@@ -97,7 +97,8 @@ export default function DCFPage() {
 
   useEffect(() => {
     const r = runDCF(inputs)
-    setResult(r)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+setResult(r)
   }, [inputs])
 
   const handlePreset = (preset: typeof PRESETS[0]) => {

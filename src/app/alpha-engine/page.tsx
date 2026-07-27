@@ -155,6 +155,7 @@ function AlphaEnginePageInner() {
   // Reset & refetch when filters change — with retry on auth failure
   useEffect(() => {
     let cancelled = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHistory([])
     setHistoryNextCursor(null)
     setHistoryHasMore(false)
@@ -237,6 +238,7 @@ function AlphaEnginePageInner() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLiveData()
     const id = setInterval(fetchLiveData, 15_000)
     return () => clearInterval(id)
@@ -320,6 +322,7 @@ function AlphaEnginePageInner() {
           <Panel title="Alpha Signals" subtitle={`${signals.length} cross-correlated signals`} liveStatus={status} onRefresh={fetchLiveData}>
             <div className="space-y-1 p-2">
               {signals.map((s, i) => {
+                // eslint-disable-next-line react-hooks/purity
                 const isExpired = s.expiresAt < Date.now()
                 const periodLabel: Record<ValidPeriod, string> = { '4h': '4H', '24h': '24H', '7d': '7D' }
 

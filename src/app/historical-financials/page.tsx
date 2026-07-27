@@ -46,7 +46,8 @@ export default function HistoricalFinancialsPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setLoading(true)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+        setLoading(true)
     setError(null)
     fetch(`/api/v1/historical-financials?ticker=${selected}`)
       .then(r => r.json())

@@ -43,7 +43,8 @@ export default function ComparablesPage() {
   const group = PEER_GROUPS[selected]
 
   useEffect(() => {
-    setLoading(true)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+        setLoading(true)
     const symbols = group.symbols.join(',')
     fetch(`/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${symbols}`)
       .then(r => r.json())

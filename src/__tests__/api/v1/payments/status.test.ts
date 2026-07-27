@@ -12,7 +12,7 @@ const mockPaymentService = {
 describe('GET /api/v1/payments/:orderId', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    vi.mocked(getPaymentService).mockReturnValue(mockPaymentService as any)
+    vi.mocked(getPaymentService).mockReturnValue(mockPaymentService as never)
   })
 
   it('should return pending payment status', async () => {

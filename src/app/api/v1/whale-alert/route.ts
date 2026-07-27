@@ -32,7 +32,7 @@ async function fetchWhaleAlerts(): Promise<WhaleAlertItem[]> {
   let match
 
   while ((match = messageRegex.exec(html)) !== null) {
-    let text = match[1].replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/&#036;/g, '$')
+    const text = match[1].replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/&#036;/g, '$')
     if (!text.includes('🚨') || !text.includes('transferred from')) continue
 
     const clean = text.replace(/🚨/g, '').trim()

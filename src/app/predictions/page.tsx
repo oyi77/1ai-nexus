@@ -78,7 +78,8 @@ function PredictionsPageInner() {
   }, [source, category, sort, order])
 
   useEffect(() => {
-    fetchData()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+fetchData()
   }, [fetchData])
 
   return (

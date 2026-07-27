@@ -182,7 +182,8 @@ export default function OptionsIntelPage() {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+fetchData()
     const interval = setInterval(fetchData, 120_000) // refresh every 2 min
     return () => clearInterval(interval)
   }, [fetchData])

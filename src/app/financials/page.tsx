@@ -55,7 +55,8 @@ export default function FinancialsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+        setLoading(true)
     fetch(`/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${selected}`)
       .then(r => r.json())
       .then(d => {

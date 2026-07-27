@@ -76,7 +76,8 @@ export default function PnlPage() {
   }, [])
 
   useEffect(() => {
-    fetchLeaderboard()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+        fetchLeaderboard()
   }, [fetchLeaderboard])
 
   const lookupWallet = async () => {

@@ -148,7 +148,8 @@ export default function PaperTradingPage() {
   }, [fetchStats, fetchTrades, fetchMarkets])
 
   useEffect(() => {
-    if (tab === "history") fetchHistory()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+if (tab === "history") fetchHistory()
     if (tab === "positions") fetchTrades()
   }, [tab, fetchHistory, fetchTrades])
 

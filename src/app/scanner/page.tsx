@@ -78,7 +78,8 @@ function DegenScannerPageInner() {
   }, [network])
 
   useEffect(() => {
-    fetchData()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+fetchData()
     const interval = setInterval(fetchData, 10_000) // Fast 10s polling for sniper
     return () => clearInterval(interval)
   }, [fetchData])

@@ -4,7 +4,7 @@
  * upstreamProduct: Yahoo Finance
  * endpoint: query1.finance.yahoo.com / query2.finance.yahoo.com
  * discoveredVia: community-package
- * lastVerified: 2026-06-20
+ * lastVerified: 2026-07-27
  * UNOFFICIAL: this calls Yahoo Finance's internal JSON API, not their public API.
  *   Uses /v8/finance/chart for quotes (v7 quote returns empty from server IPs).
  *   fallbackFn: cached last-known-good

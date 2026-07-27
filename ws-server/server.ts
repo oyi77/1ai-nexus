@@ -495,7 +495,6 @@ function computeArbitrage() {
     if (!fundingRate) continue
 
     if (Math.abs(fundingRate) > 0.0003) {
-      const annualized = fundingRate * 3 * 365 * 100
       opportunities.push({
         type: 'Funding Arb',
         symbol: symbol.toUpperCase(),
@@ -723,7 +722,7 @@ dexscreenerNs.on('connection', (socket) => {
 
 
 // Detect new token creation from raw Solana logs
-function detectNewTokenCreation(logs: string[], program: string, signature: string): { isNew: boolean; tokenMint?: string } {
+function detectNewTokenCreation(logs: string[], program: string, _signature: string): { isNew: boolean; tokenMint?: string } {
   // Pump.fun: "Instruction: Create" creates a new token
   if (program === 'pumpfun') {
     const hasCreate = logs.some((l: string) =>
@@ -790,7 +789,7 @@ function connectSolanaWS() {
 
   ws.on('open', () => {
     console.log('[memecoins] Solana WS connected — subscribing to ' + Object.keys(SOL_PROGRAMS).length + ' DEX programs')
-    for (const [name, programId] of Object.entries(SOL_PROGRAMS)) {
+    for (const [_name, programId] of Object.entries(SOL_PROGRAMS)) {
       ws.send(JSON.stringify({
         jsonrpc: '2.0',
         id: Math.floor(Math.random() * 10000),

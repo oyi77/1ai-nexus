@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 
 interface FinancialDisclaimerProps {
   variant?: 'banner' | 'modal' | 'inline'
@@ -13,6 +14,7 @@ export function FinancialDisclaimer({ variant = 'banner', onAccept }: FinancialD
 
   useEffect(() => {
     const hasAccepted = localStorage.getItem('financial-disclaimer-accepted')
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (hasAccepted) setAccepted(true)
   }, [])
 
@@ -48,12 +50,12 @@ export function FinancialDisclaimer({ variant = 'banner', onAccept }: FinancialD
             >
               I Understand the Risks
             </button>
-            <a
+            <Link
               href="/"
               className="px-4 py-2 bg-bg-raised text-text-muted font-mono rounded hover:text-text-primary transition-colors"
             >
               Leave
-            </a>
+            </Link>
           </div>
         </div>
       </div>

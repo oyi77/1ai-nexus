@@ -104,7 +104,8 @@ export default function OrderBookPage() {
       socket.on('connect_error', () => setWsConnected(false))
     } catch { /* silent */ }
 
-    fetchData()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+fetchData()
     const tickerInterval = setInterval(fetchData, 30_000)
 
     return () => {

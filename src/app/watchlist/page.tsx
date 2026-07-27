@@ -49,6 +49,7 @@ export default function WatchlistPage() {
   const [filter, setFilter] = useState<'all' | 'token' | 'wallet' | 'entity'>('all')
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setItems(loadWatchlist())
   }, [])
 
@@ -81,6 +82,7 @@ export default function WatchlistPage() {
   }, [items])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPrices()
     const id = setInterval(fetchPrices, 10_000)
     return () => clearInterval(id)

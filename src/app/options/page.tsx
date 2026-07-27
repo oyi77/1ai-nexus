@@ -151,10 +151,12 @@ export default function OptionsPage() {
     }
   }, [currency])
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchChain() }, [fetchChain])
 
   // Reset selectedExpiry when data changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (chainData && selectedExpiry >= chainData.expiries.length) setSelectedExpiry(0)
   }, [chainData, selectedExpiry])
 

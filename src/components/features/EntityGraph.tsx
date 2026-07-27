@@ -104,7 +104,7 @@ export function EntityGraph({ data }: { data: GraphData }) {
           if (!event.active) simulation.alphaTarget(0)
           event.subject.fx = null
           event.subject.fy = null
-        }) as any)
+        }) as never)
 
     node.append('title')
       .text((d: GraphNode) => `${d.label}\nType: ${d.type}\nTVL: $${(d.tvl / 1e6).toFixed(2)}M`)
@@ -269,8 +269,10 @@ export function EntityGraph({ data }: { data: GraphData }) {
   const handleNodeClick = (nodeId: string, nodeType: string) => {
     zoomToNode(nodeId)
     if (nodeType === 'entity') {
+      // eslint-disable-next-line react-hooks/immutability
       window.location.href = `/entity/${nodeId}`
     } else if (nodeType === 'wallet') {
+      // eslint-disable-next-line react-hooks/immutability
       window.location.href = `/wallet/${nodeId}`
     }
   }

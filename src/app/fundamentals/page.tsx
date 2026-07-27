@@ -102,7 +102,8 @@ export default function FundamentalsPage() {
   }, [])
 
   useEffect(() => {
-    setDetail(data.find(i => i.symbol === selected) ?? null)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+setDetail(data.find(i => i.symbol === selected) ?? null)
   }, [selected, data])
 
   const fmt = (n: number | null, decimals = 2) => n != null ? n.toLocaleString(undefined, { maximumFractionDigits: decimals }) : '—'

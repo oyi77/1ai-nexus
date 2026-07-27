@@ -82,16 +82,16 @@ export async function POST(request: Request) {
       const subscription = await prisma.subscription.upsert({
         where: { userId },
         update: {
-          plan: plan as any,
-          status: 'active' as any,
+          plan: plan as 'free' | 'pro' | 'enterprise',
+          status: 'active' as 'active' | 'canceled' | 'expired' | 'trial',
           startDate,
           endDate,
           canceledAt: null,
         },
         create: {
           userId,
-          plan: plan as any,
-          status: 'active' as any,
+          plan: plan as 'free' | 'pro' | 'enterprise',
+          status: 'active' as 'active' | 'canceled' | 'expired' | 'trial',
           startDate,
           endDate,
         },
@@ -100,6 +100,7 @@ export async function POST(request: Request) {
       // Update user role
       await prisma.user.update({
         where: { id: userId },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         data: { role: plan as any },
       })
 

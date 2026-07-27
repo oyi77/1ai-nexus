@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { createHmac } from 'crypto'
 import { POST } from '@/app/api/v1/webhooks/payment/route'
 import { prisma } from '@/lib/db'
 
@@ -21,9 +22,8 @@ const mockBody = (overrides = {}) => JSON.stringify({
 })
 
 function signedRequest(body: string) {
-  const crypto = require('crypto')
   const secret = process.env.ONEAI_PAYMENT_WEBHOOK_SECRET || 'test-secret'
-  const signature = crypto.createHmac('sha256', secret).update(body).digest('hex')
+  const signature = createHmac('sha256', secret).update(body).digest('hex')
   return new Request('http://localhost:3000/api/v1/webhooks/payment', {
     method: 'POST',
     headers: {
@@ -41,9 +41,8 @@ describe('POST /api/v1/webhooks/payment', () => {
   })
 
   it('creates subscription and payment on paid webhook', async () => {
-    const sub = { id: 'sub-1', userId: 'user-1' }
-    vi.mocked(prisma.subscription.upsert).mockResolvedValue({ id: 'sub-1', userId: 'user-1' } as any)
-    vi.mocked(prisma.payment.create).mockResolvedValue({ id: 'pay-1' } as any)
+    vi.mocked(prisma.subscription.upsert).mockResolvedValue({ id: 'sub-1', userId: 'user-1' } as never)
+    vi.mocked(prisma.payment.create).mockResolvedValue({ id: 'pay-1' } as never)
 
     const body = mockBody()
     const response = await POST(signedRequest(body))
@@ -73,9 +72,8 @@ describe('POST /api/v1/webhooks/payment', () => {
   })
 
   it('records failed payment when status is failed', async () => {
-    const sub = { id: 'sub-1', userId: 'user-1' }
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({ id: 'sub-1', userId: 'user-1' } as any)
-    vi.mocked(prisma.payment.create).mockResolvedValue({ id: 'pay-2' } as any)
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({ id: 'sub-1', userId: 'user-1' } as never)
+    vi.mocked(prisma.payment.create).mockResolvedValue({ id: 'pay-2' } as never)
 
     const body = mockBody({ status: 'failed' })
     const response = await POST(signedRequest(body))
@@ -93,9 +91,8 @@ describe('POST /api/v1/webhooks/payment', () => {
   })
 
   it('records failed payment when status is expired', async () => {
-    const sub = { id: 'sub-1', userId: 'user-1' }
-    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({ id: 'sub-1', userId: 'user-1' } as any)
-    vi.mocked(prisma.payment.create).mockResolvedValue({ id: 'pay-3' } as any)
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({ id: 'sub-1', userId: 'user-1' } as never)
+    vi.mocked(prisma.payment.create).mockResolvedValue({ id: 'pay-3' } as never)
 
     const body = mockBody({ status: 'expired' })
     const response = await POST(signedRequest(body))

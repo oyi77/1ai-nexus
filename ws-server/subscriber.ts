@@ -1,6 +1,6 @@
 import Redis from "ioredis";
 import type { Server } from "socket.io";
-import { RedisStreamsBus, eventBus } from "../indexer/streams/redis-streams";
+import { RedisStreamsBus } from "../indexer/streams/redis-streams";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 
@@ -10,14 +10,6 @@ const LEGACY_CHANNELS = [
   "nexus:prices",
   "nexus:flows",
   "nexus:cex",
-] as const;
-
-const STREAM_CHANNELS = [
-  "stream:nexus:trades",
-  "stream:nexus:alerts",
-  "stream:nexus:prices",
-  "stream:nexus:flows",
-  "stream:nexus:cex",
 ] as const;
 
 const CHANNEL_TO_NAMESPACE: Record<string, string> = {
@@ -32,6 +24,13 @@ const CHANNEL_TO_NAMESPACE: Record<string, string> = {
   "stream:nexus:flows": "/flows",
   "stream:nexus:cex": "/cex",
 };
+
+interface StreamEvent {
+  data?: {
+    platform?: string;
+    triggerType?: string;
+  };
+}
 
 export function startSubscriber(io: Server): { legacy: Redis; streams: RedisStreamsBus } {
   // Legacy pub/sub bridge
@@ -65,17 +64,18 @@ export function startSubscriber(io: Server): { legacy: Redis; streams: RedisStre
 
     try {
       const event = JSON.parse(message);
+      const streamEvent = event as StreamEvent;
 
       // Emit to the namespace (all connected clients in that namespace)
       io.of(namespace).emit("event", event);
 
       // Also emit to rooms matching the event data
-      if ((event as any).data?.platform) {
-        const room = `${namespace}:${(event as any).data.platform}`;
+      if (streamEvent.data?.platform) {
+        const room = `${namespace}:${streamEvent.data.platform}`;
         io.of(namespace).to(room).emit("event", event);
       }
-      if ((event as any).data?.triggerType) {
-        const room = `${namespace}:${(event as any).data.triggerType}`;
+      if (streamEvent.data?.triggerType) {
+        const room = `${namespace}:${streamEvent.data.triggerType}`;
         io.of(namespace).to(room).emit("event", event);
       }
     } catch (err) {

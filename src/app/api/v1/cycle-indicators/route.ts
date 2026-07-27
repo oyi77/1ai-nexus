@@ -90,7 +90,7 @@ export async function GET(request: Request) {
 
 async function fetchLatestFromDb() {
   const indicators = ['mvrv', 'nupl', 'ssr', 'dominance']
-  const results: Record<string, any> = {}
+  const results: Record<string, unknown> = {}
   let latestTimestamp = new Date().toISOString()
 
   for (const ind of indicators) {

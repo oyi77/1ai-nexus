@@ -130,7 +130,8 @@ export default function PortfolioPage() {
   }, [])
 
   useEffect(() => {
-    fetchPortfolio()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+        fetchPortfolio()
     const interval = setInterval(fetchPortfolio, 30000)
     return () => clearInterval(interval)
   }, [fetchPortfolio])

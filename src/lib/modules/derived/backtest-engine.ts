@@ -449,7 +449,8 @@ export async function checkExpiredSignals(): Promise<{ checked: number; updated:
     bySymbol.set(s.symbol, existing)
   }
 
-  let wins = 0, losses = 0, expired = 0, notTriggered = 0, updated = 0
+  let wins = 0, losses = 0, notTriggered = 0, updated = 0
+  const expired = 0
   const now = Date.now()
 
   for (const [symbol, signals] of bySymbol) {

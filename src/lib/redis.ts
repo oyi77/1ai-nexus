@@ -12,7 +12,29 @@ function isNodeRuntime(): boolean {
   return typeof process !== 'undefined' && typeof process.version === 'string' && process.version.startsWith('v')
 }
 
-export function getRedisClient(): any {
+export interface RedisPipeline {
+  zremrangebyscore(key: string, min: number, max: number): void
+  zadd(key: string, score: number, member: string): void
+  zcard(key: string): void
+  pexpire(key: string, ms: number): void
+  exec(): Promise<Array<[Error | null, unknown]> | null>
+}
+
+export interface RedisClient {
+  ping(): Promise<string>
+  get(key: string): Promise<string | null>
+  set(key: string, value: string, ...args: unknown[]): Promise<'OK' | null>
+  del(...keys: string[]): Promise<number>
+  dbsize(): Promise<number>
+  info(section?: string): Promise<string>
+  publish(channel: string, message: string): Promise<number>
+  subscribe(channel: string, callback: (err: Error | null, count: number) => void): void
+  multi(): RedisPipeline
+  quit(): Promise<'OK'>
+  on(event: string, handler: (...args: unknown[]) => void): void
+}
+
+export function getRedisClient(): RedisClient {
   if (!isNodeRuntime()) {
     // Edge runtime — return a no-op proxy
     return new Proxy({}, {
@@ -25,7 +47,7 @@ export function getRedisClient(): any {
         if (prop === 'publish') return async () => 0
         return () => {}
       },
-    })
+    }) as unknown as RedisClient
   }
 
   if (!client) {

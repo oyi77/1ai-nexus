@@ -23,7 +23,7 @@ interface PaymentOrder {
   paymentUrl?: string;
   expiresAt?: Date;
   paidAt?: Date;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export class PaymentService {
@@ -82,13 +82,13 @@ export class PaymentService {
       currency: order.currency,
       gateway: order.gateway,
       paymentUrl: order.payment_url ?? undefined,
-      expiresAt: (order as any).expiresAt
-        ? new Date((order as any).expiresAt)
+      expiresAt: (order as { expiresAt?: string }).expiresAt
+        ? new Date((order as { expiresAt?: string }).expiresAt!)
         : order.status === 'pending'
           ? new Date(new Date(order.created_at).getTime() + 24 * 60 * 60 * 1000)
           : undefined,
-      paidAt: (order as any).paidAt
-        ? new Date((order as any).paidAt)
+      paidAt: (order as { paidAt?: string }).paidAt
+        ? new Date((order as { paidAt?: string }).paidAt!)
         : order.status === 'paid'
           ? new Date(order.updated_at)
           : undefined,

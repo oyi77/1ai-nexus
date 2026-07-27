@@ -10,7 +10,8 @@ export async function GET() {
 
   // 1. Redis health
   try {
-    const redis = await import('@/lib/redis').then(m => m.getRedisClient())
+    const mod = await import('@/lib/redis')
+    const redis = mod.getRedisClient()
     await redis.ping()
     checks.redis = 'ok'
   } catch {

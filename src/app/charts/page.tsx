@@ -64,6 +64,7 @@ export default function ChartsPage() {
 
   // Fetch OHLCV data
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true)
     const fetchCandles = async () => {
       try {

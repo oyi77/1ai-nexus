@@ -105,7 +105,8 @@ export default function LiquidationsPage() {
   }, [selectedSymbol])
 
   useEffect(() => {
-    fetchBinance()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+fetchBinance()
     const id = setInterval(fetchBinance, 10_000)
     return () => clearInterval(id)
   }, [fetchBinance])

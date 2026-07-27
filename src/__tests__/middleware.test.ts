@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock native modules with factory functions AFTER vitest import
 vi.mock('jsonwebtoken', () => {
-  const mockSign = vi.fn((payload: any, secret: string, options?: any) => {
+  const mockSign = vi.fn((payload: Record<string, unknown>, secret: string, options?: Record<string, unknown>) => {
     if (options?.expiresIn === '-1h') return 'expired-token'
     return 'valid-token'
   })
@@ -60,7 +60,7 @@ describe('Middleware JWT Integration', () => {
       })
 
       // Verify token can be decoded
-      const decoded = jwt.verify(token, JWT_SECRET) as any
+      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string; plan: string }
       expect(decoded.userId).toBe(userId)
       expect(decoded.email).toBe(email)
       expect(decoded.role).toBe(role)

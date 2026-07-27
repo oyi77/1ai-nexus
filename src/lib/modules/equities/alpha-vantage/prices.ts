@@ -4,7 +4,7 @@
  * upstreamProduct: Alpha Vantage
  * endpoint: alphavantage.co widget endpoints
  * discoveredVia: devtools-network-tab
- * lastVerified: 2026-06-19
+ * lastVerified: 2026-07-27
  * UNOFFICIAL: this calls Alpha Vantage's internal widget API, not their public API.
  *   It may break without notice if they change their dashboard.
  *   fallbackFn: yahoo-finance

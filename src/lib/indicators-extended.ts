@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────
 
 import type { OHLCV, IndicatorPoint } from './indicators'
+import { SMA, EMA, RSI, MACD, Bollinger } from './indicators'
 
 // ─── Existing indicators re-exported ──────────────────────
 export { SMA, EMA, RSI, MACD, Bollinger, computeAllIndicators } from './indicators'
@@ -426,9 +427,6 @@ export interface ExtendedIndicators {
 }
 
 export function computeExtendedIndicators(data: OHLCV[]): ExtendedIndicators {
-  // Import base indicators
-  const { SMA, EMA, RSI, MACD, Bollinger } = require('./indicators')
-
   return {
     sma20: SMA(data, 20),
     sma50: SMA(data, 50),

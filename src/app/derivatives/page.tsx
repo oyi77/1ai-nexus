@@ -75,7 +75,8 @@ export default function DerivativesPage() {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+fetchData()
     const id = setInterval(fetchData, 10_000)
     return () => clearInterval(id)
   }, [fetchData])

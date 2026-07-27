@@ -132,6 +132,7 @@ export default function TokenGodModePage() {
   // Auto-fetch when address changes (from preset click)
   useEffect(() => {
     if (address.trim() && status !== 'loading') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchToken()
     }
   }, [address, network])

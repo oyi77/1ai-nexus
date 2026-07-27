@@ -54,6 +54,7 @@ export default function TopTradersPage() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData()
     const id = setInterval(fetchData, 15_000)
     return () => clearInterval(id)

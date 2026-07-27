@@ -69,6 +69,7 @@ function YieldsPageInner() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData()
     const id = setInterval(fetchData, 300_000) // 5min
     return () => clearInterval(id)

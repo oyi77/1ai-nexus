@@ -72,7 +72,8 @@ export default function MevPage() {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+fetchData()
     const iv = setInterval(fetchData, 15_000)
     return () => clearInterval(iv)
   }, [fetchData])

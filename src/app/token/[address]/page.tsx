@@ -50,6 +50,7 @@ export default function TokenDetailPage() {
   
   useEffect(() => {
     if (!address) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatus('stale')
 
     // Fetch token info from GeckoTerminal

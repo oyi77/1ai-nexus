@@ -11,6 +11,7 @@ export function LanguageSwitcher() {
   const [open, setOpen] = useState(false)
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCurrentLocale(getLocale())
   }, [])
 

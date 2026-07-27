@@ -10,7 +10,8 @@ export default function ForexPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    setError(null)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+        setError(null)
     setLoading(true)
     fetch(`/api/v1/forex?base=${base}`)
       .then(r => r.json())

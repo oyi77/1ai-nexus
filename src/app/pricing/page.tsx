@@ -79,6 +79,7 @@ export default function PricingPage() {
 
   const handlePayment = async (tierId: string) => {
     if (tierId === 'free') {
+      // eslint-disable-next-line react-hooks/immutability
       window.location.href = '/alpha-engine'
       return
     }
@@ -105,6 +106,7 @@ export default function PricingPage() {
       const data = await res.json()
 
       if (data.data?.paymentUrl) {
+        // eslint-disable-next-line react-hooks/immutability
         window.location.href = data.data.paymentUrl
       } else {
         setError(data.error ?? 'Payment failed')

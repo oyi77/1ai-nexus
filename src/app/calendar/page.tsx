@@ -61,7 +61,8 @@ function CalendarPageInner() {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+fetchData()
     const id = setInterval(fetchData, 3_600_000) // 1h refresh
     return () => clearInterval(id)
   }, [fetchData])

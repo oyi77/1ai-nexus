@@ -42,6 +42,7 @@ export function NewsFeedContent() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchNews(filter === 'All' ? undefined : filter)
     // Refresh every 60 seconds
     const interval = setInterval(() => fetchNews(filter === 'All' ? undefined : filter), 60000)

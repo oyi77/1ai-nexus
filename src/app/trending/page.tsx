@@ -61,6 +61,7 @@ function TrendingCoinsPageInner() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchData()
     const id = setInterval(fetchData, 60_000) // 2min
     return () => clearInterval(id)

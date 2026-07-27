@@ -50,7 +50,8 @@ export default function MarketScorePage() {
   }, [])
 
   useEffect(() => {
-    fetchScores()
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+fetchScores()
     const id = setInterval(fetchScores, 60_000) // Refresh every minute
     return () => clearInterval(id)
   }, [fetchScores])

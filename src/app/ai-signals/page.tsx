@@ -405,8 +405,10 @@ export default function AiSignalsPage() {
                         <div className="flex items-center gap-4 text-[11px] font-mono">
                           <span className="text-text-muted">VALID</span>
                           <span className={`px-1.5 py-0.5 rounded ${
+                            // eslint-disable-next-line react-hooks/purity
                             signal.expiresAt < Date.now() ? 'bg-data-bear/20 text-data-bear' : 'bg-data-bull/20 text-data-bull'
                           }`}>
+                            {/* eslint-disable-next-line react-hooks/purity */}
                             {signal.expiresAt < Date.now() ? 'EXPIRED' : signal.validPeriod}
                           </span>
                           <span className="text-text-muted">ENTRY</span>

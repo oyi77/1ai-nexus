@@ -102,7 +102,7 @@ export default function DerivativesIntelPage() {
   const exchanges = useMemo(() => [...new Set(snapshots.map(s => s.exchange))], [snapshots])
 
   const filtered = useMemo(() => {
-    let data = filterExchange === 'all' ? snapshots : snapshots.filter(s => s.exchange === filterExchange)
+    const data = filterExchange === 'all' ? snapshots : snapshots.filter(s => s.exchange === filterExchange)
     switch (sortBy) {
       case 'funding': return [...data].sort((a, b) => Math.abs(b.fundingRate) - Math.abs(a.fundingRate))
       case 'oi': return [...data].sort((a, b) => b.openInterest - a.openInterest)

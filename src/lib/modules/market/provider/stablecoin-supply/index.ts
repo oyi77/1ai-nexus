@@ -27,9 +27,9 @@ async function fetchStablecoins(): Promise<StablecoinData[]> {
 
     return (data.data ?? []).map(s => ({
       symbol: s.symbol ?? 'USDT',
-      marketCap: (s as any).marketCap ?? 0,
+      marketCap: s.marketCap ?? 0,
       change24h: s.change24h ?? 0,
-      changePercent: (s as any).marketCap > 0 ? ((s as any).change24h ?? 0) / (s as any).marketCap * 100 : 0,
+      changePercent: s.marketCap && s.marketCap > 0 ? (s.change24h ?? 0) / s.marketCap * 100 : 0,
     }))
   } catch {
     return []
