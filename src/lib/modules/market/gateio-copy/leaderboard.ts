@@ -97,7 +97,10 @@ function upstreamOrderBy(orderBy: string): string {
 
 /** Fetch the gate.io copy-trading leader list from the first reachable host (200 + code 0 wins). */
 async function fetchGateioList(pageSize: number, cycle: string, orderBy: string): Promise<{ rows: GateLeaderRow[]; total: number }> {
-  const qs = `cycle=${cycle}&page=1&page_size=${pageSize}&status=running&order_by=${upstreamOrderBy(orderBy)}&sub_website_id=0`
+  // Upstream rejects page_size > 100 with the misleading "Service is busy" code -1;
+  // clamp so large page_size (route allows up to 200) degrades to 100 rows instead of erroring.
+  const clamped = Math.max(1, Math.min(pageSize, 100))
+  const qs = `cycle=${cycle}&page=1&page_size=${clamped}&status=running&order_by=${upstreamOrderBy(orderBy)}&sub_website_id=0`
   let lastErr: unknown = new Error('no host attempted')
 
   for (const host of GATEIO_HOSTS) {
