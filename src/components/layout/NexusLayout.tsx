@@ -102,6 +102,13 @@ const NAV_SECTIONS: NavSection[] = [
     ],
   },
   {
+    title: 'Copy Trading',
+    items: [
+      { label: 'Leaderboard',  href: '/copy-trading',            icon: Users },
+      { label: 'Performance',  href: '/copy-trading/performance', icon: Users },
+    ],
+  },
+  {
     title: 'Analytics',
     items: [
       { label: 'Analytics Hub', href: '/analytics',      icon: Zap },

@@ -32,6 +32,9 @@ const MODULE_FILE_MAP: Record<string, string> = {
   'sectors-app':        'src/lib/modules/market/sectors-app.ts',
   'defillama-research': 'src/lib/modules/news/defillama/research.ts',
   'vimero-feed-proxy':  'src/lib/modules/news/vimero/feed.ts',
+  'gateio-performance': 'src/lib/modules/derivatives/gateio/performance.ts',
+  'gateio-copy-leaderboard': 'src/lib/modules/market/gateio-copy/leaderboard.ts',
+  'hyperliquid-copy-leaderboard': 'src/lib/modules/market/hyperliquid-copy/leaderboard.ts',
 }
 
 // ─── TTY helpers ──────────────────────────────────────────────

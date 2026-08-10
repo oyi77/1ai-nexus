@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // NEXUS Module Registry — Auto-registration
-// 57 modules across 12+ data categories
+// 61 modules across 12+ data categories
 // ─────────────────────────────────────────────────────────────
 
 import { getRegistry } from './registry'
@@ -30,6 +30,8 @@ import indodax from './market/indodax'
 import sectorsApp from './market/sectors-app'
 import eastmoney from './market/eastmoney'
 import marketFlow from './market/market-flow'
+import gateioCopyLeaderboard from './market/gateio-copy/leaderboard'
+import hyperliquidCopyLeaderboard from './market/hyperliquid-copy/leaderboard'
 
 // Macro
 import {
@@ -62,6 +64,7 @@ import fearGreed from './sentiment/alternative-me/fear-greed'
 import derivativesAggregate from './derivatives/aggregate'
 import deribitOptions from './derivatives/deribit/options'
 import binanceFutures from './derivatives/binance/futures'
+import gateioPerformance from './derivatives/gateio/performance'
 
 // Prediction
 import manifold from './prediction/manifold/markets'
@@ -122,14 +125,15 @@ export function registerAllModules() {
     geckoterminal, defillama, dexscreener, hyperliquid, polymarket,
     blockscoutEth, arkhamRe, birdeyeRe, mempoolSpace, l2beat, blockchair, covalent,
     cycleIndicators,
-    // Market (9)
+    // Market (11)
     coingecko, binance, bybit, coinpaprika, coincap, indodax, sectorsApp, eastmoney, marketFlow,
+    gateioCopyLeaderboard, hyperliquidCopyLeaderboard,
     fred, fearGreed, frankfurter, exchangeRate, ecbSdw, worldbank,
     finnhubRe, secEdgar, dbnomics, usTreasury, usgsEarthquakes, gdacsAlerts,
     openMeteo, nasaEonet, reliefweb, adsbFlight, openfema, bankOfCanada,
     ukOns, imfSdmx, indonesiaMacro, bisSdmx, eurostat,
-    // Derivatives (3)
-    derivativesAggregate, deribitOptions, binanceFutures,
+    // Derivatives (4)
+    derivativesAggregate, deribitOptions, binanceFutures, gateioPerformance,
     manifold, polymarketGamma,
     // Equities RE (4)
     yahooFinance, alphaVantageRe, fmpRe, secEdgarInsider,

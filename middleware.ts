@@ -45,7 +45,10 @@ import { NextResponse, type NextRequest } from "next/server";
   '/api/v1/revenue',
   '/api/v1/token/god-mode',
   '/api/v1/mempool',
- ]);
+  '/api/v1/copy-trading/leaderboard',
+  '/api/v1/copy-trading/performance',
+  '/api/v1/news',
+]);
 
 // Routes that require JWT authentication (premium features)
 const PROTECTED_ROUTES = new Set([
