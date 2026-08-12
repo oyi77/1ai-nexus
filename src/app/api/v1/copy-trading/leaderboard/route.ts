@@ -3,18 +3,20 @@
 // Copy-trading leaderboard across platforms (gateio + hyperliquid).
 // Per-platform error isolation: one platform failing never 502s
 // the whole request — meta.platforms carries each platform's status.
+//
+// The platform set, per-platform leaderboard modules, and per-platform
+// TTLs all live in the copy-trading registry — register a new exchange
+// there instead of editing this route.
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
 import { getCached } from '@/lib/api/server-cache'
-import gateioCopyLeaderboardModule from '@/lib/modules/market/gateio-copy/leaderboard'
-import hyperliquidCopyLeaderboardModule from '@/lib/modules/market/hyperliquid-copy/leaderboard'
+import {
+  COPY_TRADING_REGISTRY,
+  getEnabledPlatforms,
+  getLeaderboardModule,
+} from '@/lib/modules/market/copy-trading/registry'
 import type { CopyTradingLeader, CopyTradingPlatform } from '@/lib/modules/market/copy-trading/types'
-
-const PLATFORM_TTL: Record<CopyTradingPlatform, number> = {
-  gateio: 180_000, // mirrors gateio-copy-leaderboard module TTL (TOKEN_DATA × RE_MULTIPLIER)
-  hyperliquid: 3_600_000, // mirrors hyperliquid-copy-leaderboard module TTL (MACRO_DATA)
-}
 
 type PlatformStatus = { platform: CopyTradingPlatform; status: 'ok' | 'error'; error?: string; total?: number }
 
@@ -29,8 +31,9 @@ async function fetchPlatform(
   orderBy: string,
   pageSize: number,
 ): Promise<PlatformResult> {
-  const mod = platform === 'gateio' ? gateioCopyLeaderboardModule : hyperliquidCopyLeaderboardModule
+  const mod = getLeaderboardModule(platform)
   try {
+    if (!mod) throw new Error(`No leaderboard module registered for platform: ${platform}`)
     const res = await mod.fetch<{ leaders: CopyTradingLeader[]; total: number }>({
       platform,
       cycle,
@@ -59,14 +62,18 @@ export async function GET(req: Request) {
   const orderBy = searchParams.get('order_by') ?? 'aum'
   const pageSize = Math.min(Math.max(Number(searchParams.get('page_size') ?? 50) || 50, 1), 200)
 
-  const platform = platformParam === 'gateio' || platformParam === 'hyperliquid' ? platformParam : 'all'
+  const enabledPlatforms = getEnabledPlatforms()
+  const platform = (enabledPlatforms as readonly string[]).includes(platformParam)
+    ? (platformParam as CopyTradingPlatform)
+    : 'all'
 
   try {
     if (platform !== 'all') {
+      const ttl = COPY_TRADING_REGISTRY[platform].ttlMs
       const { data, fromCache } = await getCached(
         `copy-trading:leaderboard:${platform}:${cycle}:${orderBy}:${pageSize}`,
-        PLATFORM_TTL[platform],
-        () => fetchPlatform(platform as CopyTradingPlatform, cycle, orderBy, pageSize),
+        ttl,
+        () => fetchPlatform(platform, cycle, orderBy, pageSize),
       )
       const leaders = sortLeaders(data.leaders, orderBy)
       const resp = NextResponse.json({
@@ -76,18 +83,15 @@ export async function GET(req: Request) {
         },
         error: null,
       })
-      resp.headers.set('Cache-Control', `public, max-age=${Math.floor(PLATFORM_TTL[platform as CopyTradingPlatform] / 1000)}`)
+      resp.headers.set('Cache-Control', `public, max-age=${Math.floor(ttl / 1000)}`)
       resp.headers.set('X-Cache', fromCache ? 'HIT' : 'MISS')
       return resp
     }
 
-    // 'all' — fetch each platform independently so one failure never 502s the request
-    const [gateio, hyperliquid] = await Promise.all([
-      fetchPlatform('gateio', cycle, orderBy, pageSize),
-      fetchPlatform('hyperliquid', cycle, orderBy, pageSize),
-    ])
-    const leaders = sortLeaders([...gateio.leaders, ...hyperliquid.leaders], orderBy)
-    const platforms: PlatformStatus[] = [gateio.status, hyperliquid.status]
+    // 'all' — fetch each enabled platform independently so one failure never 502s the request
+    const results = await Promise.all(enabledPlatforms.map((p) => fetchPlatform(p, cycle, orderBy, pageSize)))
+    const leaders = sortLeaders(results.flatMap((r) => r.leaders), orderBy)
+    const platforms: PlatformStatus[] = results.map((r) => r.status)
     const total = platforms.reduce((sum, p) => sum + (p.total ?? 0), 0)
 
     const resp = NextResponse.json({
@@ -97,7 +101,7 @@ export async function GET(req: Request) {
     resp.headers.set('Cache-Control', 'public, max-age=180')
     return resp
   } catch (error) {
-    // Both platforms failed (module caches + fallbacks exhausted) — still a 200 with explicit statuses
+    // All platforms failed (module caches + fallbacks exhausted) — still a 200 with explicit statuses
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({
       data: { leaders: [], meta: { platforms: [], total: 0, updatedAt: new Date().toISOString() } },

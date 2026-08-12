@@ -17,7 +17,13 @@ interface LeaderboardMeta {
 const platformColors: Record<string, string> = {
   gateio: 'bg-teal-vivid/20 text-teal-vivid',
   hyperliquid: 'bg-accent-amber/20 text-accent-amber',
+  binance: 'bg-yellow-500/20 text-yellow-500',
+  bitget: 'bg-orange-500/20 text-orange-500',
+  okx: 'bg-blue-500/20 text-blue-500',  // OKX blue
 }
+
+const ENABLED_PLATFORMS = ['all', 'gateio', 'hyperliquid', 'binance', 'bitget', 'okx'] as const
+type EnabledPlatform = typeof ENABLED_PLATFORMS[number]
 
 const CYCLES = ['day', 'week', 'month'] as const
 
@@ -37,7 +43,7 @@ export default function CopyTradingPage() {
   const [leaders, setLeaders] = useState<CopyTradingLeader[]>([])
   const [meta, setMeta] = useState<LeaderboardMeta | null>(null)
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
-  const [platform, setPlatform] = useState<'all' | CopyTradingPlatform>('all')
+  const [platform, setPlatform] = useState<EnabledPlatform>('all')
   const [cycle, setCycle] = useState<(typeof CYCLES)[number]>('month')
 
   const fetchData = useCallback(async () => {
@@ -137,7 +143,7 @@ export default function CopyTradingPage() {
               <span className="text-teal-vivid">🎯</span> Copy Trading Leaderboard
             </h1>
             <p className="text-[12px] text-text-muted font-mono mt-1">
-              Top copy-trading leaders ranked by performance. Gate.io via gate.tv web API + Hyperliquid leaderboard.
+              Top copy-trading leaders ranked by performance. Gate.io via gate.tv web API, Hyperliquid, Binance, Bitget + OKX leaderboards.
             </p>
           </div>
           <LiveDot status={status} label />
@@ -156,7 +162,7 @@ export default function CopyTradingPage() {
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-mono text-text-muted uppercase">Platform:</span>
             <div className="flex bg-bg-raised p-1 rounded">
-              {(['all', 'gateio', 'hyperliquid'] as const).map(p => (
+              {ENABLED_PLATFORMS.map(p => (
                 <button
                   key={p}
                   onClick={() => setPlatform(p)}
@@ -191,7 +197,7 @@ export default function CopyTradingPage() {
               const r = row as unknown as CopyTradingLeader
               window.location.href = `/copy-trading/leader/${r.id}?platform=${r.platform}`
             }}
-            emptyState={<div className="text-text-muted text-[12px] p-8 text-center">No leaders yet. Fetching from gate.io + Hyperliquid...</div>}
+            emptyState={<div className="text-text-muted text-[12px] p-8 text-center">No leaders yet. Fetching from gate.io, Hyperliquid, Binance, Bitget + OKX...</div>}
           />
         </Panel>
       </div>

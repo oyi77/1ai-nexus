@@ -35,6 +35,11 @@ yarn-error.log*
 .env.local
 .env.production
 
+# scratch research artifacts (large scraped dumps — must not be scanned by tailwind or committed)
+/local/
+/research-copy-trading.ts
+/home/
+
 # OMC state
 .omc/
 

@@ -4,9 +4,19 @@
 // Hyperliquid (public-api) copy-trading leaderboards.
 // ─────────────────────────────────────────────────────────────
 
-export type CopyTradingPlatform = 'gateio' | 'hyperliquid'
+export type CopyTradingPlatform = 'gateio' | 'hyperliquid' | 'binance' | 'bybit' | 'okx' | 'bitget'
 
-export const COPY_TRADING_PLATFORMS: CopyTradingPlatform[] = ['gateio', 'hyperliquid']
+export const COPY_TRADING_PLATFORMS: CopyTradingPlatform[] = [
+  'gateio',
+  'hyperliquid',
+  // ── Pending research ────────────────────────────────────
+  // Registered so APIs/pages can enumerate them, but disabled in
+  // the copy-trading registry until their modules land.
+  'binance',
+  'bybit',
+  'okx',
+  'bitget',
+]
 
 /** Normalized leader row — shared across platforms. */
 export interface CopyTradingLeader {

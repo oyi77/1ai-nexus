@@ -9,6 +9,7 @@ export type SourceType =
   | 'oss-mirror'   // Free-hosted open-source mirror of a paid product
   | 're'           // Reverse-engineered frontend/internal endpoint
   | 'derived'      // Computed from other modules' data, no external call
+  | 'pending'      // Placeholder/stub — endpoint not yet reverse-engineered; registry entry disabled
 
 export type DataCategory =
   | 'onchain' | 'market' | 'defi' | 'derivatives' | 'macro'
@@ -17,7 +18,7 @@ export type DataCategory =
 
 export type ModuleStatus = 'active' | 'degraded' | 'offline'
 
-export type Fragility = 'stable' | 'moderate' | 'fragile'
+export type Fragility = 'stable' | 'moderate' | 'fragile' | 'unknown' // 'unknown' — stub/pending modules whose real stability is not yet known
 
 export type DiscoveryMethod = 'docs' | 'devtools-network-tab' | 'community-package' | 'computed'
 
@@ -36,6 +37,8 @@ export interface ModuleProvenance {
   lastVerified: string
   /** ALWAYS true — losing a module degrades, never breaks */
   toleratesAbsence: boolean
+  /** Free-form notes (e.g. research findings for pending/stub modules) */
+  notes?: string
 }
 
 export interface ModuleHealth {
@@ -119,5 +122,6 @@ export function getSourceTypeLabel(st: SourceType): string {
     case 'oss-mirror':  return 'OSS Mirror'
     case 're':          return 'Reverse-Engineered'
     case 'derived':     return 'Derived'
+    case 'pending':     return 'Pending'
   }
 }

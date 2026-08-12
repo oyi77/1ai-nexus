@@ -47,6 +47,7 @@ import { NextResponse, type NextRequest } from "next/server";
   '/api/v1/mempool',
   '/api/v1/copy-trading/leaderboard',
   '/api/v1/copy-trading/performance',
+  '/api/v1/copy-trading/leader',
   '/api/v1/news',
 ]);
 

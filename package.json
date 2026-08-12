@@ -22,6 +22,7 @@
     "verify-re": "npx tsx src/scripts/verify-re-modules.ts"
   },
   "dependencies": {
+    "@1ai/payment": "file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",
     "@base-ui/react": "^1.5.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^6.19.3",
@@ -82,6 +83,7 @@
     "@vitejs/plugin-react": "^6.0.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "playwright": "^1.62.1",
     "tailwindcss": "^4",
     "tsx": "^4.22.3",
     "typescript": "^5",

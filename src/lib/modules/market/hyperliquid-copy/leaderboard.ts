@@ -36,6 +36,19 @@ interface HlLeaderboardEnvelope {
   leaderboardRows?: HlLeaderRow[]
 }
 
+/** One window's normalized pnl/roi/volume (raw stats-data values arrive as strings). */
+export interface HlLeaderWindowPerformance {
+  window: string
+  pnl: number
+  roi: number
+  vlm: number
+}
+
+/** Hyperliquid leader with all-window performance (extends the shared leader shape). */
+export interface HyperliquidLeaderDetail extends CopyTradingLeader {
+  windowPerformances?: HlLeaderWindowPerformance[]
+}
+
 function toNum(v: string | number | undefined): number {
   if (v === undefined || v === null) return 0
   if (typeof v === 'number') return v
@@ -54,7 +67,7 @@ function windowPerf(rows: Array<[string, HlWindowPerf]>, cycle: string): HlWindo
   return found?.[1] ?? {}
 }
 
-function normalizeHlRows(rows: HlLeaderRow[], cycle: string): CopyTradingLeader[] {
+function normalizeHlRows(rows: HlLeaderRow[], cycle: string): HyperliquidLeaderDetail[] {
   return rows.map(r => {
     const perf = windowPerf(r.windowPerformances ?? [], cycle)
     return {
@@ -76,17 +89,57 @@ function normalizeHlRows(rows: HlLeaderRow[], cycle: string): CopyTradingLeader[
       plRatio: 0,
       isPrivate: false,
       createTime: null,
+      // All four windows (day/week/month/allTime) — the client renders a
+      // 1D/7D/30D/All grid. The active-cycle profit/profitRate above are
+      // derived from the same raw tuples via windowPerf, unchanged.
+      windowPerformances: (r.windowPerformances ?? []).map(([window, p]) => ({
+        window,
+        pnl: toNum(p.pnl),
+        roi: toNum(p.roi),
+        vlm: toNum(p.vlm),
+      })),
     }
   })
 }
 
-async function fetchHyperliquidList(pageSize: number, cycle: string): Promise<{ leaders: CopyTradingLeader[]; total: number }> {
+/**
+ * Fetch the FULL stats-data dump (every leaderboard row, ~41k rows).
+ * Callers slice/cache only what they need — the dump itself is never cached.
+ */
+async function fetchHyperliquidDump(): Promise<HlLeaderRow[]> {
   const res = await fetch(STATS_DATA_URL, { signal: AbortSignal.timeout(30_000) })
   if (!res.ok) throw new Error(`Hyperliquid stats-data: HTTP ${res.status}`)
   const body = (await res.json()) as HlLeaderboardEnvelope
-  const rows = body.leaderboardRows ?? []
+  return body.leaderboardRows ?? []
+}
+
+async function fetchHyperliquidList(pageSize: number, cycle: string): Promise<{ leaders: CopyTradingLeader[]; total: number }> {
+  const rows = await fetchHyperliquidDump()
   const sliced = rows.slice(0, pageSize)
   return { leaders: normalizeHlRows(sliced, cycle), total: rows.length }
+}
+
+/**
+ * Deep lookup for a single Hyperliquid leader by scanning EVERY row of the
+ * full stats-data dump — the page-1 slice misses leaders ranked past
+ * page_size. Matches `ethAddress` exactly, falling back to an exact
+ * `displayName` match. Returns `null` when not found or the dump errors.
+ * Consumers cache the RESULT (route-level 1h TTL), never the dump itself.
+ */
+export async function findHyperliquidLeaderById(
+  leaderId: string,
+  cycle: string = 'month',
+): Promise<HyperliquidLeaderDetail | null> {
+  if (!leaderId) return null
+  try {
+    const rows = await fetchHyperliquidDump()
+    const hit = rows.find(r => r.ethAddress === leaderId || r.displayName === leaderId)
+    if (!hit) return null
+    return normalizeHlRows([hit], cycle)[0] ?? null
+  } catch {
+    // Graceful: transient dump errors behave like "not found" for a lookup.
+    return null
+  }
 }
 
 /** Cheap reachability probe: read one body chunk then abort — avoids pulling the whole 34 MB dump. */

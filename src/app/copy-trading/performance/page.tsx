@@ -7,13 +7,19 @@ import { DataTable, type Column } from '@/components/shell/DataTable'
 import { PriceTag } from '@/components/primitives/PriceTag'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { StatCard } from '@/components/domain/stat-card'
-import type { CopyTradingLeader, CopyTradingPlatform } from '@/lib/modules/market/copy-trading/types'
+import type { CopyTradingLeader } from '@/lib/modules/market/copy-trading/types'
 
 const CYCLES = ['day', 'week', 'month'] as const
+
+const ENABLED_PLATFORMS = ['all', 'gateio', 'hyperliquid', 'binance', 'bitget', 'okx'] as const
+type EnabledPlatform = (typeof ENABLED_PLATFORMS)[number]
 
 const platformColors: Record<string, string> = {
   gateio: 'bg-teal-vivid/20 text-teal-vivid',
   hyperliquid: 'bg-accent-amber/20 text-accent-amber',
+  binance: 'bg-yellow-500/20 text-yellow-500', // Binance yellow
+  bitget: 'bg-orange-500/20 text-orange-500', // Bitget orange
+  okx: 'bg-blue-500/20 text-blue-500', // OKX blue
 }
 
 function fmtUsd(n: number): string {
@@ -30,7 +36,7 @@ function fmtPct(n: number): string {
 
 /** Fetch top-N leaders for an order_by dimension. null → response shape missing (auth/error). */
 async function fetchLeaders(
-  platform: 'all' | CopyTradingPlatform,
+  platform: EnabledPlatform,
   cycle: (typeof CYCLES)[number],
   orderBy: 'win_rate' | 'profit',
 ): Promise<CopyTradingLeader[] | null> {
@@ -46,7 +52,7 @@ export default function CopyTradingPerformancePage() {
   const [winRateLeaders, setWinRateLeaders] = useState<CopyTradingLeader[]>([])
   const [profitLeaders, setProfitLeaders] = useState<CopyTradingLeader[]>([])
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
-  const [platform, setPlatform] = useState<'all' | CopyTradingPlatform>('all')
+  const [platform, setPlatform] = useState<EnabledPlatform>('all')
   const [cycle, setCycle] = useState<(typeof CYCLES)[number]>('month')
 
   const fetchData = useCallback(async () => {
@@ -158,7 +164,7 @@ export default function CopyTradingPerformancePage() {
   const emptyState = status === 'error' ? (
     <div className="text-text-muted text-[12px] p-8 text-center">API access requires a key — data unavailable</div>
   ) : (
-    <div className="text-text-muted text-[12px] p-8 text-center">No leaders yet. Fetching from gate.io + Hyperliquid...</div>
+    <div className="text-text-muted text-[12px] p-8 text-center">No leaders yet. Fetching from Gate.io + Hyperliquid + Binance + Bitget + OKX...</div>
   )
 
   return (
@@ -170,7 +176,7 @@ export default function CopyTradingPerformancePage() {
               <span className="text-teal-vivid">📈</span> Performance Intelligence
             </h1>
             <p className="text-[12px] text-text-muted font-mono mt-1">
-              Copy-trading leader performance: top win rates and profit gainers. Gate.io + Hyperliquid.
+              Copy-trading leader performance: top win rates and profit gainers. Gate.io + Hyperliquid + Binance + Bitget + OKX.
             </p>
           </div>
           <LiveDot status={status} label />
@@ -189,7 +195,7 @@ export default function CopyTradingPerformancePage() {
           <div className="flex items-center gap-2">
             <span className="text-[10px] font-mono text-text-muted uppercase">Platform:</span>
             <div className="flex bg-bg-raised p-1 rounded">
-              {(['all', 'gateio', 'hyperliquid'] as const).map(p => (
+              {ENABLED_PLATFORMS.map(p => (
                 <button
                   key={p}
                   onClick={() => setPlatform(p)}
