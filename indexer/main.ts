@@ -9,10 +9,16 @@ import {
   etherscan,
   alchemy,
   jupiter,
+  tokenterminal,
+  arkham,
+  thegraph,
 } from "./integrations";
+import { fetchWithRetry } from "./integrations/http-client";
 import { startEthereumListener } from "./chains/ethereum";
 import { startSolanaListener } from "./chains/solana";
 import { startBitcoinListener } from "./chains/bitcoin";
+import { startSentimentWorker } from "./workers/sentiment";
+import { startMacroWorker } from "./workers/macro";
 
 // NEW: batch ingestion layer (opt-in via USE_BATCH_INDEXER=1)
 import { startEthereumBatchIndexer } from "./core/evm-batch-indexer";
@@ -56,6 +62,17 @@ async function main() {
   cex.startCexSync(config);
   defillama.startDeFiLlamaSync(config);
   etherscan.startEtherscanPolling(config);
+
+  // Token Terminal (fundamentals)
+  if (config.tokenterminal.apiKey) {
+    tokenterminal.startTokenTerminalSync(config);
+  }
+
+  // Start sentiment worker
+  startSentimentWorker(config);
+
+  // Start macro worker
+  startMacroWorker(config);
 
   // Health check HTTP server
   const server = http.createServer(async (req, res) => {
@@ -127,6 +144,80 @@ async function checkIntegrations(config: IntegrationConfig) {
     });
   } catch {
     results.push({ name: "jupiter", status: "error" });
+  }
+
+  // Token Terminal
+  if (config.tokenterminal.apiKey) {
+    try {
+      const ttHealth = await tokenterminal.healthCheck(config);
+      results.push({
+        name: "tokenterminal",
+        status: ttHealth.ok ? "ok" : "error",
+        details: ttHealth.ok ? `${ttHealth.projectCount} projects` : ttHealth.error,
+      });
+    } catch {
+      results.push({ name: "tokenterminal", status: "error" });
+    }
+  } else {
+    results.push({ name: "tokenterminal", status: "not_configured", details: "TOKEN_TERMINAL_API_KEY not set" });
+  }
+
+  // Arkham
+  if (config.arkham.apiKey) {
+    try {
+      const arkhamHealth = await arkham.healthCheck(config);
+      results.push({
+        name: "arkham",
+        status: arkhamHealth.ok ? "ok" : "error",
+        details: arkhamHealth.ok ? "API reachable" : arkhamHealth.error,
+      });
+    } catch {
+      results.push({ name: "arkham", status: "error" });
+    }
+  } else {
+    results.push({ name: "arkham", status: "not_configured", details: "ARKHAM_API_KEY not set" });
+  }
+
+  // FRED
+  if (config.fred.apiKey) {
+    try {
+      const fredHealth = await fetchWithRetry(
+        `https://api.stlouisfed.org/fred/series/observations?series_id=FEDFUNDS&api_key=${config.fred.apiKey}&file_type=json&limit=1`,
+        { maxRetries: 1, timeoutMs: 10_000 }
+      );
+      results.push({ name: "fred", status: "ok", details: "API reachable" });
+    } catch {
+      results.push({ name: "fred", status: "error" });
+    }
+  } else {
+    results.push({ name: "fred", status: "not_configured", details: "FRED_API_KEY not set" });
+  }
+
+  // CoinMetrics
+  if (config.coinmetrics.apiKey) {
+    try {
+      const cmHealth = await fetchWithRetry(
+        "https://api.coinmetrics.io/v4/timeseries/asset-metrics?assets=btc&metrics=PriceUSD&page_size=1",
+        { headers: { Authorization: `Bearer ${config.coinmetrics.apiKey}` }, maxRetries: 1, timeoutMs: 10_000 }
+      );
+      results.push({ name: "coinmetrics", status: "ok", details: "API reachable" });
+    } catch {
+      results.push({ name: "coinmetrics", status: "error" });
+    }
+  } else {
+    results.push({ name: "coinmetrics", status: "not_configured", details: "COINMETRICS_API_KEY not set" });
+  }
+
+  // The Graph
+  try {
+    const graphHealth = await thegraph.healthCheck(config);
+    results.push({
+      name: "thegraph",
+      status: graphHealth.ok ? "ok" : "error",
+      details: graphHealth.ok ? `Subgraph: ${graphHealth.subgraph}` : graphHealth.error,
+    });
+  } catch {
+    results.push({ name: "thegraph", status: "error" });
   }
 
   // Alchemy (optional)

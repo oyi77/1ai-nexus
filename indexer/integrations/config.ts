@@ -15,6 +15,13 @@ export interface IntegrationConfig {
   helius: { apiKey: string | null };
   defillama: { baseUrl: string; yieldsUrl: string }; // always available
   jupiter: { priceUrl: string }; // always available
+  tokenterminal: { baseUrl: string; apiKey: string | null };
+  arkham: { apiKey: string | null };
+  lunarcrush: { apiKey: string | null };
+  xapi: { bearerToken: string | null };
+  fred: { apiKey: string | null };
+  coinmetrics: { apiKey: string | null };
+  thegraph: { apiKey: string | null };
 }
 
 const NETWORKS: Record<string, string> = {
@@ -62,6 +69,28 @@ export function buildConfig(): IntegrationConfig {
     jupiter: {
       priceUrl: "https://api.coingecko.com/api/v3/simple/price",
     },
+    tokenterminal: {
+      baseUrl: "https://api.tokenterminal.com/v2",
+      apiKey: env("TOKEN_TERMINAL_API_KEY"),
+    },
+    arkham: {
+      apiKey: env("ARKHAM_API_KEY"),
+    },
+    lunarcrush: {
+      apiKey: env("LUNARCRUSH_API_KEY"),
+    },
+    xapi: {
+      bearerToken: env("X_API_BEARER_TOKEN"),
+    },
+    fred: {
+      apiKey: env("FRED_API_KEY"),
+    },
+    coinmetrics: {
+      apiKey: env("COINMETRICS_API_KEY"),
+    },
+    thegraph: {
+      apiKey: env("THE_GRAPH_API_KEY"),
+    },
   };
 }
 
@@ -100,6 +129,55 @@ export function checkAvailability(config: IntegrationConfig): IntegrationStatus[
       name: "Jupiter",
       available: true,
       reason: "Free, no auth needed",
+    },
+    {
+      name: "TokenTerminal",
+      available: !!config.tokenterminal.apiKey,
+      reason: config.tokenterminal.apiKey
+        ? "API key configured"
+        : "TOKEN_TERMINAL_API_KEY not set",
+    },
+    {
+      name: "Arkham",
+      available: !!config.arkham.apiKey,
+      reason: config.arkham.apiKey
+        ? "API key configured"
+        : "ARKHAM_API_KEY not set",
+    },
+    {
+      name: "LunarCrush",
+      available: !!config.lunarcrush.apiKey,
+      reason: config.lunarcrush.apiKey
+        ? "API key configured"
+        : "LUNARCRUSH_API_KEY not set",
+    },
+    {
+      name: "X API",
+      available: !!config.xapi.bearerToken,
+      reason: config.xapi.bearerToken
+        ? "Bearer token configured"
+        : "X_API_BEARER_TOKEN not set",
+    },
+    {
+      name: "FRED",
+      available: !!config.fred.apiKey,
+      reason: config.fred.apiKey
+        ? "API key configured"
+        : "FRED_API_KEY not set",
+    },
+    {
+      name: "CoinMetrics",
+      available: !!config.coinmetrics.apiKey,
+      reason: config.coinmetrics.apiKey
+        ? "API key configured"
+        : "COINMETRICS_API_KEY not set",
+    },
+    {
+      name: "The Graph",
+      available: true, // Hosted service is free
+      reason: config.thegraph.apiKey
+        ? "API key configured (higher rate limits)"
+        : "Free hosted service (rate limited)",
     },
   ];
 }
