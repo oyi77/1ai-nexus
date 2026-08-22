@@ -140,13 +140,27 @@ function classifyZone(indicator: string, value: number): string {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
-    const action = searchParams.get("action") ?? "fred";
+    const action = searchParams.get("action") ?? "all";
     const series = searchParams.get("series") ?? "FEDFUNDS";
     const assets = searchParams.get("assets") ?? "btc,eth,sol,arb,op";
     const metrics = searchParams.get("metrics") ?? "PriceUSD,MVRVRatio,NUPL,SOPR,HashRate,AdrActCnt,FeeTotUSD,NetFlowExUSD";
     const asset = searchParams.get("asset") ?? "BTC";
 
     switch (action) {
+      case "all": {
+        const allData = await fetchFredAll();
+        const indicators = allData.map((s) => ({
+          id: s.seriesId,
+          name: s.title,
+          seriesId: s.seriesId,
+          latestValue: s.latestValue,
+          unit: s.unit,
+          latestDate: s.latestDate,
+        }));
+        const r = apiSuccess({ indicators }, { total: indicators.length });
+        r.headers.set("Cache-Control", "public, max-age=1800, stale-while-revalidate=3600");
+        return r;
+      }
       case "fred": {
         const seriesData = await fetchFredSeries(series, 20);
         const meta = FRED_SERIES[series] ?? { title: series, unit: "", category: "unknown" };
