@@ -1,9 +1,0 @@
-{
-  "name": "@1ai/payment",
-  "version": "0.1.0",
-  "description": "Local shim for the proprietary @1ai/payment SDK. Unblocks `npm install` on machines where the internal package (file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz) is unavailable. Replace with the real SDK when present.",
-  "main": "index.js",
-  "types": "index.d.ts",
-  "private": true,
-  "license": "UNLICENSED"
-}

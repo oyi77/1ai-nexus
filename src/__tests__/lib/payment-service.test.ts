@@ -75,7 +75,7 @@ import type { Order } from '@1ai/payment';
        gateway: 'midtrans',
        customerEmail: 'test@example.com',
        customerName: 'Test User',
-      callbackUrl: 'http://localhost:3000/api/v1/webhooks/payment',
+      returnUrl: 'http://localhost:3000/dashboard', cancelUrl: 'http://localhost:3000/cancel',
      });
  
      expect(mockCreate).toHaveBeenCalledWith({
@@ -145,7 +145,7 @@ import type { Order } from '@1ai/payment';
        currency: 'IDR',
        gateway: 'duitku',
        customerEmail: 'enterprise@example.com',
-      callbackUrl: 'http://localhost:3000/api/v1/webhooks/payment',
+      returnUrl: 'http://localhost:3000/dashboard', cancelUrl: 'http://localhost:3000/cancel',
      });
  
      expect(mockCreate).toHaveBeenCalledWith({
@@ -183,20 +183,23 @@ import type { Order } from '@1ai/payment';
         currency: 'IDR',
         status: 'pending',
         gateway: 'midtrans',
-        paymentUrl: 'https://payment.example.com/ord_789',
-        expiresAt: '2026-07-10T08:52:28.397Z',
+        gateway_reference: 'ref_789',
+        payment_method: null,
+        payment_url: 'https://payment.example.com/ord_789',
         metadata: {
           userId: 'user_789',
           plan: 'pro',
           type: 'subscription',
         },
+        created_at: '2026-07-09T08:52:28.397Z',
+        updated_at: '2026-07-09T08:52:28.397Z',
       };
 
-     mockGet.mockResolvedValue(mockOrder);
- 
-     const result = await service.getPaymentStatus('ord_789');
- 
-     expect(mockGet).toHaveBeenCalledWith('ord_789');
+      mockGet.mockResolvedValue(mockOrder);
+
+      const result = await service.getPaymentStatus('ord_789');
+
+      expect(mockGet).toHaveBeenCalledWith('ord_789');
       expect(result.orderId).toBe('ord_789');
       expect(result.status).toBe('pending');
       expect(result.paidAt).toBeUndefined();
@@ -209,15 +212,19 @@ import type { Order } from '@1ai/payment';
         currency: 'IDR',
         status: 'paid',
         gateway: 'midtrans',
-        paidAt: '2026-07-09T08:00:00.000Z',
+        gateway_reference: 'ref_paid',
+        payment_method: null,
+        payment_url: null,
         metadata: {
           userId: 'user_paid',
           plan: 'pro',
           type: 'subscription',
         },
+        created_at: '2026-07-09T08:00:00.000Z',
+        updated_at: '2026-07-09T08:00:00.000Z',
       };
 
-     mockGet.mockResolvedValue(mockOrder);
+      mockGet.mockResolvedValue(mockOrder);
 
       const result = await service.getPaymentStatus('ord_paid');
 
@@ -232,14 +239,19 @@ import type { Order } from '@1ai/payment';
         currency: 'IDR',
         status: 'failed',
         gateway: 'midtrans',
+        gateway_reference: 'ref_failed',
+        payment_method: null,
+        payment_url: null,
         metadata: {
           userId: 'user_failed',
           plan: 'pro',
           type: 'subscription',
         },
+        created_at: '2026-07-09T08:00:00.000Z',
+        updated_at: '2026-07-09T08:00:00.000Z',
       };
 
-     mockGet.mockResolvedValue(mockOrder);
+      mockGet.mockResolvedValue(mockOrder);
 
       const result = await service.getPaymentStatus('ord_failed');
 
@@ -247,19 +259,24 @@ import type { Order } from '@1ai/payment';
     });
 
     it('should get payment status for expired order', async () => {
-      const mockOrder: Order = {
+      const mockOrder = {
         id: 'ord_expired',
         amount: 50000,
         currency: 'IDR',
         status: 'expired',
         gateway: 'midtrans',
-        expiresAt: '2026-07-08T08:52:28.397Z',
+        gateway_reference: 'ref_expired',
+        payment_method: null,
+        payment_url: null,
         metadata: {
           userId: 'user_expired',
           plan: 'pro',
           type: 'subscription',
         },
-      };
+        created_at: '2026-07-07T08:52:28.397Z',
+        updated_at: '2026-07-07T08:52:28.397Z',
+        expiresAt: '2026-07-08T08:52:28.397Z',
+      } as Order;
 
       mockGet.mockResolvedValue(mockOrder);
 
