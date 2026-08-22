@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       cacheSet(cacheKey, rows, 600).catch(() => {})
     }
     return apiSuccess({ count: rows.length, matrix: rows })
-  } catch (e) {
+  } catch {
     return apiError('Failed to compute lead-lag', 502)
   }
 }

@@ -64,6 +64,8 @@ model Wallet {
   lastSeen     DateTime
   holdings     TokenHolding[]
   transactions Transaction[]
+  relationshipsFrom WalletRelationship[] @relation("WalletRelationshipFrom")
+  relationshipsTo   WalletRelationship[] @relation("WalletRelationshipTo")
   createdAt    DateTime @default(now())
 
   @@index([chain])
@@ -202,8 +204,8 @@ model WalletRelationship {
   firstSeen       DateTime @default(now())
   lastSeen        DateTime @default(now())
 
-  from            Wallet   @relation(fields: [fromWalletId], references: [id], onDelete: Cascade)
-  to              Wallet   @relation(fields: [toWalletId], references: [id], onDelete: Cascade)
+  from            Wallet   @relation("WalletRelationshipFrom", fields: [fromWalletId], references: [id], onDelete: Cascade)
+  to              Wallet   @relation("WalletRelationshipTo", fields: [toWalletId], references: [id], onDelete: Cascade)
 
   @@unique([fromWalletId, toWalletId, relationshipType])
   @@index([fromWalletId, relationshipType])

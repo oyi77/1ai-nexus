@@ -76,9 +76,9 @@ export async function computeLeadLag(asset: string): Promise<{
   for (let lag = -MAX_LAG; lag <= MAX_LAG; lag++) {
     let a: number[], b: number[]
     if (lag >= 0) {
-      a = dex.slice(lag); b = cex.slice(0, cex.length - lag)
+      a = dex.slice(lag).map((x) => x.ret); b = cex.slice(0, cex.length - lag).map((x) => x.ret)
     } else {
-      a = dex.slice(0, dex.length + lag); b = cex.slice(-lag)
+      a = dex.slice(0, dex.length + lag).map((x) => x.ret); b = cex.slice(-lag).map((x) => x.ret)
     }
     if (a.length < 3 || b.length < 3) continue
     const c = Math.abs(pearson(a, b))

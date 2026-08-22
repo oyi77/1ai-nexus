@@ -7,7 +7,7 @@
 
 import { NextResponse } from 'next/server'
 import { getCached } from '@/lib/api/server-cache'
-import scanArbitrage, { type ArbitrageSnapshot } from '@/lib/modules/market/arbitrage-engine'
+import { scanArbitrage, type ArbitrageSnapshot } from '@/lib/modules/market/arbitrage-engine'
 
 async function runScan(): Promise<ArbitrageSnapshot> {
   return scanArbitrage({ minSpreadBps: 3, minFundingBps: 50, minBasisPercent: 0.5 })

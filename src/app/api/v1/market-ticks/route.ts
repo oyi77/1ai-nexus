@@ -5,7 +5,6 @@
 // caller can align timestamps and compute repricing latency.
 // ─────────────────────────────────────────────────────────────
 
-import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
 import { apiSuccess, apiError } from '@/lib/api/response'
 
@@ -31,7 +30,7 @@ export async function GET(request: Request) {
       timestamp: r.timestamp,
     }))
     return apiSuccess({ symbol, count: series.length, series })
-  } catch (e) {
+  } catch {
     return apiError('Failed to load market ticks', 500)
   }
 }

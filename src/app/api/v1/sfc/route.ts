@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
       cacheSet(cacheKey, rows, 300).catch(() => {})
     }
     return apiSuccess({ count: rows.length, wallets: rows })
-  } catch (e) {
+  } catch {
     return apiError('Failed to compute SFC', 502)
   }
 }

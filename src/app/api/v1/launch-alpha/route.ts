@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       cacheSet(cacheKey, rows, 120).catch(() => {})
     }
     return apiSuccess({ count: rows.length, tokens: rows })
-  } catch (e) {
+  } catch {
     return apiError('Failed to compute Launch Alpha', 502)
   }
 }

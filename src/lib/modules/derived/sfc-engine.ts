@@ -198,11 +198,14 @@ export async function computeSfcConvergence(tokenSymbol: string): Promise<SfcCon
     where: { walletId: { in: ids }, tokenSymbol: { contains: asset } },
     _count: { _all: true },
   })
-  const tradingIds = new Set(trades.map((t) => t.walletId))
+  const tradingIds = new Set(
+    trades.map((t) => t.walletId).filter((w): w is string => w != null),
+  )
 
-  const edges = await prisma.walletRelationship.findMany({
+  const edges = await prisma.walletRelationship.groupBy({
+    by: ['fromWalletId'],
     where: { fromWalletId: { in: ids } },
-    select: { fromWalletId: true, _count: { _all: true } },
+    _count: { _all: true },
   })
   const edgeCount = new Map<string, number>()
   for (const e of edges) edgeCount.set(e.fromWalletId, e._count._all)

@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
       cacheSet('lrfg:' + symbol, events, 60).catch(() => {})
     }
     return cacheHeaders(apiSuccess({ symbol, count: events.length, events }), 15)
-  } catch (e) {
+  } catch {
     return apiError('Failed to compute LRFG events', 502)
   }
 }

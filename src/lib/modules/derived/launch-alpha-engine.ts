@@ -75,7 +75,6 @@ export interface LaunchAlphaToken {
 function computeLaunchAlpha(p: GtPool): { hype: number; las: number; flow: number } {
   const liq = parseFloat(p.attributes.reserve_in_usd) || 0
   const vol = parseFloat(p.attributes.volume_usd.h24) || 0
-  const mcap = parseFloat(p.attributes.base_token_price_usd) || 0
   const pct = parseFloat(p.attributes.price_change_percentage.h24) || 0
   const age = ageMinutes(p.attributes.pool_created_at)
   const flow = flowAcceleration(p)
@@ -95,7 +94,7 @@ export async function ingestLaunchTokens(network = 'solana', limit = 20): Promis
   const pools = await fetchNewPools(network, limit)
   let written = 0
   for (const p of pools) {
-    const { hype, las, flow } = computeLaunchAlpha(p)
+    const { hype, las } = computeLaunchAlpha(p)
     const address = p.attributes.address
     const chain = p.relationships.network.data.id
     try {

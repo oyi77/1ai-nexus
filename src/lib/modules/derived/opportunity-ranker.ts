@@ -64,18 +64,19 @@ export async function gatherOpportunities(): Promise<Opportunity[]> {
   try {
     const snap = await scanArbitrage({ minSpreadBps: 3, minFundingBps: 50, minBasisPercent: 0.5 })
     for (const sp of snap.priceSpreads ?? []) {
-      if (Math.abs(sp.spreadBps) < 3) continue
-      const score = Math.min(100, Math.round(Math.abs(sp.spreadBps) / 2))
+      const bps = sp.spreadPercent * 100 // spreadPercent is in % units (0.12 = 12 bps)
+      if (Math.abs(bps) < 3) continue
+      const score = Math.min(100, Math.round(Math.abs(bps) / 2))
       out.push({
         id: `arb:${sp.symbol}`,
         asset: sp.symbol,
         source: 'arb',
-        direction: sp.spreadBps > 0 ? 'bearish' : 'bullish',
+        direction: bps > 0 ? 'bearish' : 'bullish',
         score,
         confidence: 80,
-        reason: `Spot/Futures spread ${sp.spreadBps.toFixed(1)} bps`,
+        reason: `Cross-exchange spread ${bps.toFixed(1)} bps`,
         createdAt: new Date().toISOString(),
-        metadata: { spotPrice: sp.spotPrice, futuresPrice: sp.futuresPrice },
+        metadata: { buyExchange: sp.buyExchange, buyPrice: sp.buyPrice, sellExchange: sp.sellExchange, sellPrice: sp.sellPrice },
       })
     }
   } catch { /* skip */ }
