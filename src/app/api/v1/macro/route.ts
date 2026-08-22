@@ -34,31 +34,31 @@ async function fetchFredSeries(seriesId: string, limit = 10) {
 }
 
 async function fetchFredAll() {
-  const results: Array<{ seriesId: string; title: string; unit: string; category: string; latestValue: number | null; latestDate: string | null }> = [];
-
-  for (const [seriesId, meta] of Object.entries(FRED_SERIES)) {
-    try {
-      const series = await fetchFredSeries(seriesId, 1);
-      const latest = series.observations[0];
-      results.push({
-        seriesId,
-        title: meta.title,
-        unit: meta.unit,
-        category: meta.category,
-        latestValue: latest ? parseFloat(latest.value) : null,
-        latestDate: latest?.date ?? null,
-      });
-    } catch {
-      results.push({
-        seriesId,
-        title: meta.title,
-        unit: meta.unit,
-        category: meta.category,
-        latestValue: null,
-        latestDate: null,
-      });
-    }
-  }
+  const results = await Promise.all(
+    Object.entries(FRED_SERIES).map(async ([seriesId, meta]) => {
+      try {
+        const series = await fetchFredSeries(seriesId, 1);
+        const latest = series.observations[0];
+        return {
+          seriesId,
+          title: meta.title,
+          unit: meta.unit,
+          category: meta.category,
+          latestValue: latest ? parseFloat(latest.value) : null,
+          latestDate: latest?.date ?? null,
+        };
+      } catch {
+        return {
+          seriesId,
+          title: meta.title,
+          unit: meta.unit,
+          category: meta.category,
+          latestValue: null,
+          latestDate: null,
+        };
+      }
+    })
+  );
 
   return results;
 }
@@ -153,6 +153,7 @@ export async function GET(request: NextRequest) {
           id: s.seriesId,
           name: s.title,
           seriesId: s.seriesId,
+          category: s.category,
           latestValue: s.latestValue,
           unit: s.unit,
           latestDate: s.latestDate,
@@ -231,7 +232,12 @@ export async function GET(request: NextRequest) {
       }
 
       case "health": {
-        const fredOk = (await fetchFredSeries("FEDFUNDS", 1)).observations.length > 0;
+        let fredOk = false;
+        try {
+          fredOk = (await fetchFredSeries("FEDFUNDS", 1)).observations.length > 0;
+        } catch {
+          fredOk = false;
+        }
         const cmOk = !!COINMETRICS_API_KEY;
         const r = apiSuccess({ fredAvailable: fredOk, coinmetricsAvailable: cmOk });
         r.headers.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
