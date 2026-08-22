@@ -133,11 +133,11 @@ function detectMEV(tx: EnrichedTx): boolean {
 function detectApproval(tx: EnrichedTx): boolean {
   // ERC-20 Approval event topic0: keccak256("Approval(address,address,uint256)")
   // = 0x8c5be1e5ebec7d5bd14f71427d1e83f0ddc1122334455667788990011223344
-  const APPROVAL_TOPIC0 = '0x8c5be1e5ebec7d5bd14f71427d1e8427d1e83f0ddc1122334455667788990011';
+  const APPROVAL_TOPIC0 = '0x8c5be1e5ebec7d5bd14f71427d1e83f0ddc1122334455667788990011223344';
   const topic0 = (tx.raw?.topics?.[0] || '').toLowerCase();
 
-  // Match by event topic (exact first 66 chars = topic0)
-  if (topic0 && topic0.startsWith(APPROVAL_TOPIC0.slice(0, 10))) return true;
+  // Match by event topic0 (exact, case-insensitive)
+  if (topic0 && topic0 === APPROVAL_TOPIC0) return true;
 
   // Match by function selector: approve(address,uint256) = 0x095ea7b3
   const input = (tx.raw?.input || tx.raw?.data || '').toLowerCase();

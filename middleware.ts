@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
  import { trackUsage } from "@/lib/usage-tracking";
+import { extractJwtSession, checkSubscriptionRateLimit } from '@/lib/jwt-middleware'
  const ALLOWED_ORIGINS = [
    "http://localhost:3000",
    "http://localhost:4400",
@@ -127,6 +128,34 @@ function checkRateLimit(key: string, maxRequests = 100, windowMs = 60_000): { al
   if (ALWAYS_PUBLIC.has(pathname) || pathname.startsWith("/api/auth/")) {
     return addCorsHeaders(NextResponse.next(), request);
   }
+  // Premium / protected routes — require a valid JWT session (browser) or API key (external)
+  if (PROTECTED_ROUTES.has(pathname)) {
+    const session = extractJwtSession(request)
+    const authHeader = request.headers.get("authorization")
+    const apiKey = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null
+    const hasApiKey = !!apiKey && API_KEYS.size > 0 && API_KEYS.has(apiKey)
+    if (!session && !hasApiKey) {
+      return NextResponse.json(
+        { data: null, error: "Authentication required for this premium feature" },
+        { status: 401 }
+      )
+    }
+    if (session) {
+      const limit = checkSubscriptionRateLimit(session.userId, session.plan)
+      if (!limit.allowed) {
+        return NextResponse.json(
+          { data: null, error: "Rate limit reached for plan " + session.plan },
+          { status: 429, headers: { "X-RateLimit-Remaining": "0" } }
+        )
+      }
+      const response = NextResponse.next()
+      response.headers.set("X-RateLimit-Remaining", String(limit.remaining))
+      response.headers.set("X-RateLimit-Limit", String(limit.limit))
+      return addCorsHeaders(response, request)
+    }
+    // API-key consumers fall through to the standard API-key rate-limit below
+  }
+
 
 
   
