@@ -57,6 +57,11 @@ const PROTECTED_ROUTES = new Set([
   "/api/v1/signals/history",
   "/api/v1/backtest",
   "/api/v1/alpha-engine",
+  "/api/v1/lrfg",
+  "/api/v1/sfc",
+  "/api/v1/launch-alpha",
+  "/api/v1/lead-lag",
+  "/api/v1/opportunities",
 ]);
  
  // Parse API keys from env

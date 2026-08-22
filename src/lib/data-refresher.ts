@@ -7,6 +7,11 @@
 
 import { logger } from '@/lib/logger'
 import { fetchDerivativesSnapshot, fetchRecentLiquidations, persistDerivativesSnapshot, persistLiquidations } from '@/lib/modules/derived/derivatives-intel'
+import { fetchMarketTicks, persistMarketTicks } from '@/lib/modules/derived/market-ticks'
+import { refreshSmartMoneyScores } from '@/lib/modules/derived/sfc-engine'
+import { ingestLaunchTokens } from '@/lib/modules/derived/launch-alpha-engine'
+import { rankAndPersist } from '@/lib/modules/derived/opportunity-ranker'
+import { refreshWalletRelationships } from '@/lib/modules/derived/wallet-graph'
 import { fetchETFSummary, persistETFFlows } from '@/lib/modules/tradfi/etf/flows'
 import { fetchPremiumSnapshots, persistPremiumSnapshots } from '@/lib/modules/tradfi/premium/monitor'
 import { fetchSentimentIntelligence, persistSentimentSnapshots } from '@/lib/modules/sentiment/sentiment-intel'
@@ -38,6 +43,43 @@ async function refreshDerivatives() {
 
     logger.info(`derivatives: ${snapshots.length} snapshots, ${liquidations.length} liquidations`, "refresher")
   } catch (e) { logger.error("derivatives failed:", "refresher", { error: (e as Error).message }) }
+}
+
+async function refreshMarketTicks() {
+  try {
+    const ticks = await fetchMarketTicks()
+    await cacheSet('market:ticks', ticks, 120)
+    persistMarketTicks(ticks).catch(() => {})
+    logger.info(`market-ticks: ${ticks.length} ticks`, 'refresher')
+  } catch (e) { logger.error('market-ticks failed:', 'refresher', { error: (e as Error).message }) }
+}
+
+async function refreshSmartMoney() {
+  try {
+    const n = await refreshSmartMoneyScores()
+    logger.info(`smart-money: ${n} wallets scored`, 'refresher')
+  } catch (e) { logger.error('smart-money failed:', 'refresher', { error: (e as Error).message }) }
+}
+
+async function refreshLaunchAlpha() {
+  try {
+    const n = await ingestLaunchTokens()
+    logger.info(`launch-alpha: ${n} tokens ingested`, 'refresher')
+  } catch (e) { logger.error('launch-alpha failed:', 'refresher', { error: (e as Error).message }) }
+}
+
+async function refreshOpportunities() {
+  try {
+    const top = await rankAndPersist()
+    logger.info(`opportunities: ${top.length} ranked`, 'refresher')
+  } catch (e) { logger.error('opportunities failed:', 'refresher', { error: (e as Error).message }) }
+}
+
+async function refreshWalletGraph() {
+  try {
+    const n = await refreshWalletRelationships()
+    logger.info(`wallet-graph: ${n} relationships derived`, 'refresher')
+  } catch (e) { logger.error('wallet-graph failed:', 'refresher', { error: (e as Error).message }) }
 }
 
 async function refreshETF() {
@@ -186,9 +228,14 @@ export function startDataRefresher() {
   setTimeout(() => refreshOnchain(), 11_000)
   setTimeout(() => refreshComposite(), 15_000)
   setTimeout(() => refreshScore(), 20_000)
+  setTimeout(() => refreshWalletGraph(), 20_000)
   setTimeout(() => refreshSignalStore(), 25_000)
   setTimeout(() => refreshSignalOutcomes(), 30_000)
+  setTimeout(() => refreshMarketTicks(), 12_000)
+  setTimeout(() => refreshSmartMoney(), 16_000)
+  setTimeout(() => refreshLaunchAlpha(), 18_000)
 
+  setTimeout(() => refreshOpportunities(), 25_000)
   // Recurring intervals
   setInterval(refreshDerivatives, FAST_INTERVAL)
   setInterval(refreshETF, MEDIUM_INTERVAL)
@@ -197,9 +244,14 @@ export function startDataRefresher() {
   setInterval(refreshRisk, MEDIUM_INTERVAL)
   setInterval(refreshOnchain, FAST_INTERVAL)
   setInterval(refreshComposite, MEDIUM_INTERVAL)
+  setInterval(refreshWalletGraph, MEDIUM_INTERVAL)
   setInterval(refreshScore, MEDIUM_INTERVAL)
   setInterval(refreshSignalStore, SIGNAL_INTERVAL)      // Store signals hourly
   setInterval(refreshSignalOutcomes, OUTCOME_INTERVAL)  // Check outcomes every 15 min
+  setInterval(refreshMarketTicks, MEDIUM_INTERVAL)
+  setInterval(refreshSmartMoney, SIGNAL_INTERVAL)
+  setInterval(refreshLaunchAlpha, MEDIUM_INTERVAL)
 
+  setInterval(refreshOpportunities, SIGNAL_INTERVAL)
   logger.info("Scheduled: derivatives(1m), etf(5m), sentiment(5m), news(15m), risk(5m), onchain(1m), composite(5m), score(5m), signals(1h), outcomes(15m)", "refresher")
 }

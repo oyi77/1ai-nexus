@@ -192,6 +192,99 @@ model SmartMoneyWallet {
   @@index([category])
 }
 
+model WalletRelationship {
+  id              String   @id @default(cuid())
+  fromWalletId    String
+  toWalletId      String
+  relationshipType String // 'funds' | 'funded_by' | 'same_cluster'
+  txCount         Int      @default(0)
+  totalUsd        Float    @default(0)
+  firstSeen       DateTime @default(now())
+  lastSeen        DateTime @default(now())
+
+  from            Wallet   @relation(fields: [fromWalletId], references: [id], onDelete: Cascade)
+  to              Wallet   @relation(fields: [toWalletId], references: [id], onDelete: Cascade)
+
+  @@unique([fromWalletId, toWalletId, relationshipType])
+  @@index([fromWalletId, relationshipType])
+  @@index([toWalletId, relationshipType])
+}
+
+model LaunchToken {
+  id              String   @id @default(cuid())
+  address         String
+  chain           String
+  name            String
+  symbol          String
+  creatorAddress  String?
+  liquidityUsd    Float    @default(0)
+  marketCapUsd    Float    @default(0)
+  volume24hUsd    Float    @default(0)
+  ageMinutes      Int      @default(0)
+  bondingProgress Float?   // 0-100 if bonding-curve tracked
+  migrationState  String?  // 'bonding' | 'migrated' | 'rug'
+  hypeScore       Float    @default(0)
+  launchAlphaScore Float   @default(0)
+  firstSeen       DateTime @default(now())
+  lastSeen        DateTime @default(now())
+
+  snapshots       LaunchFlowSnapshot[]
+
+  @@unique([address, chain])
+  @@index([chain, firstSeen(sort: Desc)])
+  @@index([launchAlphaScore(sort: Desc)])
+}
+
+model LaunchFlowSnapshot {
+  id             String   @id @default(cuid())
+  tokenAddress   String
+  chain          String
+  m5Buys         Int      @default(0)
+  m5Sells        Int      @default(0)
+  h1Buys         Int      @default(0)
+  h1Sells        Int      @default(0)
+  h24Buys        Int      @default(0)
+  h24Sells       Int      @default(0)
+  timestamp      DateTime @default(now())
+
+  token          LaunchToken @relation(fields: [tokenAddress, chain], references: [address, chain], onDelete: Cascade)
+
+  @@index([tokenAddress, chain, timestamp(sort: Desc)])
+}
+
+model LeadLagMatrix {
+  id            String   @id @default(cuid())
+  asset         String
+  dexVenue      String
+  cexVenue      String
+  bestLagMinutes Int     @default(0)  // +DEX leads CEX, -DEX lags
+  correlation   Float    @default(0)
+  sampleSize    Int      @default(0)
+  computedAt    DateTime @default(now())
+
+  @@unique([asset, dexVenue, cexVenue])
+  @@index([asset, computedAt(sort: Desc)])
+}
+
+model OpportunitySnapshot {
+  id            String   @id @default(cuid())
+  asset         String
+  source        String // 'alpha' | 'arb' | 'launch' | 'lrfg' | 'sfc'
+  direction     String // 'bullish' | 'bearish' | 'neutral'
+  score         Float
+  confidence    Float
+  reason        String
+  metadata      Json
+  priceAtCreate Float?
+  resolved      Boolean  @default(false)
+  realizedPct   Float?
+  resolvedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  @@index([source, score(sort: Desc)])
+  @@index([resolved, createdAt(sort: Desc)])
+}
+
 model DeFiProtocol {
   id               String   @id @default(cuid())
   name             String
@@ -514,6 +607,25 @@ model LiquidationEvent {
   @@index([exchange, timestamp(sort: Desc)])
   @@index([estimatedValueUsd(sort: Desc)])
   @@index([symbol, timestamp(sort: Desc)])
+}
+
+model LrfgEvent {
+  id               String   @id @default(cuid())
+  symbol           String
+  exchange         String
+  type             String   // 'leverage_reset' | 'rebound'
+  severity         Float    @default(0)
+  oiDeltaPct       Float
+  priceDeltaPct    Float
+  fundingRate      Float
+  longShortRatio   Float?
+  detectedAt       DateTime @default(now())
+  reboundedAt      DateTime?
+  outcome          String?  // 'success' | 'partial' | 'failed' | null
+
+  @@index([symbol, detectedAt(sort: Desc)])
+  @@index([exchange, detectedAt(sort: Desc)])
+  @@index([detectedAt(sort: Desc)])
 }
 
 model SentimentSnapshot {

@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { prisma } from '@/lib/db'
+import { areWalletsConnectedReal } from './wallet-graph'
 
 export interface ClusterWallet {
   address: string
@@ -194,8 +195,16 @@ export async function detectClusters(): Promise<ClusterPayload> {
   return payload
 }
 
-export function areWalletsConnected(_walletA: string, _walletB: string): { connected: boolean; confidence: number; method: string } {
-  return { connected: false, confidence: 0, method: 'Insufficient data' }
+export async function areWalletsConnected(walletA: string, walletB: string): Promise<{ connected: boolean; confidence: number; method: string }> {
+  // Inputs may be wallet ids or addresses; resolve to ids.
+  const resolve = async (v: string) => {
+    const byId = await prisma.wallet.findUnique({ where: { id: v }, select: { id: true } })
+    if (byId) return byId.id
+    const byAddr = await prisma.wallet.findFirst({ where: { address: v }, select: { id: true } })
+    return byAddr?.id ?? v
+  }
+  const [a, b] = await Promise.all([resolve(walletA), resolve(walletB)])
+  return areWalletsConnectedReal(a, b)
 }
 
 export function getClusterById(id: string): WalletCluster | undefined {
