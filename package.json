@@ -22,7 +22,7 @@
     "verify-re": "npx tsx src/scripts/verify-re-modules.ts"
   },
   "dependencies": {
-    "@1ai/payment": "file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",
+    "@1ai/payment": "file:./vendor/1ai-payment",
     "@base-ui/react": "^1.5.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^6.19.3",
