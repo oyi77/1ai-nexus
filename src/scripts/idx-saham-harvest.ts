@@ -138,7 +138,7 @@ async function main() {
     // 1) Full-universe trading summary (OHLCV + foreign flows).
     const stock = await fetchAllRows(
       page,
-      'https://www.idx.co.id/primary/TradingSummary/GetStockSummary?periodType=Full&language=en-us',
+      'https://www.idx.co.id/primary/TradingSummary/GetStockSummary?periodType=All&language=en-us',
     )
     const stocks = stock.rows.map(toRow).filter((r) => r.code)
     if (stocks.length === 0) throw new Error('no stock-summary rows returned')
