@@ -28,7 +28,7 @@ interface PriceTick {
 
 import { CRYPTO_TAB_SYMBOLS } from '@/lib/config/universe'
 
-const SYMBOLS = CRYPTO_TAB_SYMBOLS.map((s) => s.toLowerCase())
+const FALLBACK_SYMBOLS: string[] = CRYPTO_TAB_SYMBOLS.map((s) => s.toLowerCase())
 
 function fmtUsd(n: number): string {
   if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`
@@ -42,6 +42,19 @@ export default function TradesPage() {
   const [trades, setTrades] = useState<Trade[]>([])
   const [totalBuy, setTotalBuy] = useState(0)
   const [totalSell, setTotalSell] = useState(0)
+  const [SYMBOLS, setTabSymbols] = useState<string[]>(FALLBACK_SYMBOLS)
+  // Live top-volume perps replace the static fallback once loaded.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/v1/crypto/top-symbols?n=9')
+      .then((r) => r.json())
+      .then((d) => {
+        const syms = d.data?.symbols as string[] | undefined
+        if (!cancelled && Array.isArray(syms) && syms.length > 0) setTabSymbols(syms.map((s) => s.toLowerCase()))
+      })
+      .catch(() => { /* static fallback stays */ })
+    return () => { cancelled = true }
+  }, [])
   const [connected, setConnected] = useState(false)
   const socketRef = useRef<Socket | null>(null)
 

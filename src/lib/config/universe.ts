@@ -395,3 +395,29 @@ export const LEAD_LAG_WATCHLIST = ['BTC', 'ETH', 'SOL', 'WIF', 'BONK'] as const
 
 // Sectors.app Yahoo fallback quote set (sectors-app module)
 export const SECTORS_APP_FALLBACK_SYMBOLS = ['^JKSE', ...IDX_FALLBACK.slice(0, 4).map((s) => s.symbol)]
+
+// ─────────────────────────────────────────────────────────────
+// Taxonomy translation: TradingView sector → IDX-IC style sector.
+// Applied at serve time over the live universe (see idx-universe
+// provider). Unmapped values pass through unchanged.
+// ─────────────────────────────────────────────────────────────
+export const TV_TO_IC_SECTOR: Record<string, string> = {
+  Finance: 'Financials',
+  Communications: 'Infrastructure',
+  'Consumer Durables': 'Consumer Cyclicals',
+  'Consumer Non-Durables': 'Consumer Non-Cyclicals',
+  'Non-Energy Minerals': 'Basic Materials',
+  'Energy Minerals': 'Energy',
+  'Technology Services': 'Technology',
+  'Health Technology': 'Healthcare',
+  'Health Services': 'Healthcare',
+  'Industrial Services': 'Industrials',
+  'Process Industries': 'Basic Materials',
+  Transportation: 'Infrastructure',
+  Utilities: 'Utilities',
+  'Retail Trade': 'Consumer Cyclicals',
+  'Distribution Services': 'Consumer Cyclicals',
+  'Commercial Services': 'Technology',
+  'Consumer Services': 'Consumer Cyclicals',
+  'Miscellaneous': 'Others',
+}

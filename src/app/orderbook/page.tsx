@@ -29,13 +29,28 @@ interface OrderBookData {
   }
 }
 
-import { CRYPTO_TAB_SYMBOLS as SYMBOLS } from '@/lib/config/universe'
+import { CRYPTO_TAB_SYMBOLS } from '@/lib/config/universe'
+
+const FALLBACK_SYMBOLS: string[] = [...CRYPTO_TAB_SYMBOLS]
 
 export default function OrderBookPage() {
   const [data, setData] = useState<OrderBookData | null>(null)
   const [symbol, setSymbol] = useState('BTC')
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  const [SYMBOLS, setTabSymbols] = useState<string[]>(FALLBACK_SYMBOLS)
+  // Live top-volume perps replace the static fallback once loaded.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/v1/crypto/top-symbols?n=9')
+      .then((r) => r.json())
+      .then((d) => {
+        const syms = d.data?.symbols as string[] | undefined
+        if (!cancelled && Array.isArray(syms) && syms.length > 0) setTabSymbols(syms.map((s) => s.toUpperCase()))
+      })
+      .catch(() => { /* static fallback stays */ })
+    return () => { cancelled = true }
+  }, [])
 
   const [wsConnected, setWsConnected] = useState(false)
   const socketRef = useRef<Socket | null>(null)

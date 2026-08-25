@@ -11,6 +11,9 @@
 //      src/scripts/idx-universe-harvest.ts)
 //   3. curated fallback floor from lib/config/universe
 //
+// Every stock is enriched with `icSector` (IDX-IC style taxonomy)
+// via the TV_TO_IC_SECTOR translation table.
+//
 // SERVER-ONLY: imports node:fs — never import from client code.
 // Consume via GET /api/v1/equities/universe.
 // ─────────────────────────────────────────────────────────────
@@ -18,13 +21,13 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
-import { IDX_FALLBACK } from '@/lib/config/universe'
+import { IDX_FALLBACK, TV_TO_IC_SECTOR } from '@/lib/config/universe'
 import { getCached } from '@/lib/api/server-cache'
 
 const SNAPSHOT_FILE = join(process.cwd(), 'data', 'idx', 'universe.json')
 const SCAN_URL = 'https://scanner.tradingview.com/indonesia/scan'
 
-const CACHE_KEY = 'idx-universe:v2' // v2 adds industry column
+const CACHE_KEY = 'idx-universe:v2' // v2 adds industry + icSector
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000 // 6h — listings change rarely
 
 export interface IdxUniverseStock {
@@ -32,6 +35,7 @@ export interface IdxUniverseStock {
   name: string
   sector?: string
   industry?: string
+  icSector?: string
 }
 
 export type IdxUniverseSource = 'tradingview' | 'snapshot' | 'curated-fallback'
@@ -65,6 +69,16 @@ const SnapshotSchema = z.object({
     industry: z.string().optional(),
   })),
 })
+
+/** Translate TradingView sector to IDX-IC style sector (passthrough when unmapped). */
+export function applyIcSector<T extends { sector?: string }>(stock: T): T & { icSector?: string } {
+  if (!stock.sector) return stock
+  return { ...stock, icSector: TV_TO_IC_SECTOR[stock.sector] ?? stock.sector }
+}
+
+function applyAll(stocks: IdxUniverseStock[]): IdxUniverseStock[] {
+  return stocks.map(applyIcSector)
+}
 
 /** Live universe from TradingView Indonesia scanner. */
 async function fetchLive(): Promise<IdxUniverseStock[]> {
@@ -107,7 +121,7 @@ async function load(): Promise<IdxUniverse> {
     const stocks = await fetchLive()
     if (stocks.length > 0) {
       return {
-        stocks,
+        stocks: applyAll(stocks),
         meta: { source: 'tradingview', count: stocks.length, fetchedAt: new Date().toISOString(), stale: false },
       }
     }
@@ -120,7 +134,7 @@ async function load(): Promise<IdxUniverse> {
     if (stocks.length > 0) {
       const age = Date.now() - new Date(fetchedAt).getTime()
       return {
-        stocks,
+        stocks: applyAll(stocks),
         meta: { source: 'snapshot', count: stocks.length, fetchedAt, stale: age > 7 * 24 * 60 * 60 * 1000 },
       }
     }
@@ -128,7 +142,7 @@ async function load(): Promise<IdxUniverse> {
     // fall through to curated floor
   }
 
-  const stocks = curatedFallback()
+  const stocks = applyAll(curatedFallback())
   return {
     stocks,
     meta: { source: 'curated-fallback', count: stocks.length, fetchedAt: null, stale: false },

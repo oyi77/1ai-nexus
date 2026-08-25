@@ -21,7 +21,9 @@
     "start:ws": "cd ws-server && npx tsx server.ts",
     "verify-re": "npx tsx src/scripts/verify-re-modules.ts",
     "harvest:crossex": "tsx src/scripts/crossex-harvest.ts",
-    "harvest:idx-universe": "tsx src/scripts/idx-universe-harvest.ts"
+    "harvest:idx-universe": "tsx src/scripts/idx-universe-harvest.ts",
+    "harvest:idx-saham": "tsx src/scripts/idx-saham-harvest.ts",
+    "harvest:idx-fundamentals": "tsx src/scripts/idx-fundamentals-harvest.ts"
   },
   "dependencies": {
     "@1ai/payment": "file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",

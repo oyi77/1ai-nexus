@@ -105,13 +105,23 @@ export default function EquitiesPage() {
       .catch((err) => { setLoading(false); setError((err as Error).message) })
   }, [])
 
-  // Dynamic IDX universe: idx.co.id → data/idx/universe.json → curated floor
+  // Dynamic IDX universe: TradingView live → snapshot → curated floor.
+  // ?quotes=1 embeds the daily harvest's OHLCV so the IDX slice needs
+  // zero Yahoo calls on warm paths; Yahoo only fills residual gaps.
   useEffect(() => {
-    fetch('/api/v1/equities/universe')
+    fetch('/api/v1/equities/universe?quotes=1')
       .then((r) => r.json())
       .then((d) => {
-        const stocks = d.data?.stocks as Array<{ symbol: string; name: string }> | undefined
-        if (stocks?.length) setIdxUniverse(stocks)
+        const stocks = d.data?.stocks as Array<{ symbol: string; name: string; quote?: { close: number; changePct: number } | null }> | undefined
+        if (!stocks?.length) return
+        const snap: Record<string, EquityQuote> = {}
+        for (const s of stocks) {
+          if (s.quote && Number.isFinite(s.quote.close)) {
+            snap[s.symbol] = { price: s.quote.close, change: s.quote.changePct, name: s.name }
+          }
+        }
+        if (Object.keys(snap).length > 0) setQuotes((prev) => ({ ...prev, ...snap }))
+        setIdxUniverse(stocks)
       })
       .catch(() => { /* curated fallback floor covers the UI */ })
   }, [])

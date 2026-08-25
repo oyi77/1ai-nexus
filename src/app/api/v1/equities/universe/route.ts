@@ -4,6 +4,8 @@
 //                  config; idx-* groups are DERIVED live from the
 //                  universe via sector/industry predicates.
 //   ?sector=<s>  → raw universe rows filtered by sector.
+//   ?quotes=1    → embed latest harvested session OHLCV per stock
+//                  (from data/idx/saham-latest.json when present).
 //   (default)    → full dynamic IDX listed-equity universe.
 // ─────────────────────────────────────────────────────────────
 
@@ -11,6 +13,7 @@ import { type NextRequest } from 'next/server'
 import { apiSuccess, apiError } from '@/lib/api/response'
 import { IDX_DERIVED_GROUPS, PEER_GROUPS } from '@/lib/config/universe'
 import { getIdxUniverse } from '@/lib/modules/market/provider/idx-universe'
+import { getSahamLatestQuotes } from '@/lib/modules/market/provider/idx-saham-quotes'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,10 +46,24 @@ export async function GET(request: NextRequest) {
     }
 
     const { stocks, meta } = await getIdxUniverse()
+
     if (sector) {
       const filtered = stocks.filter((s) => s.sector?.toLowerCase() === sector.toLowerCase())
       return apiSuccess({ exchange: 'IDX', sector, stocks: filtered, meta })
     }
+
+    // Optional instant-quote layer from the daily harvest snapshot.
+    if (params.get('quotes')) {
+      try {
+        const q = await getSahamLatestQuotes()
+        return apiSuccess({
+          exchange: 'IDX',
+          stocks: stocks.map((s) => ({ ...s, quote: q.quotes[s.symbol] ?? null })),
+          meta: { ...meta, quoteTradeDate: q.tradeDate },
+        })
+      } catch { /* snapshot absent — fall through to plain payload */ }
+    }
+
     return apiSuccess({ exchange: 'IDX', stocks, meta })
   } catch (error) {
     return apiError((error as Error).message, 502)

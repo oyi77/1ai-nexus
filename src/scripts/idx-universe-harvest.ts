@@ -14,6 +14,7 @@
 import { mkdirSync, renameSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { z } from 'zod'
+import { notifyAlert } from '@/lib/config/alerting'
 
 const OUT_FILE = join(process.cwd(), 'data', 'idx', 'universe.json')
 const SCAN_URL = 'https://scanner.tradingview.com/indonesia/scan'
@@ -68,7 +69,9 @@ async function main() {
   console.log(`[idx-universe] ${stocks.length}/${parsed.totalCount} stocks → ${OUT_FILE}`)
 }
 
-main().catch((err) => {
-  console.error('[idx-universe] harvest failed:', err instanceof Error ? err.message : err)
+main().catch(async (err) => {
+  const msg = err instanceof Error ? err.message : err
+  console.error('[idx-universe] harvest failed:', msg)
+  await notifyAlert('IDX universe harvest FAILED', String(msg))
   process.exit(1)
 })
