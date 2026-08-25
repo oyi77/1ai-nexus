@@ -27,7 +27,7 @@
 | GAP-002 | IDR Forex | 2026-06-30 | ✅ 6 IDR pairs via ExchangeRate-API |
 | GAP-003 | Indonesian Macro | 2026-06-30 | ✅ 8 indicators via World Bank |
 | GAP-004 | Technical Indicators | 2026-06-30 | ✅ SMA, EMA, RSI, MACD, BB |
-| GAP-005 | Multi-Asset Screener | 2026-06-30 | ✅ 32 stocks, 7 exchanges |
+| GAP-005 | Multi-Asset Screener | 2026-08-26 | ✅ Live merged universe (~870+; 844 IDX alone) across 7+ exchanges |
 
 ## P1 — Strategic Gaps (ALL CLOSED)
 
@@ -63,7 +63,7 @@
 | GAP-002 | IDR Forex | 2026-06-30 | ✅ 6 IDR pairs via ExchangeRate-API |
 | GAP-003 | Indonesian Macro | 2026-06-30 | ✅ 8 indicators via World Bank |
 | GAP-004 | Technical Indicators | 2026-06-30 | ✅ SMA, EMA, RSI, MACD, BB |
-| GAP-005 | Multi-Asset Screener | 2026-06-30 | ✅ 32 stocks, 7 exchanges |
+| GAP-005 | Multi-Asset Screener | 2026-08-26 | ✅ Live merged universe (~870+; 844 IDX alone) across 7+ exchanges |
 | GAP-006 | SUN Bonds | 2026-06-30 | ✅ 15 bonds (9 IDR + 6 USD) |
 | GAP-007 | Options Analytics | 2026-06-30 | ✅ Black-Scholes Greeks, 6 symbols |
 | GAP-008 | Portfolio Risk | 2026-06-30 | ✅ VaR, Sharpe, Beta, concentration |
