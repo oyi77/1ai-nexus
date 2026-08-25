@@ -166,7 +166,7 @@ export async function getAaveV3Reserves(
   variableBorrowRate: string;
   stableBorrowRate: string;
   priceUSD: string;
-}>> | null> {
+}> | null> {
   const subgraphMap = {
     ethereum: "aaveV3Ethereum",
     arbitrum: "aaveV3Arbitrum",
@@ -212,7 +212,7 @@ export async function getGMXMarkets(
   totalFees: string;
   fundingRate: string;
   maxLeverage: string;
-}>> | null> {
+}> | null> {
   const subgraphMap = {
     ethereum: "gmxV2",
     arbitrum: "gmxArbitrum",
