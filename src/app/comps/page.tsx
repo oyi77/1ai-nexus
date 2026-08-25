@@ -3,8 +3,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
-interface CompData {
+type CompData = {
   symbol: string
   name: string
   sector: string
@@ -37,8 +38,6 @@ export default function ComparablesPage() {
   const [selected, setSelected] = useState('us-tech')
   const [data, setData] = useState<Record<string, CompData>>({})
   const [loading, setLoading] = useState(true)
-  const [sortField, setSortField] = useState<keyof CompData>('marketCap')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
   const group = PEER_GROUPS[selected]
 
@@ -76,13 +75,8 @@ export default function ComparablesPage() {
       .catch(() => setLoading(false))
   }, [selected])
 
-  const sorted = useMemo(() => {
-    return Object.values(data).sort((a, b) => {
-      const av = a[sortField] ?? 0
-      const bv = b[sortField] ?? 0
-      return sortDir === 'desc' ? (bv as number) - (av as number) : (av as number) - (bv as number)
-    })
-  }, [data, sortField, sortDir])
+  const rows = useMemo(() => Object.values(data), [data])
+  const tc = useTableControls(rows, undefined, { initialSortKey: 'marketCap', initialSortDir: 'desc' })
 
   // Compute averages for valuation metrics
   const averages = useMemo(() => {
@@ -93,15 +87,6 @@ export default function ComparablesPage() {
     }
     return { pe: avg('pe'), pb: avg('pb'), ps: avg('ps'), evEbitda: avg('evEbitda'), roe: avg('roe'), margin: avg('margin') }
   }, [data])
-
-  const handleSort = (field: keyof CompData) => {
-    if (sortField === field) {
-      setSortDir(d => d === 'desc' ? 'asc' : 'desc')
-    } else {
-      setSortField(field)
-      setSortDir('desc')
-    }
-  }
 
   const fmt = (n: number | null, decimals = 2) => n != null ? n.toLocaleString(undefined, { maximumFractionDigits: decimals }) : '—'
   const fmtB = (n: number) => {
@@ -165,6 +150,8 @@ export default function ComparablesPage() {
         {loading ? (
           <div className="text-text-dim text-xs p-8 text-center">Loading comparable data...</div>
         ) : (
+          <>
+            <TableControlsBar idPrefix="comps" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -184,16 +171,15 @@ export default function ComparablesPage() {
                     ['revenueGrowth', 'REV GRW'],
                     ['dividendYield', 'DIV'],
                   ] as [keyof CompData, string][]).map(([field, label]) => (
-                    <th key={field}
-                      className={`py-2 font-mono cursor-pointer hover:text-text-primary ${field === 'symbol' || field === 'name' ? 'text-left' : 'text-right'}`}
-                      onClick={() => handleSort(field)}>
-                      {label} {sortField === field ? (sortDir === 'desc' ? '↓' : '↑') : ''}
-                    </th>
+                    <SortableTh key={field} controls={tc} k={field}
+                      className={`py-2 font-mono ${field === 'symbol' || field === 'name' ? 'text-left' : 'text-right'}`}>
+                      {label}
+                    </SortableTh>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {sorted.map(comp => (
+                {tc.visible.map(comp => (
                   <tr key={comp.symbol} className="border-b border-border-dim/30 hover:bg-bg-elevated">
                     <td className="py-2 font-mono text-accent-cyan">{comp.symbol}</td>
                     <td className="py-2 text-text-dim max-w-32 truncate">{comp.name}</td>
@@ -215,6 +201,7 @@ export default function ComparablesPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">

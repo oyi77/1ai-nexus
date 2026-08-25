@@ -305,6 +305,8 @@ fetchData()
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             data={pairs as unknown as Record<string, unknown>[]}
             sortable
+            filterable
+            filterPlaceholder="Filter pairs…"
             rowHeight={40}
             emptyState={<div className="text-text-muted text-[12px] p-8 text-center">Scanning blockchain for new pairs...</div>}
           />

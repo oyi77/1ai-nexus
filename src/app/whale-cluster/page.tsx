@@ -439,6 +439,8 @@ function WhaleClusterPageInner() {
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             data={filtered as unknown as Record<string, unknown>[]}
             sortable
+            filterable
+            filterPlaceholder="Filter clusters…"
             rowHeight={36}
             onRowClick={(row) => {
               const cluster = row as unknown as WalletCluster

@@ -3,12 +3,16 @@
 import { useState, useEffect } from "react"
 import { NexusLayout } from "@/components/layout/NexusLayout"
 import { useUserPreferences } from "@/lib/hooks/useUserPreferences"
+import { useTableControls, TableControlsBar, SortableTh } from "@/components/shell/TableControls"
 
 // Major global indices (US, EU, Asia, EM)
 const INDICES = ['^GSPC', '^IXIC', '^DJI', '^VIX', '^FTSE', '^N225', '^HSI', '^STOXX50E', '^JKSE', '^AXJO', '^STI', '^GSPTSE', '^KS11', '^TWII']
 
 // Global equities across ALL major exchanges
-const GLOBAL_STOCKS = [
+type EquityStock = { symbol: string; name: string; sector: string }
+type EquityQuote = { price: number; change: number; name: string }
+
+const GLOBAL_STOCKS: EquityStock[] = [
   // US Tech
   { symbol: 'AAPL', name: 'Apple', sector: 'Tech' },
   { symbol: 'MSFT', name: 'Microsoft', sector: 'Tech' },
@@ -121,8 +125,68 @@ const GLOBAL_STOCKS = [
   { symbol: 'MDKA.JK', name: 'Merdeka Copper Gold', sector: 'IDX' },
 ]
 
+/**
+ * One record-list table per sector; each instance owns its filter/sort state
+ * via the shared primitives (no default sort — preserves declaration order).
+ */
+function SectorTable({
+  sector,
+  stocks,
+  quotes,
+}: {
+  sector: string
+  stocks: EquityStock[]
+  quotes: Record<string, EquityQuote>
+}) {
+  const { format } = useUserPreferences()
+  const tc = useTableControls(stocks, [
+    { key: "symbol" },
+    { key: "name" },
+    { key: "price", accessor: s => quotes[s.symbol]?.price },
+    { key: "change", accessor: s => quotes[s.symbol]?.change },
+  ])
+  const idPrefix = `equities-${sector.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
+  return (
+    <>
+      <TableControlsBar idPrefix={idPrefix} query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} placeholder={`Filter ${sector} stocks…`} />
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-text-muted border-b border-border-dim">
+              <SortableTh controls={tc} k="symbol" className="text-left py-2 font-mono w-20">SYMBOL</SortableTh>
+              <SortableTh controls={tc} k="name" className="text-left py-2 font-mono">NAME</SortableTh>
+              <SortableTh controls={tc} k="price" className="text-right py-2 font-mono w-24">PRICE</SortableTh>
+              <SortableTh controls={tc} k="change" className="text-right py-2 font-mono w-20">CHANGE</SortableTh>
+            </tr>
+          </thead>
+          <tbody>
+            {tc.visible.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="py-3 text-center text-text-muted font-mono">No matching stocks</td>
+              </tr>
+            ) : tc.visible.map(s => {
+              const q = quotes[s.symbol]
+              if (!q) return null
+              return (
+                <tr key={s.symbol} className="border-b border-border-dim/30 hover:bg-bg-elevated">
+                  <td className="py-2 font-mono text-accent-cyan">{s.symbol}</td>
+                  <td className="py-2 text-text-dim">{s.name}</td>
+                  <td className="py-2 text-right font-mono">{q.price != null ? format(q.price) : "—"}</td>
+                  <td className={`py-2 text-right font-mono ${(q.change ?? 0) >= 0 ? "text-accent-green" : "text-accent-red"}`}>
+                    {q.change != null ? `${q.change >= 0 ? "+" : ""}${q.change.toFixed(2)}%` : "—"}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </>
+  )
+}
+
 export default function EquitiesPage() {
-  const [quotes, setQuotes] = useState<Record<string, { price: number; change: number; name: string }>>({})
+  const [quotes, setQuotes] = useState<Record<string, EquityQuote>>({})
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const { format } = useUserPreferences()
@@ -131,7 +195,7 @@ export default function EquitiesPage() {
     fetch(`/api/v1/equities?symbols=${allSymbols}`)
       .then(r => r.json())
       .then(d => {
-        const map: Record<string, { price: number; change: number; name: string }> = {}
+        const map: Record<string, EquityQuote> = {}
         for (const q of d.data?.stocks ?? []) {
           map[q.symbol] = { price: q.price, change: q.changePercent, name: q.name ?? q.symbol }
         }
@@ -215,34 +279,11 @@ export default function EquitiesPage() {
             return (
               <div key={sector} className="bg-bg-panel border border-border-dim rounded-lg p-4">
                 <h2 className="text-xs font-mono text-accent-cyan mb-3">{sector.toUpperCase()}</h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-text-muted border-b border-border-dim">
-                        <th className="text-left py-2 font-mono w-20">SYMBOL</th>
-                        <th className="text-left py-2 font-mono">NAME</th>
-                        <th className="text-right py-2 font-mono w-24">PRICE</th>
-                        <th className="text-right py-2 font-mono w-20">CHANGE</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {stocks.map(s => {
-                        const q = quotes[s.symbol]
-                        if (!q) return null
-                        return (
-                          <tr key={s.symbol} className="border-b border-border-dim/30 hover:bg-bg-elevated">
-                            <td className="py-2 font-mono text-accent-cyan">{s.symbol}</td>
-                            <td className="py-2 text-text-dim">{s.name}</td>
-                            <td className="py-2 text-right font-mono">{q.price != null ? format(q.price) : '—'}</td>
-                            <td className={`py-2 text-right font-mono ${(q.change ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
-                              {q.change != null ? `${q.change >= 0 ? '+' : ''}${q.change.toFixed(2)}%` : '—'}
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <SectorTable
+                  sector={sector}
+                  stocks={stocks}
+                  quotes={quotes}
+                />
               </div>
             )
           })

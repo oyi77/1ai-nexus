@@ -149,6 +149,8 @@ function InsiderPageInner() {
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             data={signals as unknown as Record<string, unknown>[]}
             sortable
+            filterable
+            filterPlaceholder="Filter signals…"
             rowHeight={36}
             emptyState={
               <div className="p-8 text-center">

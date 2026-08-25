@@ -157,6 +157,8 @@ export default function TopTradersPage() {
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             data={filtered as unknown as Record<string, unknown>[]}
             rowHeight={36}
+          filterable
+          filterPlaceholder="Filter traders…"
             emptyState={<div className="text-text-muted text-[12px] p-8 text-center">No traders yet. Indexer is collecting transactions...</div>}
           />
         </Panel>

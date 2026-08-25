@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar } from '@/components/shell/TableControls'
 import { useLiveFetch } from '@/lib/hooks/useLiveFetch'
 
 const COUNTRIES = [
@@ -40,8 +41,15 @@ export default function GlobalMacroPage() {
 
   const macroData: MacroData = data ?? {}
 
-  // Sort countries by selected indicator
-  const sortedCountries = [...COUNTRIES].sort((a, b) => {
+  // Text filtering via the shared hook; indicator columns are searched through accessors
+  // because their values live in macroData, not on the row. The ranking comparator is kept
+  // as-is: it parses unit-suffixed World Bank strings ("$21,433B", "2.5%") that the shared
+  // numeric/string comparator cannot rank correctly.
+  const tc = useTableControls(COUNTRIES, INDICATORS.map(ind => ({
+    key: ind,
+    accessor: country => macroData[country.code]?.[ind] ?? '',
+  })))
+  const ranked = [...tc.visible].sort((a, b) => {
     const av = macroData[a.code]?.[selectedIndicator] ?? ''
     const bv = macroData[b.code]?.[selectedIndicator] ?? ''
     const aNum = Number.parseFloat(av.replace(/[^0-9.-]/g, '')) || 0
@@ -84,6 +92,7 @@ export default function GlobalMacroPage() {
             <h2 className="text-xs font-mono text-accent-cyan mb-3">
               {selectedIndicator.toUpperCase()} — RANKED BY {COUNTRIES.length} COUNTRIES
             </h2>
+            <TableControlsBar idPrefix="global-macro" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
@@ -96,20 +105,28 @@ export default function GlobalMacroPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedCountries.map((country, i) => (
-                    <tr key={country.code} className="border-b border-border-dim/30 hover:bg-bg-elevated">
-                      <td className="py-2 font-mono text-text-muted">{i + 1}</td>
-                      <td className="py-2 font-mono">
-                        <span className="mr-2">{country.flag}</span>
-                        <span className="text-text-primary">{country.name}</span>
+                  {ranked.length === 0 ? (
+                    <tr>
+                      <td colSpan={INDICATORS.length + 2} className="py-4 text-center text-text-muted text-xs">
+                        No countries match the current filter.
                       </td>
-                      {INDICATORS.map(ind => (
-                        <td key={ind} className="py-2 text-right font-mono text-text-dim">
-                          {macroData[country.code]?.[ind] ?? '—'}
-                        </td>
-                      ))}
                     </tr>
-                  ))}
+                  ) : (
+                    ranked.map((country, i) => (
+                      <tr key={country.code} className="border-b border-border-dim/30 hover:bg-bg-elevated">
+                        <td className="py-2 font-mono text-text-muted">{i + 1}</td>
+                        <td className="py-2 font-mono">
+                          <span className="mr-2">{country.flag}</span>
+                          <span className="text-text-primary">{country.name}</span>
+                        </td>
+                        {INDICATORS.map(ind => (
+                          <td key={ind} className="py-2 text-right font-mono text-text-dim">
+                            {macroData[country.code]?.[ind] ?? '—'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

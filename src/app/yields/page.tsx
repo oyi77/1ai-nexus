@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
-interface YieldPool {
+type YieldPool = {
   pool: string
   project: string
   symbol: string
@@ -81,6 +82,9 @@ function YieldsPageInner() {
     ? topYields.filter(y => y.apy > 20)
     : topYields
 
+  const tc = useTableControls(filtered, undefined, { initialSortKey: 'apy', initialSortDir: 'desc' })
+  const view = tc.visible.slice(0, 50)
+
   const avgApy = topYields.length > 0 ? topYields.reduce((s, y) => s + y.apy, 0) / topYields.length : 0
   const totalTvl = topYields.reduce((s, y) => s + y.tvlUsd, 0)
 
@@ -126,24 +130,25 @@ function YieldsPageInner() {
 
         {/* Top Yields */}
         <Panel title="Top Yield Opportunities" subtitle={`${filtered.length} pools | Sorted by APY`} liveStatus={status}>
+          <TableControlsBar idPrefix="yields" query={tc.query} onQueryChange={tc.setQuery} shown={view.length} total={tc.total} />
           <div className="overflow-auto scrollbar-thin">
             <table className="w-full border-separate border-spacing-0">
               <thead>
                 <tr className="text-text-muted">
                   <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">#</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Protocol</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Asset</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Chain</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">TVL</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">APY</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Base APY</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Reward APY</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-center">IL Risk</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-center">Prediction</th>
+                  <SortableTh controls={tc} k="project" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Protocol</SortableTh>
+                  <SortableTh controls={tc} k="symbol" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Asset</SortableTh>
+                  <SortableTh controls={tc} k="chain" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Chain</SortableTh>
+                  <SortableTh controls={tc} k="tvlUsd" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">TVL</SortableTh>
+                  <SortableTh controls={tc} k="apy" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">APY</SortableTh>
+                  <SortableTh controls={tc} k="apyBase" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Base APY</SortableTh>
+                  <SortableTh controls={tc} k="apyReward" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Reward APY</SortableTh>
+                  <SortableTh controls={tc} k="ilRisk" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-center">IL Risk</SortableTh>
+                  <SortableTh controls={tc} k="prediction" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-center">Prediction</SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {filtered.slice(0, 50).map((pool, i) => (
+                {view.map((pool, i) => (
                   <tr key={pool.pool} className="border-b border-bg-border/30 hover:bg-bg-raised transition-colors">
                     <td className="text-[11px] font-mono px-3 py-1.5 text-text-muted">{i + 1}</td>
                     <td className="text-[12px] font-mono px-3 py-1.5 font-bold text-text-primary">{pool.project}</td>

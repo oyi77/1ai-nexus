@@ -192,6 +192,9 @@ export default function CopyTradingPage() {
           <DataTable
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             data={leaders as unknown as Record<string, unknown>[]}
+            sortable
+            filterable
+            filterPlaceholder="Filter leaders…"
             rowHeight={36}
             onRowClick={(row) => {
               const r = row as unknown as CopyTradingLeader

@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh, type TableControlsColumn } from '@/components/shell/TableControls'
 
-interface PackageStats {
+type PackageStats = {
   name: string
   ecosystem: string
   category: string
@@ -45,6 +46,15 @@ function MoMBadge({ change }: { change: number | null }) {
   )
 }
 
+// Default ordering preserved: MoM change desc (nulls last), matching the previous pre-sort.
+const PKG_COLUMNS: TableControlsColumn<PackageStats>[] = [
+  { key: 'name' },
+  { key: 'ecosystem' },
+  { key: 'downloads' },
+  { key: 'previousDownloads', accessor: p => p.previousDownloads ?? 0 },
+  { key: 'changeMoM', accessor: p => p.changeMoM ?? 0 },
+]
+
 export default function DevActivityPage() {
   const [data, setData] = useState<DevActivity | null>(null)
   const [loading, setLoading] = useState(true)
@@ -68,10 +78,7 @@ export default function DevActivityPage() {
     ? [...data.ecosystemSummary].sort((a, b) => (b.changeMoM ?? 0) - (a.changeMoM ?? 0))
     : []
 
-  // Sort packages by MoM change (biggest gainers first)
-  const sortedPackages = data?.packages
-    ? [...data.packages].sort((a, b) => (b.changeMoM ?? 0) - (a.changeMoM ?? 0))
-    : []
+  const packagesTc = useTableControls(data?.packages, PKG_COLUMNS, { initialSortKey: 'changeMoM', initialSortDir: 'desc' })
 
   return (
     <NexusLayout>
@@ -115,23 +122,28 @@ export default function DevActivityPage() {
         )}
 
         {/* Package Rankings with MoM */}
-        {sortedPackages.length > 0 && (
-          <Panel title="Package MoM Trends" subtitle={`${sortedPackages.length} packages — sorted by MoM change`}>
+        {(data?.packages?.length ?? 0) > 0 && (
+          <Panel title="Package MoM Trends" subtitle={`${packagesTc.total} packages — sorted by MoM change`}>
+            <TableControlsBar idPrefix="dev-activity" query={packagesTc.query} onQueryChange={packagesTc.setQuery} shown={packagesTc.visible.length} total={packagesTc.total} placeholder="Filter packages…" />
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-text-muted border-b border-border-dim">
                     <th className="text-left py-2 px-2 font-mono">#</th>
-                    <th className="text-left py-2 px-2 font-mono">PACKAGE</th>
-                    <th className="text-left py-2 px-2 font-mono">ECOSYSTEM</th>
-                    <th className="text-right py-2 px-2 font-mono">DOWNLOADS</th>
-                    <th className="text-right py-2 px-2 font-mono">PREV MONTH</th>
-                    <th className="text-right py-2 px-2 font-mono">MoM</th>
+                    <SortableTh controls={packagesTc} k="name" className="text-left py-2 px-2 font-mono">PACKAGE</SortableTh>
+                    <SortableTh controls={packagesTc} k="ecosystem" className="text-left py-2 px-2 font-mono">ECOSYSTEM</SortableTh>
+                    <SortableTh controls={packagesTc} k="downloads" className="text-right py-2 px-2 font-mono">DOWNLOADS</SortableTh>
+                    <SortableTh controls={packagesTc} k="previousDownloads" className="text-right py-2 px-2 font-mono">PREV MONTH</SortableTh>
+                    <SortableTh controls={packagesTc} k="changeMoM" className="text-right py-2 px-2 font-mono">MoM</SortableTh>
                     <th className="text-left py-2 px-2 font-mono w-1/4">VOLUME</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedPackages.map((pkg, i) => (
+                  {packagesTc.visible.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-3 text-center text-text-muted font-mono">No matching packages</td>
+                    </tr>
+                  ) : packagesTc.visible.map((pkg, i) => (
                     <tr key={pkg.name} className="border-b border-border-dim/30 hover:bg-bg-elevated">
                       <td className="py-2 px-2 text-text-dim">{i + 1}</td>
                       <td className="py-2 px-2 font-mono font-bold text-teal-vivid">{pkg.name}</td>

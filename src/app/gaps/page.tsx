@@ -280,6 +280,8 @@ export default function GapsPage() {
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             data={filtered as unknown as Record<string, unknown>[]}
             sortable
+            filterable
+            filterPlaceholder="Filter gaps…"
             rowHeight={32}
             emptyState={
               <div className="text-text-muted text-[11px] p-4 text-center">

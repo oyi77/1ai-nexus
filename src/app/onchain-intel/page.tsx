@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { TableControlsBar, SortableTh, useTableControls } from '@/components/shell/TableControls'
 
 interface MempoolEvent {
   chain: string
@@ -39,6 +40,11 @@ export default function OnchainIntelPage() {
   const [bridge, setBridge] = useState<BridgeStats | null>(null)
   const [staking, setStaking] = useState<StakingSnapshot | null>(null)
   const [loading, setLoading] = useState(true)
+  const tc = useTableControls(
+    bridge?.bridges,
+    [{ key: 'chains', accessor: b => b.chains.slice(0, 4).join(', ') }],
+    { initialSortKey: 'volume24h', initialSortDir: 'desc' },
+  )
 
   useEffect(() => {
     const fetchData = async () => {
@@ -120,18 +126,19 @@ export default function OnchainIntelPage() {
         {/* Bridge Flows */}
         {bridge && bridge.bridges.length > 0 && (
           <Panel title="Bridge Flows" subtitle={`Top bridges by 24h volume — ${fmtUsd(bridge.totalVolume24h)} total`}>
+            <TableControlsBar idPrefix="onchain-intel" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-text-muted border-b border-border-dim">
-                    <th className="text-left py-2 px-2 font-mono">BRIDGE</th>
-                    <th className="text-right py-2 px-2 font-mono">24H VOLUME</th>
-                    <th className="text-left py-2 px-2 font-mono">CHAINS</th>
+                    <SortableTh controls={tc} k="name" className="text-left py-2 px-2 font-mono">BRIDGE</SortableTh>
+                    <SortableTh controls={tc} k="volume24h" className="text-right py-2 px-2 font-mono">24H VOLUME</SortableTh>
+                    <SortableTh controls={tc} k="chains" className="text-left py-2 px-2 font-mono">CHAINS</SortableTh>
                   </tr>
                 </thead>
                 <tbody>
-                  {bridge.bridges.map((b, i) => (
-                    <tr key={i} className="border-b border-border-dim/30 hover:bg-bg-elevated">
+                  {tc.visible.map(b => (
+                    <tr key={b.name} className="border-b border-border-dim/30 hover:bg-bg-elevated">
                       <td className="py-2 px-2 font-mono font-bold text-teal-vivid">{b.name}</td>
                       <td className="py-2 px-2 text-right font-mono">{fmtUsd(b.volume24h)}</td>
                       <td className="py-2 px-2 text-text-dim">{b.chains.slice(0, 4).join(', ')}</td>

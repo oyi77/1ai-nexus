@@ -158,6 +158,8 @@ function SectorsPageInner() {
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             data={chains as unknown as Record<string, unknown>[]}
             sortable
+            filterable
+            filterPlaceholder="Filter chains…"
             rowHeight={28}
             emptyState={<div className="text-text-muted text-[11px] p-4">{status === 'error' ? 'Failed to load' : 'Loading DeFi sector data...'}</div>}
           />

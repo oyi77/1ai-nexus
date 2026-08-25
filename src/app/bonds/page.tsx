@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
 // Indonesian Government Bonds (SUN - Surat Utang Negara)
 // Data sourced from public market data
@@ -111,6 +112,20 @@ export default function BondsPage() {
   }, [])
 
   const filtered = filter === 'All' ? SUN_BONDS : SUN_BONDS.filter(b => b.type === filter)
+  // Quote fields live on the joined quotes map, not on the bond row — accessors bridge them.
+  type BondRow = (typeof SUN_BONDS)[number]
+  const BOND_COLUMNS = [
+    { key: 'code' },
+    { key: 'name' },
+    { key: 'coupon' },
+    { key: 'maturity' },
+    { key: 'price', accessor: (b: BondRow) => quotes[b.code]?.price ?? null },
+    { key: 'yield', accessor: (b: BondRow) => quotes[b.code]?.yield ?? null },
+    { key: 'ytm', accessor: (b: BondRow) => quotes[b.code]?.ytm ?? null },
+    { key: 'duration', accessor: (b: BondRow) => quotes[b.code]?.duration ?? null },
+    { key: 'currency' },
+  ]
+  const tc = useTableControls(filtered, BOND_COLUMNS)
 
   return (
     <NexusLayout>
@@ -173,23 +188,25 @@ export default function BondsPage() {
         {loading ? (
           <div className="text-text-dim text-xs p-8 text-center">Loading bond data...</div>
         ) : (
+          <>
+          <TableControlsBar idPrefix="bonds" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-text-muted border-b border-border-dim">
-                  <th className="text-left py-2 font-mono">CODE</th>
-                  <th className="text-left py-2 font-mono">NAME</th>
-                  <th className="text-right py-2 font-mono">COUPON</th>
-                  <th className="text-right py-2 font-mono">MATURITY</th>
-                  <th className="text-right py-2 font-mono">PRICE</th>
-                  <th className="text-right py-2 font-mono">YIELD</th>
-                  <th className="text-right py-2 font-mono">YTM</th>
-                  <th className="text-right py-2 font-mono">DURATION</th>
-                  <th className="text-right py-2 font-mono">CUR</th>
+                  <SortableTh controls={tc} k="code" className="text-left py-2 font-mono">CODE</SortableTh>
+                  <SortableTh controls={tc} k="name" className="text-left py-2 font-mono">NAME</SortableTh>
+                  <SortableTh controls={tc} k="coupon" className="text-right py-2 font-mono">COUPON</SortableTh>
+                  <SortableTh controls={tc} k="maturity" className="text-right py-2 font-mono">MATURITY</SortableTh>
+                  <SortableTh controls={tc} k="price" className="text-right py-2 font-mono">PRICE</SortableTh>
+                  <SortableTh controls={tc} k="yield" className="text-right py-2 font-mono">YIELD</SortableTh>
+                  <SortableTh controls={tc} k="ytm" className="text-right py-2 font-mono">YTM</SortableTh>
+                  <SortableTh controls={tc} k="duration" className="text-right py-2 font-mono">DURATION</SortableTh>
+                  <SortableTh controls={tc} k="currency" className="text-right py-2 font-mono">CUR</SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(bond => {
+                {tc.visible.map(bond => {
                   const q = quotes[bond.code]
                   return (
                     <tr key={bond.code} className="border-b border-border-dim/30 hover:bg-bg-elevated">
@@ -208,7 +225,9 @@ export default function BondsPage() {
               </tbody>
             </table>
           </div>
+          </>
         )}
+
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
           <h2 className="text-xs font-mono text-accent-cyan mb-2">METHODOLOGY</h2>

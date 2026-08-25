@@ -6,9 +6,10 @@ import { Panel } from '@/components/shell/Panel'
 import { PriceTag } from '@/components/primitives/PriceTag'
 import { DeltaBadge } from '@/components/primitives/DeltaBadge'
 import { LiveDot } from '@/components/primitives/LiveDot'
-import { Search, X, TrendingUp, TrendingDown, Eye, EyeOff } from 'lucide-react'
+import { useTableControls, TableControlsBar, SortableTh, type TableControlsColumn } from '@/components/shell/TableControls'
+import { X, TrendingUp, TrendingDown, Eye, EyeOff } from 'lucide-react'
 
-interface WatchItem {
+type WatchItem = {
   id: string
   symbol: string
   type: 'token' | 'wallet' | 'entity'
@@ -43,10 +44,19 @@ function saveWatchlist(items: WatchItem[]) {
 export default function WatchlistPage() {
   const [items, setItems] = useState<WatchItem[]>([])
   const [prices, setPrices] = useState<Map<string, TokenPrice>>(new Map())
-  const [search, setSearch] = useState('')
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
   const [newSymbol, setNewSymbol] = useState('')
   const [filter, setFilter] = useState<'all' | 'token' | 'wallet' | 'entity'>('all')
+
+  const wlColumns: TableControlsColumn<WatchItem>[] = [
+    { key: 'symbol' },
+    { key: 'type' },
+    { key: 'price', accessor: it => (it.type === 'token' ? prices.get(it.symbol)?.price : undefined) },
+    { key: 'change24h', accessor: it => (it.type === 'token' ? prices.get(it.symbol)?.change24h : undefined) },
+    { key: 'volume24h', accessor: it => (it.type === 'token' ? prices.get(it.symbol)?.volume24h : undefined) },
+    { key: 'addedAt' },
+  ]
+  const tc = useTableControls(items, wlColumns)
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -109,11 +119,7 @@ export default function WatchlistPage() {
     saveWatchlist(updated)
   }
 
-  const filtered = items.filter(i => {
-    if (filter !== 'all' && i.type !== filter) return false
-    if (search && !i.symbol.toLowerCase().includes(search.toLowerCase())) return false
-    return true
-  })
+  const filtered = tc.visible.filter(it => filter === 'all' || it.type === filter)
 
   const triggered = items.filter(i => {
     if (i.type !== 'token') return false
@@ -184,16 +190,6 @@ export default function WatchlistPage() {
 
         {/* Filter Bar */}
         <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search watchlist..."
-              className="w-full bg-bg-raised border border-bg-border rounded pl-7 pr-3 py-2 text-[11px] font-mono text-text-primary placeholder:text-text-muted focus:border-teal-vivid focus:outline-none"
-            />
-          </div>
           <div className="flex bg-bg-raised p-1 rounded">
             {(['all', 'token', 'wallet', 'entity'] as const).map(f => (
               <button
@@ -209,6 +205,9 @@ export default function WatchlistPage() {
 
         {/* Watchlist Table */}
         <Panel title="Watchlist" subtitle={`${filtered.length} items`} liveStatus={status}>
+          {items.length > 0 && (
+            <TableControlsBar idPrefix="watchlist" query={tc.query} onQueryChange={tc.setQuery} shown={filtered.length} total={tc.total} />
+          )}
           {filtered.length === 0 ? (
             <div className="p-8 text-text-muted text-[12px] font-mono text-center">
               {items.length === 0
@@ -221,12 +220,12 @@ export default function WatchlistPage() {
                 <thead>
                   <tr className="text-text-muted">
                     <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left w-12">#</th>
-                    <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Symbol</th>
-                    <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left w-16">Type</th>
-                    <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Price</th>
-                    <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">24h</th>
-                    <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right hidden sm:table-cell">Volume</th>
-                    <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Added</th>
+                    <SortableTh controls={tc} k="symbol" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Symbol</SortableTh>
+                    <SortableTh controls={tc} k="type" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left w-16">Type</SortableTh>
+                    <SortableTh controls={tc} k="price" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Price</SortableTh>
+                    <SortableTh controls={tc} k="change24h" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">24h</SortableTh>
+                    <SortableTh controls={tc} k="volume24h" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right hidden sm:table-cell">Volume</SortableTh>
+                    <SortableTh controls={tc} k="addedAt" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Added</SortableTh>
                     <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right w-10"></th>
                   </tr>
                 </thead>

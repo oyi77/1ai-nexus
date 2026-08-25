@@ -227,6 +227,8 @@ fetchData()
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             data={sorted as unknown as Record<string, unknown>[]}
             rowHeight={36}
+            filterable
+            filterPlaceholder="Filter pairs…"
             emptyState={<div className="text-text-muted text-[12px] p-8 text-center">Loading derivatives data...</div>}
           />
         </Panel>

@@ -4,8 +4,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh, type TableControlsColumn } from '@/components/shell/TableControls'
 
-interface DerivSnapshot {
+type DerivSnapshot = {
   exchange: string
   symbol: string
   fundingRate: number
@@ -16,7 +17,7 @@ interface DerivSnapshot {
   timestamp: string
 }
 
-interface Liquidation {
+type Liquidation = {
   exchange: string
   symbol: string
   side: string
@@ -62,13 +63,34 @@ function fundingColor(rate: number): string {
   return 'text-text-muted'
 }
 
+// Sort/filter accessors: numeric compare on raw/magnitude values; symbol accessors
+// reflect rendered (stripped) text so search matches what the user sees.
+const DERIV_COLUMNS: TableControlsColumn<DerivSnapshot>[] = [
+  { key: 'exchange' },
+  { key: 'symbol', accessor: s => s.symbol.replace('USDT', '').replace('-USDT-SWAP', '') },
+  { key: 'funding', accessor: s => Math.abs(s.fundingRate) },
+  { key: 'oi' },
+  { key: 'lsr', accessor: s => s.longShortRatio ?? 0 },
+  { key: 'mark', accessor: s => s.markPrice ?? 0 },
+  { key: 'index', accessor: s => s.indexPrice ?? 0 },
+]
+
+const LIQ_COLUMNS: TableControlsColumn<Liquidation>[] = [
+  { key: 'time', accessor: l => new Date(l.timestamp).getTime() },
+  { key: 'exchange' },
+  { key: 'symbol', accessor: l => l.symbol.replace('USDT', '') },
+  { key: 'side' },
+  { key: 'quantity' },
+  { key: 'price' },
+  { key: 'estimatedValueUsd' },
+]
+
 export default function DerivativesIntelPage() {
   const [snapshots, setSnapshots] = useState<DerivSnapshot[]>([])
   const [liquidations, setLiquidations] = useState<Liquidation[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)
   const [loading, setLoading] = useState(true)
   const [filterExchange, setFilterExchange] = useState<string>('all')
-  const [sortBy, setSortBy] = useState<'funding' | 'oi' | 'lsr'>('funding')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -101,14 +123,14 @@ export default function DerivativesIntelPage() {
 
   const exchanges = useMemo(() => [...new Set(snapshots.map(s => s.exchange))], [snapshots])
 
-  const filtered = useMemo(() => {
-    const data = filterExchange === 'all' ? snapshots : snapshots.filter(s => s.exchange === filterExchange)
-    switch (sortBy) {
-      case 'funding': return [...data].sort((a, b) => Math.abs(b.fundingRate) - Math.abs(a.fundingRate))
-      case 'oi': return [...data].sort((a, b) => b.openInterest - a.openInterest)
-      case 'lsr': return [...data].sort((a, b) => (b.longShortRatio ?? 0) - (a.longShortRatio ?? 0))
-    }
-  }, [snapshots, filterExchange, sortBy])
+  const exchangeFiltered = useMemo(
+    () => (filterExchange === 'all' ? snapshots : snapshots.filter(s => s.exchange === filterExchange)),
+    [snapshots, filterExchange],
+  )
+  const recentLiquidations = useMemo(() => liquidations.slice(0, 20), [liquidations])
+  // Default paint preserved: funding magnitude desc (snapshot), newest first (liquidations).
+  const derivTc = useTableControls(exchangeFiltered, DERIV_COLUMNS, { initialSortKey: 'funding', initialSortDir: 'desc' })
+  const liqTc = useTableControls(recentLiquidations, LIQ_COLUMNS, { initialSortKey: 'time', initialSortDir: 'desc' })
 
   return (
     <NexusLayout>
@@ -171,34 +193,30 @@ export default function DerivativesIntelPage() {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-1 text-[10px] font-mono">
-            <span className="text-text-muted">Sort:</span>
-            {([['funding', 'Funding'], ['oi', 'OI'], ['lsr', 'L/S']] as const).map(([key, label]) => (
-              <button key={key} onClick={() => setSortBy(key)}
-                className={`px-2 py-1 rounded ${sortBy === key ? 'bg-teal-dim/30 text-teal-vivid' : 'text-text-muted hover:text-text-secondary'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Derivatives Table */}
-        <Panel title="Derivatives Snapshot" subtitle={`${filtered.length} pairs across ${exchanges.length} exchanges`}>
+        <Panel title="Derivatives Snapshot" subtitle={`${derivTc.visible.length} pairs across ${exchanges.length} exchanges`}>
+          <TableControlsBar idPrefix="derivatives-intel" query={derivTc.query} onQueryChange={derivTc.setQuery} shown={derivTc.visible.length} total={derivTc.total} placeholder="Filter pairs…" />
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-text-muted border-b border-border-dim">
-                  <th className="text-left py-2 px-2 font-mono">EXCHANGE</th>
-                  <th className="text-left py-2 px-2 font-mono">SYMBOL</th>
-                  <th className="text-right py-2 px-2 font-mono">FUNDING</th>
-                  <th className="text-right py-2 px-2 font-mono">OI</th>
-                  <th className="text-right py-2 px-2 font-mono">L/S</th>
-                  <th className="text-right py-2 px-2 font-mono">MARK</th>
-                  <th className="text-right py-2 px-2 font-mono">INDEX</th>
+                  <SortableTh controls={derivTc} k="exchange" className="text-left py-2 px-2 font-mono">EXCHANGE</SortableTh>
+                  <SortableTh controls={derivTc} k="symbol" className="text-left py-2 px-2 font-mono">SYMBOL</SortableTh>
+                  <SortableTh controls={derivTc} k="funding" className="text-right py-2 px-2 font-mono">FUNDING</SortableTh>
+                  <SortableTh controls={derivTc} k="oi" className="text-right py-2 px-2 font-mono">OI</SortableTh>
+                  <SortableTh controls={derivTc} k="lsr" className="text-right py-2 px-2 font-mono">L/S</SortableTh>
+                  <SortableTh controls={derivTc} k="mark" className="text-right py-2 px-2 font-mono">MARK</SortableTh>
+                  <SortableTh controls={derivTc} k="index" className="text-right py-2 px-2 font-mono">INDEX</SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((s, i) => (
+                {derivTc.visible.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-3 text-center text-text-muted font-mono">No matching pairs</td>
+                  </tr>
+                ) : derivTc.visible.map((s, i) => (
                   <tr key={`${s.exchange}-${s.symbol}-${i}`} className="border-b border-border-dim/30 hover:bg-bg-elevated">
                     <td className="py-2 px-2 font-mono text-accent-cyan">{s.exchange}</td>
                     <td className="py-2 px-2 font-mono font-bold">{s.symbol.replace('USDT', '').replace('-USDT-SWAP', '')}</td>
@@ -217,21 +235,26 @@ export default function DerivativesIntelPage() {
         {/* Recent Liquidations */}
         {liquidations.length > 0 && (
           <Panel title="Recent Liquidations" subtitle={`${liquidations.length} events`}>
+            <TableControlsBar idPrefix="derivatives-intel-2" query={liqTc.query} onQueryChange={liqTc.setQuery} shown={liqTc.visible.length} total={liqTc.total} placeholder="Filter liquidations…" />
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-text-muted border-b border-border-dim">
-                    <th className="text-left py-2 px-2 font-mono">TIME</th>
-                    <th className="text-left py-2 px-2 font-mono">EXCHANGE</th>
-                    <th className="text-left py-2 px-2 font-mono">SYMBOL</th>
-                    <th className="text-right py-2 px-2 font-mono">SIDE</th>
-                    <th className="text-right py-2 px-2 font-mono">QTY</th>
-                    <th className="text-right py-2 px-2 font-mono">PRICE</th>
-                    <th className="text-right py-2 px-2 font-mono">VALUE</th>
+                    <SortableTh controls={liqTc} k="time" className="text-left py-2 px-2 font-mono">TIME</SortableTh>
+                    <SortableTh controls={liqTc} k="exchange" className="text-left py-2 px-2 font-mono">EXCHANGE</SortableTh>
+                    <SortableTh controls={liqTc} k="symbol" className="text-left py-2 px-2 font-mono">SYMBOL</SortableTh>
+                    <SortableTh controls={liqTc} k="side" className="text-right py-2 px-2 font-mono">SIDE</SortableTh>
+                    <SortableTh controls={liqTc} k="quantity" className="text-right py-2 px-2 font-mono">QTY</SortableTh>
+                    <SortableTh controls={liqTc} k="price" className="text-right py-2 px-2 font-mono">PRICE</SortableTh>
+                    <SortableTh controls={liqTc} k="estimatedValueUsd" className="text-right py-2 px-2 font-mono">VALUE</SortableTh>
                   </tr>
                 </thead>
                 <tbody>
-                  {liquidations.slice(0, 20).map((l, i) => (
+                  {liqTc.visible.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-3 text-center text-text-muted font-mono">No matching liquidations</td>
+                    </tr>
+                  ) : liqTc.visible.map((l, i) => (
                     <tr key={i} className="border-b border-border-dim/30 hover:bg-bg-elevated">
                       <td className="py-2 px-2 font-mono text-text-muted">{new Date(l.timestamp).toLocaleTimeString()}</td>
                       <td className="py-2 px-2 font-mono text-accent-cyan">{l.exchange}</td>

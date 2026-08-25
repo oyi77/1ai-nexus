@@ -1,10 +1,13 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
-interface ETFData {
+// Type alias (not interface): useTableControls requires Record<string, unknown>,
+// which TS only satisfies implicitly for type aliases.
+type ETFData = {
   symbol: string
   name: string
   category: string
@@ -99,7 +102,15 @@ export default function ETFPage() {
       .catch(() => setLoading(false))
   }, [])
 
-  const filtered = filter === 'All' ? ETF_LIST : ETF_LIST.filter(e => e.category === filter)
+  // Category filter narrows candidates; rows joined with fetched quotes feed the shared filter/sort hook.
+  const rows = useMemo(
+    () =>
+      (filter === 'All' ? ETF_LIST : ETF_LIST.filter(e => e.category === filter))
+        .map(etf => data[etf.symbol])
+        .filter((d): d is ETFData => d != null),
+    [filter, data],
+  )
+  const tc = useTableControls(rows)
 
   const fmt = (n: number | null, decimals = 2) => n != null ? n.toLocaleString(undefined, { maximumFractionDigits: decimals }) : '—'
   const fmtB = (n: number | null) => {
@@ -141,44 +152,49 @@ export default function ETFPage() {
         {loading ? (
           <div className="text-text-dim text-xs p-8 text-center">Loading ETF data...</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-text-muted border-b border-border-dim">
-                  <th className="text-left py-2 font-mono">SYMBOL</th>
-                  <th className="text-left py-2 font-mono">NAME</th>
-                  <th className="text-left py-2 font-mono">CATEGORY</th>
-                  <th className="text-right py-2 font-mono">PRICE</th>
-                  <th className="text-right py-2 font-mono">CHG%</th>
-                  <th className="text-right py-2 font-mono">AUM</th>
-                  <th className="text-right py-2 font-mono">YIELD</th>
-                  <th className="text-right py-2 font-mono">VOLUME</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(etf => {
-                  const d = data[etf.symbol]
-                  if (!d) return null
-                  return (
-                    <tr key={etf.symbol}
-                      className={`border-b border-border-dim/30 hover:bg-bg-elevated cursor-pointer ${selected === etf.symbol ? 'bg-bg-elevated' : ''}`}
-                      onClick={() => setSelected(selected === etf.symbol ? null : etf.symbol)}>
-                      <td className="py-2 font-mono text-accent-cyan">{d.symbol}</td>
-                      <td className="py-2 text-text-dim max-w-40 truncate">{d.name}</td>
-                      <td className="py-2 text-text-muted">{d.category}</td>
-                      <td className="py-2 text-right font-mono">${fmt(d.price)}</td>
-                      <td className={`py-2 text-right font-mono font-bold ${d.changePercent >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
-                        {d.changePercent >= 0 ? '+' : ''}{fmt(d.changePercent)}%
-                      </td>
-                      <td className="py-2 text-right font-mono">{fmtB(d.aum)}</td>
-                      <td className="py-2 text-right font-mono">{d.yield != null ? `${(d.yield * 100).toFixed(2)}%` : '—'}</td>
-                      <td className="py-2 text-right font-mono">{d.volume.toLocaleString()}</td>
+          <>
+            <TableControlsBar idPrefix="etf" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
+            {tc.visible.length === 0 ? (
+              <div className="text-text-dim text-xs p-8 text-center">No ETF data available</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-text-muted border-b border-border-dim">
+                      <SortableTh controls={tc} k="symbol" className="text-left py-2 font-mono">SYMBOL</SortableTh>
+                      <SortableTh controls={tc} k="name" className="text-left py-2 font-mono">NAME</SortableTh>
+                      <SortableTh controls={tc} k="category" className="text-left py-2 font-mono">CATEGORY</SortableTh>
+                      <SortableTh controls={tc} k="price" className="text-right py-2 font-mono">PRICE</SortableTh>
+                      <SortableTh controls={tc} k="changePercent" className="text-right py-2 font-mono">CHG%</SortableTh>
+                      <SortableTh controls={tc} k="aum" className="text-right py-2 font-mono">AUM</SortableTh>
+                      <SortableTh controls={tc} k="yield" className="text-right py-2 font-mono">YIELD</SortableTh>
+                      <SortableTh controls={tc} k="volume" className="text-right py-2 font-mono">VOLUME</SortableTh>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {tc.visible.map(d => {
+                      return (
+                        <tr key={d.symbol}
+                          className={`border-b border-border-dim/30 hover:bg-bg-elevated cursor-pointer ${selected === d.symbol ? 'bg-bg-elevated' : ''}`}
+                          onClick={() => setSelected(selected === d.symbol ? null : d.symbol)}>
+                          <td className="py-2 font-mono text-accent-cyan">{d.symbol}</td>
+                          <td className="py-2 text-text-dim max-w-40 truncate">{d.name}</td>
+                          <td className="py-2 text-text-muted">{d.category}</td>
+                          <td className="py-2 text-right font-mono">${fmt(d.price)}</td>
+                          <td className={`py-2 text-right font-mono font-bold ${d.changePercent >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                            {d.changePercent >= 0 ? '+' : ''}{fmt(d.changePercent)}%
+                          </td>
+                          <td className="py-2 text-right font-mono">{fmtB(d.aum)}</td>
+                          <td className="py-2 text-right font-mono">{d.yield != null ? `${(d.yield * 100).toFixed(2)}%` : '—'}</td>
+                          <td className="py-2 text-right font-mono">{d.volume.toLocaleString()}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
 
         {/* Detail Panel */}

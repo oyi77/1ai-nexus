@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { TerminalShell } from "@/components/layout/TerminalShell"
+import { useTableControls, TableControlsBar, SortableTh } from "@/components/shell/TableControls"
 import { TrendingUp, TrendingDown, AlertTriangle, Droplets, Clock } from "lucide-react"
 
-interface DiscoveredToken {
+type DiscoveredToken = {
   name: string
   symbol: string
   address: string
@@ -26,12 +27,15 @@ export default function TokenDiscoverPage() {
   const [loading, setLoading] = useState(true)
   const [sort, setSort] = useState<SortMode>('trending')
 
+  // Client-side filter + sort over fetched tokens (server sort-mode buttons unaffected).
+  const tc = useTableControls(tokens)
+
   const fetchTokens = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch(`/api/v1/tokens/discover?sort=${sort}&limit=30`)
       const data = await res.json()
-      setTokens(data.tokens ?? [])
+      setTokens(data.data?.tokens ?? data.tokens ?? [])
     } catch {
       // Silent
     } finally {
@@ -81,25 +85,26 @@ export default function TokenDiscoverPage() {
           ) : tokens.length === 0 ? (
             <div className="text-center py-20 text-text-dim text-xs">No tokens found</div>
           ) : (
+            <>
+            <TableControlsBar idPrefix="tokens-discover" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-text-muted text-[10px] uppercase">
                   <th className="text-left py-2 px-2 font-mono">#</th>
-                  <th className="text-left py-2 px-2 font-mono">TOKEN</th>
-                  <th className="text-left py-2 px-2 font-mono">CHAIN</th>
-                  <th className="text-right py-2 px-2 font-mono">PRICE</th>
-                  <th className="text-right py-2 px-2 font-mono">24H</th>
-                  <th className="text-right py-2 px-2 font-mono">VOL 24H</th>
-                  <th className="text-right py-2 px-2 font-mono">LIQUIDITY</th>
-                  <th className="text-center py-2 px-2 font-mono">AGE</th>
-                  <th className="text-center py-2 px-2 font-mono">RUG</th>
-                  <th className="text-left py-2 px-2 font-mono">SIGNALS</th>
+                  <SortableTh controls={tc} k="symbol" className="text-left py-2 px-2 font-mono">TOKEN</SortableTh>
+                  <SortableTh controls={tc} k="network" className="text-left py-2 px-2 font-mono">CHAIN</SortableTh>
+                  <SortableTh controls={tc} k="priceUsd" className="text-right py-2 px-2 font-mono">PRICE</SortableTh>
+                  <SortableTh controls={tc} k="change24h" className="text-right py-2 px-2 font-mono">24H</SortableTh>
+                  <SortableTh controls={tc} k="volume24h" className="text-right py-2 px-2 font-mono">VOL 24H</SortableTh>
+                  <SortableTh controls={tc} k="liquidity" className="text-right py-2 px-2 font-mono">LIQUIDITY</SortableTh>
+                  <SortableTh controls={tc} k="age" className="text-center py-2 px-2 font-mono">AGE</SortableTh>
+                  <SortableTh controls={tc} k="rugScore" className="text-center py-2 px-2 font-mono">RUG</SortableTh>
+                  <SortableTh controls={tc} k="badges" className="text-left py-2 px-2 font-mono">SIGNALS</SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {tokens.map((t, i) => (
+                {tc.visible.map((t, i) => (
                   <tr
-                    key={t.address + i}
                     className="border-t border-border-dim/30 hover:bg-bg-elevated cursor-pointer transition-colors"
                   >
                     <td className="py-2 px-2 text-text-muted">{i + 1}</td>
@@ -157,8 +162,14 @@ export default function TokenDiscoverPage() {
                     </td>
                   </tr>
                 ))}
+                {tc.visible.length === 0 && (
+                  <tr>
+                    <td colSpan={10} className="py-6 text-center text-text-dim text-xs">No tokens match the current filter.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
+            </>
           )}
         </div>
       </div>

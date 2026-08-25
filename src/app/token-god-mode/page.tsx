@@ -7,6 +7,7 @@ import { PriceTag } from '@/components/primitives/PriceTag'
 import { DeltaBadge } from '@/components/primitives/DeltaBadge'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { Search } from 'lucide-react'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
 interface Holder {
   address: string
@@ -18,7 +19,7 @@ interface Holder {
   smartMoneyScore: number
 }
 
-interface Pool {
+type Pool = {
   address: string
   name: string
   dex: string
@@ -79,6 +80,7 @@ export default function TokenGodModePage() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'live' | 'error'>('idle')
   const [trending, setTrending] = useState<TrendingToken[]>([])
   const [trendingLoading, setTrendingLoading] = useState(true)
+  const poolsTc = useTableControls(data?.pools, undefined, { initialSortKey: 'liquidity', initialSortDir: 'desc' })
 
   // Popular tokens for quick analysis
   const POPULAR_TOKENS = [
@@ -238,19 +240,20 @@ export default function TokenGodModePage() {
 
             {/* Pools */}
             <Panel title="Liquidity Pools" subtitle={`${data.pools.length} pools from GeckoTerminal`}>
+                <TableControlsBar idPrefix="token-god-mode" query={poolsTc.query} onQueryChange={poolsTc.setQuery} shown={poolsTc.visible.length} total={poolsTc.total} />
               <div className="overflow-auto scrollbar-thin">
                 <table className="w-full border-separate border-spacing-0">
                   <thead>
                     <tr className="text-text-muted">
-                      <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Pool</th>
-                      <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">DEX</th>
-                      <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Price</th>
-                      <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Volume 24h</th>
-                      <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Liquidity</th>
+                      <SortableTh controls={poolsTc} k="name" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Pool</SortableTh>
+                      <SortableTh controls={poolsTc} k="dex" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">DEX</SortableTh>
+                      <SortableTh controls={poolsTc} k="priceUsd" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Price</SortableTh>
+                      <SortableTh controls={poolsTc} k="volume24h" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Volume 24h</SortableTh>
+                      <SortableTh controls={poolsTc} k="liquidity" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Liquidity</SortableTh>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.pools.map((p, i) => (
+                    {poolsTc.visible.map((p, i) => (
                       <tr key={i} className="border-b border-bg-border/30 hover:bg-bg-raised transition-colors">
                         <td className="text-[11px] font-mono px-3 py-1.5 text-text-primary font-bold">{p.name}</td>
                         <td className="text-[10px] font-mono px-3 py-1.5 text-teal-vivid">{p.dex}</td>

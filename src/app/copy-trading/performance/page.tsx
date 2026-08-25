@@ -230,6 +230,9 @@ export default function CopyTradingPerformancePage() {
           <DataTable
             columns={winRateColumns as unknown as Column<Record<string, unknown>>[]}
             data={winRateLeaders as unknown as Record<string, unknown>[]}
+            sortable
+            filterable
+            filterPlaceholder="Filter leaders…"
             rowHeight={36}
             onRowClick={(row) => goLeader(row as unknown as CopyTradingLeader)}
             emptyState={emptyState}
@@ -246,6 +249,9 @@ export default function CopyTradingPerformancePage() {
           <DataTable
             columns={profitColumns as unknown as Column<Record<string, unknown>>[]}
             data={profitLeaders as unknown as Record<string, unknown>[]}
+            sortable
+            filterable
+            filterPlaceholder="Filter leaders…"
             rowHeight={36}
             maxHeight={320}
             onRowClick={(row) => goLeader(row as unknown as CopyTradingLeader)}

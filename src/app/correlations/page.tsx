@@ -150,6 +150,8 @@ function CorrelationsPageInner() {
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             data={correlations as unknown as Record<string, unknown>[]}
             sortable
+            filterable
+            filterPlaceholder="Filter correlations…"
             rowHeight={36}
             emptyState={<div className="text-text-muted text-[11px] p-4">Calculating correlations...</div>}
           />

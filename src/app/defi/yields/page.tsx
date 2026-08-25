@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { TerminalShell } from "@/components/layout/TerminalShell"
 import { Percent } from "lucide-react"
+import { useTableControls, TableControlsBar, SortableTh } from "@/components/shell/TableControls"
 
-interface YieldPool {
+type YieldPool = {
   pool: string
   chain: string
   project: string
@@ -28,7 +29,7 @@ export default function DeFiYieldsPage() {
       if (stableOnly) params.set('stablecoin', 'true')
       const res = await fetch(`/api/v1/defi/yields?${params}`)
       const data = await res.json()
-      setPools(data.pools ?? [])
+      setPools(data.data?.pools ?? data.pools ?? [])
     } catch {
       // Silent
     } finally {
@@ -37,6 +38,8 @@ export default function DeFiYieldsPage() {
   }, [stableOnly])
 
   useEffect(() => { const invoke = () => fetchData(); invoke() }, [fetchData])
+
+  const tc = useTableControls(pools)
 
   return (
     <TerminalShell>
@@ -63,21 +66,23 @@ export default function DeFiYieldsPage() {
           {loading ? (
             <div className="text-center py-20 text-text-dim text-xs">Loading yield data from DeFiLlama...</div>
           ) : (
+          <>
+            <TableControlsBar idPrefix="defi-yields" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-text-muted text-[10px] uppercase">
                   <th className="text-left py-2 px-2 font-mono">#</th>
-                  <th className="text-left py-2 px-2 font-mono">PROTOCOL</th>
-                  <th className="text-left py-2 px-2 font-mono">CHAIN</th>
-                  <th className="text-left py-2 px-2 font-mono">SYMBOL</th>
-                  <th className="text-right py-2 px-2 font-mono">TVL</th>
-                  <th className="text-right py-2 px-2 font-mono">APY</th>
-                  <th className="text-right py-2 px-2 font-mono">BASE</th>
-                  <th className="text-right py-2 px-2 font-mono">REWARD</th>
+                  <SortableTh controls={tc} k="project" className="text-left py-2 px-2 font-mono">PROTOCOL</SortableTh>
+                  <SortableTh controls={tc} k="chain" className="text-left py-2 px-2 font-mono">CHAIN</SortableTh>
+                  <SortableTh controls={tc} k="symbol" className="text-left py-2 px-2 font-mono">SYMBOL</SortableTh>
+                  <SortableTh controls={tc} k="tvlUsd" className="text-right py-2 px-2 font-mono">TVL</SortableTh>
+                  <SortableTh controls={tc} k="apy" className="text-right py-2 px-2 font-mono">APY</SortableTh>
+                  <SortableTh controls={tc} k="apyBase" className="text-right py-2 px-2 font-mono">BASE</SortableTh>
+                  <SortableTh controls={tc} k="apyReward" className="text-right py-2 px-2 font-mono">REWARD</SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {pools.map((p, i) => (
+                {tc.visible.map((p, i) => (
                   <tr key={p.pool + i} className="border-t border-border-dim/30 hover:bg-bg-elevated cursor-pointer">
                     <td className="py-2 px-2 text-text-muted">{i + 1}</td>
                     <td className="py-2 px-2 font-mono text-text-primary">{p.project}</td>
@@ -91,6 +96,7 @@ export default function DeFiYieldsPage() {
                 ))}
               </tbody>
             </table>
+          </>
           )}
         </div>
       </div>

@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { NexusLayout } from "@/components/layout/NexusLayout"
-import { Search } from "lucide-react"
+import { TableControlsBar, SortableTh, useTableControls, type TableControlsColumn } from "@/components/shell/TableControls"
 
-interface WalletPnl {
+type WalletPnl = {
   address: string
   chain: string
   totalPnl: number
@@ -43,7 +43,6 @@ const typeColors: Record<string, string> = {
 export default function PnlPage() {
   const [wallets, setWallets] = useState<WalletPnl[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
   const [lookupAddr, setLookupAddr] = useState('')
   const [lookupChain, setLookupChain] = useState('eth')
   const [singleWallet, setSingleWallet] = useState<WalletPnl | null>(null)
@@ -94,12 +93,15 @@ export default function PnlPage() {
     }
   }
 
-  const filtered = wallets.filter(w =>
-    !search ||
-    w.address.toLowerCase().includes(search.toLowerCase()) ||
-    w.chain.toLowerCase().includes(search.toLowerCase()) ||
-    (w.entityName ?? '').toLowerCase().includes(search.toLowerCase())
-  )
+  const pnlColumns: TableControlsColumn<WalletPnl>[] = [
+    { key: 'entityName', accessor: w => w.entityName ?? w.address },
+    { key: 'entityType', accessor: w => w.entityType ?? '' },
+    { key: 'smartMoneyScore', accessor: w => w.smartMoneyScore ?? -Infinity },
+    { key: 'entityTvl', accessor: w => w.entityTvl ?? -Infinity },
+  ]
+
+  // Replaces bespoke address/chain/entityName filter — hook fallback covers every field.
+  const tc = useTableControls(wallets, pnlColumns)
 
   return (
     <NexusLayout>
@@ -183,37 +185,29 @@ export default function PnlPage() {
         <div className="bg-bg-panel border border-bg-border rounded">
           <div className="px-3 py-2 border-b border-bg-border flex items-center justify-between">
             <span className="text-[11px] font-mono font-bold text-text-primary">TOP 50 WALLETS BY SMART MONEY SCORE</span>
-            <div className="relative">
-              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Filter..."
-                className="bg-bg-raised border border-bg-border rounded pl-7 pr-2 py-1 text-[10px] font-mono text-text-primary placeholder:text-text-muted focus:border-teal-vivid focus:outline-none w-32"
-              />
-            </div>
           </div>
 
           {loading ? (
             <div className="p-8 text-text-muted text-[11px] font-mono text-center">Loading leaderboard...</div>
-          ) : filtered.length === 0 ? (
+          ) : wallets.length === 0 ? (
             <div className="p-8 text-text-muted text-[11px] font-mono text-center">No wallet data available</div>
           ) : (
+            <>
+              <TableControlsBar idPrefix="pnl" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
             <div className="overflow-auto scrollbar-thin" style={{ maxHeight: '600px' }}>
               <table className="w-full border-separate border-spacing-0">
                 <thead>
                   <tr className="text-text-muted">
                     <th className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left w-12">Rank</th>
-                    <th className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left">Entity / Address</th>
-                    <th className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left w-20">Chain</th>
-                    <th className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left w-20">Type</th>
-                    <th className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-right w-16">Score</th>
-                    <th className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-right hidden sm:table-cell">TVL</th>
+                    <SortableTh controls={tc} k="entityName" className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left">Entity / Address</SortableTh>
+                    <SortableTh controls={tc} k="chain" className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left w-20">Chain</SortableTh>
+                    <SortableTh controls={tc} k="entityType" className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left w-20">Type</SortableTh>
+                    <SortableTh controls={tc} k="smartMoneyScore" className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-right w-16">Score</SortableTh>
+                    <SortableTh controls={tc} k="entityTvl" className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-right hidden sm:table-cell">TVL</SortableTh>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((w, i) => (
+                  {tc.visible.map((w, i) => (
                     <tr
                       key={`${w.address}-${i}`}
                       className="border-b border-bg-border/30 hover:bg-bg-raised transition-colors cursor-pointer"
@@ -247,9 +241,15 @@ export default function PnlPage() {
                       </td>
                     </tr>
                   ))}
+                  {tc.visible.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-4 text-center text-[11px] font-mono text-text-muted">No wallets match the current filter.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
       </div>

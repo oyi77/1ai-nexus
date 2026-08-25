@@ -181,6 +181,8 @@ function EntitiesPageInner() {
                 columns={columns}
                 data={filtered}
                 sortable
+                filterable
+                filterPlaceholder="Filter entities…"
                 rowHeight={32}
                 onRowClick={(row) => setSelectedEntity(row)}
                 emptyState={<div className="text-text-muted text-[11px] p-4">Loading entities...</div>}

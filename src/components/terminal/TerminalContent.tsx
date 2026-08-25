@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { TrendingUp, TrendingDown, Layers, Globe } from "lucide-react"
+import { useTableControls, TableControlsBar, SortableTh } from "@/components/shell/TableControls"
 
 interface Ticker {
   symbol: string
@@ -18,7 +19,9 @@ interface NewsItem {
   category: string
 }
 
-interface DeFiProtocol {
+// Type alias (not interface): useTableControls requires Record<string, unknown>,
+// which TS only satisfies implicitly for type aliases.
+type DeFiProtocol = {
   name: string
   chain: string
   tvl: number
@@ -29,6 +32,10 @@ export function TerminalContent() {
   const [tickers, setTickers] = useState<Ticker[]>([])
   const [news, setNews] = useState<NewsItem[]>([])
   const [defi, setDeFi] = useState<DeFiProtocol[]>([])
+
+  // Default sort preserves the incoming TVL-desc order from fetchData; no column
+  // accessors needed — raw values match rendered keys for both filter and sort.
+  const defiTc = useTableControls(defi, undefined, { initialSortKey: 'tvl', initialSortDir: 'desc' })
   const [fearGreed, setFearGreed] = useState<{ value: number; classification: string } | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -151,24 +158,27 @@ export function TerminalContent() {
             <span className="text-xs font-mono text-accent-cyan">TOP DeFi BY TVL</span>
             <span className="text-[10px] text-text-muted">{defi.length} protocols</span>
           </div>
+          {!loading && defi.length > 0 && (
+            <TableControlsBar idPrefix="terminal-defi" query={defiTc.query} onQueryChange={defiTc.setQuery} shown={defiTc.visible.length} total={defiTc.total} />
+          )}
           <div className="max-h-[400px] overflow-y-auto scrollbar-thin">
             {loading ? (
               <div className="p-4 text-text-dim text-xs text-center">Loading DeFi data...</div>
-            ) : defi.length === 0 ? (
+            ) : defiTc.visible.length === 0 ? (
               <div className="p-4 text-text-dim text-xs text-center">No DeFi data available</div>
             ) : (
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-text-muted">
                     <th className="text-left py-1.5 px-3 font-mono">#</th>
-                    <th className="text-left py-1.5 px-3 font-mono">PROTOCOL</th>
-                    <th className="text-left py-1.5 px-3 font-mono">CHAIN</th>
-                    <th className="text-right py-1.5 px-3 font-mono">TVL</th>
-                    <th className="text-right py-1.5 px-3 font-mono">1D</th>
+                    <SortableTh controls={defiTc} k="name" className="text-left py-1.5 px-3 font-mono">PROTOCOL</SortableTh>
+                    <SortableTh controls={defiTc} k="chain" className="text-left py-1.5 px-3 font-mono">CHAIN</SortableTh>
+                    <SortableTh controls={defiTc} k="tvl" className="text-right py-1.5 px-3 font-mono">TVL</SortableTh>
+                    <SortableTh controls={defiTc} k="change_1d" className="text-right py-1.5 px-3 font-mono">1D</SortableTh>
                   </tr>
                 </thead>
                 <tbody>
-                  {defi.map((p, i) => (
+                  {defiTc.visible.map((p, i) => (
                     <tr key={p.name} className="border-t border-border-dim/30 hover:bg-bg-elevated">
                       <td className="py-1.5 px-3 text-text-muted">{i + 1}</td>
                       <td className="py-1.5 px-3 text-text-primary font-mono">{p.name}</td>

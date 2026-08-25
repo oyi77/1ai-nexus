@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { TableControlsBar, SortableTh, useTableControls, type TableControlsColumn } from '@/components/shell/TableControls'
 
-interface ProtocolRevenue {
+type ProtocolRevenue = {
   name: string
   category: string
   fees24h: number
@@ -64,6 +65,14 @@ fetchData()
     return () => clearInterval(id)
   }, [fetchData])
 
+  const revColumns: TableControlsColumn<ProtocolRevenue>[] = [
+    { key: 'peRatio', accessor: p => p.peRatio ?? -Infinity },
+    { key: 'feeMargin', accessor: p => p.feeMargin ?? -Infinity },
+  ]
+
+  // Default paint: fees 24h desc — matches the panel subtitle's declared ordering.
+  const revTc = useTableControls(protocols, revColumns, { initialSortKey: 'fees24h', initialSortDir: 'desc' })
+
   return (
     <>
       <div className="p-4 space-y-4 max-w-7xl mx-auto">
@@ -91,23 +100,24 @@ fetchData()
 
         {/* Top Protocols */}
         <Panel title="Top Protocols by Fees" subtitle={`${protocols.length} protocols | Sorted by 24h fees`} liveStatus={status} onRefresh={fetchData}>
+          <TableControlsBar idPrefix="revenue" query={revTc.query} onQueryChange={revTc.setQuery} shown={revTc.visible.length} total={revTc.total} />
           <div className="overflow-auto scrollbar-thin">
             <table className="w-full border-separate border-spacing-0">
               <thead>
                 <tr className="text-text-muted">
                   <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">#</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Protocol</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Category</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Fees 24h</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Fees 30d</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Revenue 24h</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">P/E Ratio</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Fee Margin</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">24h</th>
+                  <SortableTh controls={revTc} k="name" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Protocol</SortableTh>
+                  <SortableTh controls={revTc} k="category" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Category</SortableTh>
+                  <SortableTh controls={revTc} k="fees24h" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Fees 24h</SortableTh>
+                  <SortableTh controls={revTc} k="fees30d" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Fees 30d</SortableTh>
+                  <SortableTh controls={revTc} k="revenue24h" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Revenue 24h</SortableTh>
+                  <SortableTh controls={revTc} k="peRatio" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">P/E Ratio</SortableTh>
+                  <SortableTh controls={revTc} k="feeMargin" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Fee Margin</SortableTh>
+                  <SortableTh controls={revTc} k="change1d" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">24h</SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {protocols.map((p, i) => (
+                {revTc.visible.map((p, i) => (
                   <tr key={p.name} className="border-b border-bg-border/30 hover:bg-bg-raised transition-colors">
                     <td className="text-[11px] font-mono px-3 py-1.5 text-text-muted">{i + 1}</td>
                     <td className="text-[12px] font-mono px-3 py-1.5 font-bold text-text-primary">{p.name}</td>

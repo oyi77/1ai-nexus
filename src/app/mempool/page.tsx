@@ -308,6 +308,8 @@ function MempoolPageInner() {
             columns={whaleColumns as unknown as Column<Record<string, unknown>>[]}
             data={whales as unknown as Record<string, unknown>[]}
             sortable
+            filterable
+            filterPlaceholder="Filter transactions…"
             rowHeight={36}
             emptyState={
               <div className="p-8 text-center">

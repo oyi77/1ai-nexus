@@ -225,6 +225,8 @@ export default function ExchangeFlowPage() {
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             data={flows as unknown as Record<string, unknown>[]}
             sortable
+            filterable
+            filterPlaceholder="Filter exchanges…"
             rowHeight={32}
             emptyState={<div className="text-text-muted text-[11px] p-4">No exchange flow data available</div>}
           />
@@ -235,6 +237,8 @@ export default function ExchangeFlowPage() {
             columns={whaleColumns as unknown as Column<Record<string, unknown>>[]}
             data={whaleEvents as unknown as Record<string, unknown>[]}
             sortable
+            filterable
+            filterPlaceholder="Filter whale events…"
             rowHeight={28}
             emptyState={<div className="text-text-muted text-[11px] p-4">No whale events detected</div>}
           />

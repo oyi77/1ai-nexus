@@ -359,6 +359,8 @@ fetchBinance()
                 columns={posColumns as unknown as Column<Record<string, unknown>>[]}
                 data={topPositions as unknown as Record<string, unknown>[]}
                 sortable rowHeight={28}
+                filterable
+                filterPlaceholder="Filter positions…"
                 emptyState={<div className="text-text-muted text-[11px] p-4 text-center font-mono">Loading positions…</div>}
               />
             </Panel>
@@ -367,6 +369,8 @@ fetchBinance()
                 columns={lbColumns as unknown as Column<Record<string, unknown>>[]}
                 data={leaderboard as unknown as Record<string, unknown>[]}
                 sortable rowHeight={28}
+                filterable
+                filterPlaceholder="Filter traders…"
                 emptyState={<div className="text-text-muted text-[11px] p-4 text-center font-mono">Loading leaderboard…</div>}
               />
             </Panel>

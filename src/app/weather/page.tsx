@@ -441,6 +441,8 @@ export default function WeatherPage() {
             columns={columns as unknown as Column<Record<string, unknown>>[]}
             data={flatRows as unknown as Record<string, unknown>[]}
             sortable
+            filterable
+            filterPlaceholder="Filter weather signals…"
             rowHeight={36}
             emptyState={
               <div className="text-text-muted text-[11px] p-4 text-center">

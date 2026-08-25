@@ -292,6 +292,8 @@ function SmartMoneyPageInner() {
               columns={signalColumns}
               data={filteredSignals}
               rowHeight={28}
+            filterable
+            filterPlaceholder="Filter signals…"
               emptyState={<div className="text-text-muted text-[11px] p-4">No signals matching filter</div>}
             />
           </Panel>
@@ -306,6 +308,8 @@ function SmartMoneyPageInner() {
             <DataTable
               columns={walletColumns}
               data={topWallets}
+            filterable
+            filterPlaceholder="Filter wallets…"
               sortable
               rowHeight={28}
               emptyState={<div className="text-text-muted text-[11px] p-4">Loading wallet rankings...</div>}

@@ -4,8 +4,11 @@ import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
-interface ETFFlow {
+// Type alias (not interface): useTableControls requires Record<string, unknown>,
+// which TS only satisfies implicitly for type aliases.
+type ETFFlow = {
   issuer: string
   asset: string
   netFlowUsd: number
@@ -61,6 +64,10 @@ export default function ETFFlowsPage() {
     return () => clearInterval(interval)
   }, [])
 
+  // Display cap preserved: the table shows at most the 20 most recent days, as before.
+  const rows = flows.slice(0, 20)
+  const tc = useTableControls(rows)
+
   return (
     <NexusLayout>
       <div className="p-4 space-y-4">
@@ -115,31 +122,36 @@ export default function ETFFlowsPage() {
         <Panel title="ETF Flows" subtitle={`${flows.length} days of data`}>
           {loading ? (
             <div className="text-text-dim text-xs p-4 text-center">Loading ETF flow data...</div>
-          ) : flows.length === 0 ? (
-            <div className="text-text-dim text-xs p-4 text-center">No flow data available</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-text-muted border-b border-border-dim">
-                    <th className="text-left py-2 px-2 font-mono">DATE</th>
-                    <th className="text-right py-2 px-2 font-mono">NET FLOW</th>
-                    <th className="text-right py-2 px-2 font-mono">CUMULATIVE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {flows.slice(0, 20).map((f, i) => (
-                    <tr key={i} className="border-b border-border-dim/30 hover:bg-bg-elevated">
-                      <td className="py-2 px-2 font-mono">{f.date}</td>
-                      <td className={`py-2 px-2 text-right font-mono font-bold ${f.netFlowUsd >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
-                        {fmtUsd(f.netFlowUsd)}
-                      </td>
-                      <td className="py-2 px-2 text-right font-mono">{fmtUsd(f.cumulativeFlowUsd)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <TableControlsBar idPrefix="etf-flows" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
+              {tc.visible.length === 0 ? (
+                <div className="text-text-dim text-xs p-4 text-center">No flow data available</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="text-text-muted border-b border-border-dim">
+                        <SortableTh controls={tc} k="date" className="text-left py-2 px-2 font-mono">DATE</SortableTh>
+                        <SortableTh controls={tc} k="netFlowUsd" className="text-right py-2 px-2 font-mono">NET FLOW</SortableTh>
+                        <SortableTh controls={tc} k="cumulativeFlowUsd" className="text-right py-2 px-2 font-mono">CUMULATIVE</SortableTh>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tc.visible.map(f => (
+                        <tr key={f.date} className="border-b border-border-dim/30 hover:bg-bg-elevated">
+                          <td className="py-2 px-2 font-mono">{f.date}</td>
+                          <td className={`py-2 px-2 text-right font-mono font-bold ${f.netFlowUsd >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                            {fmtUsd(f.netFlowUsd)}
+                          </td>
+                          <td className="py-2 px-2 text-right font-mono">{fmtUsd(f.cumulativeFlowUsd)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </Panel>
 

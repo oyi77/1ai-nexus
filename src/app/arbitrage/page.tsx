@@ -5,8 +5,9 @@ import { io, Socket } from 'socket.io-client'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
-interface Opportunity {
+type Opportunity = {
   type: string
   symbol: string
   buyAt: string
@@ -31,6 +32,18 @@ interface ArbitrageData {
   }
   timestamp: number
 }
+
+const OPP_COLUMNS = [
+  { key: 'type' },
+  { key: 'symbol' },
+  { key: 'buyAt' },
+  { key: 'buyPrice' },
+  { key: 'sellAt' },
+  { key: 'sellPrice' },
+  // Rendered Spread cell prefers bps and falls back to percent — mirror that for sort/filter.
+  { key: 'spread', accessor: (o: Opportunity) => (o.spreadBps > 0 ? o.spreadBps : o.spreadPercent) },
+  { key: 'signal' },
+]
 
 function fmtUsd(n: number): string {
   if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`
@@ -70,6 +83,7 @@ export default function ArbitragePage() {
   const opps = data?.opportunities ?? []
   const filtered = filter === 'all' ? opps : opps.filter(o => o.type === filter)
   const summary = data?.summary ?? { total: 0, cexFutures: 0, dexCex: 0, funding: 0 }
+  const tc = useTableControls(filtered, OPP_COLUMNS)
 
   return (
     <NexusLayout>
@@ -110,23 +124,24 @@ export default function ArbitragePage() {
         </div>
 
         {/* Opportunities */}
-        <Panel title="Live Arbitrage Opportunities" subtitle={`${filtered.length} active | Auto-updates via WebSocket`} liveStatus={connected ? 'live' : 'stale'}>
+        <Panel title="Live Arbitrage Opportunities" subtitle={`${tc.visible.length} active | Auto-updates via WebSocket`} liveStatus={connected ? 'live' : 'stale'}>
+          <TableControlsBar idPrefix="arbitrage" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
           <div className="overflow-auto scrollbar-thin">
             <table className="w-full border-separate border-spacing-0">
               <thead>
                 <tr className="text-text-muted">
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Type</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Pair</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Buy At</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Buy Price</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Sell At</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Sell Price</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Spread</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-center">Signal</th>
+                  <SortableTh controls={tc} k="type" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Type</SortableTh>
+                  <SortableTh controls={tc} k="symbol" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Pair</SortableTh>
+                  <SortableTh controls={tc} k="buyAt" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Buy At</SortableTh>
+                  <SortableTh controls={tc} k="buyPrice" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Buy Price</SortableTh>
+                  <SortableTh controls={tc} k="sellAt" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Sell At</SortableTh>
+                  <SortableTh controls={tc} k="sellPrice" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Sell Price</SortableTh>
+                  <SortableTh controls={tc} k="spread" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Spread</SortableTh>
+                  <SortableTh controls={tc} k="signal" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-center">Signal</SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((o, i) => (
+                {tc.visible.map((o, i) => (
                   <tr key={`${o.symbol}-${o.type}-${i}`} className="border-b border-bg-border/30 hover:bg-bg-raised transition-colors">
                     <td className="px-3 py-1.5">
                       <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
@@ -150,7 +165,7 @@ export default function ArbitragePage() {
                     </td>
                   </tr>
                 ))}
-                {filtered.length === 0 && (
+                {tc.visible.length === 0 && (
                   <tr>
                     <td colSpan={8} className="text-center py-8 text-text-muted text-[11px] font-mono">
                       {connected ? 'Scanning for arbitrage opportunities...' : 'Connecting to WebSocket...'}

@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
-interface UnlockEvent {
+type UnlockEvent = {
   token: string
   symbol: string
   unlockDate: string
@@ -50,6 +51,15 @@ export default function UnlocksPage() {
   const totalSupplyShock = unlocks.reduce((s, u) => s + (u.amountUsd ?? 0), 0)
   const nextUnlock = unlocks[0]
 
+  const tc = useTableControls(unlocks, [
+    { key: 'symbol' },
+    { key: 'unlockDate' },
+    { key: 'days', accessor: u => daysUntil(u.unlockDate) },
+    { key: 'amountUsd' },
+    { key: 'percentOfSupply' },
+    { key: 'source' },
+  ])
+
   return (
     <NexusLayout>
       <div className="p-4 space-y-4">
@@ -86,20 +96,22 @@ export default function UnlocksPage() {
           ) : unlocks.length === 0 ? (
             <div className="text-text-dim text-xs p-4 text-center">No upcoming unlocks found</div>
           ) : (
+            <>
+            <TableControlsBar idPrefix="unlocks" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-text-muted border-b border-border-dim">
-                    <th className="text-left py-2 px-2 font-mono">TOKEN</th>
-                    <th className="text-left py-2 px-2 font-mono">DATE</th>
-                    <th className="text-right py-2 px-2 font-mono">DAYS</th>
-                    <th className="text-right py-2 px-2 font-mono">AMOUNT</th>
-                    <th className="text-right py-2 px-2 font-mono">% SUPPLY</th>
-                    <th className="text-left py-2 px-2 font-mono">SOURCE</th>
+                    <SortableTh controls={tc} k="symbol" className="text-left py-2 px-2 font-mono">TOKEN</SortableTh>
+                    <SortableTh controls={tc} k="unlockDate" className="text-left py-2 px-2 font-mono">DATE</SortableTh>
+                    <SortableTh controls={tc} k="days" className="text-right py-2 px-2 font-mono">DAYS</SortableTh>
+                    <SortableTh controls={tc} k="amountUsd" className="text-right py-2 px-2 font-mono">AMOUNT</SortableTh>
+                    <SortableTh controls={tc} k="percentOfSupply" className="text-right py-2 px-2 font-mono">% SUPPLY</SortableTh>
+                    <SortableTh controls={tc} k="source" className="text-left py-2 px-2 font-mono">SOURCE</SortableTh>
                   </tr>
                 </thead>
                 <tbody>
-                  {unlocks.map((u, i) => {
+                  {tc.visible.map((u, i) => {
                     const days = daysUntil(u.unlockDate)
                     return (
                       <tr key={i} className="border-b border-border-dim/30 hover:bg-bg-elevated">
@@ -112,9 +124,15 @@ export default function UnlocksPage() {
                       </tr>
                     )
                   })}
+                  {tc.visible.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="py-3 text-center text-text-dim text-xs">No unlock events match the current filter.</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </Panel>
 

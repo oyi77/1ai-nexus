@@ -60,7 +60,7 @@ export default function StablecoinsPage() {
         </div>
         {status === 'error' && <div className="text-data-bear text-[11px] font-mono p-4">Error: Failed to fetch stablecoin data</div>}
         <Panel title="Stablecoin Monitor" subtitle={`${stablecoins.length} tracked`} liveStatus={status} onRefresh={refresh} maxHeight={600}>
-          <DataTable columns={columns as unknown as Column<Record<string, unknown>>[]} data={stablecoins as unknown as Record<string, unknown>[]} sortable rowHeight={28} emptyState={<div className="text-text-muted text-[11px] p-4">Loading...</div>} />
+          <DataTable columns={columns as unknown as Column<Record<string, unknown>>[]} data={stablecoins as unknown as Record<string, unknown>[]} sortable filterable filterPlaceholder="Filter stablecoins…" rowHeight={28} emptyState={<div className="text-text-muted text-[11px] p-4">Loading...</div>} />
         </Panel>
       </div>
     </NexusLayout>

@@ -4,8 +4,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
-interface BasisRow {
+type BasisRow = {
   symbol: string
   spotPrice: number
   perpPrice: number
@@ -18,6 +19,20 @@ interface BasisRow {
   signal: string
 }
 
+const BASIS_COLUMNS = [
+  { key: 'symbol' },
+  { key: 'spotPrice' },
+  { key: 'perpPrice' },
+  { key: 'basis' },
+  // Legacy sort buttons ranked by |basis %| and |annualized funding| — semantics preserved via accessors.
+  { key: 'basisPercent', accessor: (r: BasisRow) => Math.abs(r.basisPercent) },
+  { key: 'fundingRate' },
+  { key: 'annualizedFunding', accessor: (r: BasisRow) => Math.abs(r.annualizedFunding) },
+  // OI cell renders notional value (openInterest x perp price) — sort on the displayed magnitude.
+  { key: 'openInterest', accessor: (r: BasisRow) => r.openInterest * r.perpPrice },
+  { key: 'signal' },
+]
+
 function fmtUsd(n: number): string {
   if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`
   if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`
@@ -28,7 +43,6 @@ function fmtUsd(n: number): string {
 export default function BasisPage() {
   const [rows, setRows] = useState<BasisRow[]>([])
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
-  const [sortBy, setSortBy] = useState<'basis' | 'funding' | 'oi'>('basis')
 
   const fetchData = useCallback(async () => {
     try {
@@ -52,11 +66,13 @@ fetchData()
     return () => clearInterval(id)
   }, [fetchData])
 
-  const sorted = [...rows].sort((a, b) => {
-    if (sortBy === 'funding') return Math.abs(b.annualizedFunding) - Math.abs(a.annualizedFunding)
-    if (sortBy === 'oi') return b.openInterest - a.openInterest
-    return Math.abs(b.basisPercent) - Math.abs(a.basisPercent)
-  })
+  const tc = useTableControls(rows, BASIS_COLUMNS, { initialSortKey: 'basisPercent', initialSortDir: 'desc' })
+
+  // Featured-cards ordering kept independent of the table's filter/sort state.
+  const featured = [...rows]
+    .sort((a, b) => Math.abs(b.basisPercent) - Math.abs(a.basisPercent))
+    .filter(r => Math.abs(r.basisPercent) > 0.02 || Math.abs(r.annualizedFunding) > 5)
+    .slice(0, 6)
 
   const positiveBasis = rows.filter(r => r.basisPercent > 0).length
   const negativeBasis = rows.filter(r => r.basisPercent < 0).length
@@ -90,7 +106,7 @@ fetchData()
         {/* Arbitrage Signals */}
         <Panel title="⚡ Funding Arbitrage Opportunities" subtitle="Pairs with significant basis or funding" liveStatus={status}>
           <div className="p-3 grid grid-cols-2 gap-3">
-            {sorted
+            {featured
               .filter(r => Math.abs(r.basisPercent) > 0.02 || Math.abs(r.annualizedFunding) > 5)
               .slice(0, 6)
               .map((r, i) => (
@@ -118,37 +134,26 @@ fetchData()
         </Panel>
 
         {/* Full Table */}
-        <Panel title="All Pairs" subtitle={`${sorted.length} USDT perpetual pairs`} liveStatus={status} onRefresh={fetchData}>
-          <div className="flex items-center gap-1 p-2 border-b border-bg-border">
-            <span className="text-[10px] font-mono text-text-muted mr-2">Sort:</span>
-            {(['basis', 'funding', 'oi'] as const).map(s => (
-              <button
-                key={s}
-                onClick={() => setSortBy(s)}
-                className={`px-3 py-1 text-[10px] font-mono rounded uppercase transition-colors ${sortBy === s ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary bg-bg-raised'}`}
-              >
-                {s === 'oi' ? 'Open Interest' : s}
-              </button>
-            ))}
-          </div>
+        <Panel title="All Pairs" subtitle={`${tc.total} USDT perpetual pairs`} liveStatus={status} onRefresh={fetchData}>
+          <TableControlsBar idPrefix="basis" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
           <div className="overflow-auto scrollbar-thin">
             <table className="w-full border-separate border-spacing-0">
               <thead>
                 <tr className="text-text-muted">
                   <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">#</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Pair</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Spot</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Perp</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Basis</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Basis %</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Funding</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Ann%</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">OI</th>
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Signal</th>
+                  <SortableTh controls={tc} k="symbol" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Pair</SortableTh>
+                  <SortableTh controls={tc} k="spotPrice" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Spot</SortableTh>
+                  <SortableTh controls={tc} k="perpPrice" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Perp</SortableTh>
+                  <SortableTh controls={tc} k="basis" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Basis</SortableTh>
+                  <SortableTh controls={tc} k="basisPercent" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Basis %</SortableTh>
+                  <SortableTh controls={tc} k="fundingRate" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Funding</SortableTh>
+                  <SortableTh controls={tc} k="annualizedFunding" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Ann%</SortableTh>
+                  <SortableTh controls={tc} k="openInterest" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">OI</SortableTh>
+                  <SortableTh controls={tc} k="signal" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Signal</SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {sorted.map((r, i) => (
+                {tc.visible.map((r, i) => (
                   <tr key={r.symbol} className="border-b border-bg-border/30 hover:bg-bg-raised transition-colors">
                     <td className="text-[11px] font-mono px-3 py-1.5 text-text-muted">{i + 1}</td>
                     <td className="text-[12px] font-mono px-3 py-1.5 font-bold text-teal-vivid">{r.symbol}</td>

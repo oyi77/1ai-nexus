@@ -290,6 +290,8 @@ function DexMonitorPageInner() {
             <DataTable
               columns={pairColumns}
               data={pairs}
+            filterable
+            filterPlaceholder="Filter pairs…"
               sortable
               rowHeight={28}
               emptyState={<div className="text-text-muted text-[11px] p-4">Loading pair data...</div>}

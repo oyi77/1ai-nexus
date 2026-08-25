@@ -223,6 +223,8 @@ export default function TokensPage() {
                 columns={columns}
                 data={filtered}
                 sortable
+                filterable
+                filterPlaceholder="Filter tokens…"
                 rowHeight={28}
                 onRowClick={(row) => setSelectedToken(row)}
                 emptyState={<div className="text-text-muted text-[11px] p-4">Loading tokens...</div>}

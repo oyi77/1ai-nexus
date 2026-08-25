@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { NexusLayout } from "@/components/layout/NexusLayout"
 import { TrendingUp, TrendingDown, BarChart3, Globe, Activity } from "lucide-react"
+import { TableControlsBar, SortableTh, useTableControls } from "@/components/shell/TableControls"
 
-interface Ticker {
+type Ticker = {
   symbol: string
   price: string
   change: string
@@ -29,6 +30,7 @@ export default function MarketPage() {
   const [global, setGlobal] = useState<GlobalData | null>(null)
   const [fearGreed, setFearGreed] = useState<FearGreedData | null>(null)
   const [loading, setLoading] = useState(true)
+  const tc = useTableControls(tickers)
 
   const fetchData = useCallback(async () => {
     const [priceRes, globalRes, fgRes] = await Promise.allSettled([
@@ -37,8 +39,11 @@ export default function MarketPage() {
       fetch('/api/v1/market/sentiment').then(r => r.json()),
     ])
 
-    if (priceRes.status === 'fulfilled' && priceRes.value?.tickers) {
-      setTickers(priceRes.value.tickers)
+    const priceList = priceRes.status === 'fulfilled'
+      ? (priceRes.value?.data?.tickers ?? priceRes.value?.tickers)
+      : undefined
+    if (Array.isArray(priceList)) {
+      setTickers(priceList)
     }
 
     if (globalRes.status === 'fulfilled' && globalRes.value?.data) {
@@ -102,39 +107,42 @@ export default function MarketPage() {
           {loading ? (
             <div className="p-8 text-center text-text-dim text-xs">Loading market data...</div>
           ) : (
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-text-muted text-[10px] uppercase">
-                  <th className="text-left py-2 px-3 font-mono">#</th>
-                  <th className="text-left py-2 px-3 font-mono">ASSET</th>
-                  <th className="text-right py-2 px-3 font-mono">PRICE</th>
-                  <th className="text-right py-2 px-3 font-mono">24H CHANGE</th>
-                  <th className="text-right py-2 px-3 font-mono">SPARKLINE</th>
-                </tr>
-              </thead>
-              <tbody>
-                {tickers.map((t, i) => (
-                  <tr key={t.symbol} className="border-t border-border-dim/30 hover:bg-bg-elevated cursor-pointer">
-                    <td className="py-2.5 px-3 text-text-muted">{i + 1}</td>
-                    <td className="py-2.5 px-3">
-                      <span className="font-mono text-text-primary font-bold">{t.symbol}</span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right font-mono text-text-primary">{t.price}</td>
-                    <td className={`py-2.5 px-3 text-right font-mono ${t.positive ? 'text-accent-green' : 'text-accent-red'}`}>
-                      <span className="flex items-center justify-end gap-1">
-                        {t.positive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
-                        {t.change}
-                      </span>
-                    </td>
-                    <td className="py-2.5 px-3 text-right">
-                      <span className={`inline-block w-16 h-4 rounded ${t.positive ? 'bg-accent-green/20' : 'bg-accent-red/20'}`}>
-                        <span className={`block h-full w-3/4 rounded ${t.positive ? 'bg-accent-green/40' : 'bg-accent-red/40'}`} />
-                      </span>
-                    </td>
+            <>
+              <TableControlsBar idPrefix="market" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-text-muted text-[10px] uppercase">
+                    <th className="text-left py-2 px-3 font-mono">#</th>
+                    <SortableTh controls={tc} k="symbol" className="text-left py-2 px-3 font-mono">ASSET</SortableTh>
+                    <SortableTh controls={tc} k="price" className="text-right py-2 px-3 font-mono">PRICE</SortableTh>
+                    <SortableTh controls={tc} k="change" className="text-right py-2 px-3 font-mono">24H CHANGE</SortableTh>
+                    <th className="text-right py-2 px-3 font-mono">SPARKLINE</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {tc.visible.map((t, i) => (
+                    <tr key={t.symbol} className="border-t border-border-dim/30 hover:bg-bg-elevated cursor-pointer">
+                      <td className="py-2.5 px-3 text-text-muted">{i + 1}</td>
+                      <td className="py-2.5 px-3">
+                        <span className="font-mono text-text-primary font-bold">{t.symbol}</span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono text-text-primary">{t.price}</td>
+                      <td className={`py-2.5 px-3 text-right font-mono ${t.positive ? 'text-accent-green' : 'text-accent-red'}`}>
+                        <span className="flex items-center justify-end gap-1">
+                          {t.positive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                          {t.change}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <span className={`inline-block w-16 h-4 rounded ${t.positive ? 'bg-accent-green/20' : 'bg-accent-red/20'}`}>
+                          <span className={`block h-full w-3/4 rounded ${t.positive ? 'bg-accent-green/40' : 'bg-accent-red/40'}`} />
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           )}
         </div>
 

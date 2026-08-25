@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { TableControlsBar, SortableTh, useTableControls } from '@/components/shell/TableControls'
 
-interface Position {
+type Position = {
   symbol: string
   qty: number
   avgCost: number
@@ -35,6 +36,9 @@ export default function PortfolioPage() {
   const [error, setError] = useState<string | null>(null)
   const [risk, setRisk] = useState<RiskMetrics | null>(null)
   const [isConfigured, setIsConfigured] = useState(false)
+
+  // Default paint preserved: Alpaca position order; raw row keys equal rendered columns.
+  const posTc = useTableControls(positions, undefined)
 
   const fetchPortfolio = useCallback(async () => {
     try {
@@ -210,21 +214,22 @@ export default function PortfolioPage() {
             {/* Positions Table */}
             <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
               <h3 className="text-xs font-mono text-accent-cyan mb-3">POSITIONS (FROM ALPACA)</h3>
+              <TableControlsBar idPrefix="portfolio" query={posTc.query} onQueryChange={posTc.setQuery} shown={posTc.visible.length} total={posTc.total} />
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-text-muted border-b border-border-dim">
-                      <th className="text-left py-2 font-mono">SYMBOL</th>
-                      <th className="text-right py-2 font-mono">QTY</th>
-                      <th className="text-right py-2 font-mono">AVG COST</th>
-                      <th className="text-right py-2 font-mono">CURRENT</th>
-                      <th className="text-right py-2 font-mono">VALUE</th>
-                      <th className="text-right py-2 font-mono">P&L</th>
-                      <th className="text-right py-2 font-mono">WEIGHT</th>
+                      <SortableTh controls={posTc} k="symbol" className="text-left py-2 font-mono">SYMBOL</SortableTh>
+                      <SortableTh controls={posTc} k="qty" className="text-right py-2 font-mono">QTY</SortableTh>
+                      <SortableTh controls={posTc} k="avgCost" className="text-right py-2 font-mono">AVG COST</SortableTh>
+                      <SortableTh controls={posTc} k="currentPrice" className="text-right py-2 font-mono">CURRENT</SortableTh>
+                      <SortableTh controls={posTc} k="marketValue" className="text-right py-2 font-mono">VALUE</SortableTh>
+                      <SortableTh controls={posTc} k="unrealizedPnl" className="text-right py-2 font-mono">P&L</SortableTh>
+                      <SortableTh controls={posTc} k="weight" className="text-right py-2 font-mono">WEIGHT</SortableTh>
                     </tr>
                   </thead>
                   <tbody>
-                    {positions.map(p => (
+                    {posTc.visible.map(p => (
                       <tr key={p.symbol} className="border-b border-border-dim/30 hover:bg-bg-elevated">
                         <td className="py-2 font-mono text-accent-cyan">{p.symbol}</td>
                         <td className="py-2 text-right font-mono">{p.qty}</td>
@@ -237,6 +242,13 @@ export default function PortfolioPage() {
                         <td className="py-2 text-right font-mono">{p.weight.toFixed(1)}%</td>
                       </tr>
                     ))}
+                    {posTc.visible.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-4 text-center text-text-dim font-mono text-xs">
+                          No positions match filter
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>

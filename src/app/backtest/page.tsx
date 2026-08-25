@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
-interface BacktestSignal {
+type BacktestSignal = {
   timestamp: string
   predicted: string
   actual: string
@@ -13,6 +14,16 @@ interface BacktestSignal {
   correct: boolean
   priceChange: number | null
 }
+
+const SIGNAL_COLUMNS = [
+  // Rendered TIME cell formats the ISO timestamp — sort/filter on the raw value.
+  { key: 'timestamp', accessor: (s: BacktestSignal) => s.timestamp },
+  { key: 'predicted' },
+  { key: 'actual' },
+  { key: 'confidence' },
+  { key: 'priceChange' },
+  { key: 'correct', accessor: (s: BacktestSignal) => (s.correct ? 'HIT' : 'MISS') },
+]
 
 interface BacktestResult {
   module: string
@@ -28,6 +39,58 @@ interface BacktestReport {
   modules: BacktestResult[]
   overall: { totalSignals: number; totalCorrect: number; accuracy: number }
   timestamp: string
+}
+
+/**
+ * Per-module recent-signals table. Lives outside the parent's modules.map so
+ * useTableControls (a hook) is called at a stable component top level.
+ */
+function ModuleSignalsTable({ signals, idPrefix }: { signals: BacktestSignal[]; idPrefix: string }) {
+  // Display window preserved from the previous slice(-10) view; filter/sort operate within it.
+  const tc = useTableControls(signals.slice(-10), SIGNAL_COLUMNS)
+  return (
+    <div>
+      <TableControlsBar idPrefix={idPrefix} query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-text-muted border-b border-border-dim">
+              <SortableTh controls={tc} k="timestamp" className="text-left py-1 px-2 font-mono">TIME</SortableTh>
+              <SortableTh controls={tc} k="predicted" className="text-left py-1 px-2 font-mono">PREDICTED</SortableTh>
+              <SortableTh controls={tc} k="actual" className="text-left py-1 px-2 font-mono">ACTUAL</SortableTh>
+              <SortableTh controls={tc} k="confidence" className="text-right py-1 px-2 font-mono">CONF</SortableTh>
+              <SortableTh controls={tc} k="priceChange" className="text-right py-1 px-2 font-mono">PRICE Δ</SortableTh>
+              <SortableTh controls={tc} k="correct" className="text-left py-1 px-2 font-mono">RESULT</SortableTh>
+            </tr>
+          </thead>
+          <tbody>
+            {tc.visible.map((sig, j) => (
+              <tr key={j} className="border-b border-border-dim/30">
+                <td className="py-1 px-2 font-mono text-text-dim">{new Date(sig.timestamp).toLocaleDateString()}</td>
+                <td className={`py-1 px-2 font-mono ${sig.predicted === 'bullish' ? 'text-data-bull' : sig.predicted === 'bearish' ? 'text-data-bear' : 'text-text-muted'}`}>
+                  {sig.predicted}
+                </td>
+                <td className={`py-1 px-2 font-mono ${sig.actual === 'bullish' ? 'text-data-bull' : sig.actual === 'bearish' ? 'text-data-bear' : 'text-text-muted'}`}>
+                  {sig.actual}
+                </td>
+                <td className="py-1 px-2 text-right font-mono">{sig.confidence.toFixed(0)}%</td>
+                <td className={`py-1 px-2 text-right font-mono ${sig.priceChange && sig.priceChange > 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                  {sig.priceChange ? `${sig.priceChange > 0 ? '+' : ''}${sig.priceChange.toFixed(2)}%` : '—'}
+                </td>
+                <td className="py-1 px-2">
+                  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                    sig.correct ? 'bg-data-bull/20 text-data-bull' : 'bg-data-bear/20 text-data-bear'
+                  }`}>
+                    {sig.correct ? 'HIT' : 'MISS'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
 }
 
 export default function BacktestPage() {
@@ -124,44 +187,7 @@ export default function BacktestPage() {
 
                   {/* Recent signals */}
                   {mod.signals.length > 0 && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="text-text-muted border-b border-border-dim">
-                            <th className="text-left py-1 px-2 font-mono">TIME</th>
-                            <th className="text-left py-1 px-2 font-mono">PREDICTED</th>
-                            <th className="text-left py-1 px-2 font-mono">ACTUAL</th>
-                            <th className="text-right py-1 px-2 font-mono">CONF</th>
-                            <th className="text-right py-1 px-2 font-mono">PRICE Δ</th>
-                            <th className="text-left py-1 px-2 font-mono">RESULT</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {mod.signals.slice(-10).map((sig, j) => (
-                            <tr key={j} className="border-b border-border-dim/30">
-                              <td className="py-1 px-2 font-mono text-text-dim">{new Date(sig.timestamp).toLocaleDateString()}</td>
-                              <td className={`py-1 px-2 font-mono ${sig.predicted === 'bullish' ? 'text-data-bull' : sig.predicted === 'bearish' ? 'text-data-bear' : 'text-text-muted'}`}>
-                                {sig.predicted}
-                              </td>
-                              <td className={`py-1 px-2 font-mono ${sig.actual === 'bullish' ? 'text-data-bull' : sig.actual === 'bearish' ? 'text-data-bear' : 'text-text-muted'}`}>
-                                {sig.actual}
-                              </td>
-                              <td className="py-1 px-2 text-right font-mono">{sig.confidence.toFixed(0)}%</td>
-                              <td className={`py-1 px-2 text-right font-mono ${sig.priceChange && sig.priceChange > 0 ? 'text-data-bull' : 'text-data-bear'}`}>
-                                {sig.priceChange ? `${sig.priceChange > 0 ? '+' : ''}${sig.priceChange.toFixed(2)}%` : '—'}
-                              </td>
-                              <td className="py-1 px-2">
-                                <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
-                                  sig.correct ? 'bg-data-bull/20 text-data-bull' : 'bg-data-bear/20 text-data-bear'
-                                }`}>
-                                  {sig.correct ? 'HIT' : 'MISS'}
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <ModuleSignalsTable signals={mod.signals} idPrefix={`backtest-mod-${i}`} />
                   )}
 
                   {mod.signals.length === 0 && (

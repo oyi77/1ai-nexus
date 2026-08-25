@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
-interface RepoVelocity {
+type RepoVelocity = {
   repo: string
   owner: string
   stars: number
@@ -15,6 +16,15 @@ interface RepoVelocity {
   commitHistory: number[]
   contributorCount: number
 }
+
+const GITHUB_COLUMNS = [
+  { key: 'repo' },
+  { key: 'stars' },
+  { key: 'forks' },
+  { key: 'openIssues' },
+  { key: 'contributorCount' },
+  { key: 'weeklyCommits' },
+]
 
 interface TrendingCoin {
   name: string
@@ -97,6 +107,8 @@ export default function AttentionIndexPage() {
     }
     fetchData()
   }, [])
+  // Default ordering preserved from the previous inline weeklyCommits-desc sort.
+  const tc = useTableControls(data?.github.repos, GITHUB_COLUMNS, { initialSortKey: 'weeklyCommits', initialSortDir: 'desc' })
 
   return (
     <NexusLayout>
@@ -147,24 +159,23 @@ export default function AttentionIndexPage() {
         {/* GitHub Velocity Table */}
         {data && (
           <Panel title="GitHub Developer Velocity" subtitle={`${data.github.repos.length} crypto repos — stars, forks, weekly commits`}>
+            <TableControlsBar idPrefix="attention-index" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-text-muted border-b border-border-dim">
                     <th className="text-left py-2 px-2 font-mono">#</th>
-                    <th className="text-left py-2 px-2 font-mono">REPO</th>
-                    <th className="text-right py-2 px-2 font-mono">STARS</th>
-                    <th className="text-right py-2 px-2 font-mono">FORKS</th>
-                    <th className="text-right py-2 px-2 font-mono">ISSUES</th>
-                    <th className="text-right py-2 px-2 font-mono">CONTRIBS</th>
-                    <th className="text-right py-2 px-2 font-mono">COMMITS/WK</th>
+                    <SortableTh controls={tc} k="repo" className="text-left py-2 px-2 font-mono">REPO</SortableTh>
+                    <SortableTh controls={tc} k="stars" className="text-right py-2 px-2 font-mono">STARS</SortableTh>
+                    <SortableTh controls={tc} k="forks" className="text-right py-2 px-2 font-mono">FORKS</SortableTh>
+                    <SortableTh controls={tc} k="openIssues" className="text-right py-2 px-2 font-mono">ISSUES</SortableTh>
+                    <SortableTh controls={tc} k="contributorCount" className="text-right py-2 px-2 font-mono">CONTRIBS</SortableTh>
+                    <SortableTh controls={tc} k="weeklyCommits" className="text-right py-2 px-2 font-mono">COMMITS/WK</SortableTh>
                     <th className="text-left py-2 px-2 font-mono w-24">TREND</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.github.repos
-                    .sort((a, b) => b.weeklyCommits - a.weeklyCommits)
-                    .map((repo, i) => (
+                  {tc.visible.map((repo, i) => (
                     <tr key={repo.repo} className="border-b border-border-dim/30 hover:bg-bg-elevated">
                       <td className="py-2 px-2 text-text-dim">{i + 1}</td>
                       <td className="py-2 px-2">

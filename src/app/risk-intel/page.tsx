@@ -4,8 +4,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
-interface CreditRisk {
+type CreditRisk = {
   protocol: string
   chain: string
   tvl: number
@@ -22,7 +23,7 @@ interface MinerFlow {
   signal: string
 }
 
-interface SectorFlow {
+type SectorFlow = {
   sector: string
   marketCap: number
   change24h: number
@@ -43,6 +44,8 @@ export default function RiskIntelPage() {
   const [narrative, setNarrative] = useState<SectorFlow[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'credit' | 'miner' | 'narrative'>('credit')
+  const creditTc = useTableControls(creditRisk, undefined, { initialSortKey: 'tvl', initialSortDir: 'desc' })
+  const narrativeTc = useTableControls(narrative, undefined, { initialSortKey: 'marketCap', initialSortDir: 'desc' })
 
   useEffect(() => {
     const fetchData = async () => {
@@ -94,20 +97,22 @@ export default function RiskIntelPage() {
             {creditRisk.length === 0 ? (
               <div className="text-text-muted text-[11px] p-4 text-center">No elevated credit risk detected</div>
             ) : (
+              <>
+                <TableControlsBar idPrefix="risk-intel" query={creditTc.query} onQueryChange={creditTc.setQuery} shown={creditTc.visible.length} total={creditTc.total} />
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-text-muted border-b border-border-dim">
-                      <th className="text-left py-2 px-2 font-mono">PROTOCOL</th>
-                      <th className="text-left py-2 px-2 font-mono">CHAIN</th>
-                      <th className="text-right py-2 px-2 font-mono">TVL</th>
-                      <th className="text-right py-2 px-2 font-mono">AVG APY</th>
-                      <th className="text-left py-2 px-2 font-mono">RISK</th>
-                      <th className="text-left py-2 px-2 font-mono">SIGNAL</th>
+                      <SortableTh controls={creditTc} k="protocol" className="text-left py-2 px-2 font-mono">PROTOCOL</SortableTh>
+                      <SortableTh controls={creditTc} k="chain" className="text-left py-2 px-2 font-mono">CHAIN</SortableTh>
+                      <SortableTh controls={creditTc} k="tvl" className="text-right py-2 px-2 font-mono">TVL</SortableTh>
+                      <SortableTh controls={creditTc} k="avgApy" className="text-right py-2 px-2 font-mono">AVG APY</SortableTh>
+                      <SortableTh controls={creditTc} k="riskLevel" className="text-left py-2 px-2 font-mono">RISK</SortableTh>
+                      <SortableTh controls={creditTc} k="signal" className="text-left py-2 px-2 font-mono">SIGNAL</SortableTh>
                     </tr>
                   </thead>
                   <tbody>
-                    {creditRisk.map((c, i) => (
+                    {creditTc.visible.map((c, i) => (
                       <tr key={i} className="border-b border-border-dim/30 hover:bg-bg-elevated">
                         <td className="py-2 px-2 font-mono font-bold text-teal-vivid">{c.protocol}</td>
                         <td className="py-2 px-2 text-text-dim">{c.chain}</td>
@@ -125,9 +130,15 @@ export default function RiskIntelPage() {
                         <td className="py-2 px-2 text-text-dim">{c.signal}</td>
                       </tr>
                     ))}
+                    {creditTc.visible.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-3 text-center text-text-muted font-mono">No protocols match the current filter.</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
+              </>
             )}
           </Panel>
         )}
@@ -199,20 +210,21 @@ export default function RiskIntelPage() {
 
             {/* Full narrative table */}
             <Panel title="Narrative Sectors" subtitle={`${narrative.length} sectors from CoinGecko`}>
+                <TableControlsBar idPrefix="risk-intel-2" query={narrativeTc.query} onQueryChange={narrativeTc.setQuery} shown={narrativeTc.visible.length} total={narrativeTc.total} />
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-text-muted border-b border-border-dim">
-                      <th className="text-left py-2 px-2 font-mono">SECTOR</th>
-                      <th className="text-right py-2 px-2 font-mono">MCAP</th>
-                      <th className="text-right py-2 px-2 font-mono">24H</th>
-                      <th className="text-right py-2 px-2 font-mono">7D</th>
-                      <th className="text-left py-2 px-2 font-mono">SIGNAL</th>
-                      <th className="text-left py-2 px-2 font-mono">TOP COINS</th>
+                      <SortableTh controls={narrativeTc} k="sector" className="text-left py-2 px-2 font-mono">SECTOR</SortableTh>
+                      <SortableTh controls={narrativeTc} k="marketCap" className="text-right py-2 px-2 font-mono">MCAP</SortableTh>
+                      <SortableTh controls={narrativeTc} k="change24h" className="text-right py-2 px-2 font-mono">24H</SortableTh>
+                      <SortableTh controls={narrativeTc} k="change7d" className="text-right py-2 px-2 font-mono">7D</SortableTh>
+                      <SortableTh controls={narrativeTc} k="signal" className="text-left py-2 px-2 font-mono">SIGNAL</SortableTh>
+                      <SortableTh controls={narrativeTc} k="topCoins" className="text-left py-2 px-2 font-mono">TOP COINS</SortableTh>
                     </tr>
                   </thead>
                   <tbody>
-                    {narrative.map((s, i) => (
+                    {narrativeTc.visible.map((s, i) => (
                       <tr key={i} className="border-b border-border-dim/30 hover:bg-bg-elevated">
                         <td className="py-2 px-2 font-mono font-bold text-teal-vivid">{s.sector}</td>
                         <td className="py-2 px-2 text-right font-mono">{fmtUsd(s.marketCap)}</td>

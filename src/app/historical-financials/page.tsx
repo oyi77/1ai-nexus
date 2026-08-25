@@ -3,8 +3,11 @@
 import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
-interface FinancialData {
+// Type alias (not interface): useTableControls requires Record<string, unknown>,
+// which TS only satisfies implicitly for type aliases.
+type FinancialData = {
   period: string
   revenue: number | null
   netIncome: number | null
@@ -15,6 +18,10 @@ interface FinancialData {
   capitalExpenditure: number | null
   freeCashFlow: number | null
 }
+
+// View row: YoY growth is precomputed against the ORIGINAL chronological neighbor
+// so it stays correct regardless of how the table is sorted or filtered.
+type FinancialRow = FinancialData & { yoy: number | null }
 
 const COMPANIES = [
   { ticker: 'AAPL', name: 'Apple' },
@@ -75,6 +82,13 @@ export default function HistoricalFinancialsPage() {
     return ((current - previous) / Math.abs(previous)) * 100
   }
 
+  // Rows enriched once per fetch in ORIGINAL order so YoY references the true prior year.
+  const rows: FinancialRow[] = data.map((row, i) => ({
+    ...row,
+    yoy: calcGrowth(row.revenue, data[i + 1]?.revenue),
+  }))
+  const tc = useTableControls(rows)
+
   return (
     <NexusLayout>
       <div className="p-6 space-y-4">
@@ -108,49 +122,53 @@ export default function HistoricalFinancialsPage() {
 
         {loading ? (
           <div className="text-text-dim text-xs p-8 text-center">Loading SEC EDGAR financial data for {selected}...</div>
-        ) : data.length === 0 ? (
-          <div className="text-text-dim text-xs p-8 text-center">No financial data available for {selected}</div>
         ) : (
-          <div className="bg-bg-panel border border-border-dim rounded-lg overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-text-muted border-b border-border-dim">
-                  <th className="text-left py-2 px-3 font-mono">Year</th>
-                  <th className="text-right py-2 px-3 font-mono">Revenue</th>
-                  <th className="text-right py-2 px-3 font-mono">YoY</th>
-                  <th className="text-right py-2 px-3 font-mono">Net Income</th>
-                  <th className="text-right py-2 px-3 font-mono">Total Assets</th>
-                  <th className="text-right py-2 px-3 font-mono">Equity</th>
-                  <th className="text-right py-2 px-3 font-mono">Op. Cash Flow</th>
-                  <th className="text-right py-2 px-3 font-mono">CapEx</th>
-                  <th className="text-right py-2 px-3 font-mono">FCF</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.map((row, i) => {
-                  const prev = data[i + 1]
-                  const revGrowth = calcGrowth(row.revenue, prev?.revenue)
-                  return (
-                    <tr key={row.period} className="border-b border-border-dim/30 hover:bg-bg-elevated">
-                      <td className="py-2 px-3 font-mono font-bold text-accent-cyan">{row.period}</td>
-                      <td className="py-2 px-3 text-right font-mono">{fmtB(row.revenue)}</td>
-                      <td className={`py-2 px-3 text-right font-mono ${revGrowth != null && revGrowth >= 0 ? 'text-accent-green' : revGrowth != null ? 'text-accent-red' : 'text-text-dim'}`}>
-                        {revGrowth != null ? `${revGrowth >= 0 ? '+' : ''}${revGrowth.toFixed(1)}%` : '—'}
-                      </td>
-                      <td className="py-2 px-3 text-right font-mono">{fmtB(row.netIncome)}</td>
-                      <td className="py-2 px-3 text-right font-mono">{fmtB(row.totalAssets)}</td>
-                      <td className="py-2 px-3 text-right font-mono">{fmtB(row.totalEquity)}</td>
-                      <td className="py-2 px-3 text-right font-mono">{fmtB(row.operatingCashFlow)}</td>
-                      <td className="py-2 px-3 text-right font-mono">{fmtB(row.capitalExpenditure)}</td>
-                      <td className={`py-2 px-3 text-right font-mono ${(row.freeCashFlow ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
-                        {fmtB(row.freeCashFlow)}
-                      </td>
+          <>
+            <TableControlsBar idPrefix="historical-financials" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
+            {tc.visible.length === 0 ? (
+              <div className="text-text-dim text-xs p-8 text-center">No financial data available for {selected}</div>
+            ) : (
+              <div className="bg-bg-panel border border-border-dim rounded-lg overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-text-muted border-b border-border-dim">
+                      <SortableTh controls={tc} k="period" className="text-left py-2 px-3 font-mono">Year</SortableTh>
+                      <SortableTh controls={tc} k="revenue" className="text-right py-2 px-3 font-mono">Revenue</SortableTh>
+                      <SortableTh controls={tc} k="yoy" className="text-right py-2 px-3 font-mono">YoY</SortableTh>
+                      <SortableTh controls={tc} k="netIncome" className="text-right py-2 px-3 font-mono">Net Income</SortableTh>
+                      <SortableTh controls={tc} k="totalAssets" className="text-right py-2 px-3 font-mono">Total Assets</SortableTh>
+                      <SortableTh controls={tc} k="totalEquity" className="text-right py-2 px-3 font-mono">Equity</SortableTh>
+                      <SortableTh controls={tc} k="operatingCashFlow" className="text-right py-2 px-3 font-mono">Op. Cash Flow</SortableTh>
+                      <SortableTh controls={tc} k="capitalExpenditure" className="text-right py-2 px-3 font-mono">CapEx</SortableTh>
+                      <SortableTh controls={tc} k="freeCashFlow" className="text-right py-2 px-3 font-mono">FCF</SortableTh>
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {tc.visible.map(row => {
+                      const revGrowth = row.yoy
+                      return (
+                        <tr key={row.period} className="border-b border-border-dim/30 hover:bg-bg-elevated">
+                          <td className="py-2 px-3 font-mono font-bold text-accent-cyan">{row.period}</td>
+                          <td className="py-2 px-3 text-right font-mono">{fmtB(row.revenue)}</td>
+                          <td className={`py-2 px-3 text-right font-mono ${revGrowth != null && revGrowth >= 0 ? 'text-accent-green' : revGrowth != null ? 'text-accent-red' : 'text-text-dim'}`}>
+                            {revGrowth != null ? `${revGrowth >= 0 ? '+' : ''}${revGrowth.toFixed(1)}%` : '—'}
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono">{fmtB(row.netIncome)}</td>
+                          <td className="py-2 px-3 text-right font-mono">{fmtB(row.totalAssets)}</td>
+                          <td className="py-2 px-3 text-right font-mono">{fmtB(row.totalEquity)}</td>
+                          <td className="py-2 px-3 text-right font-mono">{fmtB(row.operatingCashFlow)}</td>
+                          <td className="py-2 px-3 text-right font-mono">{fmtB(row.capitalExpenditure)}</td>
+                          <td className={`py-2 px-3 text-right font-mono ${(row.freeCashFlow ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                            {fmtB(row.freeCashFlow)}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">

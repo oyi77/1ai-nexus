@@ -109,7 +109,7 @@ export default function FlowsPage() {
         </div>
 
         <Panel title="Exchange Flows" subtitle={`${flows.length} exchanges`} liveStatus={status} onRefresh={refresh} maxHeight={600}>
-          <DataTable columns={columns as unknown as Column<Record<string, unknown>>[]} data={flows as unknown as Record<string, unknown>[]} sortable rowHeight={32} emptyState={<div className="text-text-muted text-[11px] p-4">Loading exchange flow data...</div>} />
+          <DataTable columns={columns as unknown as Column<Record<string, unknown>>[]} data={flows as unknown as Record<string, unknown>[]} sortable filterable filterPlaceholder="Filter flows…" rowHeight={32} emptyState={<div className="text-text-muted text-[11px] p-4">Loading exchange flow data...</div>} />
         </Panel>
       </div>
     </NexusLayout>

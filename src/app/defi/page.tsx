@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { NexusLayout } from "@/components/layout/NexusLayout"
-import { Layers, TrendingUp, TrendingDown, Search } from "lucide-react"
+import { Layers, TrendingUp, TrendingDown } from "lucide-react"
+import { useTableControls, TableControlsBar, SortableTh } from "@/components/shell/TableControls"
 
-interface Protocol {
+type Protocol = {
   name: string
   chain: string
   tvl: number
@@ -25,7 +26,6 @@ function DeFiPageInner() {
   const [protocols, setProtocols] = useState<Protocol[]>([])
   const [loading, setLoading] = useState(true)
   const [chain, setChain] = useState('')
-  const [search, setSearch] = useState('')
   const [totalTvl, setTotalTvl] = useState(0)
 
   const fetchData = useCallback(async () => {
@@ -46,9 +46,8 @@ function DeFiPageInner() {
 
   useEffect(() => { const invoke = () => fetchData(); invoke() }, [fetchData])
 
-  const filtered = protocols.filter(p =>
-    !search || p.name.toLowerCase().includes(search.toLowerCase())
-  )
+  const tc = useTableControls(protocols)
+
 
   return (
     <>
@@ -64,16 +63,6 @@ function DeFiPageInner() {
             <span className="text-[10px] text-text-muted">{protocols.length} protocols · DeFiLlama</span>
           </div>
           <div className="flex gap-2">
-            <div className="relative flex-1 max-w-xs">
-              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-text-muted" />
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Search protocols..."
-                className="w-full bg-bg-panel border border-border-dim rounded pl-7 pr-3 py-1 text-xs font-mono text-text-primary placeholder:text-text-muted focus:border-accent-cyan focus:outline-none"
-              />
-            </div>
             <div className="flex gap-1">
               {['', 'Ethereum', 'Solana', 'BSC', 'Arbitrum', 'Base', 'Polygon', 'Avalanche'].map(c => (
                 <button
@@ -93,23 +82,26 @@ function DeFiPageInner() {
         <div className="px-4 py-2">
           {loading ? (
             <div className="text-center py-20 text-text-dim text-xs">Loading DeFi data from DeFiLlama...</div>
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-20 text-text-dim text-xs">No protocols found</div>
           ) : (
+            <>
+              <TableControlsBar idPrefix="defi" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
+              {tc.visible.length === 0 ? (
+                <div className="text-center py-20 text-text-dim text-xs">No protocols found</div>
+              ) : (
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-text-muted text-[10px] uppercase">
                   <th className="text-left py-2 px-2 font-mono">#</th>
-                  <th className="text-left py-2 px-2 font-mono">PROTOCOL</th>
-                  <th className="text-left py-2 px-2 font-mono">CHAIN</th>
-                  <th className="text-left py-2 px-2 font-mono">CATEGORY</th>
-                  <th className="text-right py-2 px-2 font-mono">TVL</th>
-                  <th className="text-right py-2 px-2 font-mono">1D CHANGE</th>
-                  <th className="text-right py-2 px-2 font-mono">7D CHANGE</th>
+                  <SortableTh controls={tc} k="name" className="text-left py-2 px-2 font-mono">PROTOCOL</SortableTh>
+                  <SortableTh controls={tc} k="chain" className="text-left py-2 px-2 font-mono">CHAIN</SortableTh>
+                  <SortableTh controls={tc} k="category" className="text-left py-2 px-2 font-mono">CATEGORY</SortableTh>
+                  <SortableTh controls={tc} k="tvl" className="text-right py-2 px-2 font-mono">TVL</SortableTh>
+                  <SortableTh controls={tc} k="change_1d" className="text-right py-2 px-2 font-mono">1D CHANGE</SortableTh>
+                  <SortableTh controls={tc} k="change_7d" className="text-right py-2 px-2 font-mono">7D CHANGE</SortableTh>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p, i) => (
+                {tc.visible.map((p, i) => (
                   <tr key={p.name + i} className="border-t border-border-dim/30 hover:bg-bg-elevated cursor-pointer transition-colors">
                     <td className="py-2 px-2 text-text-muted">{i + 1}</td>
                     <td className="py-2 px-2 font-mono text-text-primary font-bold">{p.name}</td>
@@ -127,6 +119,8 @@ function DeFiPageInner() {
                 ))}
               </tbody>
             </table>
+              )}
+            </>
           )}
         </div>
       </div>
