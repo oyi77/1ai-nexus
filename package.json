@@ -19,8 +19,8 @@
     "pm2:restart": "pm2 restart nexus-web nexus-ws nexus-indexer",
     "pm2:logs": "pm2 logs nexus-web nexus-ws nexus-indexer",
     "start:ws": "cd ws-server && npx tsx server.ts",
-    "start:indexer": "cd indexer && npx tsx main.ts",
-    "verify-re": "npx tsx src/scripts/verify-re-modules.ts"
+    "verify-re": "npx tsx src/scripts/verify-re-modules.ts",
+    "harvest:crossex": "tsx src/scripts/crossex-harvest.ts"
   },
   "dependencies": {
     "@1ai/payment": "file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",
