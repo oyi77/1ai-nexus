@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
-import { useTableControls, TableControlsBar } from '@/components/shell/TableControls'
+import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 import { useLiveFetch } from '@/lib/hooks/useLiveFetch'
 
 const COUNTRIES = [
@@ -36,26 +35,19 @@ interface MacroData {
 
 export default function GlobalMacroPage() {
   const { data, status } = useLiveFetch<MacroData>({ url: '/api/v1/global-macro', interval: 30 * 60_000 })
-  const [selectedIndicator, setSelectedIndicator] = useState('GDP Growth')
   const loading = status === 'stale' && !data
 
   const macroData: MacroData = data ?? {}
 
-  // Text filtering via the shared hook; indicator columns are searched through accessors
-  // because their values live in macroData, not on the row. The ranking comparator is kept
-  // as-is: it parses unit-suffixed World Bank strings ("$21,433B", "2.5%") that the shared
-  // numeric/string comparator cannot rank correctly.
+  // Text filtering + sorting via the shared hook; indicator columns are searched and
+  // ranked through accessors because their values live in macroData, not on the row.
+  // The active indicator mirrors the sort column so selector buttons and sortable
+  // headers stay in lockstep.
   const tc = useTableControls(COUNTRIES, INDICATORS.map(ind => ({
     key: ind,
     accessor: country => macroData[country.code]?.[ind] ?? '',
-  })))
-  const ranked = [...tc.visible].sort((a, b) => {
-    const av = macroData[a.code]?.[selectedIndicator] ?? ''
-    const bv = macroData[b.code]?.[selectedIndicator] ?? ''
-    const aNum = Number.parseFloat(av.replace(/[^0-9.-]/g, '')) || 0
-    const bNum = Number.parseFloat(bv.replace(/[^0-9.-]/g, '')) || 0
-    return bNum - aNum
-  })
+  })), { initialSortKey: 'GDP Growth', initialSortDir: 'desc' })
+  const selectedIndicator = INDICATORS.includes(tc.sortKey ?? '') ? (tc.sortKey as string) : INDICATORS[0]
 
   return (
     <NexusLayout>
@@ -73,7 +65,7 @@ export default function GlobalMacroPage() {
         {/* Indicator Selector */}
         <div className="flex flex-wrap gap-2">
           {INDICATORS.map(name => (
-            <button key={name} onClick={() => setSelectedIndicator(name)}
+              <button key={name} onClick={() => tc.setSort(name, 'desc')}
               className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
                 selectedIndicator === name
                   ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
@@ -98,21 +90,21 @@ export default function GlobalMacroPage() {
                 <thead>
                   <tr className="text-text-muted border-b border-border-dim">
                     <th className="text-left py-2 font-mono w-8">#</th>
-                    <th className="text-left py-2 font-mono">COUNTRY</th>
+                    <SortableTh controls={tc} k="name" className="text-left py-2 font-mono">COUNTRY</SortableTh>
                     {INDICATORS.map(ind => (
-                      <th key={ind} className="text-right py-2 font-mono">{ind.toUpperCase()}</th>
+                      <SortableTh key={ind} controls={tc} k={ind} className="text-right py-2 font-mono">{ind.toUpperCase()}</SortableTh>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {ranked.length === 0 ? (
+                  {tc.visible.length === 0 ? (
                     <tr>
                       <td colSpan={INDICATORS.length + 2} className="py-4 text-center text-text-muted text-xs">
                         No countries match the current filter.
                       </td>
                     </tr>
                   ) : (
-                    ranked.map((country, i) => (
+                    tc.visible.map((country, i) => (
                       <tr key={country.code} className="border-b border-border-dim/30 hover:bg-bg-elevated">
                         <td className="py-2 font-mono text-text-muted">{i + 1}</td>
                         <td className="py-2 font-mono">

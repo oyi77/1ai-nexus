@@ -1,5 +1,5 @@
+import { cellString, compareCells, filterRows, nextSort, parseCellNumber, sortRows } from './table-controls'
 import { describe, expect, it } from 'vitest'
-import { cellString, compareCells, filterRows, nextSort, sortRows } from './table-controls'
 
 describe('cellString', () => {
   it('renders null and undefined as empty string', () => {
@@ -98,5 +98,65 @@ describe('nextSort', () => {
   it('flips direction on the same column', () => {
     expect(nextSort('vol', 'desc', 'vol')).toEqual({ key: 'vol', dir: 'asc' })
     expect(nextSort('vol', 'asc', 'vol')).toEqual({ key: 'vol', dir: 'desc' })
+  })
+})
+
+describe('parseCellNumber', () => {
+  it('parses plain numbers and finite checks', () => {
+    expect(parseCellNumber(42)).toBe(42)
+    expect(parseCellNumber(-3.5)).toBe(-3.5)
+    expect(parseCellNumber(Number.NaN)).toBeNull()
+    expect(parseCellNumber(Number.POSITIVE_INFINITY)).toBeNull()
+  })
+
+  it('parses formatted currency, percent, and SI-suffixed strings', () => {
+    expect(parseCellNumber('$80,060')).toBe(80060)
+    expect(parseCellNumber('$2,487')).toBe(2487)
+    expect(parseCellNumber('+3.8%')).toBe(3.8)
+    expect(parseCellNumber('45K')).toBe(45000)
+    expect(parseCellNumber('2.5M')).toBe(2_500_000)
+    expect(parseCellNumber('1.2B')).toBe(1_200_000_000)
+    expect(parseCellNumber('-$1.2B')).toBe(-1_200_000_000)
+    expect(parseCellNumber('(1,234)')).toBe(-1234)
+    expect(parseCellNumber('.5')).toBe(0.5)
+  })
+
+  it('rejects non-numeric text entirely', () => {
+    expect(parseCellNumber('btc')).toBeNull()
+    expect(parseCellNumber('BTC 0.3%')).toBeNull()
+    expect(parseCellNumber('—')).toBeNull()
+    expect(parseCellNumber('')).toBeNull()
+    expect(parseCellNumber(null)).toBeNull()
+    expect(parseCellNumber(undefined)).toBeNull()
+  })
+})
+
+describe('compareCells numeric-string awareness', () => {
+  it('orders formatted currency numerically instead of lexically', () => {
+    // Lexical order would put "$100..." before "$80...".
+    expect(compareCells('$80,060', '$2,487')).toBeGreaterThan(0)
+    expect(compareCells('$2,487', '$80,060')).toBeLessThan(0)
+  })
+
+  it('compares percent strings by face value', () => {
+    expect(compareCells('+3.8%', '-1.2%')).toBeGreaterThan(0)
+  })
+
+  it('falls back to deterministic string comparison when either side is not numeric', () => {
+    expect(compareCells('btc', 'abc')).toBeGreaterThan(0)
+    expect(compareCells('abc', 'btc')).toBeLessThan(0)
+    expect(Number.isFinite(compareCells('btc', '$100'))).toBe(true)
+    expect(compareCells('BTC 0.3%', 'abc')).not.toBeNaN()
+  })
+
+
+  it('sorts mixed formatted rows correctly through sortRows', () => {
+    const rows = [
+      { price: '$100.00' },
+      { price: '$80,060' },
+      { price: '$2,487' },
+    ]
+    const out = sortRows(rows, 'price', 'desc', {})
+    expect(out.map(r => r.price)).toEqual(['$80,060', '$2,487', '$100.00'])
   })
 })

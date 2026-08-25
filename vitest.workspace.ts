@@ -9,7 +9,9 @@ import path from 'path';
        environment: 'node',
        testTimeout: 30_000,
        hookTimeout: 15_000,
-       include: ['**/*.test.ts', '**/*.spec.ts'],
+      include: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts'],
+      // Playwright-authored browser specs must not be collected by Vitest.
+      exclude: ['tests/verify-okx-leader.test.ts', '**/node_modules/**', '**/dist/**', '**/cypress/**', '**/.{idea,git,cache,output,temp}/**'],
      },
      resolve: {
        alias: {

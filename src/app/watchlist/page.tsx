@@ -205,9 +205,7 @@ export default function WatchlistPage() {
 
         {/* Watchlist Table */}
         <Panel title="Watchlist" subtitle={`${filtered.length} items`} liveStatus={status}>
-          {items.length > 0 && (
-            <TableControlsBar idPrefix="watchlist" query={tc.query} onQueryChange={tc.setQuery} shown={filtered.length} total={tc.total} />
-          )}
+          <TableControlsBar idPrefix="watchlist" query={tc.query} onQueryChange={tc.setQuery} shown={filtered.length} total={tc.total} />
           {filtered.length === 0 ? (
             <div className="p-8 text-text-muted text-[12px] font-mono text-center">
               {items.length === 0
