@@ -178,6 +178,7 @@ export default function ArbitragePage() {
         </Panel>
 
         <CrossExFundingPanel />
+        <CrossExSpreadPanel />
       </div>
     </NexusLayout>
   )
@@ -277,5 +278,86 @@ function KPI({ label, value, color }: { label: string; value: string; color?: st
       <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className={`text-[16px] font-head font-bold tabular-nums ${color ?? 'text-text-primary'}`}>{value}</div>
     </div>
+  )
+}
+
+// ─── CrossEx Futures Spread Arbitrage (per-exchange futures prices) ───
+
+function CrossExSpreadPanel() {
+  const [rows, setRows] = useState<CrossexRow[]>([])
+  const [meta, setMeta] = useState<CrossexMeta | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const res = await fetch('/api/v1/arbitrage/crossex')
+        const j = await res.json()
+        if (!res.ok || !j.data) throw new Error(j.error ?? `HTTP ${res.status}`)
+        const raw = (j.data.priceSpreadRate?.rows ?? []) as Array<{ base: string; maxApy: string; values: CrossexValue[] }>
+        const flat = raw.map(r => ({
+          base: r.base,
+          maxApy: r.maxApy,
+          ...Object.fromEntries(r.values.map(v => [v.exchange, v.value])),
+        })) as CrossexRow[]
+        setRows(flat)
+        setMeta(j.meta)
+        setError(null)
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'snapshot unavailable')
+      }
+    }
+    load()
+    const id = setInterval(load, 300_000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [])
+
+  const tc = useTableControls(rows, undefined, { initialSortKey: 'maxApy', initialSortDir: 'desc' })
+  return (
+
+    <Panel title="CrossEx Futures Spread Arbitrage" subtitle={meta ? `${rows.length} coins · 14d convergence · Gate snapshot ${meta.ageMinutes}m ago` : 'Per-exchange futures price spreads'} liveStatus={meta ? (meta.stale ? 'stale' : 'live') : 'error'}>
+      {error ? (
+        <div className="p-4 text-[11px] font-mono text-text-muted text-center">{error}</div>
+      ) : (
+        <>
+          <TableControlsBar idPrefix="crossex-spread" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} placeholder="Filter asset or exchange price…" />
+          <div className="overflow-auto scrollbar-thin">
+            <table className="w-full border-separate border-spacing-0">
+              <thead>
+                <tr className="text-text-muted">
+                  <SortableTh controls={tc} k="base" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Asset</SortableTh>
+                  <SortableTh controls={tc} k="maxApy" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Max APR</SortableTh>
+                  {CROSSEX_EXCHANGES.map(ex => (
+                    <SortableTh key={ex} controls={tc} k={ex} className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">{ex}</SortableTh>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {tc.visible.map((r, i) => (
+                  <tr key={`${r.base}-${i}`} className="border-b border-bg-border/30 hover:bg-bg-raised transition-colors">
+                    <td className="text-[12px] font-mono px-3 py-1.5 font-bold text-text-primary">{r.base}</td>
+                    <td className="text-[11px] font-mono px-3 py-1.5 text-right font-bold text-accent-amber tabular-nums">+{(Number(r.maxApy) * 100).toFixed(2)}%</td>
+                    {CROSSEX_EXCHANGES.map(ex => {
+                      const v = r[ex]
+                      return (
+                        <td key={ex} className="text-[11px] font-mono px-3 py-1.5 text-right text-text-primary tabular-nums">
+                          {v === '' || v == null ? '—' : String(v)}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                ))}
+                {tc.visible.length === 0 && (
+                  <tr>
+                    <td colSpan={CROSSEX_EXCHANGES.length + 2} className="text-center py-8 text-text-muted text-[11px] font-mono">No assets match the filter.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </Panel>
   )
 }

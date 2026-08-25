@@ -25,6 +25,7 @@ const MAX_PAGES = 12 // hard cap: 786 coins today → 8 pages
 
 const ExchangeValue = z.object({ exchange: z.string(), value: z.string() })
 const ArbRow = z.object({ base: z.string(), maxApy: z.string(), values: z.array(ExchangeValue) })
+type ArbRowT = z.infer<typeof ArbRow>
 
 const ViewPage = z.object({ list: z.array(ArbRow), total: z.number() })
 const StringList = z.array(z.string())
@@ -60,9 +61,21 @@ async function gotoJson<T extends z.ZodTypeAny>(page: Page, url: string, schema:
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
 }
 
+async function fetchAll(page: Page, type: 'fundingRate' | 'priceSpreadRate', extraParams = ''): Promise<{ rows: ArbRowT[]; total: number; pages: number }> {
+  const first = await gotoJson(page, `${API}/view?benchmarkExchange=NONE&${extraParams}interval=live&page=1&pageSize=${PAGE_SIZE}&sort=desc&type=${type}&sub_website_id=0`, ViewPage)
+  const rows = [...first.list]
+  const pages = Math.min(Math.ceil(first.total / PAGE_SIZE), MAX_PAGES)
+  for (let p = 2; p <= pages; p++) {
+    const j = await gotoJson(page, `${API}/view?benchmarkExchange=NONE&${extraParams}interval=live&page=${p}&pageSize=${PAGE_SIZE}&sort=desc&type=${type}&sub_website_id=0`, ViewPage)
+    rows.push(...j.list)
+  }
+  return { rows, total: first.total, pages }
+}
+
 async function main() {
   // Headed mode: Akamai fingerprints headless Chrome and 403s the API even
-  // with valid sensor cookies. The box runs a desktop session (DISPLAY set).
+  // with valid sensor cookies. The box runs a desktop session (DISPLAY set),
+  // so cron wraps this script in xvfb-run.
   const browser = await chromium.launch({ channel: 'chrome', headless: false })
   try {
     const context = await browser.newContext({ locale: 'en-US' })
@@ -70,14 +83,10 @@ async function main() {
 
     await warmup(page)
 
-    const first = await gotoJson(page, `${API}/view?benchmarkExchange=NONE&interval=live&page=1&pageSize=${PAGE_SIZE}&sort=desc&type=fundingRate&sub_website_id=0`, ViewPage)
-    const rows = [...first.list]
-    const totalPages = Math.min(Math.ceil(first.total / PAGE_SIZE), MAX_PAGES)
-
-    for (let p = 2; p <= totalPages; p++) {
-      const j = await gotoJson(page, `${API}/view?benchmarkExchange=NONE&interval=live&page=${p}&pageSize=${PAGE_SIZE}&sort=desc&type=fundingRate&sub_website_id=0`, ViewPage)
-      rows.push(...j.list)
-    }
+    const funding = await fetchAll(page, 'fundingRate')
+    // Futures-spread dataset: values are raw per-exchange futures prices;
+    // convergencePeriod drives the annualized-convergence APR window.
+    const spread = await fetchAll(page, 'priceSpreadRate', 'convergencePeriod=14d&')
 
     let exchanges: string[] = []
     try {
@@ -87,12 +96,14 @@ async function main() {
     const snapshot = {
       capturedAt: new Date().toISOString(),
       source: 'gate-crossex',
-      type: 'fundingRate',
       interval: 'live',
-      total: first.total,
-      captured: rows.length,
       exchanges,
-      rows,
+      fundingRate: { type: 'fundingRate', total: funding.total, captured: funding.rows.length, rows: funding.rows },
+      priceSpreadRate: { type: 'priceSpreadRate', convergencePeriod: '14d', total: spread.total, captured: spread.rows.length, rows: spread.rows },
+      // Back-compat flat aliases consumed by /api/v1/arbitrage/crossex clients.
+      rows: funding.rows,
+      total: funding.total,
+      captured: funding.rows.length,
     }
 
     mkdirSync(join(process.cwd(), 'data', 'crossex'), { recursive: true })
@@ -100,7 +111,7 @@ async function main() {
     writeFileSync(tmp, JSON.stringify(snapshot))
     renameSync(tmp, OUT_FILE)
 
-    console.log(`[crossex] captured ${rows.length}/${first.total} rows (${totalPages} pages) → ${OUT_FILE}`)
+    console.log(`[crossex] funding ${funding.rows.length}/${funding.total} (${funding.pages}p) · spread ${spread.rows.length}/${spread.total} (${spread.pages}p) → ${OUT_FILE}`)
   } finally {
     await browser.close()
   }
