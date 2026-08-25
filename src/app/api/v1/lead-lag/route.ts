@@ -14,7 +14,7 @@ import { cacheGet, cacheSet } from '@/lib/cache'
 
 export const dynamic = 'force-dynamic'
 
-const WATCHLIST = ['BTC', 'ETH', 'SOL', 'WIF', 'BONK']
+import { LEAD_LAG_WATCHLIST as WATCHLIST } from '@/lib/config/universe'
 
 export async function GET(request: NextRequest) {
   try {

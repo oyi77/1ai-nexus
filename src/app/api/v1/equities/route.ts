@@ -9,32 +9,15 @@ import { type NextRequest, NextResponse } from "next/server";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { registerAllModules } from "@/lib/modules";
 import { getCached } from "@/lib/api/server-cache";
+import { INDICES, EQUITIES_DEFAULT_SYMBOLS as DEFAULT_STOCKS } from "@/lib/config/universe";
 import { saveBackup, getBackup } from "@/lib/api/backup";
 
-const INDICES = [
-  { symbol: "^GSPC", name: "S&P 500" },
-  { symbol: "^IXIC", name: "NASDAQ" },
-  { symbol: "^DJI", name: "Dow Jones" },
-  { symbol: "^VIX", name: "VIX" },
-  { symbol: "^FTSE", name: "FTSE 100" },
-  { symbol: "^N225", name: "Nikkei 225" },
-  { symbol: "^HSI", name: "Hang Seng" },
-  { symbol: "^STOXX50E", name: "Euro Stoxx 50" },
-  { symbol: "^JKSE", name: "IHSG" },
-  { symbol: "^AXJO", name: "All Ordinaries" },
-  { symbol: "^STI", name: "STI Index" },
-  { symbol: "^GSPTSE", name: "S&P/TSX" },
-  { symbol: "^KS11", name: "KOSPI" },
-  { symbol: "^TWII", name: "TAIEX" },
-] as const;
-
-const DEFAULT_STOCKS = [
-  "AAPL","MSFT","GOOGL","AMZN","NVDA","TSLA","META","AMD","AVGO",
-  "JPM","GS","V","BAC","BRK-B","UNH","JNJ","PFE","LLY",
-  "XOM","CVX","WMT","KO","PG","SAP.DE","MC.PA","7203.T","BABA",
-  "0700.HK","BHP.AX","D05.SI","RELIANCE.NS","005930.KS","2330.TW",
-  "VALE","PBR","BBCA.JK","BBRI.JK","BMRI.JK","TLKM.JK","ADRO.JK",
-] as const;
+/** Short stable hash for long cache keys (symbol-set dependent caching). */
+function djb2(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return `h${(h >>> 0).toString(36)}`;
+}
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -42,9 +25,10 @@ export async function GET(request: NextRequest) {
   const stockSymbols = symbolsParam
     ? symbolsParam.split(",").map((s) => s.trim()).filter(Boolean)
     : [...DEFAULT_STOCKS];
-
   const allSymbols = [...new Set([...stockSymbols, ...INDICES.map((i) => i.symbol)])];
-  const cacheKey = "equities:all"; // Use a static key so the cache behaves reliably
+
+  const symbolSetKey = [...allSymbols].sort().join(",");
+  const cacheKey = `equities:${symbolSetKey.length <= 100 ? symbolSetKey : djb2(symbolSetKey)}`; // key reflects the requested symbol set
 
   try {
     const { data, fromCache } = await getCached(cacheKey, 60_000, async () => {

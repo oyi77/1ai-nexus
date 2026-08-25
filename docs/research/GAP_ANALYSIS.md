@@ -23,7 +23,7 @@
 
 | Gap | Name | Closed | Result |
 |-----|------|--------|--------|
-| GAP-001 | IDX/IHSG | 2026-06-30 | ✅ 16 stocks + IHSG via Yahoo Finance |
+| GAP-001 | IDX/IHSG | 2026-08-25 | ✅ Dynamic IDX universe (844 tickers, TradingView scanner) + IHSG via Yahoo |
 | GAP-002 | IDR Forex | 2026-06-30 | ✅ 6 IDR pairs via ExchangeRate-API |
 | GAP-003 | Indonesian Macro | 2026-06-30 | ✅ 8 indicators via World Bank |
 | GAP-004 | Technical Indicators | 2026-06-30 | ✅ SMA, EMA, RSI, MACD, BB |
@@ -59,7 +59,7 @@
 
 | Gap ID | Name | Sprint | Result |
 |--------|------|--------|--------|
-| GAP-001 | IDX/IHSG Integration | 2026-06-30 | ✅ 16 stocks + IHSG via Yahoo Finance |
+| GAP-001 | IDX/IHSG Integration | 2026-08-25 | ✅ Dynamic IDX universe (844 tickers, TradingView scanner) + IHSG via Yahoo |
 | GAP-002 | IDR Forex | 2026-06-30 | ✅ 6 IDR pairs via ExchangeRate-API |
 | GAP-003 | Indonesian Macro | 2026-06-30 | ✅ 8 indicators via World Bank |
 | GAP-004 | Technical Indicators | 2026-06-30 | ✅ SMA, EMA, RSI, MACD, BB |

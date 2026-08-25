@@ -7,7 +7,7 @@ import { apiJson, apiError } from '@/lib/api/response'
 import { computeMarketMovingScore, computeBatchScores } from '@/lib/modules/derived/market-moving-score'
 import type { MarketVertical } from '@/lib/modules/market/types'
 
-const TOP_SYMBOLS = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'AVAX', 'LINK', 'ARB', 'OP', 'ADA']
+import { MARKET_SCORE_TOP_SYMBOLS as TOP_SYMBOLS } from '@/lib/config/universe'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)

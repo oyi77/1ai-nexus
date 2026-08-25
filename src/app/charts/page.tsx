@@ -41,16 +41,7 @@ const TOOL_COLORS: Record<DrawingTool, string> = {
   text: '#ef4444',
 }
 
-const CHART_SYMBOLS = [
-  { symbol: 'BTC-USD', name: 'Bitcoin' },
-  { symbol: 'ETH-USD', name: 'Ethereum' },
-  { symbol: 'AAPL', name: 'Apple' },
-  { symbol: 'TSLA', name: 'Tesla' },
-  { symbol: 'NVDA', name: 'NVIDIA' },
-  { symbol: 'BBCA.JK', name: 'BCA' },
-  { symbol: 'SPY', name: 'S&P 500' },
-  { symbol: 'GLD', name: 'Gold' },
-]
+import { CHART_SYMBOLS } from '@/lib/config/universe'
 
 export default function ChartsPage() {
   const [selected, setSelected] = useState('BTC-USD')

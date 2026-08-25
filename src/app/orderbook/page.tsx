@@ -29,7 +29,7 @@ interface OrderBookData {
   }
 }
 
-const SYMBOLS = ['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'AVAX', 'LINK', 'ARB', 'OP']
+import { CRYPTO_TAB_SYMBOLS as SYMBOLS } from '@/lib/config/universe'
 
 export default function OrderBookPage() {
   const [data, setData] = useState<OrderBookData | null>(null)

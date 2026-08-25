@@ -3,55 +3,7 @@
 import { useState, useEffect } from "react"
 import { NexusLayout } from "@/components/layout/NexusLayout"
 
-// Comprehensive commodity futures list (Yahoo Finance symbols)
-const COMMODITY_GROUPS = [
-  {
-    category: 'Precious Metals',
-    items: [
-      { symbol: 'GC=F', name: 'Gold', unit: '$/oz' },
-      { symbol: 'SI=F', name: 'Silver', unit: '$/oz' },
-      { symbol: 'PL=F', name: 'Platinum', unit: '$/oz' },
-      { symbol: 'PA=F', name: 'Palladium', unit: '$/oz' },
-    ],
-  },
-  {
-    category: 'Energy',
-    items: [
-      { symbol: 'CL=F', name: 'WTI Crude Oil', unit: '$/bbl' },
-      { symbol: 'BZ=F', name: 'Brent Crude', unit: '$/bbl' },
-      { symbol: 'NG=F', name: 'Natural Gas', unit: '$/MMBtu' },
-      { symbol: 'HO=F', name: 'Heating Oil', unit: '$/gal' },
-      { symbol: 'RB=F', name: 'RBOB Gasoline', unit: '$/gal' },
-    ],
-  },
-  {
-    category: 'Industrial Metals',
-    items: [
-      { symbol: 'HG=F', name: 'Copper', unit: '$/lb' },
-    ],
-  },
-  {
-    category: 'Agriculture',
-    items: [
-      { symbol: 'ZC=F', name: 'Corn', unit: '$/bu' },
-      { symbol: 'ZW=F', name: 'Wheat', unit: '$/bu' },
-      { symbol: 'ZS=F', name: 'Soybeans', unit: '$/bu' },
-      { symbol: 'KC=F', name: 'Coffee', unit: '$/lb' },
-      { symbol: 'SB=F', name: 'Sugar', unit: '$/lb' },
-      { symbol: 'CT=F', name: 'Cotton', unit: '$/lb' },
-      { symbol: 'CC=F', name: 'Cocoa', unit: '$/mt' },
-    ],
-  },
-  {
-    category: 'Livestock',
-    items: [
-      { symbol: 'LE=F', name: 'Live Cattle', unit: '$/lb' },
-      { symbol: 'HE=F', name: 'Lean Hogs', unit: '$/lb' },
-    ],
-  },
-]
-
-const ALL_COMMODITIES = COMMODITY_GROUPS.flatMap(g => g.items)
+import { COMMODITY_GROUPS, ALL_COMMODITIES } from "@/lib/config/universe"
 
 interface Quote {
   price: number

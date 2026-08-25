@@ -27,16 +27,7 @@ interface DCFResult {
   presentValue: number
 }
 
-const PRESETS = [
-  { symbol: 'AAPL', name: 'Apple', fcf: 110e9, growth5y: 0.08, growth10y: 0.05, shares: 15.2e9, debt: 100e9, price: 195 },
-  { symbol: 'MSFT', name: 'Microsoft', fcf: 70e9, growth5y: 0.12, growth10y: 0.08, shares: 7.4e9, debt: 50e9, price: 450 },
-  { symbol: 'GOOGL', name: 'Alphabet', fcf: 80e9, growth5y: 0.10, growth10y: 0.07, shares: 12.5e9, debt: 30e9, price: 175 },
-  { symbol: 'AMZN', name: 'Amazon', fcf: 55e9, growth5y: 0.15, growth10y: 0.10, shares: 10.3e9, debt: 150e9, price: 200 },
-  { symbol: 'NVDA', name: 'NVIDIA', fcf: 40e9, growth5y: 0.25, growth10y: 0.15, shares: 24.5e9, debt: 10e9, price: 130 },
-  { symbol: 'META', name: 'Meta', fcf: 50e9, growth5y: 0.10, growth10y: 0.06, shares: 2.5e9, debt: 30e9, price: 550 },
-  { symbol: 'TSLA', name: 'Tesla', fcf: 10e9, growth5y: 0.20, growth10y: 0.12, shares: 3.2e9, debt: 5e9, price: 250 },
-  { symbol: 'BBCA.JK', name: 'BCA', fcf: 35e9, growth5y: 0.10, growth10y: 0.07, shares: 12.4e9, debt: 0, price: 9500 },
-]
+import { DCF_PRESETS as PRESETS } from '@/lib/config/universe'
 
 function runDCF(inputs: DCFInputs): DCFResult {
   const { freeCashFlow: fcf, growthRate5Y: g5, growthRate10Y: g10, terminalGrowthRate: tg, discountRate: r, sharesOutstanding: shares, netDebt: debt } = inputs

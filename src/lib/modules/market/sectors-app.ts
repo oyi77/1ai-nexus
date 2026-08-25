@@ -1,3 +1,5 @@
+import { SECTORS_APP_FALLBACK_SYMBOLS } from '@/lib/config/universe'
+
 import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../types'
 import { TTL } from '../types'
 import { cachedFetch } from '../fetch-with-cache'
@@ -33,7 +35,7 @@ async function fetchSectors(params: FetchParams): Promise<unknown> {
       console.warn('Sectors.app RSC failed, falling back to Yahoo Finance', e)
       const yfRes = await yahooFinanceModule.fetch({
         action: 'quote',
-        symbols: '^JKSE,BBCA.JK,BBRI.JK,BMRI.JK,BBNI.JK'
+        symbols: SECTORS_APP_FALLBACK_SYMBOLS.join(',')
       })
       return yfRes.data
     }

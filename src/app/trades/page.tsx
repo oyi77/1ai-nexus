@@ -26,7 +26,9 @@ interface PriceTick {
   trades24h: number
 }
 
-const SYMBOLS = ['btc', 'eth', 'sol', 'xrp', 'doge', 'avax', 'link', 'arb', 'op']
+import { CRYPTO_TAB_SYMBOLS } from '@/lib/config/universe'
+
+const SYMBOLS = CRYPTO_TAB_SYMBOLS.map((s) => s.toLowerCase())
 
 function fmtUsd(n: number): string {
   if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`

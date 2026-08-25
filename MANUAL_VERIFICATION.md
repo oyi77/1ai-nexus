@@ -77,6 +77,7 @@
 | `/api/v1/sectors` | ✅ 200 | IDX, IHSG, BBCA, BBRI equities |
 | `/api/v1/macro` | ✅ 200 | Fed Funds Rate, 10Y Treasury, CPI |
 | `/api/v1/history` | ✅ 200 | Historical price data |
+| `/api/v1/equities/universe` | ✅ 200 | 844 IDX tickers (TradingView scanner → snapshot → curated fallback) |
 
 ### AI & PnL
 

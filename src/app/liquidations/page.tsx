@@ -82,7 +82,7 @@ function shortenAddress(addr: string): string {
 
 // ── Page ───────────────────────────────────────────────────
 
-const SYMBOLS = ['BTC', 'ETH', 'SOL', 'DOGE', 'XRP', 'AVAX', 'LINK', 'ARB', 'OP']
+import { CRYPTO_TAB_SYMBOLS as SYMBOLS } from '@/lib/config/universe'
 
 export default function LiquidationsPage() {
   const [selectedSymbol, setSelectedSymbol] = useState('BTC')

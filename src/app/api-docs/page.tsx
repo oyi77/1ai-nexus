@@ -283,6 +283,16 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     response: '{ data: { results: [{ symbol: "AAPL", price: 195.50, pe: 28.5, marketCap: 3e12 }], count: 10 } }',
   },
 
+  {
+    method: 'GET',
+    path: '/api/v1/equities/universe',
+    description: 'Dynamic IDX listed-equity universe (~840 tickers) or curated peer groups',
+    category: 'Screener',
+    params: 'group=idx-banks|us-tech|… (optional)',
+    example: 'curl "https://tracker.aitradepulse.com/api/v1/equities/universe"',
+    response: '{ data: { exchange: "IDX", stocks: [{ symbol: "BBCA.JK", name: "Bank Central Asia", sector: "Finance" }], meta: { source: "tradingview", count: 844 } } }',
+  },
+
   // ─── API Keys ──────────────────────────────────────────
   {
     method: 'GET',

@@ -11,37 +11,15 @@ import { registerAllModules } from "@/lib/modules";
 import { getCached } from "@/lib/api/server-cache";
 import { saveBackup, getBackup } from "@/lib/api/backup";
 
-const COMMODITY_GROUPS = {
-  precious_metals: [
-    { symbol: "GC=F", name: "Gold", unit: "$/oz" },
-    { symbol: "SI=F", name: "Silver", unit: "$/oz" },
-    { symbol: "PL=F", name: "Platinum", unit: "$/oz" },
-    { symbol: "PA=F", name: "Palladium", unit: "$/oz" },
-  ],
-  energy: [
-    { symbol: "CL=F", name: "WTI Crude Oil", unit: "$/bbl" },
-    { symbol: "BZ=F", name: "Brent Crude", unit: "$/bbl" },
-    { symbol: "NG=F", name: "Natural Gas", unit: "$/MMBtu" },
-    { symbol: "HO=F", name: "Heating Oil", unit: "$/gal" },
-    { symbol: "RB=F", name: "RBOB Gasoline", unit: "$/gal" },
-  ],
-  industrial_metals: [{ symbol: "HG=F", name: "Copper", unit: "$/lb" }],
-  agriculture: [
-    { symbol: "ZC=F", name: "Corn", unit: "$/bu" },
-    { symbol: "ZW=F", name: "Wheat", unit: "$/bu" },
-    { symbol: "ZS=F", name: "Soybeans", unit: "$/bu" },
-    { symbol: "KC=F", name: "Coffee", unit: "$/lb" },
-    { symbol: "SB=F", name: "Sugar", unit: "$/lb" },
-    { symbol: "CT=F", name: "Cotton", unit: "$/lb" },
-    { symbol: "CC=F", name: "Cocoa", unit: "$/mt" },
-  ],
-  livestock: [
-    { symbol: "LE=F", name: "Live Cattle", unit: "$/lb" },
-    { symbol: "HE=F", name: "Lean Hogs", unit: "$/lb" },
-  ],
-} as const;
+import { COMMODITY_GROUPS, ALL_COMMODITIES } from "@/lib/config/universe";
 
-const ALL_COMMODITIES = Object.values(COMMODITY_GROUPS).flat();
+// Same wire shape as before (category-slug → items), sourced from central config.
+const COMMODITY_CATEGORIES = Object.fromEntries(
+  COMMODITY_GROUPS.map((g) => [
+    g.category.replace(/[^a-zA-Z]+/g, "_").replace(/^_+|_+$/g, "").toLowerCase(),
+    g.items,
+  ]),
+);
 
 export async function GET(_request: NextRequest) {
   const cacheKey = "commodities:all";
@@ -70,7 +48,7 @@ export async function GET(_request: NextRequest) {
 
       const payload = {
         commodities,
-        categories: COMMODITY_GROUPS,
+        categories: COMMODITY_CATEGORIES,
         summary: {
           total: commodities.length,
           live: commodities.filter((c) => c.price != null).length,

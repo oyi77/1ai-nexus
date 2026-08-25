@@ -58,18 +58,7 @@ interface MacroData {
   date: string
 }
 
-const WATCHLIST = [
-  { symbol: 'AAPL', name: 'Apple', class: 'equity' },
-  { symbol: 'MSFT', name: 'Microsoft', class: 'equity' },
-  { symbol: 'NVDA', name: 'NVIDIA', class: 'equity' },
-  { symbol: 'TSLA', name: 'Tesla', class: 'equity' },
-  { symbol: 'BTC-USD', name: 'Bitcoin', class: 'crypto' },
-  { symbol: 'ETH-USD', name: 'Ethereum', class: 'crypto' },
-  { symbol: 'GC=F', name: 'Gold', class: 'commodity' },
-  { symbol: 'CL=F', name: 'Crude Oil', class: 'commodity' },
-  { symbol: 'EURUSD=X', name: 'EUR/USD', class: 'forex' },
-  { symbol: 'JPY=X', name: 'USD/JPY', class: 'forex' },
-]
+import { AI_SIGNALS_WATCHLIST as WATCHLIST } from '@/lib/config/universe'
 
 export default function AiSignalsPage() {
   const [signals, setSignals] = useState<ComputedSignal[]>([])

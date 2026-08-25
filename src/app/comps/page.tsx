@@ -23,16 +23,7 @@ type CompData = {
   debtEquity: number | null
 }
 
-const PEER_GROUPS: Record<string, { name: string; symbols: string[] }> = {
-  'us-banks': { name: 'US Banks', symbols: ['JPM', 'BAC', 'WFC', 'GS', 'MS', 'C'] },
-  'us-tech': { name: 'US Big Tech', symbols: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA'] },
-  'us-healthcare': { name: 'US Healthcare', symbols: ['UNH', 'JNJ', 'LLY', 'PFE', 'ABBV', 'MRK'] },
-  'us-energy': { name: 'US Energy', symbols: ['XOM', 'CVX', 'COP', 'SLB', 'EOG', 'OXY'] },
-  'idx-banks': { name: 'IDX Banks', symbols: ['BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'BBNI.JK', 'BRIS.JK', 'BTPS.JK'] },
-  'idx-telecom': { name: 'IDX Telecom', symbols: ['TLKM.JK', 'EXCL.JK', 'ISAT.JK', 'FREN.JK'] },
-  'global-luxury': { name: 'Global Luxury', symbols: ['MC.PA', 'RMS.DE', 'CFR.SW', 'EL', 'COTY', 'TPR'] },
-  'ev-battery': { name: 'EV & Battery', symbols: ['TSLA', 'NIO', 'RIVN', 'LCID', 'BYDDY', '1211.HK'] },
-}
+import { PEER_GROUPS } from '@/lib/config/universe'
 
 export default function ComparablesPage() {
   const [selected, setSelected] = useState('us-tech')

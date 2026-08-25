@@ -31,10 +31,7 @@ const FOREX_PAIRS: Record<string, string> = {
   IDR: 'USD/IDR', KRW: 'USD/KRW', THB: 'USD/THB', MYR: 'USD/MYR',
 }
 
-const COMMODITY_SYMBOLS: Record<string, string> = {
-  'GC=F': 'Gold', 'SI=F': 'Silver', 'CL=F': 'WTI Crude',
-  'BZ=F': 'Brent Crude', 'HG=F': 'Copper', 'NG=F': 'Nat Gas',
-}
+import { COMMODITY_NAMES as COMMODITY_SYMBOLS } from '@/lib/config/universe'
 
 const EQUITY_INDICES: Record<string, string> = {
   '^GSPC': 'S&P 500', '^IXIC': 'NASDAQ', '^DJI': 'Dow Jones',

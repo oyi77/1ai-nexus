@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { HEATMAP_STOCKS } from '@/lib/config/universe'
 
 interface HeatmapStock {
   symbol: string
@@ -13,45 +14,6 @@ interface HeatmapStock {
   price: number
 }
 
-const HEATMAP_STOCKS = [
-  // US Tech
-  { symbol: 'AAPL', name: 'Apple', sector: 'Technology' },
-  { symbol: 'MSFT', name: 'Microsoft', sector: 'Technology' },
-  { symbol: 'GOOGL', name: 'Alphabet', sector: 'Technology' },
-  { symbol: 'AMZN', name: 'Amazon', sector: 'Technology' },
-  { symbol: 'NVDA', name: 'NVIDIA', sector: 'Technology' },
-  { symbol: 'META', name: 'Meta', sector: 'Technology' },
-  { symbol: 'TSLA', name: 'Tesla', sector: 'Technology' },
-  { symbol: 'NFLX', name: 'Netflix', sector: 'Technology' },
-  { symbol: 'AMD', name: 'AMD', sector: 'Technology' },
-  { symbol: 'CRM', name: 'Salesforce', sector: 'Technology' },
-  // US Financial
-  { symbol: 'JPM', name: 'JPMorgan', sector: 'Financial' },
-  { symbol: 'GS', name: 'Goldman Sachs', sector: 'Financial' },
-  { symbol: 'V', name: 'Visa', sector: 'Financial' },
-  { symbol: 'MA', name: 'Mastercard', sector: 'Financial' },
-  { symbol: 'BAC', name: 'Bank of America', sector: 'Financial' },
-  // US Healthcare
-  { symbol: 'UNH', name: 'UnitedHealth', sector: 'Healthcare' },
-  { symbol: 'JNJ', name: 'J&J', sector: 'Healthcare' },
-  { symbol: 'LLY', name: 'Eli Lilly', sector: 'Healthcare' },
-  { symbol: 'PFE', name: 'Pfizer', sector: 'Healthcare' },
-  // US Energy
-  { symbol: 'XOM', name: 'Exxon', sector: 'Energy' },
-  { symbol: 'CVX', name: 'Chevron', sector: 'Energy' },
-  // US Consumer
-  { symbol: 'WMT', name: 'Walmart', sector: 'Consumer' },
-  { symbol: 'KO', name: 'Coca-Cola', sector: 'Consumer' },
-  { symbol: 'PG', name: 'P&G', sector: 'Consumer' },
-  { symbol: 'MCD', name: "McDonald's", sector: 'Consumer' },
-  // IDX
-  { symbol: 'BBCA.JK', name: 'BCA', sector: 'IDX' },
-  { symbol: 'BBRI.JK', name: 'BRI', sector: 'IDX' },
-  { symbol: 'BMRI.JK', name: 'Mandiri', sector: 'IDX' },
-  { symbol: 'TLKM.JK', name: 'Telkom', sector: 'IDX' },
-  { symbol: 'GOTO.JK', name: 'GoTo', sector: 'IDX' },
-  { symbol: 'ASII.JK', name: 'Astra', sector: 'IDX' },
-]
 
 const SECTOR_COLORS: Record<string, string> = {
   Technology: '#3b82f6',

@@ -1,5 +1,7 @@
 import { type NextRequest } from 'next/server'
 import { apiJson } from '@/lib/api/response'
+import { SCREENER_STOCKS } from '@/lib/config/universe'
+import { getIdxUniverse } from '@/lib/modules/market/provider/idx-universe'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,49 +32,21 @@ export async function GET(request: NextRequest) {
   const sortOrder = searchParams.get('sortOrder') ?? 'desc'
   const limit = Math.min(Number(searchParams.get('limit') ?? '50'), 200)
 
-  // All screener stocks
-  const ALL_STOCKS = [
-    // US Tech
-    { symbol: 'AAPL', name: 'Apple', sector: 'Technology', exchange: 'NASDAQ' },
-    { symbol: 'MSFT', name: 'Microsoft', sector: 'Technology', exchange: 'NASDAQ' },
-    { symbol: 'GOOGL', name: 'Alphabet', sector: 'Technology', exchange: 'NASDAQ' },
-    { symbol: 'AMZN', name: 'Amazon', sector: 'Technology', exchange: 'NASDAQ' },
-    { symbol: 'NVDA', name: 'NVIDIA', sector: 'Technology', exchange: 'NASDAQ' },
-    { symbol: 'META', name: 'Meta', sector: 'Technology', exchange: 'NASDAQ' },
-    { symbol: 'TSLA', name: 'Tesla', sector: 'Automotive', exchange: 'NASDAQ' },
-    { symbol: 'NFLX', name: 'Netflix', sector: 'Media', exchange: 'NASDAQ' },
-    // US Financial
-    { symbol: 'JPM', name: 'JPMorgan', sector: 'Financial', exchange: 'NYSE' },
-    { symbol: 'GS', name: 'Goldman Sachs', sector: 'Financial', exchange: 'NYSE' },
-    { symbol: 'V', name: 'Visa', sector: 'Financial', exchange: 'NYSE' },
-    { symbol: 'BAC', name: 'Bank of America', sector: 'Financial', exchange: 'NYSE' },
-    // US Healthcare
-    { symbol: 'UNH', name: 'UnitedHealth', sector: 'Healthcare', exchange: 'NYSE' },
-    { symbol: 'JNJ', name: 'Johnson & Johnson', sector: 'Healthcare', exchange: 'NYSE' },
-    { symbol: 'LLY', name: 'Eli Lilly', sector: 'Healthcare', exchange: 'NYSE' },
-    // US Energy
-    { symbol: 'XOM', name: 'Exxon Mobil', sector: 'Energy', exchange: 'NYSE' },
-    { symbol: 'CVX', name: 'Chevron', sector: 'Energy', exchange: 'NYSE' },
-    // IDX
-    { symbol: 'BBCA.JK', name: 'Bank Central Asia', sector: 'Financial', exchange: 'IDX' },
-    { symbol: 'BBRI.JK', name: 'Bank Rakyat Indonesia', sector: 'Financial', exchange: 'IDX' },
-    { symbol: 'BMRI.JK', name: 'Bank Mandiri', sector: 'Financial', exchange: 'IDX' },
-    { symbol: 'TLKM.JK', name: 'Telkom Indonesia', sector: 'Telecom', exchange: 'IDX' },
-    { symbol: 'GOTO.JK', name: 'GoTo Gojek Tokopedia', sector: 'Technology', exchange: 'IDX' },
-    { symbol: 'ADRO.JK', name: 'Adaro Energy', sector: 'Energy', exchange: 'IDX' },
-    // EU
-    { symbol: 'SAP.DE', name: 'SAP', sector: 'Technology', exchange: 'XETRA' },
-    { symbol: 'MC.PA', name: 'LVMH', sector: 'Consumer', exchange: 'Euronext' },
-    // Asia
-    { symbol: '7203.T', name: 'Toyota', sector: 'Automotive', exchange: 'TSE' },
-    { symbol: '0700.HK', name: 'Tencent', sector: 'Technology', exchange: 'HKEX' },
-    { symbol: 'BABA', name: 'Alibaba', sector: 'Technology', exchange: 'NYSE' },
-    { symbol: '005930.KS', name: 'Samsung', sector: 'Technology', exchange: 'KRX' },
-    { symbol: '2330.TW', name: 'TSMC', sector: 'Technology', exchange: 'TWSE' },
-  ]
 
   // Apply filters
-  let filtered = ALL_STOCKS
+  const universe: Array<{ symbol: string; name: string; sector: string; exchange: string }> = [...SCREENER_STOCKS]
+  if (!exchange || exchange.toLowerCase() === 'idx') {
+    try {
+      const { stocks } = await getIdxUniverse()
+      const curated = new Set(universe.map((s) => s.symbol))
+      universe.push(
+        ...stocks
+          .filter((s) => !curated.has(s.symbol))
+          .map((s) => ({ symbol: s.symbol, name: s.name || s.symbol.replace('.JK', ''), sector: s.sector ?? 'IDX', exchange: 'IDX' })),
+      )
+    } catch { /* curated floor covers */ }
+  }
+  let filtered = universe
   if (sector) filtered = filtered.filter(s => s.sector.toLowerCase() === sector.toLowerCase())
   if (exchange) filtered = filtered.filter(s => s.exchange.toLowerCase() === exchange.toLowerCase())
 

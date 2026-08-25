@@ -41,11 +41,7 @@ interface Fundamentals {
   operatingCashflow: number | null
 }
 
-const WATCHLIST = [
-  'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'JPM', 'V', 'JNJ',
-  'BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'TLKM.JK', 'GOTO.JK',
-  'SAP.DE', 'MC.PA', '0700.HK', 'BABA', '7203.T',
-]
+import { ANALYSIS_WATCHLIST as WATCHLIST } from '@/lib/config/universe'
 
 export default function FundamentalsPage() {
   const [data, setData] = useState<Fundamentals[]>([])

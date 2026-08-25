@@ -18,44 +18,7 @@ interface StockData {
   exchange: string
 }
 
-const SCREENER_STOCKS = [
-  // US Large Cap
-  { symbol: 'AAPL', name: 'Apple', sector: 'Technology', exchange: 'NASDAQ' },
-  { symbol: 'MSFT', name: 'Microsoft', sector: 'Technology', exchange: 'NASDAQ' },
-  { symbol: 'GOOGL', name: 'Alphabet', sector: 'Technology', exchange: 'NASDAQ' },
-  { symbol: 'AMZN', name: 'Amazon', sector: 'Consumer', exchange: 'NASDAQ' },
-  { symbol: 'NVDA', name: 'NVIDIA', sector: 'Technology', exchange: 'NASDAQ' },
-  { symbol: 'META', name: 'Meta', sector: 'Technology', exchange: 'NASDAQ' },
-  { symbol: 'TSLA', name: 'Tesla', sector: 'Automotive', exchange: 'NASDAQ' },
-  { symbol: 'JPM', name: 'JPMorgan Chase', sector: 'Financial', exchange: 'NYSE' },
-  { symbol: 'V', name: 'Visa', sector: 'Financial', exchange: 'NYSE' },
-  { symbol: 'JNJ', name: 'Johnson & Johnson', sector: 'Healthcare', exchange: 'NYSE' },
-  { symbol: 'WMT', name: 'Walmart', sector: 'Consumer', exchange: 'NYSE' },
-  { symbol: 'XOM', name: 'Exxon Mobil', sector: 'Energy', exchange: 'NYSE' },
-  { symbol: 'PG', name: 'Procter & Gamble', sector: 'Consumer', exchange: 'NYSE' },
-  { symbol: 'UNH', name: 'UnitedHealth', sector: 'Healthcare', exchange: 'NYSE' },
-  { symbol: 'HD', name: 'Home Depot', sector: 'Consumer', exchange: 'NYSE' },
-  { symbol: 'DIS', name: 'Disney', sector: 'Media', exchange: 'NYSE' },
-  { symbol: 'NFLX', name: 'Netflix', sector: 'Media', exchange: 'NASDAQ' },
-  { symbol: 'BA', name: 'Boeing', sector: 'Industrial', exchange: 'NYSE' },
-  { symbol: 'GS', name: 'Goldman Sachs', sector: 'Financial', exchange: 'NYSE' },
-  { symbol: 'COST', name: 'Costco', sector: 'Consumer', exchange: 'NASDAQ' },
-  // IDX Blue Chips
-  { symbol: 'BBCA.JK', name: 'Bank Central Asia', sector: 'Financial', exchange: 'IDX' },
-  { symbol: 'BBRI.JK', name: 'Bank Rakyat Indonesia', sector: 'Financial', exchange: 'IDX' },
-  { symbol: 'BMRI.JK', name: 'Bank Mandiri', sector: 'Financial', exchange: 'IDX' },
-  { symbol: 'TLKM.JK', name: 'Telkom Indonesia', sector: 'Telecom', exchange: 'IDX' },
-  { symbol: 'ASII.JK', name: 'Astra International', sector: 'Industrial', exchange: 'IDX' },
-  { symbol: 'GOTO.JK', name: 'GoTo Gojek Tokopedia', sector: 'Technology', exchange: 'IDX' },
-  // EU
-  { symbol: 'SAP.DE', name: 'SAP', sector: 'Technology', exchange: 'XETRA' },
-  { symbol: 'MC.PA', name: 'LVMH', sector: 'Consumer', exchange: 'Euronext' },
-  { symbol: 'TTE.PA', name: 'TotalEnergies', sector: 'Energy', exchange: 'Euronext' },
-  // Asia
-  { symbol: '7203.T', name: 'Toyota', sector: 'Automotive', exchange: 'TSE' },
-  { symbol: '0700.HK', name: 'Tencent', sector: 'Technology', exchange: 'HKEX' },
-  { symbol: 'BABA', name: 'Alibaba', sector: 'Technology', exchange: 'NYSE' },
-]
+import { SCREENER_STOCKS } from '@/lib/config/universe'
 
 const SECTORS = [...new Set(SCREENER_STOCKS.map(s => s.sector))].sort()
 const EXCHANGES = [...new Set(SCREENER_STOCKS.map(s => s.exchange))].sort()

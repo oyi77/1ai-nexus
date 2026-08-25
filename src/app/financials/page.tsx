@@ -43,11 +43,7 @@ interface FinancialData {
   enterpriseValue: number | null
 }
 
-const SYMBOLS = [
-  'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA', 'META', 'TSLA', 'JPM', 'V', 'JNJ',
-  'BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'TLKM.JK', 'GOTO.JK',
-  'SAP.DE', 'MC.PA', '0700.HK', 'BABA', '7203.T',
-]
+import { ANALYSIS_WATCHLIST as SYMBOLS } from '@/lib/config/universe'
 
 export default function FinancialsPage() {
   const [selected, setSelected] = useState('AAPL')
