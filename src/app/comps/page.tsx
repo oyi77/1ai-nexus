@@ -23,25 +23,42 @@ type CompData = {
   debtEquity: number | null
 }
 
-import { PEER_GROUPS } from '@/lib/config/universe'
+import { PEER_GROUPS, PEER_GROUP_NAMES } from '@/lib/config/universe'
 
 export default function ComparablesPage() {
   const [selected, setSelected] = useState('us-tech')
+  const [symbols, setSymbols] = useState<string[]>(PEER_GROUPS['us-tech'].symbols)
   const [data, setData] = useState<Record<string, CompData>>({})
   const [loading, setLoading] = useState(true)
 
-  const group = PEER_GROUPS[selected]
+  // Membership: curated groups resolve from config; IDX groups are derived
+  // server-side from the live universe (sector/industry predicates).
+  useEffect(() => {
+    let cancelled = false
+    if (PEER_GROUPS[selected]) {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- curated groups are local constants
+      setSymbols(PEER_GROUPS[selected].symbols)
+      return
+    }
+    fetch(`/api/v1/equities/universe?group=${selected}`)
+      .then(r => r.json())
+      .then(d => {
+        const g = d.data?.group as { symbols?: string[] } | undefined
+        if (!cancelled) setSymbols(g?.symbols ?? [])
+      })
+      .catch(() => { if (!cancelled) setSymbols([]) })
+    return () => { cancelled = true }
+  }, [selected])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
         setLoading(true)
-    const symbols = group.symbols.join(',')
-    fetch(`/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${symbols}`)
+    fetch(`/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${symbols.join(',')}`)
       .then(r => r.json())
       .then(d => {
         const map: Record<string, CompData> = {}
         for (const q of d.data ?? []) {
-          const meta = group.symbols.find(s => s === q.symbol)
+          if (!symbols.includes(q.symbol)) continue
           map[q.symbol] = {
             symbol: q.symbol,
             name: q.shortName ?? q.symbol,
@@ -64,7 +81,7 @@ export default function ComparablesPage() {
         setLoading(false)
       })
       .catch(() => setLoading(false))
-  }, [selected])
+  }, [symbols])
 
   const rows = useMemo(() => Object.values(data), [data])
   const tc = useTableControls(rows, undefined, { initialSortKey: 'marketCap', initialSortDir: 'desc' })
@@ -95,7 +112,7 @@ export default function ComparablesPage() {
           <div>
             <h1 className="text-xl font-bold font-mono text-accent-cyan">COMPARABLE COMPANY ANALYSIS</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
-              {Object.keys(PEER_GROUPS).length} peer groups · {Object.values(PEER_GROUPS).reduce((s, g) => s + g.symbols.length, 0)} companies
+              {Object.keys(PEER_GROUP_NAMES).length} peer groups · IDX membership derived live from universe
             </p>
           </div>
           <LiveDot status={loading ? 'stale' : 'live'} label />
@@ -103,14 +120,14 @@ export default function ComparablesPage() {
 
         {/* Peer Group Selector */}
         <div className="flex flex-wrap gap-2">
-          {Object.entries(PEER_GROUPS).map(([key, g]) => (
+          {Object.entries(PEER_GROUP_NAMES).map(([key, gname]) => (
             <button key={key} onClick={() => setSelected(key)}
               className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
                 selected === key
                   ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
                   : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
               }`}>
-              {g.name}
+              {gname}
             </button>
           ))}
         </div>

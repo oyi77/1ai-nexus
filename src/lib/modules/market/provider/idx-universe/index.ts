@@ -3,7 +3,7 @@
 //
 // Live source: TradingView Indonesia stock scanner (plain HTTPS,
 // verified reachable server-side, ~840+ active tickers with
-// company names + sectors).
+// company names + sectors + industries).
 //
 // Source ladder (first success wins):
 //   1. scanner.tradingview.com/indonesia/scan (live)
@@ -24,13 +24,14 @@ import { getCached } from '@/lib/api/server-cache'
 const SNAPSHOT_FILE = join(process.cwd(), 'data', 'idx', 'universe.json')
 const SCAN_URL = 'https://scanner.tradingview.com/indonesia/scan'
 
-const CACHE_KEY = 'idx-universe:v1'
+const CACHE_KEY = 'idx-universe:v2' // v2 adds industry column
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000 // 6h — listings change rarely
 
 export interface IdxUniverseStock {
   symbol: string
   name: string
   sector?: string
+  industry?: string
 }
 
 export type IdxUniverseSource = 'tradingview' | 'snapshot' | 'curated-fallback'
@@ -45,20 +46,27 @@ export interface IdxUniverse {
   }
 }
 
+// Columns requested from the scanner, in order:
+// ticker, company name, sector, industry.
 const ScanResponse = z.object({
   totalCount: z.number(),
   data: z.array(z.object({
     s: z.string(),
-    d: z.tuple([z.string(), z.string(), z.string()]).rest(z.unknown()),
+    d: z.array(z.string()),
   })),
 })
 
 const SnapshotSchema = z.object({
   capturedAt: z.string(),
-  stocks: z.array(z.object({ symbol: z.string(), name: z.string(), sector: z.string().optional() })),
+  stocks: z.array(z.object({
+    symbol: z.string(),
+    name: z.string(),
+    sector: z.string().optional(),
+    industry: z.string().optional(),
+  })),
 })
 
-/** Live universe from TradingView Indonesia scanner (columns: ticker, company, sector). */
+/** Live universe from TradingView Indonesia scanner. */
 async function fetchLive(): Promise<IdxUniverseStock[]> {
   const res = await fetch(SCAN_URL, {
     method: 'POST',
@@ -70,7 +78,7 @@ async function fetchLive(): Promise<IdxUniverseStock[]> {
     body: JSON.stringify({
       filter: [{ left: 'type', operation: 'equal', right: 'stock' }],
       options: { lang: 'en' },
-      columns: ['name', 'description', 'sector'],
+      columns: ['name', 'description', 'sector', 'industry'],
       range: [0, 3000],
     }),
   })
@@ -80,6 +88,7 @@ async function fetchLive(): Promise<IdxUniverseStock[]> {
     symbol: `${row.d[0] || row.s.replace('IDX:', '')}.JK`,
     name: row.d[1],
     sector: row.d[2],
+    industry: row.d[3],
   }))
 }
 

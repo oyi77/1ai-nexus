@@ -18,11 +18,12 @@ import { z } from 'zod'
 const OUT_FILE = join(process.cwd(), 'data', 'idx', 'universe.json')
 const SCAN_URL = 'https://scanner.tradingview.com/indonesia/scan'
 
+// Columns in order: ticker, company name, sector, industry.
 const ScanResponse = z.object({
   totalCount: z.number(),
   data: z.array(z.object({
     s: z.string(),
-    d: z.tuple([z.string(), z.string(), z.string()]).rest(z.unknown()),
+    d: z.array(z.string()),
   })),
 })
 
@@ -37,7 +38,7 @@ async function main() {
     body: JSON.stringify({
       filter: [{ left: 'type', operation: 'equal', right: 'stock' }],
       options: { lang: 'en' },
-      columns: ['name', 'description', 'sector'],
+      columns: ['name', 'description', 'sector', 'industry'],
       range: [0, 3000],
     }),
   })
@@ -48,6 +49,7 @@ async function main() {
     symbol: `${row.d[0] || row.s.replace('IDX:', '')}.JK`,
     name: row.d[1],
     sector: row.d[2],
+    industry: row.d[3],
   }))
   if (stocks.length === 0) throw new Error('scanner returned no listings')
 

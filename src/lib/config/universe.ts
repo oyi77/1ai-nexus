@@ -266,10 +266,22 @@ export const PEER_GROUPS: Record<string, { name: string; symbols: string[] }> = 
   'us-tech': { name: 'US Big Tech', symbols: ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA'] },
   'us-healthcare': { name: 'US Healthcare', symbols: ['UNH', 'JNJ', 'LLY', 'PFE', 'ABBV', 'MRK'] },
   'us-energy': { name: 'US Energy', symbols: ['XOM', 'CVX', 'COP', 'SLB', 'EOG', 'OXY'] },
-  'idx-banks': { name: 'IDX Banks', symbols: ['BBCA.JK', 'BBRI.JK', 'BMRI.JK', 'BBNI.JK', 'BRIS.JK', 'BTPS.JK'] },
-  'idx-telecom': { name: 'IDX Telecom', symbols: ['TLKM.JK', 'EXCL.JK', 'ISAT.JK', 'FREN.JK'] },
   'global-luxury': { name: 'Global Luxury', symbols: ['MC.PA', 'RMS.DE', 'CFR.SW', 'EL', 'COTY', 'TPR'] },
   'ev-battery': { name: 'EV & Battery', symbols: ['TSLA', 'NIO', 'RIVN', 'LCID', 'BYDDY', '1211.HK'] },
+}
+
+// IDX peer groups are DERIVED from the live universe at serve time
+// (sector/industry predicates over market/provider/idx-universe),
+// NOT stored as symbol lists — membership follows the market.
+export const IDX_DERIVED_GROUPS: Record<string, { name: string; sector: string; industry?: string }> = {
+  'idx-banks': { name: 'IDX Banks', sector: 'Finance', industry: 'banks' }, // TV splits banks into Major/Regional
+  'idx-telecom': { name: 'IDX Telecom', sector: 'Communications' },
+}
+
+// Display registry for peer-group tabs (curated + derived)
+export const PEER_GROUP_NAMES: Record<string, string> = {
+  ...Object.fromEntries(Object.entries(PEER_GROUPS).map(([id, g]) => [id, g.name])),
+  ...Object.fromEntries(Object.entries(IDX_DERIVED_GROUPS).map(([id, g]) => [id, g.name])),
 }
 
 // Chart quick-picks (charts page)
