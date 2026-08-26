@@ -1,5 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="64" fill="#080b0f"/>
-  <text x="256" y="320" font-family="monospace" font-size="240" font-weight="bold" fill="#00ff88" text-anchor="middle">N</text>
-  <rect x="60" y="400" width="392" height="4" rx="2" fill="#00c8ff"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2DD4A0"/>
+      <stop offset="1" stop-color="#14B08A"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="#0C0C0F"/>
+  <rect x="8" y="8" width="496" height="496" rx="90" fill="none" stroke="#232329" stroke-width="2"/>
+  <!-- diamond mark -->
+  <path d="M256 96 L376 216 L256 336 L136 216 Z" fill="url(#g)"/>
+  <path d="M256 148 L324 216 L256 284 L188 216 Z" fill="#0C0C0F"/>
+  <path d="M256 188 L284 216 L256 244 L228 216 Z" fill="url(#g)"/>
+  <!-- N stem -->
+  <rect x="244" y="216" width="24" height="200" rx="6" fill="#F4F4F5"/>
+  <rect x="244" y="392" width="120" height="24" rx="6" fill="#F4F4F5"/>
 </svg>

@@ -28,8 +28,9 @@ export const viewport: Viewport = {
 }
 
 export const metadata: Metadata = {
-  title: "◈ NEXUS — Intelligence Terminal",
-  description: "AI-powered intelligence terminal for news, markets, macro, and alternative data. 58+ data modules, zero API keys.",
+  title: "◆ NEXUS — Market Intelligence Terminal",
+  description:
+    "IDX bandarmology, fundamentals, 14 global markets, on-chain intel and AI signals — 38,902 instruments across 20 exchanges, served from memory in milliseconds. Free.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -37,8 +38,19 @@ export const metadata: Metadata = {
     title: "NEXUS",
   },
   openGraph: {
-    title: "◈ NEXUS",
-    description: "AI-powered intelligence scanning terminal",
+    title: "◆ NEXUS — Market Intelligence, Bloomberg-grade. Free.",
+    description:
+      "38,902 instruments · 20 exchanges · 15 markets · 58+ data modules. IDX bandarmology, fundamentals, on-chain and AI signals in one terminal.",
+    url: "https://tracker.aitradepulse.com",
+    siteName: "NEXUS",
+    type: "website",
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "NEXUS — Market Intelligence Terminal" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "◆ NEXUS — Market Intelligence, Bloomberg-grade. Free.",
+    description: "38,902 instruments · 20 exchanges · 15 markets. Free forever.",
+    images: ["/og.png"],
   },
 }
 
