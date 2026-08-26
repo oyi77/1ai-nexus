@@ -286,11 +286,21 @@ const API_ENDPOINTS: ApiEndpoint[] = [
   {
     method: 'GET',
     path: '/api/v1/equities/universe',
-    description: 'Dynamic IDX listed-equity universe (~840 tickers) or curated peer groups',
+    description: 'Equity universe: IDX by default, or one of 14 global markets (TradingView scan)',
     category: 'Screener',
-    params: 'group=idx-banks|us-tech|… (optional)',
-    example: 'curl "https://tracker.aitradepulse.com/api/v1/equities/universe"',
-    response: '{ data: { exchange: "IDX", stocks: [{ symbol: "BBCA.JK", name: "Bank Central Asia", sector: "Finance" }], meta: { source: "tradingview", count: 844 } } }',
+    params: 'market=us|japan|uk|germany|hongkong|india|canada|korea|taiwan|australia|singapore|brazil|switzerland|netherlands · markets=1 (catalog) · group=idx-banks|… · quotes=1 (IDX OHLCV embed)',
+    example: 'curl "https://tracker.aitradepulse.com/api/v1/equities/universe?market=japan"',
+    response: '{ data: { stocks: [{ symbol: "7203.T", name: "Toyota Motor", exchange: "TSE" }], meta: { captured: 3782, totalCount: 3914 } } }',
+  },
+
+  {
+    method: 'GET',
+    path: '/api/v1/saham/fundamentals',
+    description: 'IDX fundamental ratios from the nightly harvest (PER, PBV, ROE %, DER, EPS, marketCap, divYield %)',
+    category: 'Screener',
+    params: 'symbol=BBCA (optional — omit for the whole universe)',
+    example: 'curl "https://tracker.aitradepulse.com/api/v1/saham/fundamentals?symbol=BBCA"',
+    response: '{ data: { symbol: "BBCA", per: 13.62, pbv: 2.81, roe: 21.82, der: 0.20, eps: 471.83, marketCap: 788960300000000, dividendYield: 5.56 } }',
   },
 
   // ─── API Keys ──────────────────────────────────────────
