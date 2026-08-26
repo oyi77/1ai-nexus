@@ -11,6 +11,31 @@ import { _clearCaches } from '../fetch-with-cache'
 
 import gateioFixture from './fixtures/gateio-leaderboard.json'
 import hlFixture from './fixtures/hyperliquid-leaderboard.json'
+interface LeaderRow {
+  id: string
+  platform: string
+  nick: string
+  level: number
+  profit: number
+  profitRate: number
+  winRate: number
+  maxDrawdown: number
+  sharpe: number
+  aum: number
+  followers: number
+  maxFollowers: number
+  leadingDays: number
+  plRatio: number
+  isPrivate: boolean
+  labels: string[]
+  avatar: string | null
+}
+interface CopyResult {
+  source: string
+  timestamp: number
+  ttl: number
+  data: { leaders: LeaderRow[]; total: number }
+}
 
 // Keep the module's lazy Redis client out of tests (memory cache only).
 vi.mock('../../redis', () => ({
@@ -44,7 +69,7 @@ describe('Gate.io Copy-Trading Leaderboard (re)', () => {
 
   it('normalizes leader rows from the gate.tv web API fixture', async () => {
     stubFetch(gateioFixture)
-    const result = (await gateioModule.fetch({ cycle: 'month', page_size: 50, order_by: 'aum' })) as any;
+    const result = (await gateioModule.fetch({ cycle: 'month', page_size: 50, order_by: 'aum' })) as CopyResult;
     expect(result.data.leaders.length).toBe(5)
     expect(result.data.total).toBe(502) // dynamic data.totalcount, never hardcoded
 
@@ -70,13 +95,13 @@ describe('Gate.io Copy-Trading Leaderboard (re)', () => {
 
   it('maps is_private_leader to isPrivate', async () => {
     stubFetch(gateioFixture)
-    const result = (await gateioModule.fetch({ cycle: 'month' })) as any;
+    const result = (await gateioModule.fetch({ cycle: 'month' })) as CopyResult;
     expect(result.data.leaders[1].isPrivate).toBe(true)
   })
 
   it('returns the standard ModuleResult shape', async () => {
     stubFetch(gateioFixture)
-    const result = (await gateioModule.fetch({ cycle: 'week' })) as any;
+    const result = (await gateioModule.fetch({ cycle: 'week' })) as CopyResult;
     expect(result.source).toContain('gateio-copy-leaderboard')
     expect(result.timestamp).toBeGreaterThan(0)
     expect(result.ttl).toBe(180_000) // TOKEN_DATA × RE_MULTIPLIER
@@ -98,7 +123,7 @@ describe('Hyperliquid Copy-Trading Leaderboard (public-api)', () => {
 
   it('slices the dump to page_size and normalizes month performance', async () => {
     stubFetch(hlFixture)
-    const result = (await hyperliquidModule.fetch({ cycle: 'month', page_size: 3 })) as any;
+    const result = (await hyperliquidModule.fetch({ cycle: 'month', page_size: 3 })) as CopyResult;
     expect(result.data.leaders.length).toBe(3)
     expect(result.data.total).toBe(5) // fixture row count
 
@@ -118,7 +143,7 @@ describe('Hyperliquid Copy-Trading Leaderboard (public-api)', () => {
 
   it('uses a long TTL mirroring the hourly dump refresh', async () => {
     stubFetch(hlFixture)
-    const result = (await hyperliquidModule.fetch({ cycle: 'allTime', page_size: 1 })) as any;
+    const result = (await hyperliquidModule.fetch({ cycle: 'allTime', page_size: 1 })) as CopyResult;
     expect(result.ttl).toBe(3_600_000) // MACRO_DATA
     expect(result.data.leaders.length).toBe(1)
   })
