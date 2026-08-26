@@ -8,7 +8,7 @@ declare module 'jsonwebtoken' {
     token: string,
     secretOrPublicKey: string | Buffer,
     options?: Record<string, unknown>
-  ): any;
+  ): Record<string, unknown> | string;
   const _default: { sign: typeof sign; verify: typeof verify };
   export default _default;
 }
