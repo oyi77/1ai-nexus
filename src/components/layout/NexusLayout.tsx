@@ -42,6 +42,7 @@ const NAV_SECTIONS: NavSection[] = [
     title: 'Markets',
     items: [
       { label: 'Equities',      href: '/equities',       icon: Building2 },
+      { label: 'Bandarmology',  href: '/bandarmology',   icon: BarChart3 },
       { label: 'Forex',         href: '/forex',          icon: DollarSign },
       { label: 'Commodities',   href: '/commodities',    icon: Package },
       { label: 'Bonds',         href: '/bonds',          icon: TrendingUp },
