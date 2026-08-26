@@ -8,10 +8,16 @@
 //   foreign-history.json  rolling 90-session foreign flows
 //   brokers-latest.json   market broker board
 //
+// SERVING PATTERN: parsed datasets live in a process-lifetime
+// singleton invalidated by source mtimes (cron refreshes are
+// picked up on the next call). Sorts are computed once per
+// snapshot — per-request work collapses to slices over prebuilt
+// arrays.
+//
 // SERVER-ONLY (node:fs). Consume via /api/v1/saham/bandarmology.
 // ─────────────────────────────────────────────────────────────
 
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { z } from 'zod'
 
@@ -25,7 +31,7 @@ export interface ForeignLeader {
   fbuyVol: number
   fsellVol: number
   netVol: number
-  estNetValueIdr: number // netVol × close (approximation — volumes, not lots)
+  estNetValueIdr: number
 }
 
 export interface ForeignStreak extends ForeignLeader {
@@ -36,6 +42,7 @@ export interface ForeignStreak extends ForeignLeader {
 const LatestSchema = z.object({
   capturedAt: z.string(),
   tradeDate: z.string(),
+  count: z.number(),
   rows: z.array(z.object({
     code: z.string(),
     name: z.string(),
@@ -67,26 +74,24 @@ export interface SahamMeta {
   tradeDate: string
   capturedAt: string
   count: number
-  historySessions: number
+  historySessions?: number
 }
 
-async function readLatest(): Promise<{ parsed: z.infer<typeof LatestSchema>; meta: SahamMeta }> {
-  const parsed = LatestSchema.parse(JSON.parse(await readFile(join(DIR, 'saham-latest.json'), 'utf8')))
-  return {
-    parsed,
-    meta: { tradeDate: parsed.tradeDate, capturedAt: parsed.capturedAt, count: parsed.rows.length, historySessions: 0 },
-  }
+type LatestRow = z.infer<typeof LatestSchema>['rows'][number]
+
+interface BandarCache {
+  mtimes: string
+  latestParsed: { capturedAt: string; tradeDate: string; count: number }
+  history: z.infer<typeof HistorySchema>
+  brokersTradeDate: string
+  leadersAll: ForeignLeader[]
+  leadersByValueAsc: ForeignLeader[]
+  brokerRowsByValueDesc: z.infer<typeof BrokersSchema>['rows']
 }
 
-async function readHistory(): Promise<z.infer<typeof HistorySchema>> {
-  return HistorySchema.parse(JSON.parse(await readFile(join(DIR, 'foreign-history.json'), 'utf8')))
-}
+let cache: BandarCache | null = null
 
-async function readBrokers(): Promise<z.infer<typeof BrokersSchema>> {
-  return BrokersSchema.parse(JSON.parse(await readFile(join(DIR, 'brokers-latest.json'), 'utf8')))
-}
-
-function toLeader(r: z.infer<typeof LatestSchema>['rows'][number]): ForeignLeader {
+function toLeader(r: LatestRow): ForeignLeader {
   const netVol = r.foreignBuy - r.foreignSell
   return {
     code: r.code,
@@ -100,35 +105,88 @@ function toLeader(r: z.infer<typeof LatestSchema>['rows'][number]): ForeignLeade
   }
 }
 
+async function mtimeOf(file: string): Promise<number> {
+  try {
+    return (await stat(file)).mtimeMs
+  } catch {
+    return -1
+  }
+}
+
+async function buildCache(): Promise<BandarCache> {
+  const [latestRaw, historyRaw, brokersRaw] = await Promise.all([
+    readFile(join(DIR, 'saham-latest.json'), 'utf8'),
+    readFile(join(DIR, 'foreign-history.json'), 'utf8'),
+    readFile(join(DIR, 'brokers-latest.json'), 'utf8'),
+  ])
+  const latest = LatestSchema.parse(JSON.parse(latestRaw))
+  const history = HistorySchema.parse(JSON.parse(historyRaw))
+  const brokers = BrokersSchema.parse(JSON.parse(brokersRaw))
+
+  const leadersAll = latest.rows.map(toLeader)
+  const leadersByValueAsc = [...leadersAll]
+    .filter((l) => l.fbuyVol > 0 || l.fsellVol > 0)
+    .sort((a, b) => a.estNetValueIdr - b.estNetValueIdr)
+
+  return {
+    mtimes: '',
+    latestParsed: { capturedAt: latest.capturedAt, tradeDate: latest.tradeDate, count: latest.count },
+    history,
+    brokersTradeDate: brokers.tradeDate,
+    leadersAll,
+    leadersByValueAsc,
+    brokerRowsByValueDesc: [...brokers.rows].sort((a, b) => b.value - a.value),
+  }
+}
+
+/** Singleton access; rebuilds only when any source file's mtime changes. */
+async function getCache(): Promise<BandarCache> {
+  const [m1, m2, m3] = await Promise.all([
+    mtimeOf(join(DIR, 'saham-latest.json')),
+    mtimeOf(join(DIR, 'foreign-history.json')),
+    mtimeOf(join(DIR, 'brokers-latest.json')),
+  ])
+  const sig = `${m1}:${m2}:${m3}`
+  if (!cache || cache.mtimes !== sig) {
+    cache = await buildCache()
+    cache.mtimes = sig
+  }
+  return cache
+}
+
 /** Top foreign net-buy / net-sell stocks for the latest session. */
 export async function getForeignLeaders(limit = 20): Promise<{
   meta: SahamMeta
   topBuy: ForeignLeader[]
   topSell: ForeignLeader[]
 }> {
-  const { parsed, meta } = await readLatest()
-  let historySessions = 0
-  try {
-    historySessions = (await readHistory()).sessions.length
-  } catch { /* optional */ }
-  const leaders = parsed.rows.filter((r) => r.foreignBuy > 0 || r.foreignSell > 0).map(toLeader)
-  const byValue = [...leaders].sort((a, b) => b.estNetValueIdr - a.estNetValueIdr)
+  const c = await getCache()
+  const asc = c.leadersByValueAsc.filter((l) => l.netVol !== 0)
   return {
-    meta: { ...meta, historySessions },
-    topBuy: byValue.slice(0, limit),
-    topSell: [...byValue].reverse().slice(0, limit),
+    meta: { ...c.latestParsed, historySessions: c.history.sessions.length },
+    topBuy: asc.slice(-limit).reverse(),
+    topSell: asc.slice(0, limit),
   }
 }
 
 /** Consecutive-session foreign accumulation/distribution streaks. */
+const streakMemo = new Map<string, { days: number; dir: 'accumulation' | 'distribution' | null }>()
+let streakMemoSig = ''
+
 export async function getForeignStreaks(minDays = 3, limit = 25): Promise<{
   meta: SahamMeta & { sessionsUsed: number }
   accumulation: ForeignStreak[]
   distribution: ForeignStreak[]
 }> {
-  const [latest, history] = await Promise.all([readLatest(), readHistory()])
-  const sessions = history.sessions.slice(-30)
+  const c = await getCache()
+  if (streakMemoSig !== c.mtimes) {
+    streakMemo.clear()
+    streakMemoSig = c.mtimes
+  }
+  const sessions = c.history.sessions.slice(-30)
   const streakOf = (code: string): { days: number; dir: 'accumulation' | 'distribution' | null } => {
+    const hit = streakMemo.get(code)
+    if (hit) return hit
     let days = 0
     let dir: 'accumulation' | 'distribution' | null = null
     for (let i = sessions.length - 1; i >= 0; i--) {
@@ -141,19 +199,20 @@ export async function getForeignStreaks(minDays = 3, limit = 25): Promise<{
       else if (cur !== dir) break
       days++
     }
-    return { days, dir }
+    const out = { days, dir }
+    streakMemo.set(code, out)
+    return out
   }
 
-  const leaders = latest.parsed.rows.map(toLeader)
   const withStreaks: ForeignStreak[] = []
-  for (const l of leaders) {
+  for (const l of c.leadersAll) {
     const st = streakOf(l.code)
     if (st.dir && st.days >= minDays) withStreaks.push({ ...l, days: st.days, direction: st.dir })
   }
   const acc = withStreaks.filter((s) => s.direction === 'accumulation').sort((a, b) => b.days - a.days || b.estNetValueIdr - a.estNetValueIdr).slice(0, limit)
   const dist = withStreaks.filter((s) => s.direction === 'distribution').sort((a, b) => b.days - a.days || a.estNetValueIdr - b.estNetValueIdr).slice(0, limit)
   return {
-    meta: { tradeDate: latest.meta.tradeDate, capturedAt: latest.meta.capturedAt, count: latest.meta.count, historySessions: history.sessions.length, sessionsUsed: sessions.length },
+    meta: { ...c.latestParsed, historySessions: c.history.sessions.length, sessionsUsed: sessions.length },
     accumulation: acc,
     distribution: dist,
   }
@@ -164,9 +223,9 @@ export async function getForeignSeries(symbol: string, days = 30): Promise<{
   symbol: string
   series: Array<{ date: string; fbuy: number; fsell: number; net: number; close: number }>
 } | null> {
-  const history = await readHistory()
+  const c = await getCache()
   const code = symbol.replace('.JK', '').toUpperCase()
-  const series = history.sessions
+  const series = c.history.sessions
     .slice(-days)
     .map((s) => {
       const e = s.stocks[code]
@@ -182,9 +241,9 @@ export async function getBrokerBoard(limit = 25): Promise<{
   tradeDate: string
   rows: Array<z.infer<typeof BrokersSchema>['rows'][number]>
 }> {
-  const parsed = await readBrokers()
+  const c = await getCache()
   return {
-    tradeDate: parsed.tradeDate,
-    rows: [...parsed.rows].sort((a, b) => b.value - a.value).slice(0, limit),
+    tradeDate: c.brokersTradeDate,
+    rows: c.brokerRowsByValueDesc.slice(0, limit),
   }
 }

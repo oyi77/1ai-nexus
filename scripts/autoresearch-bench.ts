@@ -158,20 +158,20 @@ async function main() {
   const idx = new AnalyticsIndex(raw)
   const coldStartMs = performance.now() - t0
 
-  // Warm pass (JIT stabilization), then 3 measured passes with median kept.
+  // Warm pass (JIT stabilization), then 3 measured passes with median kept (9 passes).
   // Same seed → same stream → identical operation sequence every pass/run.
   runWorkload(idx, makeStream(1337, OPS * 8))
 
   const times: number[] = []
   let lastChecksum = 0
-  for (let pass = 0; pass < 3; pass++) {
+  for (let pass = 0; pass < 9; pass++) {
     const stream = makeStream(1337, OPS * 8)
     const t = performance.now()
     lastChecksum = runWorkload(idx, stream)
     times.push(performance.now() - t)
   }
   times.sort((a, b) => a - b)
-  const medianMs = times[1]
+  const medianMs = times[4]
 
   const opsPerSec = OPS / (medianMs / 1000)
 
