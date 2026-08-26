@@ -41,7 +41,6 @@ export const GLOBAL_MARKETS: Record<string, GlobalMarketDef> = {
   netherlands: { tv: 'netherlands', name: 'Netherlands', prefixes: { EURONEXT: '.AS' } },
 }
 
-const PAGE = 1000
 const MAX_ROWS = 20_000
 
 const ScanResponse = z.object({
@@ -64,80 +63,68 @@ export interface GlobalUniverse {
     totalCount: number
     captured: number
     skippedUnknownPrefix: number
+    /** rows dropped because the symbol already appeared on an earlier page */
+    deduped: number
     fetchedAt: string
   }
 }
 
 async function loadMarket(def: GlobalMarketDef): Promise<GlobalUniverse> {
   const stocks: GlobalUniverseStock[] = []
-  let totalCount = 0
   let skipped = 0
+  const seen = new Set<string>()
+  let deduped = 0
 
-  for (let start = 0; start < MAX_ROWS; start += PAGE) {
-    if (totalCount > 0 && start >= totalCount) break
-    // TV serves FULL pages past totalCount (probed: hk [2000,3000] → 1000 rows
-    // with only 651 remaining) and data:null when start >= totalCount. So:
-    // unclamped window + zero-row terminal + symbol dedupe for padded rows.
-    const end = start + PAGE
-    // Some markets reject 'description' (HTTP 400) — degrade to name-only.
-    let res = await fetch(`https://scanner.tradingview.com/${def.tv}/scan`, {
+  // Single oversized request returns the ENTIRE market exactly once — probed:
+  // [0,20000] on america → 11867 rows == totalCount == unique. Windowed
+  // pagination is unusable: TV reshuffles ordering between requests, so deep
+  // pages repeat earlier rows (hk page3 shared 1354 symbols with pages 1-2).
+  // data:null only occurs when range start >= totalCount, impossible here.
+  const scanBase = {
+    filter: [{ left: 'type', operation: 'equal', right: 'stock' }],
+    options: { lang: 'en' },
+    range: [0, MAX_ROWS],
+  }
+  const headers = {
+    'Content-Type': 'application/json',
+    'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126 Safari/537.36',
+  }
+
+  // Some markets reject the 'description' column with HTTP 400 → name-only.
+  let res = await fetch(`https://scanner.tradingview.com/${def.tv}/scan`, {
+    method: 'POST',
+    signal: AbortSignal.timeout(40_000),
+    headers,
+    body: JSON.stringify({ ...scanBase, columns: ['name', 'description'] }),
+  })
+  if (res.status === 400) {
+    res = await fetch(`https://scanner.tradingview.com/${def.tv}/scan`, {
       method: 'POST',
-      signal: AbortSignal.timeout(20_000),
-      headers: {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126 Safari/537.36',
-      },
-      body: JSON.stringify({
-        filter: [{ left: 'type', operation: 'equal', right: 'stock' }],
-        options: { lang: 'en' },
-        columns: ['name', 'description'],
-        range: [start, end],
-      }),
+      signal: AbortSignal.timeout(40_000),
+      headers,
+      body: JSON.stringify({ ...scanBase, columns: ['name'] }),
     })
-    let columns: string[] = ['name', 'description']
-    if (res.status === 400) {
-      columns = ['name']
-      res = await fetch(`https://scanner.tradingview.com/${def.tv}/scan`, {
-        method: 'POST',
-        signal: AbortSignal.timeout(20_000),
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/126 Safari/537.36',
-        },
-        body: JSON.stringify({
-          filter: [{ left: 'type', operation: 'equal', right: 'stock' }],
-          options: { lang: 'en' },
-          columns,
-          range: [start, end],
-        }),
-      })
+  }
+  if (!res.ok) throw new Error(`${def.tv} scan HTTP ${res.status}`)
+  const parsed = ScanResponse.parse(await res.json())
+
+  for (const row of parsed.data) {
+    const colon = row.s.indexOf(':')
+    const prefix = colon > 0 ? row.s.slice(0, colon) : ''
+    const d = Array.isArray(row.d) ? (row.d as string[]) : []
+    const base = (d[0] || (colon > 0 ? row.s.slice(colon + 1) : row.s)).trim()
+    if (!(prefix in def.prefixes)) {
+      skipped++
+      continue
     }
-    if (!res.ok) throw new Error(`${def.tv} scan HTTP ${res.status}`)
-    const parsed = ScanResponse.parse(await res.json())
-    totalCount = parsed.totalCount
-
-    let fetchedRaw = 0
-    const seen = new Set<string>()
-    for (const row of parsed.data) {
-      fetchedRaw++
-      const colon = row.s.indexOf(':')
-      const prefix = colon > 0 ? row.s.slice(0, colon) : ''
-      const d = Array.isArray(row.d) ? (row.d as string[]) : []
-      const base = (d[0] || (colon > 0 ? row.s.slice(colon + 1) : row.s)).trim()
-      const suffix = def.prefixes[prefix]
-      if (!(prefix in def.prefixes)) {
-        skipped++
-        continue
-      }
-      if (!base) continue
-      const symbol = `${base}${suffix ?? ''}`
-      if (seen.has(symbol)) continue
-      seen.add(symbol)
-      stocks.push({ symbol, name: d[1] ?? base, exchange: prefix })
+    if (!base) continue
+    const symbol = `${base}${def.prefixes[prefix]}`
+    if (seen.has(symbol)) {
+      deduped++
+      continue
     }
-
-    if (fetchedRaw === 0) break
-
+    seen.add(symbol)
+    stocks.push({ symbol, name: d[1] ?? base, exchange: prefix })
   }
 
   return {
@@ -146,19 +133,21 @@ async function loadMarket(def: GlobalMarketDef): Promise<GlobalUniverse> {
     stocks,
     meta: {
       source: `tradingview-${def.tv}-scan`,
-      totalCount,
+      totalCount: parsed.totalCount,
       captured: stocks.length,
       skippedUnknownPrefix: skipped,
+      deduped,
       fetchedAt: new Date().toISOString(),
     },
   }
 }
 
+
 /** Cached per-market universe (24h TTL — listings change rarely). */
 export async function getGlobalUniverse(marketId: string): Promise<GlobalUniverse> {
   const def = GLOBAL_MARKETS[marketId]
   if (!def) throw new Error(`Unknown market '${marketId}'. Available: ${Object.keys(GLOBAL_MARKETS).join(', ')}`)
-  const { data } = await getCached(`global-universe:${marketId}:v3`, 24 * 60 * 60 * 1000, () => loadMarket(def))
+  const { data } = await getCached(`global-universe:${marketId}:v5`, 24 * 60 * 60 * 1000, () => loadMarket(def))
   return data
 }
 /** Market catalog for UI pickers / discovery. */
