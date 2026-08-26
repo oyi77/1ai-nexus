@@ -16,6 +16,7 @@ type Streak = Leader & { days: number; direction: "accumulation" | "distribution
 type Broker = { firm: string; name: string; volume: number; value: number; freq: number }
 type FlowPoint = { date: string; buyVol: number; sellVol: number; netVol: number; netValueIdr: number }
 type RotationRow = { sector: string; netValueIdr: number; inflowStocks: number; outflowStocks: number }
+type SeriesPoint = { date: string; fbuy: number; fsell: number; net: number; cum: number; close: number }
 
 const fmtIdrB = (v: number) => `${(Math.abs(v) / 1e9).toFixed(2)}M` // miliar IDR
 const fmtVol = (v: number) => (Math.abs(v) >= 1e9 ? `${(v / 1e9).toFixed(1)}B` : v >= 1e6 ? `${(v / 1e6).toFixed(1)}M` : `${(v / 1e3).toFixed(0)}K`)
@@ -66,20 +67,62 @@ function FlowChart({ sessions }: { sessions: FlowPoint[] }) {
         const h = (Math.abs(s.netValueIdr) / max) * (mid - 14)
         const up = s.netValueIdr >= 0
         return (
-          <g key={s.date}>
-            <rect
-              x={i * bw + bw * 0.15}
-              y={up ? mid - h : mid}
-              width={bw * 0.7}
-              height={Math.max(h, 1)}
-              fill={up ? "var(--accent-green, #22c55e)" : "var(--accent-red, #ef4444)"}
-              opacity={0.85}
-            >
-              <title>{`${s.date} · Rp${fmtIdrB(s.netValueIdr)}B · vol ${fmtVol(s.netVol)}`}</title>
-            </rect>
-          </g>
+          <rect
+            key={s.date}
+            x={i * bw + bw * 0.15}
+            y={up ? mid - h : mid}
+            width={bw * 0.7}
+            height={Math.max(h, 1)}
+            fill={up ? "var(--accent-green, #22c55e)" : "var(--accent-red, #ef4444)"}
+            opacity={0.85}
+          >
+            <title>{`${s.date} · Rp${fmtIdrB(s.netValueIdr)}B · vol ${fmtVol(s.netVol)}`}</title>
+          </rect>
         )
       })}
+    </svg>
+  )
+}
+
+/** Per-stock series: net-volume bars + cumulative line overlay. */
+function SeriesChart({ pts }: { pts: SeriesPoint[] }) {
+  if (pts.length === 0) return null
+  const W = 1000
+  const H = 160
+  const bw = W / pts.length
+  const maxAbsNet = Math.max(...pts.map((p) => Math.abs(p.net)), 1)
+  const cums = pts.map((p) => p.cum)
+  const cumMin = Math.min(...cums, 0)
+  const cumMax = Math.max(...cums, 0)
+  const cumRange = Math.max(cumMax - cumMin, 1)
+  const mid = H / 2
+  // Cumulative polyline mapped into the top half.
+  const cumY = (v: number) => 8 + ((cumMax - v) / cumRange) * (mid - 20)
+  const poly = pts
+    .map((p, i) => `${i * bw + bw / 2},${cumY(p.cum)}`)
+    .join(" ")
+  const last = pts[pts.length - 1]
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full">
+      <line x1={0} y1={mid} x2={W} y2={mid} stroke="var(--border-dim, #333)" strokeWidth={1} />
+      {pts.map((p, i) => {
+        const h = (Math.abs(p.net) / maxAbsNet) * (mid - 12)
+        const up = p.net >= 0
+        return (
+          <rect
+            key={p.date}
+            x={i * bw + bw * 0.2}
+            y={up ? mid - h : mid}
+            width={Math.max(bw * 0.6, 1)}
+            height={Math.max(h, 1)}
+            fill={up ? "rgba(34,197,94,0.55)" : "rgba(239,68,68,0.55)"}
+          >
+            <title>{`${p.date} · net ${fmtVol(p.net)} sh · cum ${fmtVol(p.cum)} · close ${p.close}`}</title>
+          </rect>
+        )
+      })}
+      <polyline points={poly} fill="none" stroke="#38bdf8" strokeWidth={2} />
+      <circle cx={(pts.length - 1) * bw + bw / 2} cy={cumY(last.cum)} r={3} fill="#38bdf8" />
     </svg>
   )
 }
@@ -95,7 +138,8 @@ export default function BandarmologyPage() {
   const [flow, setFlow] = useState<FlowPoint[]>([])
   const [rotation, setRotation] = useState<RotationRow[]>([])
   const [symbol, setSymbol] = useState("")
-  const [seriesTxt, setSeriesTxt] = useState<string>("")
+  const [seriesStatus, setSeriesStatus] = useState<string>("")
+  const [seriesData, setSeriesData] = useState<{ sym: string; pts: SeriesPoint[] } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -145,24 +189,20 @@ export default function BandarmologyPage() {
   const lookupSeries = () => {
     const sym = symbol.trim().toUpperCase().replace('.JK', '')
     if (!sym) return
-    setSeriesTxt("…")
-    fetch(`/api/v1/saham/bandarmology?view=series&symbol=${sym}&days=30`)
+    setSeriesStatus(`loading ${sym}…`)
+    fetch(`/api/v1/saham/bandarmology?view=series&symbol=${sym}&days=90`)
       .then((r) => r.json())
       .then((d) => {
-        const s = d.data?.series as Array<{ date: string; net: number; cum?: number }> | undefined
-        if (!s || s.length === 0) { setSeriesTxt(`${sym}: no history yet (history builds daily)`); return }
-        const max = Math.max(...s.map((x) => Math.abs(x.net)), 1)
-        const bars = s.map((x) => {
-          const lvl = Math.ceil((Math.abs(x.net) / max) * 8)
-          const block = x.net >= 0 ? "▁▂▃▄▅▆▇█"[lvl - 1] ?? "█" : "▔▕▏╸▏▕▔ "[lvl - 1] ?? "│"
-          return block
-        }).join("")
-        const cum = typeof s[s.length - 1].cum === "number"
-          ? ` · cum ${fmtVol(s[s.length - 1].cum!)} sh`
-          : ""
-        setSeriesTxt(`${sym} last ${s.length} sessions · net foreign vol ${bars}${cum}`)
+        const s = d.data?.series as SeriesPoint[] | undefined
+        if (!s || s.length === 0) {
+          setSeriesData(null)
+          setSeriesStatus(`${sym}: no history yet (history builds daily)`)
+          return
+        }
+        setSeriesData({ sym, pts: s })
+        setSeriesStatus(`${sym} · last ${s.length} sessions · cum ${fmtVol(s[s.length - 1].cum)} shares`)
       })
-      .catch(() => setSeriesTxt(`${sym}: lookup failed`))
+      .catch(() => setSeriesStatus(`${sym}: lookup failed`))
   }
 
   const TABS = [
@@ -191,6 +231,7 @@ export default function BandarmologyPage() {
           </div>
         </div>
 
+        {/* Tabs */}
         <div className="flex flex-wrap gap-2">
           {(TABS as ReadonlyArray<readonly [typeof tab, string]>).map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)}
@@ -217,9 +258,19 @@ export default function BandarmologyPage() {
           </div>
         </div>
 
-        {seriesTxt && (
-          <div className="bg-bg-panel border border-border-dim rounded-lg p-3 text-[11px] font-mono text-text-muted whitespace-pre-wrap break-all">
-            {seriesTxt}
+        {seriesStatus && (
+          <div className="bg-bg-panel border border-border-dim rounded-lg p-4 space-y-3">
+            <p className="text-[11px] font-mono text-text-muted">{seriesStatus}</p>
+            {seriesData && seriesData.pts.length > 0 && (
+              <>
+                <SeriesChart pts={seriesData.pts} />
+                <div className="flex justify-between text-[10px] text-text-muted font-mono">
+                  <span>{seriesData.pts[0]?.date}</span>
+                  <span className="hidden md:inline">bars = daily net foreign vol · line = cumulative</span>
+                  <span>{seriesData.pts[seriesData.pts.length - 1]?.date}</span>
+                </div>
+              </>
+            )}
           </div>
         )}
 
