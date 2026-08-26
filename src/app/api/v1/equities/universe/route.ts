@@ -1,12 +1,17 @@
 // ─────────────────────────────────────────────────────────────
 // GET /api/v1/equities/universe
-//   ?group=<id>  → peer group symbols. Curated groups come from
-//                  config; idx-* groups are DERIVED live from the
-//                  universe via sector/industry predicates.
-//   ?sector=<s>  → raw universe rows filtered by sector.
-//   ?quotes=1    → embed latest harvested session OHLCV per stock
-//                  (from data/idx/saham-latest.json when present).
-//   (default)    → full dynamic IDX listed-equity universe.
+//   ?market=<id>  → full listed-equity universe for a global market
+//                   (us, japan, uk, germany, hongkong, india, canada,
+//                    korea, taiwan, australia, singapore, brazil,
+//                    switzerland, netherlands)
+//   ?markets=1    → market catalog
+//   ?group=<id>   → peer group symbols. Curated groups come from
+//                   config; idx-* groups are DERIVED live from the
+//                   universe via sector/industry predicates.
+//   ?sector=<s>   → raw IDX universe rows filtered by sector.
+//   ?quotes=1     → embed latest harvested session OHLCV per IDX stock
+//                   (from data/idx/saham-latest.json when present).
+//   (default)     → dynamic IDX listed-equity universe.
 // ─────────────────────────────────────────────────────────────
 
 import { type NextRequest } from 'next/server'
@@ -14,11 +19,31 @@ import { apiSuccess, apiError } from '@/lib/api/response'
 import { IDX_DERIVED_GROUPS, PEER_GROUPS } from '@/lib/config/universe'
 import { getIdxUniverse } from '@/lib/modules/market/provider/idx-universe'
 import { getSahamLatestQuotes } from '@/lib/modules/market/provider/idx-saham-quotes'
+import {
+  getGlobalMarketCatalog,
+  getGlobalUniverse,
+} from '@/lib/modules/market/provider/global-universe'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
+
+  // Global markets first — they own their own namespace.
+  if (params.get('markets')) {
+    return apiSuccess({ markets: getGlobalMarketCatalog() })
+  }
+
+  const marketId = params.get('market')
+  if (marketId) {
+    try {
+      const universe = await getGlobalUniverse(marketId)
+      return apiSuccess(universe)
+    } catch (error) {
+      return apiError((error as Error).message, 400)
+    }
+  }
+
   const groupId = params.get('group')
   const sector = params.get('sector')
 
