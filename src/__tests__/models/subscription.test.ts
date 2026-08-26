@@ -349,7 +349,7 @@ describe('Subscription Model', () => {
         SubscriptionStatus.active,
         SubscriptionStatus.canceled,
         SubscriptionStatus.expired,
-        SubscriptionStatus.past_due,
+        SubscriptionStatus.trial,
       ]) {
         const subscription = await prisma.subscription.create({
           data: {

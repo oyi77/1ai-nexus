@@ -172,7 +172,7 @@ describe('Gate.io Performance RE Module', () => {
 
   describe('fallbackFn()', () => {
     it('returns the empty performance shape with cached flag', async () => {
-      const result = await gateioModule.fallbackFn<GateioPerformanceData>({ leaderId: 30809 })
+        const result = await gateioModule.fallbackFn!<GateioPerformanceData>({ leaderId: 30809 });
       expect(result.data).toEqual({ profile: null, equity: [], markets: [], trades: [] })
       expect(result.source).toBe('gateio-performance (fallback)')
       expect(result.cached).toBe(true)

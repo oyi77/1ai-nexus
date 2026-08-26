@@ -44,7 +44,7 @@ describe('Gate.io Copy-Trading Leaderboard (re)', () => {
 
   it('normalizes leader rows from the gate.tv web API fixture', async () => {
     stubFetch(gateioFixture)
-    const result = await gateioModule.fetch({ cycle: 'month', page_size: 50, order_by: 'aum' })
+    const result = (await gateioModule.fetch({ cycle: 'month', page_size: 50, order_by: 'aum' })) as any;
     expect(result.data.leaders.length).toBe(5)
     expect(result.data.total).toBe(502) // dynamic data.totalcount, never hardcoded
 
@@ -70,13 +70,13 @@ describe('Gate.io Copy-Trading Leaderboard (re)', () => {
 
   it('maps is_private_leader to isPrivate', async () => {
     stubFetch(gateioFixture)
-    const result = await gateioModule.fetch({ cycle: 'month' })
+    const result = (await gateioModule.fetch({ cycle: 'month' })) as any;
     expect(result.data.leaders[1].isPrivate).toBe(true)
   })
 
   it('returns the standard ModuleResult shape', async () => {
     stubFetch(gateioFixture)
-    const result = await gateioModule.fetch({ cycle: 'week' })
+    const result = (await gateioModule.fetch({ cycle: 'week' })) as any;
     expect(result.source).toContain('gateio-copy-leaderboard')
     expect(result.timestamp).toBeGreaterThan(0)
     expect(result.ttl).toBe(180_000) // TOKEN_DATA × RE_MULTIPLIER
@@ -98,7 +98,7 @@ describe('Hyperliquid Copy-Trading Leaderboard (public-api)', () => {
 
   it('slices the dump to page_size and normalizes month performance', async () => {
     stubFetch(hlFixture)
-    const result = await hyperliquidModule.fetch({ cycle: 'month', page_size: 3 })
+    const result = (await hyperliquidModule.fetch({ cycle: 'month', page_size: 3 })) as any;
     expect(result.data.leaders.length).toBe(3)
     expect(result.data.total).toBe(5) // fixture row count
 
@@ -118,7 +118,7 @@ describe('Hyperliquid Copy-Trading Leaderboard (public-api)', () => {
 
   it('uses a long TTL mirroring the hourly dump refresh', async () => {
     stubFetch(hlFixture)
-    const result = await hyperliquidModule.fetch({ cycle: 'allTime', page_size: 1 })
+    const result = (await hyperliquidModule.fetch({ cycle: 'allTime', page_size: 1 })) as any;
     expect(result.ttl).toBe(3_600_000) // MACRO_DATA
     expect(result.data.leaders.length).toBe(1)
   })

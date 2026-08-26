@@ -50,15 +50,15 @@ describe('POST /api/v1/auth/refresh', () => {
       const mockCookie = 'nexus-refresh=new-refresh-token; HttpOnly; Secure';
 
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue(mockRefreshToken);
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+      vi.mocked(jwtLib.verifyToken).mockResolvedValue({
         userId: mockUser.id,
         email: mockUser.email,
         role: mockUser.role,
         plan: mockUser.plan,
       });
       vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
-      vi.mocked(jwtLib.signToken).mockReturnValue(mockAccessToken);
-      vi.mocked(jwtLib.generateRefreshToken).mockReturnValue(mockNewRefreshToken);
+      vi.mocked(jwtLib.signToken).mockResolvedValue(mockAccessToken);
+      vi.mocked(jwtLib.generateRefreshToken).mockResolvedValue(mockNewRefreshToken);
       vi.mocked(jwtLib.createRefreshCookie).mockReturnValue(mockCookie);
 
       const request = new NextRequest('http://localhost:3000/api/v1/auth/refresh', {
@@ -92,15 +92,15 @@ describe('POST /api/v1/auth/refresh', () => {
       const mockNewRefreshToken = 'new-refresh-token';
 
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue(mockRefreshToken);
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+      vi.mocked(jwtLib.verifyToken).mockResolvedValue({
         userId: mockUser.id,
         email: mockUser.email,
         role: mockUser.role,
         plan: mockUser.plan,
       });
       vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
-      vi.mocked(jwtLib.signToken).mockReturnValue(mockAccessToken);
-      vi.mocked(jwtLib.generateRefreshToken).mockReturnValue(mockNewRefreshToken);
+      vi.mocked(jwtLib.signToken).mockResolvedValue(mockAccessToken);
+      vi.mocked(jwtLib.generateRefreshToken).mockResolvedValue(mockNewRefreshToken);
       vi.mocked(jwtLib.createRefreshCookie).mockReturnValue('cookie');
 
       const request = new NextRequest('http://localhost:3000/api/v1/auth/refresh', {
@@ -134,15 +134,15 @@ describe('POST /api/v1/auth/refresh', () => {
       const mockNewRefreshToken = 'new-refresh-token';
 
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue(mockRefreshToken);
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+      vi.mocked(jwtLib.verifyToken).mockResolvedValue({
         userId: mockUser.id,
         email: mockUser.email,
         role: mockUser.role,
         plan: mockUser.plan,
       });
       vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
-      vi.mocked(jwtLib.signToken).mockReturnValue(mockAccessToken);
-      vi.mocked(jwtLib.generateRefreshToken).mockReturnValue(mockNewRefreshToken);
+      vi.mocked(jwtLib.signToken).mockResolvedValue(mockAccessToken);
+      vi.mocked(jwtLib.generateRefreshToken).mockResolvedValue(mockNewRefreshToken);
       vi.mocked(jwtLib.createRefreshCookie).mockReturnValue('cookie');
 
       const request = new NextRequest('http://localhost:3000/api/v1/auth/refresh', {
@@ -181,7 +181,7 @@ describe('POST /api/v1/auth/refresh', () => {
 
     it('should return 401 when refresh token is invalid', async () => {
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue('invalid-token');
-      vi.mocked(jwtLib.verifyToken).mockReturnValue(null);
+      vi.mocked(jwtLib.verifyToken).mockResolvedValue(null);
 
       const request = new NextRequest('http://localhost:3000/api/v1/auth/refresh', {
         method: 'POST',
@@ -200,7 +200,7 @@ describe('POST /api/v1/auth/refresh', () => {
 
     it('should return 401 when refresh token is expired', async () => {
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue('expired-token');
-      vi.mocked(jwtLib.verifyToken).mockReturnValue(null); // Return null instead of throwing
+      vi.mocked(jwtLib.verifyToken).mockResolvedValue(null); // Return null instead of throwing
 
       const request = new NextRequest('http://localhost:3000/api/v1/auth/refresh', {
         method: 'POST',
@@ -219,7 +219,7 @@ describe('POST /api/v1/auth/refresh', () => {
 
     it('should return 404 when user not found', async () => {
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue('valid-token');
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+      vi.mocked(jwtLib.verifyToken).mockResolvedValue({
         userId: 'nonexistent-user',
         email: 'nonexistent@example.com',
         role: 'free' as const,
@@ -244,7 +244,7 @@ describe('POST /api/v1/auth/refresh', () => {
 
     it('should return 500 on database error', async () => {
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue('valid-token');
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+      vi.mocked(jwtLib.verifyToken).mockResolvedValue({
         userId: mockUser.id,
         email: mockUser.email,
         role: mockUser.role,
@@ -274,14 +274,14 @@ describe('POST /api/v1/auth/refresh', () => {
       const bodyToken = 'body-token';
       
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue(cookieToken);
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+      vi.mocked(jwtLib.verifyToken).mockResolvedValue({
         userId: mockUser.id,
         email: mockUser.email,
         role: mockUser.role,
         plan: mockUser.plan,
       });
-      vi.mocked(jwtLib.signToken).mockReturnValue('access-token');
-      vi.mocked(jwtLib.generateRefreshToken).mockReturnValue('refresh-token');
+      vi.mocked(jwtLib.signToken).mockResolvedValue('access-token');
+      vi.mocked(jwtLib.generateRefreshToken).mockResolvedValue('refresh-token');
       vi.mocked(jwtLib.createRefreshCookie).mockReturnValue('cookie');
       vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
 
@@ -306,14 +306,14 @@ describe('POST /api/v1/auth/refresh', () => {
       const userId = 'specific-user-id';
       
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue('token');
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+      vi.mocked(jwtLib.verifyToken).mockResolvedValue({
         userId,
         email: mockUser.email,
         role: mockUser.role,
         plan: mockUser.plan,
       });
-      vi.mocked(jwtLib.signToken).mockReturnValue('access');
-      vi.mocked(jwtLib.generateRefreshToken).mockReturnValue('refresh');
+      vi.mocked(jwtLib.signToken).mockResolvedValue('access');
+      vi.mocked(jwtLib.generateRefreshToken).mockResolvedValue('refresh');
       vi.mocked(jwtLib.createRefreshCookie).mockReturnValue('cookie');
       vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
 
@@ -343,14 +343,14 @@ describe('POST /api/v1/auth/refresh', () => {
       };
 
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue('token');
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+      vi.mocked(jwtLib.verifyToken).mockResolvedValue({
         userId: mockUser.id,
         email: mockUser.email,
         role: mockUser.role,
         plan: mockUser.plan,
       });
-      vi.mocked(jwtLib.signToken).mockReturnValue('access');
-      vi.mocked(jwtLib.generateRefreshToken).mockReturnValue('refresh');
+      vi.mocked(jwtLib.signToken).mockResolvedValue('access');
+      vi.mocked(jwtLib.generateRefreshToken).mockResolvedValue('refresh');
       vi.mocked(jwtLib.createRefreshCookie).mockReturnValue('cookie');
       vi.mocked(prisma.user.findUnique).mockResolvedValue(updatedUser);
 
@@ -374,14 +374,14 @@ describe('POST /api/v1/auth/refresh', () => {
   describe('Security Headers', () => {
     it('should include HttpOnly flag in cookies', async () => {
       vi.mocked(jwtLib.extractRefreshToken).mockReturnValue('token');
-      vi.mocked(jwtLib.verifyToken).mockReturnValue({
+      vi.mocked(jwtLib.verifyToken).mockResolvedValue({
         userId: mockUser.id,
         email: mockUser.email,
         role: mockUser.role,
         plan: mockUser.plan,
       });
-      vi.mocked(jwtLib.signToken).mockReturnValue('access');
-      vi.mocked(jwtLib.generateRefreshToken).mockReturnValue('refresh');
+      vi.mocked(jwtLib.signToken).mockResolvedValue('access');
+      vi.mocked(jwtLib.generateRefreshToken).mockResolvedValue('refresh');
       vi.mocked(jwtLib.createRefreshCookie).mockReturnValue('cookie');
       vi.mocked(prisma.user.findUnique).mockResolvedValue(mockUser);
 
