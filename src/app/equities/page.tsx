@@ -9,7 +9,7 @@ import { GLOBAL_STOCKS, INDEX_SYMBOLS, type UniverseStock } from "@/lib/config/u
 
 type EquityStock = { symbol: string; name: string; sector: string }
 type EquityQuote = { price: number; change: number; name: string }
-type MarketCatalogEntry = { id: string; name: string }
+type MarketCatalogEntry = { id: string; name: string; count?: number | null }
 
 /** Quote backfill budget per selected market — keeps Yahoo chunk load bounded. */
 const MARKET_QUOTE_CAP = 500
@@ -251,7 +251,7 @@ export default function EquitiesPage() {
           >
             <option value="">Indonesia + Global Majors</option>
             {catalog.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
+              <option key={c.id} value={c.id}>{c.name}{typeof c.count === 'number' ? ` · ${c.count.toLocaleString('en-US')}` : ''}</option>
             ))}
           </select>
           {market && marketStocks && marketStocks.length > MARKET_QUOTE_CAP && (

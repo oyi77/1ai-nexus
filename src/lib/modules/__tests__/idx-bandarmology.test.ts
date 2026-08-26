@@ -4,6 +4,7 @@ import {
   getForeignLeaders,
   getForeignSeries,
   getForeignStreaks,
+  getSectorRotation,
 } from '@/lib/modules/market/provider/idx-bandarmology'
 import { applyIcSector } from '@/lib/modules/market/provider/idx-universe'
 import { fetchTopCryptoSymbols } from '@/lib/modules/market/provider/binance-top'
@@ -39,6 +40,22 @@ describe('idx-bandarmology provider', () => {
     expect(b.rows.length).toBeGreaterThan(0)
     for (let i = 1; i < b.rows.length; i++) {
       expect(b.rows[i - 1].value).toBeGreaterThanOrEqual(b.rows[i].value)
+    }
+  })
+
+  it('sector rotation is |net| desc with coherent stock counts', async () => {
+    const r = await getSectorRotation()
+    expect(r.tradeDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    expect(r.sectors.length).toBeGreaterThan(3)
+    for (let i = 1; i < r.sectors.length; i++) {
+      expect(Math.abs(r.sectors[i - 1].netValueIdr)).toBeGreaterThanOrEqual(Math.abs(r.sectors[i].netValueIdr))
+    }
+    for (const s of r.sectors) {
+      expect(Number.isFinite(s.netValueIdr)).toBe(true)
+      expect(s.inflowStocks + s.outflowStocks).toBeGreaterThan(0)
+      // sign coherence: net direction matches dominant flow side
+      if (s.netValueIdr > 0) expect(s.inflowStocks).toBeGreaterThan(0)
+      if (s.netValueIdr < 0) expect(s.outflowStocks).toBeGreaterThan(0)
     }
   })
 

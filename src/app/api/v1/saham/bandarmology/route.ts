@@ -4,6 +4,7 @@
 //   ?view=streaks            accumulation/distribution streaks
 //   ?view=series&symbol=BBRI foreign-net daily series
 //   ?view=brokers            market broker board by turnover
+//   ?view=rotation           sector-level foreign-flow rollup
 // Params: ?limit=&minDays=&days=
 // ─────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ import {
   getForeignLeaders,
   getForeignSeries,
   getForeignStreaks,
+  getSectorRotation,
 } from '@/lib/modules/market/provider/idx-bandarmology'
 
 export const dynamic = 'force-dynamic'
@@ -31,6 +33,8 @@ export async function GET(request: NextRequest) {
         return apiSuccess(await getForeignStreaks(Math.max(2, Number(p.get('minDays') ?? 3)), limit))
       case 'brokers':
         return apiSuccess(await getBrokerBoard(limit))
+      case 'rotation':
+        return apiSuccess(await getSectorRotation())
       case 'series': {
         const symbol = p.get('symbol')
         if (!symbol) return apiError('symbol is required for view=series', 400)
@@ -39,7 +43,7 @@ export async function GET(request: NextRequest) {
         return apiSuccess(data)
       }
       default:
-        return apiError(`Unknown view '${view}'. Available: leaders, streaks, series, brokers`, 400)
+        return apiError(`Unknown view '${view}'. Available: leaders, streaks, series, brokers, rotation`, 400)
     }
   } catch (error) {
     return apiError((error as Error).message, 502)

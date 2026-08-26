@@ -14,6 +14,8 @@
 // SERVER-SAFE (network only, cached via server-cache).
 // ─────────────────────────────────────────────────────────────
 
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { z } from 'zod'
 import { getCached } from '@/lib/api/server-cache'
 
@@ -150,7 +152,18 @@ export async function getGlobalUniverse(marketId: string): Promise<GlobalUnivers
   const { data } = await getCached(`global-universe:${marketId}:v5`, 24 * 60 * 60 * 1000, () => loadMarket(def))
   return data
 }
-/** Market catalog for UI pickers / discovery. */
-export function getGlobalMarketCatalog(): Array<{ id: string; name: string }> {
-  return Object.entries(GLOBAL_MARKETS).map(([id, def]) => ({ id, name: def.name }))
+/** Market catalog for UI pickers / discovery. Counts come from the
+ * committed data/global snapshots (offline, deterministic). */
+let catalogCache: Array<{ id: string; name: string; count: number | null }> | null = null
+export function getGlobalMarketCatalog(): Array<{ id: string; name: string; count: number | null }> {
+  if (catalogCache) return catalogCache
+  catalogCache = Object.entries(GLOBAL_MARKETS).map(([id, def]) => {
+    let count: number | null = null
+    try {
+      const snap = JSON.parse(readFileSync(join(process.cwd(), 'data', 'global', `${id}.json`), 'utf8')) as { count?: number }
+      count = typeof snap.count === 'number' ? snap.count : null
+    } catch { /* snapshot absent — count stays null */ }
+    return { id, name: def.name, count }
+  })
+  return catalogCache
 }

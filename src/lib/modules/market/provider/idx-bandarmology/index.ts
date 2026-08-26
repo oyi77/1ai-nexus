@@ -87,6 +87,16 @@ interface BandarCache {
   leadersAll: ForeignLeader[]
   leadersByValueAsc: ForeignLeader[]
   brokerRowsByValueDesc: z.infer<typeof BrokersSchema>['rows']
+  /** Sector-level foreign-flow rollup, |net| desc — prebuilt per snapshot. */
+  rotation: SectorRotationRow[]
+  rotationTradeDate: string
+}
+
+export interface SectorRotationRow {
+  sector: string
+  netValueIdr: number
+  inflowStocks: number
+  outflowStocks: number
 }
 
 let cache: BandarCache | null = null
@@ -114,19 +124,44 @@ async function mtimeOf(file: string): Promise<number> {
 }
 
 async function buildCache(): Promise<BandarCache> {
-  const [latestRaw, historyRaw, brokersRaw] = await Promise.all([
+  const [latestRaw, historyRaw, brokersRaw, universeRaw] = await Promise.all([
     readFile(join(DIR, 'saham-latest.json'), 'utf8'),
     readFile(join(DIR, 'foreign-history.json'), 'utf8'),
     readFile(join(DIR, 'brokers-latest.json'), 'utf8'),
+    readFile(join(DIR, 'universe.json'), 'utf8').catch(() => null),
   ])
   const latest = LatestSchema.parse(JSON.parse(latestRaw))
   const history = HistorySchema.parse(JSON.parse(historyRaw))
   const brokers = BrokersSchema.parse(JSON.parse(brokersRaw))
 
+  // code → sector from the universe snapshot (rotation cross-reference).
+  const sectorByCode = new Map<string, string>()
+  if (universeRaw) {
+    const universe = JSON.parse(universeRaw) as { stocks?: Array<{ symbol: string; sector?: string }> }
+    for (const s of universe.stocks ?? []) {
+      sectorByCode.set(s.symbol.replace('.JK', ''), s.sector ?? 'Unknown')
+    }
+  }
   const leadersAll = latest.rows.map(toLeader)
   const leadersByValueAsc = [...leadersAll]
     .filter((l) => l.fbuyVol > 0 || l.fsellVol > 0)
     .sort((a, b) => a.estNetValueIdr - b.estNetValueIdr)
+
+  // Precomputed sector rotation: foreign net value aggregated by universe
+  // sector, |net| desc — O(rows) once per snapshot instead of per request.
+  const acc = new Map<string, { netValueIdr: number; inflowStocks: number; outflowStocks: number }>()
+  for (const l of leadersAll) {
+    if (l.netVol === 0) continue
+    const sector = sectorByCode.get(l.code) ?? 'Unknown'
+    const cur = acc.get(sector) ?? { netValueIdr: 0, inflowStocks: 0, outflowStocks: 0 }
+    cur.netValueIdr += l.estNetValueIdr
+    if (l.netVol > 0) cur.inflowStocks++
+    else cur.outflowStocks++
+    acc.set(sector, cur)
+  }
+  const rotation: SectorRotationRow[] = [...acc.entries()]
+    .map(([sector, v]) => ({ sector, ...v }))
+    .sort((a, b) => Math.abs(b.netValueIdr) - Math.abs(a.netValueIdr))
 
   return {
     mtimes: '',
@@ -136,6 +171,8 @@ async function buildCache(): Promise<BandarCache> {
     leadersAll,
     leadersByValueAsc,
     brokerRowsByValueDesc: [...brokers.rows].sort((a, b) => b.value - a.value),
+    rotation,
+    rotationTradeDate: latest.tradeDate,
   }
 }
 
@@ -246,4 +283,13 @@ export async function getBrokerBoard(limit = 25): Promise<{
     tradeDate: c.brokersTradeDate,
     rows: c.brokerRowsByValueDesc.slice(0, limit),
   }
+}
+
+/** Sector-level foreign-flow rotation for the latest session (prebuilt). */
+export async function getSectorRotation(): Promise<{
+  tradeDate: string
+  sectors: SectorRotationRow[]
+}> {
+  const c = await getCache()
+  return { tradeDate: c.rotationTradeDate, sectors: c.rotation }
 }
