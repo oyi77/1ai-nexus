@@ -12,7 +12,7 @@ const BRIDGES_BASE = "https://bridges.llama.fi";
 async function fetchJson<T>(url: string, cacheSec = 120): Promise<T> {
   const res = await fetch(url, {
     next: { revalidate: cacheSec },
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
   });
   if (!res.ok) throw new Error(`DeFiLlama ${url} error: ${res.status}`);
   return res.json();

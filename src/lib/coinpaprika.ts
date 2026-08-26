@@ -9,7 +9,7 @@ const BASE = "https://api.coinpaprika.com/v1";
 async function cpFetch<T>(path: string, cacheSec = 60): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     next: { revalidate: cacheSec },
-    headers: { Accept: "application/json" },
+    headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
   });
   if (!res.ok) throw new Error(`CoinPaprika ${path}: ${res.status}`);
   return (await res.json()) as T;

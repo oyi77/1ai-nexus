@@ -4,10 +4,15 @@ import { type NextRequest } from "next/server";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import * as tokenterminal from "@/lib/tokenterminal";
 
+const TOKEN_TERMINAL_API_KEY = process.env.TOKEN_TERMINAL_API_KEY ?? "";
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
     const action = searchParams.get("action") ?? "projects";
+  if (!TOKEN_TERMINAL_API_KEY && action !== "health") {
+    return apiSuccess({ data: [], note: "TOKEN_TERMINAL_API_KEY not configured" });
+  }
     const project = searchParams.get("project") ?? undefined;
     const limit = Math.min(200, Math.max(1, Number(searchParams.get("limit") ?? 50)));
 

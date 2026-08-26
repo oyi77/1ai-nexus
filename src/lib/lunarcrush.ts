@@ -96,7 +96,7 @@ async function cgFetch<T>(path: string): Promise<T> {
   // Retry with backoff on 429 (rate limit)
   for (let attempt = 0; attempt < 3; attempt++) {
     const res = await fetch(`${COINGECKO}${path}`, {
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
       signal: AbortSignal.timeout(TIMEOUT),
     });
     if (res.status === 429) {

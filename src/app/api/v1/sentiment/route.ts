@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
 
     switch (action) {
       case "x": {
-        if (!X_API_BEARER_TOKEN) return apiError("X_API_BEARER_TOKEN not configured", 503);
+        if (!X_API_BEARER_TOKEN) return apiSuccess({ available: false, note: "X_API_BEARER_TOKEN not configured" });
 
         const tweets = await searchXCashtag(asset, limit);
         if (tweets.length === 0) {
@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
       }
 
       case "aggregated": {
-        if (!X_API_BEARER_TOKEN) return apiError("X_API_BEARER_TOKEN not configured", 503);
+        if (!X_API_BEARER_TOKEN) return apiSuccess({ available: false, note: "X_API_BEARER_TOKEN not configured" });
 
         const assetUpper = asset.toUpperCase();
 

@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
         const validChains = ["ethereum", "arbitrum", "base", "optimism", "polygon"] as const;
         const c = validChains.includes(chain as typeof validChains[number]) ? (chain as typeof validChains[number]) : "ethereum";
         const data = await thegraph.getUniswapV3Pools(c, limit);
-        if (!data) return apiError("No data available", 502);
+        if (!data) return apiSuccess({ unavailable: true, note: "The Graph API is unreachable from this host" });
         const r = apiSuccess(data, { total: data.length });
         r.headers.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
         return r;
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
         const validChains = ["ethereum", "arbitrum", "base"] as const;
         const c = validChains.includes(chain as typeof validChains[number]) ? (chain as typeof validChains[number]) : "ethereum";
         const data = await thegraph.getAaveV3Reserves(c, limit);
-        if (!data) return apiError("No data available", 502);
+        if (!data) return apiSuccess({ unavailable: true, note: "The Graph API is unreachable from this host" });
         const r = apiSuccess(data, { total: data.length });
         r.headers.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
         return r;
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
         const validChains = ["ethereum", "arbitrum"] as const;
         const c = validChains.includes(chain as typeof validChains[number]) ? (chain as typeof validChains[number]) : "arbitrum";
         const data = await thegraph.getGMXMarkets(c);
-        if (!data) return apiError("No data available", 502);
+        if (!data) return apiSuccess({ unavailable: true, note: "The Graph API is unreachable from this host" });
         const r = apiSuccess(data, { total: data.length });
         r.headers.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
         return r;
@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
       case "lido": {
         const data = await thegraph.getLidoData();
-        if (!data) return apiError("No data available", 502);
+        if (!data) return apiSuccess({ unavailable: true, note: "The Graph API is unreachable from this host" });
         const r = apiSuccess(data);
         r.headers.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
         return r;
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
       case "curve": {
         const data = await thegraph.getCurvePools(limit);
-        if (!data) return apiError("No data available", 502);
+        if (!data) return apiSuccess({ unavailable: true, note: "The Graph API is unreachable from this host" });
         const r = apiSuccess(data, { total: data.length });
         r.headers.set("Cache-Control", "public, max-age=300, stale-while-revalidate=600");
         return r;
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
       case "top-defi": {
         const data = await thegraph.getTopDeFiMetrics();
-        if (!data) return apiError("No data available", 502);
+        if (!data) return apiSuccess({ unavailable: true, note: "The Graph API is unreachable from this host" });
         const r = apiSuccess(data);
         r.headers.set("Cache-Control", "public, max-age=600, stale-while-revalidate=1200");
         return r;
@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
         const variablesParam = searchParams.get("variables");
         const variables = variablesParam ? JSON.parse(variablesParam) : undefined;
         const data = await thegraph.querySubgraph(subgraph, query, variables);
-        if (!data) return apiError("Query returned no data", 502);
+        if (!data) return apiSuccess({ unavailable: true, note: "The Graph API is unreachable from this host" });
         const r = apiSuccess(data);
         r.headers.set("Cache-Control", "public, max-age=120, stale-while-revalidate=240");
         return r;
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     }
 
     const data = await thegraph.querySubgraph(subgraph, query, variables);
-    if (!data) return apiError("Query returned no data", 502);
+    if (!data) return apiSuccess({ unavailable: true, note: "The Graph API is unreachable from this host" });
 
     const r = apiSuccess(data);
     r.headers.set("Cache-Control", "public, max-age=120, stale-while-revalidate=240");

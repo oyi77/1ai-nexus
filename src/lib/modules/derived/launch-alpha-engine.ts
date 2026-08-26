@@ -29,7 +29,7 @@ interface GtPool {
 async function fetchNewPools(network = 'solana', limit = 20): Promise<GtPool[]> {
   try {
     const res = await fetch(`${GT_BASE}/networks/${network}/new_pools?page=1&limit=${limit}`, {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' },
       signal: AbortSignal.timeout(10_000),
     })
     if (!res.ok) return []
@@ -49,7 +49,8 @@ function ageMinutes(iso: string): number {
 // Flow acceleration: recent m5 buy intensity vs h24 baseline.
 // Returns 0..1 (1 = very accelerating buy flow).
 function flowAcceleration(p: GtPool): number {
-  const h24 = p.attributes.transactions.h24
+  const h24 = p.attributes.transactions?.h24
+  if (!h24) return 0
   const h24PerMin = (h24.buys + h24.sells) / (24 * 60)
   // Estimate m5 from price-change momentum proxy; GT new_pools lacks m5,
   // so use h24 buys/sells ratio as the acceleration proxy.
@@ -74,8 +75,8 @@ export interface LaunchAlphaToken {
 
 function computeLaunchAlpha(p: GtPool): { hype: number; las: number; flow: number } {
   const liq = parseFloat(p.attributes.reserve_in_usd) || 0
-  const vol = parseFloat(p.attributes.volume_usd.h24) || 0
-  const pct = parseFloat(p.attributes.price_change_percentage.h24) || 0
+  const vol = parseFloat(p.attributes.volume_usd?.h24) || 0
+  const pct = parseFloat(p.attributes.price_change_percentage?.h24) || 0
   const age = ageMinutes(p.attributes.pool_created_at)
   const flow = flowAcceleration(p)
 
@@ -96,7 +97,7 @@ export async function ingestLaunchTokens(network = 'solana', limit = 20): Promis
   for (const p of pools) {
     const { hype, las } = computeLaunchAlpha(p)
     const address = p.attributes.address
-    const chain = p.relationships.network.data.id
+    const chain = p.relationships?.network?.data?.id ?? network
     try {
       await prisma.launchToken.upsert({
         where: { address_chain: { address, chain } },
@@ -107,7 +108,7 @@ export async function ingestLaunchTokens(network = 'solana', limit = 20): Promis
           symbol: p.attributes.name.split(' / ')[0] ?? p.attributes.name,
           liquidityUsd: parseFloat(p.attributes.reserve_in_usd) || 0,
           marketCapUsd: parseFloat(p.attributes.base_token_price_usd) || 0,
-          volume24hUsd: parseFloat(p.attributes.volume_usd.h24) || 0,
+          volume24hUsd: parseFloat(p.attributes.volume_usd?.h24) || 0,
           ageMinutes: ageMinutes(p.attributes.pool_created_at),
           hypeScore: hype,
           launchAlphaScore: las,
@@ -116,14 +117,14 @@ export async function ingestLaunchTokens(network = 'solana', limit = 20): Promis
         update: {
           liquidityUsd: parseFloat(p.attributes.reserve_in_usd) || 0,
           marketCapUsd: parseFloat(p.attributes.base_token_price_usd) || 0,
-          volume24hUsd: parseFloat(p.attributes.volume_usd.h24) || 0,
+          volume24hUsd: parseFloat(p.attributes.volume_usd?.h24) || 0,
           hypeScore: hype,
           launchAlphaScore: las,
           lastSeen: new Date(),
         },
       })
-      const h24 = p.attributes.transactions.h24
-      await prisma.launchFlowSnapshot.create({
+      const h24 = p.attributes.transactions?.h24
+      if (h24) await prisma.launchFlowSnapshot.create({
         data: {
           tokenAddress: address,
           chain,
