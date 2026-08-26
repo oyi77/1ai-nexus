@@ -8,7 +8,9 @@
 //                          (lookups / top-K / range-rank /
 //                          sector rollups / series scans), fixed
 //                          4096-operation program
-//   3. instruments       — total instruments indexed
+//   3. instruments       — total instruments indexed across ALL
+//                          committed coverage: IDX depth datasets
+//                          + 14 global-market universes
 //
 // Query implementations live in the production module
 // src/lib/modules/market/analytics-index.ts — wins here are real
@@ -21,7 +23,7 @@
 // Run via ./autoresearch.sh
 // ─────────────────────────────────────────────────────────────
 
-import { readFileSync } from 'fs'
+import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import { AnalyticsIndex } from '../src/lib/modules/market/analytics-index'
 
@@ -52,6 +54,7 @@ interface RawDatasets {
   brokerRows: Array<Record<string, unknown>>
   foreignHistory: Record<string, ReadonlyArray<{ tradeDate?: string; date?: string; net?: number; foreignNet?: number }>>
   fundamentalsData: Record<string, Record<string, unknown>>
+  globalStocks: Array<{ symbol: string; exchange?: string }>
 }
 
 function loadRaw(): RawDatasets {
@@ -60,12 +63,26 @@ function loadRaw(): RawDatasets {
   const brokersFile = JSON.parse(readFileSync(DATA('idx', 'brokers-latest.json'), 'utf8')) as { rows?: Array<Record<string, unknown>> }
   const foreign = JSON.parse(readFileSync(DATA('idx', 'foreign-history.json'), 'utf8')) as RawDatasets['foreignHistory']
   const fundamentals = JSON.parse(readFileSync(DATA('idx', 'fundamentals.json'), 'utf8')) as { data: Record<string, Record<string, unknown>> }
+
+  // Committed global-market snapshots — offline by construction:
+  // a harvest step writes them once; this loader only reads.
+  const globalDir = DATA('global')
+  const globalStocks: Array<{ symbol: string; exchange?: string }> = []
+  if (existsSync(globalDir)) {
+    for (const f of readdirSync(globalDir).sort()) {
+      if (!f.endsWith('.json')) continue
+      const j = JSON.parse(readFileSync(join(globalDir, f), 'utf8')) as { stocks?: Array<{ symbol: string; exchange?: string }> }
+      for (const s of j.stocks ?? []) globalStocks.push({ symbol: s.symbol, exchange: s.exchange })
+    }
+  }
+
   return {
     universeStocks: universe.stocks ?? [],
     sahamRows: saham.rows ?? [],
     brokerRows: brokersFile.rows ?? [],
     foreignHistory: foreign,
     fundamentalsData: fundamentals.data ?? {},
+    globalStocks,
   }
 }
 
@@ -91,6 +108,7 @@ function runWorkload(idx: AnalyticsIndex, stream: Float64Array): number {
     const kind = OP_KINDS[Math.floor(nextRand() * OP_KINDS.length)]
     switch (kind) {
       case 'lookup': {
+        // Probes the FULL merged symbol pool (IDX + global markets).
         const sym = universeSymbols[Math.floor(nextRand() * universeSymbols.length)]
         checksum += idx.universeBySymbol.has(sym) ? 1 : 0
         const code = codes[Math.floor(nextRand() * codes.length)]
@@ -160,7 +178,8 @@ async function main() {
   console.log(`METRIC bench_ops_per_sec=${opsPerSec.toFixed(1)}`)
   console.log(`METRIC cold_start_ms=${coldStartMs.toFixed(1)}`)
   console.log(`METRIC instruments=${idx.instrumentCount}`)
-  console.log(`# checksum=${lastChecksum} (integrity guard — must equal baseline 46640)`)
+  console.log(`# exchanges=${idx.exchanges.size} global_listings=${idx.globalListings}`)
+  console.log(`# checksum=${lastChecksum} (integrity guard — constant within a binary)`)
 }
 
 main().catch((err) => {

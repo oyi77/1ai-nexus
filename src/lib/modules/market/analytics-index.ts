@@ -4,11 +4,11 @@
 // Built once at process start from committed datasets; answers
 // the hot query shapes the routes serve:
 //   • rank queries ("how many instruments above threshold X")
-//     via binary search over a Float64Array — O(log n), replaces
-//     linear walks over sorted arrays
-//   • sector rollups memoized per sector (precomputed aggregates,
-//     the classic serving-layer win)
+//     via binary search over a Float64Array — O(log n)
+//   • sector rollups memoized per sector (precomputed aggregates)
 //   • direct Maps for symbol/code/firm/fundamental lookups
+//   • optional global-market listings merged into one symbol
+//     pool (IDX + 14 global markets in a single index)
 // Used by autoresearch-bench.ts as the reference implementation;
 // routes may adopt the same accessors.
 // ─────────────────────────────────────────────────────────────
@@ -52,9 +52,16 @@ export interface SectorRollup {
   withTradingRow: number
 }
 
+export interface GlobalListing {
+  symbol: string
+  name?: string
+  exchange?: string
+}
+
 export class AnalyticsIndex {
   readonly universeBySymbol: Map<string, unknown>
   private readonly universeBySector: Map<string, string[]>
+  readonly exchanges = new Set<string>()
   private readonly rollups = new Map<string, SectorRollup>()
   readonly sahamByCode: Map<string, Record<string, unknown>>
   readonly sahamForeignNet: RankedList
@@ -63,6 +70,8 @@ export class AnalyticsIndex {
   readonly brokerByFirm: Map<string, Record<string, unknown>>
   readonly foreignSeriesByCode: Map<string, ReadonlyArray<{ date: string; net: number }>>
   readonly fundamentalsByCode: Map<string, Record<string, unknown>>
+  /** Distinct global-market listings merged into the pool. */
+  readonly globalListings: number
   readonly instrumentCount: number
 
   constructor(input: {
@@ -71,6 +80,7 @@ export class AnalyticsIndex {
     brokerRows: ReadonlyArray<Record<string, unknown>>
     foreignHistory: Record<string, ReadonlyArray<{ tradeDate?: string; date?: string; net?: number; foreignNet?: number }>>
     fundamentalsData: Record<string, Record<string, unknown>>
+    globalStocks?: ReadonlyArray<GlobalListing>
   }) {
     this.universeBySymbol = new Map()
     this.universeBySector = new Map()
@@ -117,6 +127,15 @@ export class AnalyticsIndex {
     }
 
     this.fundamentalsByCode = new Map(Object.entries(input.fundamentalsData))
+
+    let globalAdded = 0
+    for (const g of input.globalStocks ?? []) {
+      if (!g.symbol || this.universeBySymbol.has(g.symbol)) continue
+      this.universeBySymbol.set(g.symbol, g)
+      if (g.exchange) this.exchanges.add(g.exchange)
+      globalAdded++
+    }
+    this.globalListings = globalAdded
 
     this.instrumentCount =
       this.universeBySymbol.size +
