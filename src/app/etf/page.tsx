@@ -126,7 +126,7 @@ export default function ETFPage() {
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">ETF ANALYTICS</h1>
+            <h1 className="page-title">ETF ANALYTICS</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               {ETF_LIST.length} ETFs across {categories.length - 1} categories
             </p>
@@ -200,7 +200,7 @@ export default function ETFPage() {
         {/* Detail Panel */}
         {selected && data[selected] && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <h3 className="text-xs font-mono text-accent-cyan mb-3">{selected} — {data[selected].name}</h3>
+            <h3 className="text-xs font-semibold text-text-secondary mb-3">{selected} — {data[selected].name}</h3>
             <div className="grid grid-cols-4 gap-4">
               <div>
                 <p className="text-[10px] text-text-muted font-mono">Price</p>

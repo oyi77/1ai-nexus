@@ -207,7 +207,7 @@ export default function ChartsPage() {
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">PROFESSIONAL CHARTS</h1>
+            <h1 className="page-title">PROFESSIONAL CHARTS</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               {CHART_SYMBOLS.length} symbols · Drawing tools · Technical indicators
             </p>

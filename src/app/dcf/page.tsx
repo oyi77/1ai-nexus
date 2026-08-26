@@ -121,7 +121,7 @@ setResult(r)
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">DCF VALUATION MODEL</h1>
+            <h1 className="page-title">DCF VALUATION MODEL</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               Discounted Cash Flow — {PRESETS.length} preset companies
             </p>
@@ -145,7 +145,7 @@ setResult(r)
         <div className="grid grid-cols-12 gap-4">
           <div className="col-span-5 space-y-4">
             <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-              <h3 className="text-xs font-mono text-accent-cyan mb-3">ASSUMPTIONS</h3>
+              <h3 className="text-xs font-semibold text-text-secondary mb-3">ASSUMPTIONS</h3>
               <div className="space-y-3">
                 {[
                   ['Current Price ($)', 'currentPrice'],
@@ -184,7 +184,7 @@ setResult(r)
             {result && (
               <>
                 <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                  <h3 className="text-xs font-mono text-accent-cyan mb-3">VALUATION RESULT</h3>
+                  <h3 className="text-xs font-semibold text-text-secondary mb-3">VALUATION RESULT</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-[10px] text-text-muted font-mono">INTRINSIC VALUE</p>
@@ -213,7 +213,7 @@ setResult(r)
                 </div>
 
                 <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                  <h3 className="text-xs font-mono text-accent-cyan mb-3">SENSITIVITY ANALYSIS</h3>
+                  <h3 className="text-xs font-semibold text-text-secondary mb-3">SENSITIVITY ANALYSIS</h3>
                   <p className="text-[10px] text-text-muted font-mono mb-2">Intrinsic Value by Growth × Discount Rate</p>
                   <div className="overflow-x-auto">
                     <table className="text-[10px]">

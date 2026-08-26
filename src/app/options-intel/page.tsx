@@ -213,7 +213,7 @@ fetchData()
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">OPTIONS INTEL</h1>
+            <h1 className="page-title">OPTIONS INTEL</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               Deribit options max pain, futures term structure, cross-exchange funding heatmap — all public APIs
             </p>

@@ -116,7 +116,7 @@ export default function AttentionIndexPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">ATTENTION INDEX</h1>
+            <h1 className="page-title">ATTENTION INDEX</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               GitHub developer velocity + search attention — weighted composite signal
             </p>

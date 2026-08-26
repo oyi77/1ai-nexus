@@ -67,7 +67,7 @@ export default function OnchainIntelPage() {
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">ON-CHAIN INTELLIGENCE</h1>
+            <h1 className="page-title">ON-CHAIN INTELLIGENCE</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               Mempool congestion, bridge flows, staking queue — all from public APIs
             </p>

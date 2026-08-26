@@ -50,7 +50,7 @@ export default function CompositeAlertsPage() {
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">COMPOSITE SIGNALS</h1>
+            <h1 className="page-title">COMPOSITE SIGNALS</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               Cross-module compound signals — ETF + derivatives + sentiment + credit + miner + narrative
             </p>

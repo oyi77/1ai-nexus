@@ -82,7 +82,7 @@ export default function CorrelationPage() {
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">CROSS-ASSET CORRELATION MATRIX</h1>
+            <h1 className="page-title">CROSS-ASSET CORRELATION MATRIX</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               Live cross-asset correlations from CoinGecko, Fear &amp; Greed, Binance, Yahoo Finance
             </p>

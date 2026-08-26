@@ -194,7 +194,7 @@ export default function OptionsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">OPTIONS CHAIN</h1>
+            <h1 className="page-title">OPTIONS CHAIN</h1>
             <p className="text-xs text-text-muted font-mono">
               Real-time Deribit options data — bid/ask, IV, Greeks, OI
             </p>

@@ -105,7 +105,7 @@ export default function ScreenerPage() {
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">MULTI-ASSET SCREENER</h1>
+            <h1 className="page-title">MULTI-ASSET SCREENER</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               {Object.keys(data).length} stocks across {EXCHANGES.length} exchanges
             </p>

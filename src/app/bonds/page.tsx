@@ -132,7 +132,7 @@ export default function BondsPage() {
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">INDONESIAN GOVERNMENT BONDS (SUN)</h1>
+            <h1 className="page-title">INDONESIAN GOVERNMENT BONDS (SUN)</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               Surat Utang Negara — {SUN_BONDS.length} bonds (IDR + USD)
             </p>
@@ -177,7 +177,7 @@ export default function BondsPage() {
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
               <p className="text-[10px] text-text-muted font-mono">USD SPREAD</p>
-              <p className="text-lg font-bold font-mono text-accent-cyan">
+              <p className="page-title text-lg">
                 {quotes['INDO28']?.spread.toFixed(0) ?? '—'}bp
               </p>
             </div>

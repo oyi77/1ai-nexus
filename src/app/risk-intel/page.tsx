@@ -71,7 +71,7 @@ export default function RiskIntelPage() {
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">RISK INTELLIGENCE</h1>
+            <h1 className="page-title">RISK INTELLIGENCE</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               DeFi credit stress, miner behavior, narrative rotation — all from public APIs
             </p>

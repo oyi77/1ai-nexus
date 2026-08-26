@@ -116,7 +116,7 @@ export default function BacktestPage() {
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">SIGNAL BACKTEST</h1>
+            <h1 className="page-title">SIGNAL BACKTEST</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               Historical signal accuracy — predicted vs actual BTC price movement
             </p>

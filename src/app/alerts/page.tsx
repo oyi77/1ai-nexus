@@ -352,7 +352,7 @@ export default function AlertsPage() {
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">ALERT CENTER</h1>
+            <h1 className="page-title">ALERT CENTER</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               {enabledCount} active alert{enabledCount !== 1 ? 's' : ''} — Price, Forex, Macro, Whale, Smart Money
             </p>
@@ -382,7 +382,7 @@ export default function AlertsPage() {
         {/* Quick presets */}
         {!showCreate && alerts.length === 0 && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <h3 className="text-xs font-mono text-accent-cyan mb-3">QUICK START — Popular Alerts</h3>
+            <h3 className="text-xs font-semibold text-text-secondary mb-3">QUICK START — Popular Alerts</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               {PRESETS.map((preset, i) => (
                 <button key={i} onClick={() => loadPreset(preset)}

@@ -12,7 +12,7 @@ export default function TermsOfServicePage() {
         </div>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan">1. Acceptance of Terms</h2>
+          <h2 className="page-title text-lg">1. Acceptance of Terms</h2>
           <p className="text-sm text-text-secondary">
             By accessing or using the Nexus Alpha Engine service (&quot;Service&quot;), you agree to be bound by these Terms of Service.
             If you do not agree to these terms, do not use the Service.
@@ -20,7 +20,7 @@ export default function TermsOfServicePage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan">2. Not Financial Advice</h2>
+          <h2 className="page-title text-lg">2. Not Financial Advice</h2>
           <div className="bg-data-bear/10 border border-data-bear/30 rounded-lg p-4">
             <p className="text-sm text-data-bear font-bold font-mono mb-2">⚠️ IMPORTANT DISCLAIMER</p>
             <p className="text-sm text-text-secondary">
@@ -35,7 +35,7 @@ export default function TermsOfServicePage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan">3. No Guarantee of Profit</h2>
+          <h2 className="page-title text-lg">3. No Guarantee of Profit</h2>
           <p className="text-sm text-text-secondary">
             Past performance does not guarantee future results. The signals and analysis provided through this Service
             are based on historical data and mathematical models, which may not accurately predict future market movements.
@@ -47,7 +47,7 @@ export default function TermsOfServicePage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan">4. User Responsibilities</h2>
+          <h2 className="page-title text-lg">4. User Responsibilities</h2>
           <ul className="list-disc list-inside text-sm text-text-secondary space-y-2">
             <li>You are solely responsible for your trading decisions and any resulting profits or losses.</li>
             <li>You must conduct your own research and due diligence before making any investment.</li>
@@ -57,7 +57,7 @@ export default function TermsOfServicePage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan">5. Limitation of Liability</h2>
+          <h2 className="page-title text-lg">5. Limitation of Liability</h2>
           <p className="text-sm text-text-secondary">
             To the maximum extent permitted by law, the Service and its operators shall not be liable for any
             direct, indirect, incidental, special, consequential, or punitive damages, including but not limited to
@@ -66,7 +66,7 @@ export default function TermsOfServicePage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan">6. API Usage</h2>
+          <h2 className="page-title text-lg">6. API Usage</h2>
           <p className="text-sm text-text-secondary">
             API keys are provided for your use only. You must not share your API key with others.
             We reserve the right to revoke API keys that are misused or shared.
@@ -77,7 +77,7 @@ export default function TermsOfServicePage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan">7. Changes to Terms</h2>
+          <h2 className="page-title text-lg">7. Changes to Terms</h2>
           <p className="text-sm text-text-secondary">
             We reserve the right to modify these terms at any time. We will notify users of significant changes
             via email or through the Service. Continued use of the Service after changes constitutes acceptance
@@ -86,7 +86,7 @@ export default function TermsOfServicePage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan">8. Contact</h2>
+          <h2 className="page-title text-lg">8. Contact</h2>
           <p className="text-sm text-text-secondary">
             If you have any questions about these Terms of Service, please contact us at support@aitradepulse.com
           </p>

@@ -20,7 +20,7 @@ export default function AccountPage() {
 
         {/* Current Plan */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-6">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan mb-4">Current Plan</h2>
+          <h2 className="page-title text-lg mb-4">Current Plan</h2>
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xl font-bold font-mono text-text-primary capitalize">{currentPlan}</p>
@@ -41,7 +41,7 @@ export default function AccountPage() {
 
         {/* API Key */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-6">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan mb-4">API Key</h2>
+          <h2 className="page-title text-lg mb-4">API Key</h2>
           <div className="flex items-center gap-4">
             <code className="flex-1 px-4 py-2 bg-bg-raised rounded font-mono text-sm text-text-primary">
               {apiKey.slice(0, 8)}...{apiKey.slice(-4)}
@@ -57,7 +57,7 @@ export default function AccountPage() {
 
         {/* Usage */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-6">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan mb-4">Usage This Month</h2>
+          <h2 className="page-title text-lg mb-4">Usage This Month</h2>
           <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-sm text-text-muted font-mono">API Calls</p>
@@ -76,7 +76,7 @@ export default function AccountPage() {
 
         {/* Billing History */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-6">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan mb-4">Billing History</h2>
+          <h2 className="page-title text-lg mb-4">Billing History</h2>
           <p className="text-sm text-text-muted font-mono">
             {currentPlan === 'free'
               ? 'You are on the Free plan. No billing history.'

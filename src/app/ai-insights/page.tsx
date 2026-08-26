@@ -145,7 +145,7 @@ export default function AiInsightsPage() {
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">AI MARKET INSIGHTS</h1>
+            <h1 className="page-title">AI MARKET INSIGHTS</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               {insights.length} insights from real data · FRED + Yahoo Finance + World Bank
             </p>
@@ -165,7 +165,7 @@ export default function AiInsightsPage() {
           <div className="space-y-4">
             {categories.map(cat => (
               <div key={cat} className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                <h2 className="text-xs font-mono text-accent-cyan mb-3">{cat.toUpperCase()}</h2>
+                <h2 className="text-xs font-semibold text-text-secondary mb-3">{cat.toUpperCase()}</h2>
                 <div className="space-y-2">
                   {insights.filter(i => i.category === cat).map(insight => (
                     <div key={insight.id} className="flex items-center justify-between py-1 border-b border-border-dim/30">

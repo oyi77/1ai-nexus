@@ -105,7 +105,7 @@ export default function StablecoinIntelPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan flex items-center gap-2">
+            <h1 className="page-title flex items-center gap-2">
               <DollarSign size={20} /> STABLECOIN INTELLIGENCE
             </h1>
             <p className="text-xs text-text-muted font-mono mt-1">

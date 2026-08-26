@@ -73,7 +73,7 @@ export default function ETFFlowsPage() {
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">ETF FLOWS + PREMIUMS</h1>
+            <h1 className="page-title">ETF FLOWS + PREMIUMS</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               Institutional demand signals — spot BTC/ETH ETF flows, Coinbase Premium, Korea Premium, futures basis
             </p>

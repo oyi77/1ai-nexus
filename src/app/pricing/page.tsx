@@ -132,7 +132,7 @@ export default function PricingPage() {
 
         {/* Payment Method Selector */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-6">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan mb-4">Payment Method</h2>
+          <h2 className="page-title text-lg mb-4">Payment Method</h2>
           <div className="grid grid-cols-4 gap-4">
             {paymentMethods.map((method) => (
               <button
@@ -156,7 +156,7 @@ export default function PricingPage() {
 
         {/* Email Input */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-6">
-          <h2 className="text-lg font-bold font-mono text-accent-cyan mb-4">Your Email</h2>
+          <h2 className="page-title text-lg mb-4">Your Email</h2>
           <input
             type="email"
             value={email}

@@ -94,7 +94,7 @@ export default function HistoricalFinancialsPage() {
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">HISTORICAL FINANCIALS</h1>
+            <h1 className="page-title">HISTORICAL FINANCIALS</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               SEC EDGAR XBRL data · {COMPANIES.length} companies · 20+ years of 10-K filings
             </p>

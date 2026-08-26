@@ -65,7 +65,7 @@ export default function UnlocksPage() {
       <div className="p-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">TOKEN UNLOCK CALENDAR</h1>
+            <h1 className="page-title">TOKEN UNLOCK CALENDAR</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               Upcoming supply events — known unlock schedules from public data
             </p>

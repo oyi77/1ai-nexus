@@ -44,10 +44,10 @@ function SectorTable({
         <table className="w-full text-xs">
           <thead>
             <tr className="text-text-muted border-b border-border-dim">
-              <SortableTh controls={tc} k="symbol" className="text-left py-2 font-mono w-20">SYMBOL</SortableTh>
-              <SortableTh controls={tc} k="name" className="text-left py-2 font-mono">NAME</SortableTh>
-              <SortableTh controls={tc} k="price" className="text-right py-2 font-mono w-24">PRICE</SortableTh>
-              <SortableTh controls={tc} k="change" className="text-right py-2 font-mono w-20">CHANGE</SortableTh>
+              <SortableTh controls={tc} k="symbol" className="text-left py-2 w-20">SYMBOL</SortableTh>
+              <SortableTh controls={tc} k="name" className="text-left py-2">NAME</SortableTh>
+              <SortableTh controls={tc} k="price" className="text-right py-2 w-24">PRICE</SortableTh>
+              <SortableTh controls={tc} k="change" className="text-right py-2 w-20">CHANGE</SortableTh>
             </tr>
           </thead>
           <tbody>
@@ -232,7 +232,7 @@ export default function EquitiesPage() {
     <NexusLayout>
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between gap-4">
-          <h1 className="text-xl font-bold font-mono text-accent-cyan">GLOBAL EQUITIES</h1>
+          <h1 className="page-title">GLOBAL EQUITIES</h1>
           <span className="text-[10px] text-text-muted font-mono">
             {market && marketStocks
               ? `${marketStocks.length} listings · ${marketName ?? market}`
@@ -264,7 +264,7 @@ export default function EquitiesPage() {
 
         {/* Indices */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-3">MAJOR INDICES</h2>
+          <h2 className="text-xs font-semibold text-text-secondary mb-3">MAJOR INDICES</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {loading ? (
               Array.from({ length: 4 }).map((_, i) => (
@@ -320,7 +320,7 @@ export default function EquitiesPage() {
             if (stocks.length === 0) return null
             return (
               <div key={sector} className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                <h2 className="text-xs font-mono text-accent-cyan mb-3">{sector.toUpperCase()}</h2>
+                <h2 className="text-xs font-semibold text-text-secondary mb-3">{sector.toUpperCase()}</h2>
                 <SectorTable
                   sector={sector}
                   stocks={stocks}

@@ -51,7 +51,7 @@ export default function CommoditiesPage() {
     <NexusLayout>
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold font-mono text-accent-cyan">GLOBAL COMMODITIES</h1>
+          <h1 className="page-title">GLOBAL COMMODITIES</h1>
           <span className="text-[10px] text-text-muted font-mono">{quotedItems.length}/{ALL_COMMODITIES.length} live</span>
         </div>
         {error && <div className="text-data-bear text-[11px] font-mono p-4">Error: {error}</div>}
@@ -96,7 +96,7 @@ export default function CommoditiesPage() {
         ) : (
           COMMODITY_GROUPS.map(group => (
             <div key={group.category} className="bg-bg-panel border border-border-dim rounded-lg p-4">
-              <h2 className="text-xs font-mono text-accent-cyan mb-3">{group.category.toUpperCase()}</h2>
+              <h2 className="text-xs font-semibold text-text-secondary mb-3">{group.category.toUpperCase()}</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                 {group.items.map(c => {
                   const q = quotes[c.symbol]

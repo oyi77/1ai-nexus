@@ -35,7 +35,7 @@ export default function ForexPage() {
     <NexusLayout>
       <div className="p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold font-mono text-accent-cyan">FOREX RATES</h1>
+          <h1 className="page-title">FOREX RATES</h1>
           <div className="flex gap-2">
             {['USD', 'EUR', 'GBP', 'IDR'].map(b => (
               <button
@@ -57,7 +57,7 @@ export default function ForexPage() {
         {/* IDR Priority Section — always visible for Indonesian traders */}
         {rates && rates['IDR'] && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <h2 className="text-xs font-mono text-accent-cyan mb-3">INDONESIAN RUPIAH (IDR)</h2>
+            <h2 className="text-xs font-semibold text-text-secondary mb-3">INDONESIAN RUPIAH (IDR)</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {idrPairs.map(({ ccy, label }) => {
                 const idrRate = rates['IDR']

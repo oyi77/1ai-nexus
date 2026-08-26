@@ -363,7 +363,7 @@ export default function ApiDocsPage() {
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">API DOCUMENTATION</h1>
+            <h1 className="page-title">API DOCUMENTATION</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               {API_ENDPOINTS.length} endpoints · REST API · JSON responses · No API key required for public endpoints
             </p>
@@ -372,7 +372,7 @@ export default function ApiDocsPage() {
 
         {/* Quick Start */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-3">QUICK START</h2>
+          <h2 className="text-xs font-semibold text-text-secondary mb-3">QUICK START</h2>
           <div className="space-y-2 text-xs text-text-dim font-mono">
             <p>Base URL: <span className="text-accent-cyan">https://tracker.aitradepulse.com</span></p>
             <p>All endpoints return JSON: <span className="text-accent-cyan">{`{ data: ..., error: null }`}</span></p>
@@ -460,7 +460,7 @@ export default function ApiDocsPage() {
 
         {/* Integration Guide */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-3">INTEGRATION GUIDE</h2>
+          <h2 className="text-xs font-semibold text-text-secondary mb-3">INTEGRATION GUIDE</h2>
           <div className="space-y-3 text-xs text-text-dim">
             <div>
               <p className="font-mono text-text-primary mb-1">1. Fetch Market Data</p>

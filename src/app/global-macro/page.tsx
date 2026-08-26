@@ -54,7 +54,7 @@ export default function GlobalMacroPage() {
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">GLOBAL MACRO DASHBOARD</h1>
+            <h1 className="page-title">GLOBAL MACRO DASHBOARD</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               {COUNTRIES.length} countries · {INDICATORS.length} indicators · World Bank data
             </p>
@@ -81,7 +81,7 @@ export default function GlobalMacroPage() {
           <div className="text-text-dim text-xs p-8 text-center">Loading global macro data for {COUNTRIES.length} countries...</div>
         ) : (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <h2 className="text-xs font-mono text-accent-cyan mb-3">
+            <h2 className="text-xs font-semibold text-text-secondary mb-3">
               {selectedIndicator.toUpperCase()} — RANKED BY {COUNTRIES.length} COUNTRIES
             </h2>
             <TableControlsBar idPrefix="global-macro" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />

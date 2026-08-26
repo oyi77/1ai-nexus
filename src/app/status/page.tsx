@@ -103,7 +103,7 @@ export default function StatusPage() {
     <NexusLayout>
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold font-mono text-accent-cyan">SYSTEM STATUS</h1>
+          <h1 className="page-title">SYSTEM STATUS</h1>
           {data && (
             <span className={`text-sm font-mono ${statusColor(data.status)}`}>
               {data.status.toUpperCase()}

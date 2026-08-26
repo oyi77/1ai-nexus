@@ -151,7 +151,7 @@ export default function PortfolioPage() {
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">PORTFOLIO RISK ANALYTICS</h1>
+            <h1 className="page-title">PORTFOLIO RISK ANALYTICS</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               {positions.length} positions · VaR, Sharpe, Beta, concentration · Alpaca Paper Trading
             </p>
@@ -213,7 +213,7 @@ export default function PortfolioPage() {
 
             {/* Positions Table */}
             <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-              <h3 className="text-xs font-mono text-accent-cyan mb-3">POSITIONS (FROM ALPACA)</h3>
+              <h3 className="text-xs font-semibold text-text-secondary mb-3">POSITIONS (FROM ALPACA)</h3>
               <TableControlsBar idPrefix="portfolio" query={posTc.query} onQueryChange={posTc.setQuery} shown={posTc.visible.length} total={posTc.total} />
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">

@@ -25,8 +25,8 @@ const signCls = (v: number) => (v >= 0 ? "text-accent-green" : "text-accent-red"
 function LeaderTable({ title, rows }: { title: string; rows: Leader[] }) {
   return (
     <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-      <h3 className="text-xs font-mono text-accent-cyan mb-3">{title}</h3>
-      <table className="w-full text-xs font-mono">
+      <h3 className="text-xs font-semibold text-text-secondary mb-3">{title}</h3>
+      <table className="w-full text-xs tabular-nums">
         <thead>
           <tr className="text-text-muted border-b border-border-dim">
             <th className="text-left py-1">Code</th>
@@ -39,10 +39,10 @@ function LeaderTable({ title, rows }: { title: string; rows: Leader[] }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.code} className="border-b border-border-dim/30">
-              <td className="py-1 font-bold text-accent-cyan">{r.code}</td>
+              <td className="py-1 font-mono font-semibold text-teal-vivid">{r.code}</td>
               <td className="py-1 text-right">{r.close.toLocaleString("id-ID")}</td>
               <td className={`py-1 text-right ${signCls(r.changePct)}`}>{r.changePct >= 0 ? "+" : ""}{r.changePct.toFixed(2)}</td>
-              <td className="py-1 text-right">{fmtVol(r.netVol)}</td>
+              <td className="py-1 text-right font-mono">{fmtVol(r.netVol)}</td>
               <td className={`py-1 text-right ${signCls(r.estNetValueIdr)}`}>{fmtIdrB(r.estNetValueIdr)}</td>
             </tr>
           ))}
@@ -219,7 +219,7 @@ export default function BandarmologyPage() {
     <NexusLayout>
       <div className="p-6 space-y-5">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h1 className="text-xl font-bold font-mono text-accent-cyan">BANDARMOLOGY — IDX FOREIGN FLOW</h1>
+          <h1 className="page-title">BANDARMOLOGY — IDX FOREIGN FLOW</h1>
           <div className="flex items-center gap-3">
             <LiveDot status={loading ? "stale" : "live"} label />
             {meta.tradeDate && (
@@ -284,7 +284,7 @@ export default function BandarmologyPage() {
         {tab === "streaks" && (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-              <h3 className="text-xs font-mono text-accent-green mb-3">ACCUMULATION STREAKS</h3>
+              <h3 className="text-xs font-semibold text-data-bull mb-3">ACCUMULATION STREAKS</h3>
               <ul className="space-y-1 text-xs font-mono">
                 {acc.map((s) => (
                   <li key={s.code} className="flex justify-between border-b border-border-dim/30 py-1">
@@ -296,7 +296,7 @@ export default function BandarmologyPage() {
               </ul>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-              <h3 className="text-xs font-mono text-accent-red mb-3">DISTRIBUTION STREAKS</h3>
+              <h3 className="text-xs font-semibold text-data-bear mb-3">DISTRIBUTION STREAKS</h3>
               <ul className="space-y-1 text-xs font-mono">
                 {dist.map((s) => (
                   <li key={s.code} className="flex justify-between border-b border-border-dim/30 py-1">
@@ -312,8 +312,8 @@ export default function BandarmologyPage() {
 
         {tab === "brokers" && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4 overflow-x-auto">
-            <h3 className="text-xs font-mono text-accent-cyan mb-3">TOP BROKERS BY TURNOVER</h3>
-            <table className="w-full text-xs font-mono">
+            <h3 className="text-xs font-semibold text-text-secondary mb-3">TOP BROKERS BY TURNOVER</h3>
+            <table className="w-full text-xs tabular-nums">
               <thead>
                 <tr className="text-text-muted border-b border-border-dim">
                   <th className="text-left py-1">#</th>
@@ -329,7 +329,7 @@ export default function BandarmologyPage() {
                     <td className="py-1 text-text-muted">{i + 1}</td>
                     <td className="py-1"><span className="font-bold mr-2">{b.firm}</span>{b.name}</td>
                     <td className="py-1 text-right">{(b.value / 1e12).toFixed(2)}T</td>
-                    <td className="py-1 text-right">{fmtVol(b.volume)}</td>
+                    <td className="py-1 text-right font-mono">{fmtVol(b.volume)}</td>
                     <td className="py-1 text-right">{b.freq.toLocaleString("id-ID")}</td>
                   </tr>
                 ))}
@@ -363,7 +363,7 @@ export default function BandarmologyPage() {
 
         {tab === "rotation" && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <h3 className="text-xs font-mono text-accent-cyan mb-3">SECTOR ROTATION — FOREIGN NET VALUE (est, Rp B)</h3>
+            <h3 className="text-xs font-semibold text-text-secondary mb-3">SECTOR ROTATION — FOREIGN NET VALUE (est, Rp B)</h3>
             <div className="space-y-1.5">
               {rotation.map((r) => {
                 const pct = (Math.abs(r.netValueIdr) / maxAbsRot) * 50

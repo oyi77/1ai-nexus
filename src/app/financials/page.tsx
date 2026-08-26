@@ -122,7 +122,7 @@ export default function FinancialsPage() {
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">FINANCIAL STATEMENTS</h1>
+            <h1 className="page-title">FINANCIAL STATEMENTS</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               Income statement, balance sheet, cash flow — {SYMBOLS.length} companies
             </p>
@@ -165,7 +165,7 @@ export default function FinancialsPage() {
 
             {/* Income Statement */}
             <div className="col-span-4 bg-bg-panel border border-border-dim rounded-lg p-4">
-              <h3 className="text-xs font-mono text-accent-cyan mb-3">INCOME STATEMENT</h3>
+              <h3 className="text-xs font-semibold text-text-secondary mb-3">INCOME STATEMENT</h3>
               <div className="space-y-2">
                 {[
                   ['Revenue', fmtB(data.revenue)],
@@ -190,7 +190,7 @@ export default function FinancialsPage() {
 
             {/* Balance Sheet */}
             <div className="col-span-4 bg-bg-panel border border-border-dim rounded-lg p-4">
-              <h3 className="text-xs font-mono text-accent-cyan mb-3">BALANCE SHEET</h3>
+              <h3 className="text-xs font-semibold text-text-secondary mb-3">BALANCE SHEET</h3>
               <div className="space-y-2">
                 {[
                   ['Total Assets', fmtB(data.totalAssets)],
@@ -211,7 +211,7 @@ export default function FinancialsPage() {
 
             {/* Cash Flow + Returns */}
             <div className="col-span-4 bg-bg-panel border border-border-dim rounded-lg p-4">
-              <h3 className="text-xs font-mono text-accent-cyan mb-3">CASH FLOW & RETURNS</h3>
+              <h3 className="text-xs font-semibold text-text-secondary mb-3">CASH FLOW & RETURNS</h3>
               <div className="space-y-2">
                 {[
                   ['Operating CF', fmtB(data.operatingCashFlow)],

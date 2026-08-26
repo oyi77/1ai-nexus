@@ -117,7 +117,7 @@ setDetail(data.find(i => i.symbol === selected) ?? null)
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">COMPANY FUNDAMENTALS</h1>
+            <h1 className="page-title">COMPANY FUNDAMENTALS</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               {data.length} companies across US, IDX, EU, Asia
             </p>
@@ -161,7 +161,7 @@ setDetail(data.find(i => i.symbol === selected) ?? null)
 
             {/* Valuation Metrics */}
             <div className="col-span-4 bg-bg-panel border border-border-dim rounded-lg p-4">
-              <h3 className="text-xs font-mono text-accent-cyan mb-3">VALUATION</h3>
+              <h3 className="text-xs font-semibold text-text-secondary mb-3">VALUATION</h3>
               <div className="space-y-2">
                 {[
                   ['Trailing P/E', fmt(detail.trailingPE, 1)],
@@ -182,7 +182,7 @@ setDetail(data.find(i => i.symbol === selected) ?? null)
 
             {/* Profitability */}
             <div className="col-span-4 bg-bg-panel border border-border-dim rounded-lg p-4">
-              <h3 className="text-xs font-mono text-accent-cyan mb-3">PROFITABILITY</h3>
+              <h3 className="text-xs font-semibold text-text-secondary mb-3">PROFITABILITY</h3>
               <div className="space-y-2">
                 {[
                   ['Revenue', fmtB(detail.revenue)],
@@ -204,7 +204,7 @@ setDetail(data.find(i => i.symbol === selected) ?? null)
 
             {/* Financial Health */}
             <div className="col-span-4 bg-bg-panel border border-border-dim rounded-lg p-4">
-              <h3 className="text-xs font-mono text-accent-cyan mb-3">FINANCIAL HEALTH</h3>
+              <h3 className="text-xs font-semibold text-text-secondary mb-3">FINANCIAL HEALTH</h3>
               <div className="space-y-2">
                 {[
                   ['Total Cash', fmtB(detail.totalCash)],

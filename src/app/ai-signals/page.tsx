@@ -241,7 +241,7 @@ export default function AiSignalsPage() {
       <FinancialDisclaimer variant="banner" />
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">AI TRADING SIGNALS</h1>
+            <h1 className="page-title">AI TRADING SIGNALS</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               {signals.length} signals computed from real market data · Yahoo Finance + FRED
             </p>
@@ -303,7 +303,7 @@ export default function AiSignalsPage() {
         {/* Macro Context */}
         {macro.length > 0 && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <h2 className="text-xs font-mono text-accent-cyan mb-3">MACRO CONTEXT (FRED)</h2>
+            <h2 className="text-xs font-semibold text-text-secondary mb-3">MACRO CONTEXT (FRED)</h2>
             <div className="grid grid-cols-4 gap-2">
               {macro.map(m => (
                 <div key={m.indicator} className="bg-bg-elevated p-2 rounded">

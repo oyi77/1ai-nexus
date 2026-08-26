@@ -110,7 +110,7 @@ export default function ComparablesPage() {
       <div className="p-6 space-y-4">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-xl font-bold font-mono text-accent-cyan">COMPARABLE COMPANY ANALYSIS</h1>
+            <h1 className="page-title">COMPARABLE COMPANY ANALYSIS</h1>
             <p className="text-xs text-text-muted font-mono mt-1">
               {Object.keys(PEER_GROUP_NAMES).length} peer groups · IDX membership derived live from universe
             </p>
@@ -135,7 +135,7 @@ export default function ComparablesPage() {
         {/* Summary Averages */}
         {!loading && Object.keys(data).length > 0 && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <h3 className="text-xs font-mono text-accent-cyan mb-3">GROUP AVERAGES</h3>
+            <h3 className="text-xs font-semibold text-text-secondary mb-3">GROUP AVERAGES</h3>
             <div className="grid grid-cols-6 gap-4">
               {[
                 ['Avg P/E', averages.pe != null ? fmt(averages.pe, 1) : '—'],
