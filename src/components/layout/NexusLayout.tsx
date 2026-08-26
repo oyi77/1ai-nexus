@@ -190,8 +190,8 @@ export function NexusLayout({ children }: NexusLayoutProps) {
             {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-teal-vivid font-bold text-[15px] font-mono tracking-tight">NEXUS</span>
-            <span className="text-[9px] text-text-muted font-mono hidden sm:inline">v2.0</span>
+            <span className="text-teal-vivid font-bold text-base tracking-tight">◆ NEXUS</span>
+            <span className="text-[10px] text-text-muted hidden sm:inline">v2</span>
           </Link>
           <div className="hidden md:block">
             <CommandBar />
@@ -236,7 +236,7 @@ export function NexusLayout({ children }: NexusLayoutProps) {
             fixed inset-y-0 left-0 top-12
             ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           `}
-          style={{ width: collapsed ? 48 : 200 }}
+          style={{ width: collapsed ? 52 : 216 }}
         >
           {/* Nav Sections */}
           <div className="flex-1 py-1">
@@ -272,9 +272,9 @@ export function NexusLayout({ children }: NexusLayoutProps) {
                         key={item.href}
                         href={item.href}
                         onClick={() => setMobileMenuOpen(false)}
-                        className={`flex items-center gap-2.5 px-3 py-1.5 text-[12px] font-medium transition-colors
+                        className={`flex items-center gap-2.5 mx-2 rounded-md px-2.5 py-1.5 text-[13px] transition-colors
                           ${isActive
-                            ? 'bg-teal-dim/30 text-teal-vivid border-r-2 border-teal-vivid'
+                            ? 'bg-teal-dim/40 text-teal-vivid font-semibold'
                             : 'text-text-secondary hover:bg-bg-raised hover:text-text-primary'
                           }`}
                         title={collapsed ? item.label : undefined}

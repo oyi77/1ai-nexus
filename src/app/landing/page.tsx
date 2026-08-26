@@ -1,322 +1,347 @@
 "use client"
 
 import Link from 'next/link'
+import {
+  ArrowRight, BarChart3, Check, Globe2, Layers, Radio, Users, Zap,
+} from 'lucide-react'
 
-const features = [
+const STATS = [
+  { value: '38,902', label: 'Instruments indexed' },
+  { value: '20', label: 'Exchanges' },
+  { value: '15', label: 'Markets' },
+  { value: '58+', label: 'Data modules' },
+  { value: '~3M', label: 'Queries/sec served' },
+]
+
+const FEATURES = [
   {
-    icon: '🧠',
-    title: 'AI-Powered Signals',
-    description: 'Cross-correlated signals from trade flow, whale alerts, funding rates, and sentiment analysis.',
+    icon: Layers,
+    title: 'Bandarmology — IDX depth nobody else has',
+    body: 'Foreign flow per stock, sector rotation, broker board, accumulation streaks — the Indonesian market decoded daily from exchange summaries.',
   },
   {
-    icon: '📊',
-    title: 'Trading Levels',
-    description: 'Every signal includes Entry, TP1, TP2, TP3, and Stop Loss — calculated from real volatility.',
+    icon: Globe2,
+    title: '14 global markets, one screen',
+    body: 'US, Japan, UK, Germany, Hong Kong, India, Canada, Korea, Taiwan, Australia, Singapore, Brazil, Switzerland, Netherlands — unified symbols, one search.',
   },
   {
-    icon: '⏱️',
-    title: 'Valid Periods',
-    description: 'Signals have expiration times (4h/24h/7d) based on strength and source.',
+    icon: BarChart3,
+    title: 'Fundamentals that load instantly',
+    body: 'PER, PBV, ROE, DER, EPS and market cap for the entire IDX universe — harvested nightly, served from memory in single-digit milliseconds.',
   },
   {
-    icon: '📈',
-    title: 'Backtested',
-    description: 'Historical accuracy tracked and verified. Win rate, profit factor, max drawdown.',
+    icon: Zap,
+    title: 'AI signals with real risk levels',
+    body: 'Entry, TP1–TP3 and stop-loss computed from live volatility — cross-correlated across trade flow, whale alerts, funding and sentiment.',
   },
   {
-    icon: '🎯',
-    title: 'Risk Management',
-    description: 'Position sizing calculator, R:R ratio display, drawdown protection.',
+    icon: Radio,
+    title: 'On-chain intelligence',
+    body: 'Whale alerts, DEX flows, stablecoin shifts, token unlocks and dev activity — the crypto layer wired into the same terminal.',
   },
   {
-    icon: '🔌',
-    title: 'API Access',
-    description: 'RESTful API with authentication, rate limiting, and usage tracking.',
+    icon: Users,
+    title: 'Copy-trading leaderboard',
+    body: 'Gate.io and Hyperliquid leaders ranked, with per-trader performance drill-downs — see what the best are actually doing.',
   },
 ]
 
-const stats = [
-  { value: '30+', label: 'Active Signals' },
-  { value: '12', label: 'Score Providers' },
-  { value: '56%', label: 'Backtest Win Rate' },
-  { value: '<1s', label: 'Latency' },
+const COMPARISON = [
+  { name: 'NEXUS', price: 'Free', idx: true, global: true, onchain: true, bandar: true, api: true, highlight: true },
+  { name: 'Bloomberg Terminal', price: '~$24k/yr', idx: true, global: true, onchain: false, bandar: false, api: true, highlight: false },
+  { name: 'Hyperdash', price: 'Paid tiers', idx: false, global: false, onchain: true, bandar: false, api: false, highlight: false },
+  { name: 'Stockbit', price: 'Freemium', idx: true, global: false, onchain: false, bandar: true, api: false, highlight: false },
 ]
+
+const MARKETS = [
+  ['United States', 5705], ['India', 7826], ['Japan', 3782], ['Canada', 4123],
+  ['United Kingdom', 2735], ['Korea', 2739], ['Hong Kong', 2652], ['Taiwan', 2343],
+  ['Germany', 822], ['Brazil', 781], ['Australia', 1619], ['Switzerland', 394],
+  ['Singapore', 539], ['Netherlands', 104], ['Indonesia', 843],
+]
+
+function Mark() {
+  return <span className="text-teal-vivid font-bold tracking-tight">◆ NEXUS</span>
+}
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen bg-bg-base">
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-teal-vivid/10 to-bg-base" />
-        <div className="relative max-w-6xl mx-auto px-6 py-24">
-          <nav className="flex items-center justify-between mb-16">
-            <div className="flex items-center gap-2">
-              <span className="text-2xl">◈</span>
-              <span className="text-xl font-bold font-mono text-text-primary">NEXUS</span>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link href="/pricing" className="text-sm font-mono text-text-muted hover:text-text-primary transition-colors">
-                Pricing
-              </Link>
-              <Link href="/terms" className="text-sm font-mono text-text-muted hover:text-text-primary transition-colors">
-                Terms
-              </Link>
-              <Link
-                href="/alpha-engine"
-                className="px-4 py-2 bg-teal-vivid text-bg-base font-mono font-bold text-sm rounded hover:bg-teal-vivid/80 transition-colors"
-              >
-                Launch App
-              </Link>
-            </div>
+    <div className="min-h-screen bg-bg-base text-text-primary">
+      {/* ── Nav ── */}
+      <header className="sticky top-0 z-50 border-b border-bg-border/60 bg-bg-base/80 backdrop-blur-md">
+        <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+          <Link href="/" className="text-lg"><Mark /></Link>
+          <nav className="hidden md:flex items-center gap-7 text-sm text-text-secondary">
+            <a href="#features" className="hover:text-text-primary transition-colors">Features</a>
+            <a href="#coverage" className="hover:text-text-primary transition-colors">Coverage</a>
+            <a href="#compare" className="hover:text-text-primary transition-colors">Compare</a>
+            <Link href="/pricing" className="hover:text-text-primary transition-colors">Pricing</Link>
           </nav>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-teal-vivid text-bg-void text-sm font-semibold hover:bg-teal-vivid/85 transition-colors"
+          >
+            Open Terminal <ArrowRight size={15} />
+          </Link>
+        </div>
+      </header>
 
-          <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-5xl font-bold font-mono text-text-primary mb-6">
-              Alpha Signals for{' '}
-              <span className="text-teal-vivid">Crypto Trading</span>
-            </h1>
-            <p className="text-lg text-text-secondary font-mono mb-8">
-              AI-powered trading signals with Entry, Take Profit, and Stop Loss levels.
-              Cross-correlated from trade flow, whale alerts, funding rates, and sentiment.
-            </p>
-            <div className="flex items-center justify-center gap-4">
-              <Link
-                href="/pricing"
-                className="px-8 py-3 bg-teal-vivid text-bg-base font-mono font-bold rounded hover:bg-teal-vivid/80 transition-colors"
-              >
-                Get Started Free
-              </Link>
-              <Link
-                href="/alpha-engine"
-                className="px-8 py-3 bg-bg-raised text-text-primary font-mono font-bold rounded hover:bg-bg-elevated transition-colors"
-              >
-                View Live Signals
-              </Link>
+      {/* ── Hero ── */}
+      <section className="relative overflow-hidden">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background:
+              'radial-gradient(ellipse 60% 45% at 50% -5%, rgba(45,212,160,0.13), transparent 70%)',
+          }}
+        />
+        <div className="relative max-w-6xl mx-auto px-6 pt-20 pb-16 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-bg-border bg-bg-panel text-xs text-text-secondary mb-7">
+            <span className="w-1.5 h-1.5 rounded-full bg-teal-vivid animate-live-dot" />
+            Live — 38,902 instruments across 20 exchanges
+          </div>
+          <h1 className="text-[2.75rem] md:text-6xl font-bold tracking-tight leading-[1.05] mb-6">
+            Market intelligence,
+            <br />
+            <span className="text-teal-vivid">Bloomberg-grade.</span> Zero cost.
+          </h1>
+          <p className="text-lg text-text-secondary max-w-2xl mx-auto mb-9 leading-relaxed">
+            IDX bandarmology, fundamentals, 14 global markets, on-chain intel and AI signals —
+            one terminal, every dataset served from memory in milliseconds.
+          </p>
+          <div className="flex items-center justify-center gap-3 mb-14">
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-teal-vivid text-bg-void font-semibold hover:bg-teal-vivid/85 transition-colors"
+            >
+              Open Terminal <ArrowRight size={16} />
+            </Link>
+            <a
+              href="#coverage"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-bg-border bg-bg-panel text-text-primary font-medium hover:border-border-active transition-colors"
+            >
+              Explore coverage
+            </a>
+          </div>
+
+          {/* ── Product mock — real layout, real numbers ── */}
+          <div className="max-w-4xl mx-auto rounded-xl border border-bg-border bg-bg-panel shadow-2xl shadow-black/50 overflow-hidden text-left">
+            <div className="flex items-center gap-1.5 px-4 h-9 border-b border-bg-border bg-bg-raised/60">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#FF5F57]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#FEBC2E]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#28C840]" />
+              <span className="ml-3 text-xs text-text-muted">◆ NEXUS — Intelligence Terminal</span>
+            </div>
+            <div className="grid grid-cols-12 text-xs">
+              {/* mini sidebar */}
+              <div className="col-span-3 md:col-span-2 border-r border-bg-border p-3 space-y-2 text-text-muted hidden sm:block">
+                {['Dashboard', 'Equities', 'Bandarmology', 'AI Signals', 'On-Chain', 'Copy Trading'].map((s, i) => (
+                  <div key={s} className={`px-2 py-1 rounded-md ${i === 2 ? 'bg-teal-dim/40 text-teal-vivid font-semibold' : ''}`}>{s}</div>
+                ))}
+              </div>
+              {/* mini content */}
+              <div className="col-span-9 md:col-span-10 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold">Bandarmology — IDX Foreign Flow</span>
+                  <span className="text-text-muted text-[10px]">session 2026-08-24 · 843 stocks</span>
+                </div>
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    ['S&P 500', '6,677', '+0.04%'],
+                    ['IHSG', '6,406', '-0.12%'],
+                    ['NIKKEI', '45,833', '+1.47%'],
+                    ['BTC', '$2,495M vol', '+2.55%'],
+                  ].map(([n, v, c]) => (
+                    <div key={n} className="rounded-lg border border-bg-border p-2.5 bg-bg-base">
+                      <div className="text-[10px] text-text-muted">{n}</div>
+                      <div className="text-sm font-semibold tabular-nums">{v}</div>
+                      <div className={`text-[10px] tabular-nums ${c.startsWith('-') ? 'text-data-bear' : 'text-data-bull'}`}>{c}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* foreign flow bars mock */}
+                <div className="rounded-lg border border-bg-border p-3">
+                  <div className="text-[10px] text-text-muted mb-2">Foreign net value / session — Rp B</div>
+                  <div className="flex items-end gap-1 h-14">
+                    {[38, 52, -30, 64, -22, 45, -70, 30, 55, -40, 62, 28, -48, 58, 35, -25, 70, 42, -55, 50].map((v, i) => (
+                      <div key={i} className="flex-1 flex flex-col justify-end h-full">
+                        <div
+                          className={v >= 0 ? 'bg-data-bull/70 rounded-sm' : 'bg-data-bear/70 rounded-sm'}
+                          style={{ height: `${Math.abs(v) * 0.9}%`, alignSelf: v >= 0 ? 'flex-end' : 'flex-start', marginTop: v >= 0 ? 'auto' : 0, marginBottom: v < 0 ? 'auto' : 0 }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  {[
+                    ['TINS', 'PT Timah Tbk', '+99.09', 'text-data-bull'],
+                    ['BRMS', 'Bumi Resources Minerals', '+56.33', 'text-data-bull'],
+                    ['BBRI', 'Bank Rakyat Indonesia', '-21.81', 'text-data-bear'],
+                  ].map(([c, n, v, cls]) => (
+                    <div key={c} className="flex items-center justify-between px-2 py-1.5 rounded-md hover:bg-bg-raised/60">
+                      <span className="font-semibold text-teal-vivid w-14">{c}</span>
+                      <span className="text-text-muted flex-1 truncate">{n}</span>
+                      <span className={`tabular-nums ${cls}`}>{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Promo Video */}
-      <section className="max-w-5xl mx-auto px-6 py-12">
-        <div className="relative rounded-xl overflow-hidden border border-border-dim shadow-2xl shadow-teal-vivid/10">
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="w-full"
-            poster="/promo-hero.jpg"
-          >
-            <source src="/promo-video-remotion.mp4" type="video/mp4" />
-          </video>
-          <div className="absolute inset-0 bg-gradient-to-t from-bg-base/80 via-transparent to-transparent" />
-          <div className="absolute bottom-6 left-6 right-6 text-center">
-            <p className="text-sm font-mono text-text-muted">
-              AI-powered signals • Real-time data • Professional grade
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* Stats */}
-      <section className="border-y border-border-dim">
-        <div className="max-w-6xl mx-auto px-6 py-12">
-          <div className="grid grid-cols-4 gap-8">
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-3xl font-bold font-mono text-teal-vivid">{stat.value}</p>
-                <p className="text-sm text-text-muted font-mono mt-1">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Features */}
-      <section className="max-w-6xl mx-auto px-6 py-24">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold font-mono text-text-primary mb-4">
-            Everything You Need to Trade Smarter
-          </h2>
-          <p className="text-text-secondary font-mono max-w-2xl mx-auto">
-            Our alpha engine combines multiple data sources to generate high-confidence trading signals
-            with precise entry and exit levels.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-8">
-          {features.map((feature) => (
-            <div
-              key={feature.title}
-              className="p-6 bg-bg-panel border border-border-dim rounded-lg hover:border-teal-vivid/50 transition-colors"
-            >
-              <span className="text-3xl mb-4 block">{feature.icon}</span>
-              <h3 className="text-lg font-bold font-mono text-text-primary mb-2">{feature.title}</h3>
-              <p className="text-sm text-text-secondary">{feature.description}</p>
+      {/* ── Stats strip ── */}
+      <section className="border-y border-bg-border bg-bg-panel/50">
+        <div className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-2 md:grid-cols-5 gap-6 text-center">
+          {STATS.map((s) => (
+            <div key={s.label}>
+              <div className="text-2xl font-bold tabular-nums tracking-tight">{s.value}</div>
+              <div className="text-xs text-text-muted mt-1">{s.label}</div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Data Sources */}
-      <section className="border-y border-border-dim bg-bg-panel/50">
-        <div className="max-w-6xl mx-auto px-6 py-16">
-          <div className="text-center mb-12">
-            <h2 className="text-2xl font-bold font-mono text-text-primary mb-4">
-              30+ Data Sources
-            </h2>
-            <p className="text-text-secondary font-mono">
-              Cross-correlated from the best free and premium data providers
-            </p>
-          </div>
+      {/* ── Features ── */}
+      <section id="features" className="max-w-6xl mx-auto px-6 py-20">
+        <p className="eyebrow mb-2">Capabilities</p>
+        <h2 className="text-3xl font-bold tracking-tight mb-3">Everything the expensive terminals have. Then some.</h2>
+        <p className="text-text-secondary mb-10 max-w-2xl">
+          Six intelligence layers, one keyboard-driven terminal — built for traders who want the data without the enterprise invoice.
+        </p>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {FEATURES.map((f) => (
+            <div key={f.title} className="card card-hover p-5">
+              <f.icon size={20} className="text-teal-vivid mb-3" />
+              <h3 className="font-semibold mb-1.5">{f.title}</h3>
+              <p className="text-sm text-text-secondary leading-relaxed">{f.body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-          <div className="grid grid-cols-4 md:grid-cols-6 gap-4">
-            {[
-              // Exchanges (Real-time WebSocket)
-              { name: 'Binance', cat: 'Exchange' },
-              { name: 'OKX', cat: 'Exchange' },
-              { name: 'Bybit', cat: 'Exchange' },
-              { name: 'Bitfinex', cat: 'Exchange' },
-              { name: 'Kraken', cat: 'Exchange' },
-              { name: 'Gate.io', cat: 'Exchange' },
-              { name: 'Indodax', cat: 'Exchange' },
-              // Market Data
-              { name: 'CoinGecko', cat: 'Market' },
-              { name: 'CoinPaprika', cat: 'Market' },
-              { name: 'Yahoo Finance', cat: 'Equities' },
-              { name: 'ExchangeRate', cat: 'Forex' },
-              // Blockchain
-              { name: 'DeFiLlama', cat: 'DeFi' },
-              { name: 'DexScreener', cat: 'DEX' },
-              { name: 'GeckoTerminal', cat: 'DEX' },
-              { name: 'Blockstream', cat: 'Bitcoin' },
-              { name: 'Mempool', cat: 'Bitcoin' },
-              { name: 'Beaconcha.in', cat: 'Ethereum' },
-              { name: 'Alchemy', cat: 'RPC' },
-              { name: 'Helius', cat: 'Solana' },
-              { name: 'Etherscan', cat: 'Explorer' },
-              // Analytics
-              { name: 'Deribit', cat: 'Options' },
-              { name: 'Polymarket', cat: 'Predictions' },
-              { name: 'Reservoir', cat: 'NFT' },
-              // Macro
-              { name: 'FRED', cat: 'Macro' },
-              { name: 'SEC EDGAR', cat: 'Filings' },
-              // News/Sentiment
-              { name: 'RSS Feeds', cat: 'News' },
-              { name: 'GDELT', cat: 'News' },
-              { name: 'Fear & Greed', cat: 'Sentiment' },
-            ].map((src) => (
-              <div key={src.name} className="text-center p-3 bg-bg-base rounded-lg border border-border-dim">
-                <p className="text-xs font-mono font-bold text-text-primary">{src.name}</p>
-                <p className="text-[10px] text-text-muted font-mono">{src.cat}</p>
+      {/* ── Coverage ── */}
+      <section id="coverage" className="border-y border-bg-border bg-bg-panel/40">
+        <div className="max-w-6xl mx-auto px-6 py-20">
+          <p className="eyebrow mb-2">Coverage</p>
+          <h2 className="text-3xl font-bold tracking-tight mb-3">15 markets. One symbol namespace.</h2>
+          <p className="text-text-secondary mb-8 max-w-2xl">
+            Every listing unified with Yahoo-compatible suffixes — search once, chart anywhere.
+          </p>
+          <div className="flex flex-wrap gap-2.5">
+            {MARKETS.map(([name, count]) => (
+              <div key={name} className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full border border-bg-border bg-bg-panel text-sm card-hover">
+                <span>{name}</span>
+                <span className="text-text-muted tabular-nums">{(count as number).toLocaleString('en-US')}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Sample Signal */}
-      <section className="border-y border-border-dim">
-        <div className="max-w-4xl mx-auto px-6 py-24">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold font-mono text-text-primary mb-4">
-              Live Signal Example
-            </h2>
-            <p className="text-text-secondary font-mono">
-              Every signal includes actionable trading levels
-            </p>
-          </div>
+      {/* ── Comparison ── */}
+      <section id="compare" className="max-w-6xl mx-auto px-6 py-20">
+        <p className="eyebrow mb-2">Compare</p>
+        <h2 className="text-3xl font-bold tracking-tight mb-8">The invoice is the feature</h2>
+        <div className="card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-bg-border text-text-muted">
+                <th className="text-left px-5 py-3.5 font-medium">Terminal</th>
+                <th className="text-right px-5 py-3.5 font-medium">Price</th>
+                <th className="px-4 py-3.5 font-medium text-center">IDX depth</th>
+                <th className="px-4 py-3.5 font-medium text-center">Global</th>
+                <th className="px-4 py-3.5 font-medium text-center">On-chain</th>
+                <th className="px-4 py-3.5 font-medium text-center">API</th>
+              </tr>
+            </thead>
+            <tbody>
+              {COMPARISON.map((r) => (
+                <tr key={r.name} className={`border-b border-bg-border/60 ${r.highlight ? 'bg-teal-dim/20' : ''}`}>
+                  <td className="px-5 py-3.5 font-semibold">
+                    {r.name}
+                    {r.highlight && (
+                      <span className="ml-2 px-1.5 py-0.5 rounded bg-teal-vivid text-bg-void text-[10px] font-bold align-middle">FREE</span>
+                    )}
+                  </td>
+                  <td className={`px-5 py-3.5 text-right tabular-nums ${r.highlight ? 'text-teal-vivid font-semibold' : 'text-text-secondary'}`}>{r.price}</td>
+                  {[r.bandar, r.global, r.onchain, r.api].map((v, i) => (
+                    <td key={i} className="px-4 py-3.5 text-center">
+                      {v ? <Check size={16} className="inline text-teal-vivid" /> : <span className="text-text-muted">—</span>}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-text-muted mt-3">
+          Competitor positioning as of Aug 2026 — Bloomberg Terminal list price, Hyperdash crypto-only scope, Stockbit IDX-focused freemium.
+        </p>
+      </section>
 
-          <div className="bg-bg-panel border border-border-dim rounded-lg p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="text-2xl">🟢</span>
-              <span className="text-xl font-bold font-mono text-data-bull">BTC LONG</span>
-              <span className="px-2 py-1 bg-data-bull/20 text-data-bull text-xs font-mono rounded">
-                STRENGTH: 85
-              </span>
-              <span className="px-2 py-1 bg-data-bull/20 text-data-bull text-xs font-mono rounded">
-                CONF: 70%
-              </span>
-              <span className="px-2 py-1 bg-data-bull/20 text-data-bull text-xs font-mono rounded">
-                R:R 2.1:1
-              </span>
-            </div>
-
-            <div className="grid grid-cols-5 gap-4 mb-4">
-              <div>
-                <p className="text-xs text-text-muted font-mono">ENTRY</p>
-                <p className="text-lg font-bold font-mono text-text-primary">$61,248</p>
-              </div>
-              <div>
-                <p className="text-xs text-data-bull font-mono">TP1</p>
-                <p className="text-lg font-bold font-mono text-data-bull">$62,803</p>
-              </div>
-              <div>
-                <p className="text-xs text-data-bull font-mono">TP2</p>
-                <p className="text-lg font-bold font-mono text-data-bull">$64,359</p>
-              </div>
-              <div>
-                <p className="text-xs text-data-bull font-mono">TP3</p>
-                <p className="text-lg font-bold font-mono text-data-bull">$65,915</p>
-              </div>
-              <div>
-                <p className="text-xs text-data-bear font-mono">STOP LOSS</p>
-                <p className="text-lg font-bold font-mono text-data-bear">$58,914</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 text-xs text-text-muted font-mono">
-              <span>Source: whale-alert, funding-rate</span>
-              <span>•</span>
-              <span>Valid: 7 days</span>
-              <span>•</span>
-              <span>Risk: 3.8%</span>
-            </div>
-          </div>
+      {/* ── CTA ── */}
+      <section className="relative overflow-hidden border-t border-bg-border">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 55% 60% at 50% 110%, rgba(45,212,160,0.12), transparent 70%)' }}
+        />
+        <div className="relative max-w-3xl mx-auto px-6 py-24 text-center">
+          <h2 className="text-4xl font-bold tracking-tight mb-4">Stop paying for less data.</h2>
+          <p className="text-text-secondary text-lg mb-8">
+            Open the terminal — no signup, no API keys, no credit card. Everything above is live right now.
+          </p>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-lg bg-teal-vivid text-bg-void font-semibold text-lg hover:bg-teal-vivid/85 transition-colors"
+          >
+            Open Terminal <ArrowRight size={18} />
+          </Link>
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="max-w-6xl mx-auto px-6 py-24 text-center">
-        <h2 className="text-3xl font-bold font-mono text-text-primary mb-4">
-          Ready to Trade Smarter?
-        </h2>
-        <p className="text-text-secondary font-mono mb-8 max-w-xl mx-auto">
-          Start with our free tier. No credit card required. 14-day trial for Pro features.
-        </p>
-        <Link
-          href="/pricing"
-          className="inline-block px-8 py-3 bg-teal-vivid text-bg-base font-mono font-bold rounded hover:bg-teal-vivid/80 transition-colors"
-        >
-          View Pricing Plans
-        </Link>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-border-dim">
-        <div className="max-w-6xl mx-auto px-6 py-12">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-xl">◈</span>
-              <span className="text-lg font-bold font-mono text-text-primary">NEXUS</span>
-            </div>
-            <div className="flex items-center gap-6">
-              <Link href="/terms" className="text-sm text-text-muted font-mono hover:text-text-primary transition-colors">
-                Terms of Service
-              </Link>
-              <Link href="/pricing" className="text-sm text-text-muted font-mono hover:text-text-primary transition-colors">
-                Pricing
-              </Link>
-              <Link href="/alpha-engine" className="text-sm text-text-muted font-mono hover:text-text-primary transition-colors">
-                Alpha Engine
-              </Link>
-            </div>
+      {/* ── Footer ── */}
+      <footer className="border-t border-bg-border bg-bg-panel/40">
+        <div className="max-w-6xl mx-auto px-6 py-12 grid md:grid-cols-4 gap-8 text-sm">
+          <div>
+            <div className="text-lg mb-2"><Mark /></div>
+            <p className="text-text-muted text-xs leading-relaxed">
+              Market intelligence terminal — IDX bandarmology, global universes, on-chain intel and AI signals.
+            </p>
           </div>
-          <p className="text-xs text-text-muted font-mono mt-4">
-            © {new Date().getFullYear()} NEXUS Intelligence Terminal. Not financial advice.
-          </p>
+          <div>
+            <p className="eyebrow mb-3">Product</p>
+            <ul className="space-y-2 text-text-secondary">
+              <li><Link href="/dashboard" className="hover:text-text-primary">Terminal</Link></li>
+              <li><Link href="/equities" className="hover:text-text-primary">Equities</Link></li>
+              <li><Link href="/bandarmology" className="hover:text-text-primary">Bandarmology</Link></li>
+              <li><Link href="/screener" className="hover:text-text-primary">Screener</Link></li>
+            </ul>
+          </div>
+          <div>
+            <p className="eyebrow mb-3">Resources</p>
+            <ul className="space-y-2 text-text-secondary">
+              <li><Link href="/api-docs" className="hover:text-text-primary">API Docs</Link></li>
+              <li><Link href="/pricing" className="hover:text-text-primary">Pricing</Link></li>
+              <li><Link href="/terms" className="hover:text-text-primary">Terms</Link></li>
+            </ul>
+          </div>
+          <div>
+            <p className="eyebrow mb-3">Data</p>
+            <ul className="space-y-2 text-text-secondary text-xs">
+              <li>TradingView · idx.co.id · Stockbit RE</li>
+              <li>Binance · Gate.io · Hyperliquid</li>
+              <li>Yahoo Finance · FRED · World Bank</li>
+            </ul>
+          </div>
+        </div>
+        <div className="border-t border-bg-border/60">
+          <div className="max-w-6xl mx-auto px-6 py-4 text-[11px] text-text-muted flex flex-col md:flex-row justify-between gap-2">
+            <span>© 2026 NEXUS — BerkahKarya. Data for research; not financial advice.</span>
+            <span>Datasets refresh nightly · served from memory</span>
+          </div>
         </div>
       </footer>
     </div>

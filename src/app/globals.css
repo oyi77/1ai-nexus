@@ -1,55 +1,59 @@
 @import "tailwindcss";
+@source "../../src";
 
 @theme inline {
-  /* ── NEXUS Design System v5.0 — Terminal Dark ──────────── */
-  
-  /* Backgrounds */
-  --color-bg-void:       #050608;
-  --color-bg-base:       #0A0B0D;
-  --color-bg-panel:      #0F1114;
-  --color-bg-raised:     #141618;
-  --color-bg-border:     #1E2126;
+  /* ── NEXUS Design System v6.0 — Premium Dark ─────────────
+     Neutral zinc base (no color tint), single emerald accent,
+     semantic data colors, elevation via borders + subtle shadow. */
 
-  /* Brand */
-  --color-teal-dim:      #0D4A3A;
-  --color-teal-muted:    #1d9e75;
-  --color-teal-vivid:    #22C997;
-  --color-teal-glow:     #22C99733;
+  /* Backgrounds — true neutral, layered */
+  --color-bg-void:       #09090B;
+  --color-bg-base:       #0C0C0F;
+  --color-bg-panel:      #121215;
+  --color-bg-raised:     #1A1A1F;
+  --color-bg-elevated:   #202026;
+  --color-bg-border:     #232329;
+
+  /* Brand — emerald */
+  --color-teal-dim:      #0D3B2E;
+  --color-teal-muted:    #1D9E75;
+  --color-teal-vivid:    #2DD4A0;
+  --color-teal-glow:     #2DD4A033;
 
   /* Semantic Data Colors */
-  --color-data-bull:     #22C997;
-  --color-data-bear:     #F03D3D;
-  --color-data-neutral:  #8B95A1;
+  --color-data-bull:     #2DD4A0;
+  --color-data-bear:     #F4506A;
+  --color-data-neutral:  #9CA3AF;
   --color-data-warn:     #F5A623;
-  --color-data-info:     #4A9EF5;
-  --color-data-purple:   #9B6EF5;
-  --color-data-orange:   #F57C4A;
+  --color-data-info:     #5BA8F5;
+  --color-data-purple:   #A78BFA;
+  --color-data-orange:   #FB923C;
 
   /* Text */
-  --color-text-primary:  #E8ECF0;
-  --color-text-secondary:#8B95A1;
-  --color-text-muted:    #4A525C;
-  --color-text-inverse:  #050608;
+  --color-text-primary:  #F4F4F5;
+  --color-text-secondary:#A1A1AA;
+  --color-text-muted:    #6B6B76;
+  --color-text-inverse:  #09090B;
 
-  /* Legacy compat */
-  --color-bg-deep:       #050608;
-  --color-bg-primary:    #080b0f;
-  --color-bg-surface:    #0d1117;
-  --color-border-dim:    #1c2430;
-  --color-border-active: #2a3f55;
-  --color-accent-green:  #22C997;
-  --color-accent-cyan:   #00c8ff;
-  --color-accent-amber:  #ffb800;
-  --color-accent-red:    #ff3060;
-  --color-accent-purple: #9b6dff;
-  --color-text-dim:      #5a7a94;
-  --color-danger:        #ff3060;
-  --color-warning:       #ffb800;
+  /* Legacy compat — same values, new system */
+  --color-bg-deep:       #09090B;
+  --color-bg-primary:    #0C0C0F;
+  --color-bg-surface:    #121215;
+  --color-border-dim:    #232329;
+  --color-border-active: #3F3F46;
+  --color-accent-green:  #2DD4A0;
+  --color-accent-cyan:   #22D3EE;
+  --color-accent-amber:  #FBBF24;
+  --color-accent-red:    #F4506A;
+  --color-accent-purple: #A78BFA;
+  --color-text-dim:      #8B8B96;
+  --color-danger:        #F4506A;
+  --color-warning:       #FBBF24;
 
-  /* Typography */
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", "JetBrains Mono", monospace;
-  --font-head: "Syne", "Space Grotesk", sans-serif;
+  /* Typography — sans for UI, mono ONLY for numerics/tickers */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", ui-monospace, monospace;
+  --font-head: "Inter", system-ui, sans-serif;
 
   /* Animations */
   --animate-pulse-green: pulse-green 0.6s ease-in-out;
@@ -61,26 +65,22 @@
 
 @keyframes pulse-green {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; color: var(--color-data-bull); background-color: var(--color-data-bull); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  50% { opacity: 0.55; }
 }
-
 @keyframes pulse-red {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; color: var(--color-data-bear); background-color: var(--color-data-bear); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  50% { opacity: 0.55; }
 }
-
 @keyframes live-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
 }
-
 @keyframes ticker-scroll {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }
-
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(-2px); }
+  from { opacity: 0; transform: translateY(2px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -88,20 +88,14 @@
 .ticker-strip {
   overflow: hidden;
   white-space: nowrap;
-  mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
 }
-
 .ticker-content {
-  display: inline-flex;
-  animation: ticker-scroll 40s linear infinite;
-  will-change: transform;
+  display: inline-block;
+  animation: var(--animate-ticker);
 }
-
 .ticker-content:hover {
   animation-play-state: paused;
 }
-
 
 /* ── Base ────────────────────────────────────────────────── */
 * {
@@ -109,28 +103,61 @@
 }
 
 body {
-  background: var(--color-bg-base);
-  color: var(--color-text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  letter-spacing: -0.011em;
 }
 
-/* ── Scrollbar — Bloomberg Thin ──────────────────────────── */
-.scrollbar-thin {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-bg-raised) var(--color-bg-panel);
+/* Headings: always sans, tight, never uppercase-by-default */
+h1, h2, h3, h4 {
+  font-family: var(--font-sans);
+  letter-spacing: -0.02em;
 }
-.scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
-.scrollbar-thin::-webkit-scrollbar-track { background: var(--color-bg-panel); }
-.scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-bg-raised); border-radius: 2px; }
+
+/* ── Shared surface utilities ────────────────────────────── */
+.card {
+  background: var(--color-bg-panel);
+  border: 1px solid var(--color-bg-border);
+  border-radius: 12px;
+}
+
+.card-hover {
+  transition: border-color 150ms ease, background 150ms ease;
+}
+.card-hover:hover {
+  border-color: var(--color-border-active);
+  background: var(--color-bg-raised);
+}
+
+/* Page-level title pattern: sans semibold, sentence case */
+.page-title {
+  font-size: 1.25rem;
+  line-height: 1.2;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+}
+
+/* Small caps label used sparingly (group headers, eyebrows) */
+.eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* ── Scrollbar — thin, unobtrusive ───────────────────────── */
+.scrollbar-thin { scrollbar-width: thin; scrollbar-color: var(--color-bg-elevated) transparent; }
+.scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: var(--color-bg-elevated); border-radius: 3px; }
 .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: var(--color-bg-border); }
 
 /* ── Data Table Density ──────────────────────────────────── */
-.data-row {
-  height: 32px;
-  border-bottom: 1px solid var(--color-bg-border);
-}
+.data-row { transition: background 120ms ease; }
 .data-row:hover {
   background: var(--color-bg-raised);
 }
@@ -140,7 +167,7 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Bloomberg Grid ──────────────────────────────────────── */
+/* ── Bloomberg Grid (legacy, restyled) ───────────────────── */
 .bloomberg-grid {
   display: grid;
   gap: 1px;
