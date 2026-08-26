@@ -3,14 +3,6 @@ import { POST } from '@/app/api/v1/auth/signup/route';
 import { prisma } from '@/lib/db';
 import { NextRequest } from 'next/server';
 
-// Mock jsonwebtoken before any imports that use it
-vi.mock('jsonwebtoken', () => ({
-  sign: vi.fn(() => 'mock-access-token'),
-  default: {
-    sign: vi.fn(() => 'mock-access-token'),
-  },
-}));
-
 // Mock bcryptjs before any imports that use it
 vi.mock('bcryptjs', () => ({
   hash: vi.fn(async (password: string) => `hashed_${password}`),

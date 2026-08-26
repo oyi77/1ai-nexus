@@ -1,12 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock native modules with factory functions AFTER vitest import
-vi.mock('jsonwebtoken', () => {
-  const mockSign = vi.fn((payload: Record<string, unknown>, secret: string, options?: Record<string, unknown>) => {
+// Local JWT stub — replaces the previous JWT mock factory.
+// Production auth uses `jose`; this test only needs deterministic
+// sign/verify behavior, so we stub it locally (no external JWT dependency).
+const mockJwt = {
+  sign: (_payload: Record<string, unknown>, _secret: string, options?: Record<string, unknown>) => {
     if (options?.expiresIn === '-1h') return 'expired-token'
     return 'valid-token'
-  })
-  const mockVerify = vi.fn((token: string) => {
+  },
+  verify: (token: string) => {
     if (token === 'valid-token') {
       return { userId: 'user-123', email: 'test@example.com', role: 'pro', plan: 'pro' }
     }
@@ -16,14 +19,9 @@ vi.mock('jsonwebtoken', () => {
       throw error
     }
     throw new Error('Invalid token')
-  })
-  return {
-    default: { sign: mockSign, verify: mockVerify },
-    sign: mockSign,
-    verify: mockVerify
-  }
-})
-import jwt from 'jsonwebtoken';
+  },
+}
+
 
 
 import { NextRequest } from 'next/server'
@@ -47,7 +45,7 @@ describe('Middleware JWT Integration', () => {
       const email = 'test@example.com'
       const role = 'pro'
       
-      const token = jwt.sign(
+      const token = mockJwt.sign(
         { userId, email, role, plan: role },
         JWT_SECRET,
         { expiresIn: '7d' }
@@ -60,7 +58,7 @@ describe('Middleware JWT Integration', () => {
       })
 
       // Verify token can be decoded
-      const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string; plan: string }
+      const decoded = mockJwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string; plan: string }
       expect(decoded.userId).toBe(userId)
       expect(decoded.email).toBe(email)
       expect(decoded.role).toBe(role)
@@ -71,19 +69,19 @@ describe('Middleware JWT Integration', () => {
       const invalidToken = 'invalid.token.here'
       
       expect(() => {
-        jwt.verify(invalidToken, JWT_SECRET)
+        mockJwt.verify(invalidToken, JWT_SECRET)
       }).toThrow()
     })
 
     it('should handle expired JWT token', () => {
-      const token = jwt.sign(
+      const token = mockJwt.sign(
         { userId: 'user-123', email: 'test@example.com', role: 'free' },
         JWT_SECRET,
         { expiresIn: '-1h' } // Already expired
       )
 
       expect(() => {
-        jwt.verify(token, JWT_SECRET)
+        mockJwt.verify(token, JWT_SECRET)
       }).toThrow('jwt expired')
     })
   })
