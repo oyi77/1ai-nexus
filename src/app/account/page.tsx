@@ -16,15 +16,15 @@ export default function AccountPage() {
   return (
     <NexusLayout>
       <div className="max-w-4xl mx-auto p-6 space-y-8">
-        <h1 className="text-2xl font-bold font-mono text-text-primary">Account Settings</h1>
+        <h1 className="text-2xl font-bold text-text-primary">Account Settings</h1>
 
         {/* Current Plan */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-6">
           <h2 className="page-title text-lg mb-4">Current Plan</h2>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xl font-bold font-mono text-text-primary capitalize">{currentPlan}</p>
-              <p className="text-sm text-text-muted font-mono">
+              <p className="text-xl font-bold text-text-primary capitalize">{currentPlan}</p>
+              <p className="text-sm text-text-muted">
                 {plans.find(p => p.id === currentPlan)?.price}
               </p>
             </div>
@@ -46,11 +46,11 @@ export default function AccountPage() {
             <code className="flex-1 px-4 py-2 bg-bg-raised rounded font-mono text-sm text-text-primary">
               {apiKey.slice(0, 8)}...{apiKey.slice(-4)}
             </code>
-            <button className="px-4 py-2 bg-bg-raised text-text-muted font-mono rounded hover:text-text-primary transition-colors">
+            <button className="px-4 py-2 bg-bg-raised text-text-muted rounded hover:text-text-primary transition-colors">
               Copy
             </button>
           </div>
-          <p className="text-xs text-text-muted font-mono mt-2">
+          <p className="text-xs text-text-muted mt-2">
             Use this key in your API requests: <code>Authorization: Bearer {apiKey.slice(0, 8)}...</code>
           </p>
         </div>
@@ -60,16 +60,16 @@ export default function AccountPage() {
           <h2 className="page-title text-lg mb-4">Usage This Month</h2>
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <p className="text-sm text-text-muted font-mono">API Calls</p>
-              <p className="text-xl font-bold font-mono text-text-primary">42 / 100</p>
+              <p className="text-sm text-text-muted">API Calls</p>
+              <p className="text-xl font-bold text-text-primary">42 / 100</p>
             </div>
             <div>
-              <p className="text-sm text-text-muted font-mono">Signals Stored</p>
-              <p className="text-xl font-bold font-mono text-text-primary">15</p>
+              <p className="text-sm text-text-muted">Signals Stored</p>
+              <p className="text-xl font-bold text-text-primary">15</p>
             </div>
             <div>
-              <p className="text-sm text-text-muted font-mono">Backtests Run</p>
-              <p className="text-xl font-bold font-mono text-text-primary">3</p>
+              <p className="text-sm text-text-muted">Backtests Run</p>
+              <p className="text-xl font-bold text-text-primary">3</p>
             </div>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default function AccountPage() {
         {/* Billing History */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-6">
           <h2 className="page-title text-lg mb-4">Billing History</h2>
-          <p className="text-sm text-text-muted font-mono">
+          <p className="text-sm text-text-muted">
             {currentPlan === 'free'
               ? 'You are on the Free plan. No billing history.'
               : 'View your invoices and payment history.'}

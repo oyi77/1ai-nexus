@@ -66,7 +66,7 @@ export default function UnlocksPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">TOKEN UNLOCK CALENDAR</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Upcoming supply events — known unlock schedules from public data
             </p>
           </div>
@@ -76,16 +76,16 @@ export default function UnlocksPage() {
         {/* Summary */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-            <p className="text-[10px] text-text-muted font-mono">UPCOMING UNLOCKS</p>
-            <p className="text-lg font-mono font-bold">{unlocks.length}</p>
+            <p className="text-xs text-text-muted">UPCOMING UNLOCKS</p>
+            <p className="text-lg font-bold">{unlocks.length}</p>
           </div>
           <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-            <p className="text-[10px] text-text-muted font-mono">TOTAL SUPPLY SHOCK</p>
-            <p className="text-lg font-mono font-bold text-accent-amber">{fmtUsd(totalSupplyShock)}</p>
+            <p className="text-xs text-text-muted">TOTAL SUPPLY SHOCK</p>
+            <p className="text-lg font-bold text-accent-amber">{fmtUsd(totalSupplyShock)}</p>
           </div>
           <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-            <p className="text-[10px] text-text-muted font-mono">NEXT UNLOCK</p>
-            <p className="text-sm font-mono font-bold">{nextUnlock ? `${nextUnlock.symbol} in ${daysUntil(nextUnlock.unlockDate)}d` : '—'}</p>
+            <p className="text-xs text-text-muted">NEXT UNLOCK</p>
+            <p className="text-sm font-bold">{nextUnlock ? `${nextUnlock.symbol} in ${daysUntil(nextUnlock.unlockDate)}d` : '—'}</p>
           </div>
         </div>
 
@@ -137,7 +137,7 @@ export default function UnlocksPage() {
         </Panel>
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <p className="text-[9px] text-text-dim font-mono">
+          <p className="text-xs text-text-dim">
             Source: Public token vesting schedules, community-maintained data. Unlock dates are approximate.
             Large unlocks often create sell pressure — monitor for distribution patterns in smart money flows.
           </p>

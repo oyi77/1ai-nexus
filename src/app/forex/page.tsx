@@ -52,7 +52,7 @@ export default function ForexPage() {
             ))}
           </div>
         </div>
-        {error && <div className="text-data-bear text-[11px] font-mono p-4">Error: {error}</div>}
+        {error && <div className="text-data-bear text-xs font-mono p-4">Error: {error}</div>}
 
         {/* IDR Priority Section — always visible for Indonesian traders */}
         {rates && rates['IDR'] && (
@@ -69,9 +69,9 @@ export default function ForexPage() {
                   : (idrRate / ccyRate).toFixed(2)
                 return (
                   <div key={ccy} className="p-2">
-                    <p className="text-[10px] text-text-muted">{label}</p>
-                    <p className="text-lg font-mono font-bold text-text-primary">{rate}</p>
-                    {ccy === 'JPY' && <p className="text-[9px] text-text-muted">per 100 JPY</p>}
+                    <p className="text-xs text-text-muted">{label}</p>
+                    <p className="text-lg font-bold text-text-primary">{rate}</p>
+                    {ccy === 'JPY' && <p className="text-xs text-text-muted">per 100 JPY</p>}
                   </div>
                 )
               })}
@@ -86,8 +86,8 @@ export default function ForexPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
             {majorPairs.filter(c => c !== base).map(currency => (
               <div key={currency} className="bg-bg-panel border border-border-dim rounded-lg p-3">
-                <p className="text-[10px] text-text-muted uppercase">{base}/{currency}</p>
-                <p className="text-lg font-mono font-bold text-text-primary">
+                <p className="text-xs text-text-muted uppercase">{base}/{currency}</p>
+                <p className="text-lg font-bold text-text-primary">
                   {rates[currency]?.toFixed(currency === 'IDR' || currency === 'KRW' || currency === 'VND' ? 2 : 4) ?? '—'}
                 </p>
               </div>
@@ -98,7 +98,7 @@ export default function ForexPage() {
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">SOURCE</h2>
+          <h2 className="text-xs text-accent-cyan mb-2">SOURCE</h2>
           <p className="text-xs text-text-dim">
             ExchangeRate-API (open.er-api.com) — 160 currencies, ECB reference rates. Updates hourly.
           </p>

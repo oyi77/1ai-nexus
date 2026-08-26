@@ -221,12 +221,12 @@ if (tab === "history") fetchHistory()
       <div className="h-full overflow-auto p-4 space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-sm font-mono font-bold text-accent-cyan flex items-center gap-2">
+          <h1 className="text-sm font-bold text-accent-cyan flex items-center gap-2">
             <Target size={14} /> PAPER TRADING
           </h1>
           <div className="flex items-center gap-1.5">
             <span className="inline-block h-2 w-2 rounded-full bg-accent-green animate-[live-dot_2s_ease-in-out_infinite]" />
-            <span className="text-[10px] text-text-muted">SIMULATED</span>
+            <span className="text-xs text-text-muted">SIMULATED</span>
           </div>
         </div>
 
@@ -248,7 +248,7 @@ if (tab === "history") fetchHistory()
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-3 py-1.5 text-[11px] font-mono uppercase transition-colors border-b-2 ${
+              className={`px-3 py-1.5 text-xs font-mono uppercase transition-colors border-b-2 ${
                 tab === t
                   ? "text-accent-cyan border-accent-cyan"
                   : "text-text-muted border-transparent hover:text-text-secondary"
@@ -280,22 +280,22 @@ if (tab === "history") fetchHistory()
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                            <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
                               trade.direction === "YES"
                                 ? "bg-accent-green/15 text-accent-green"
                                 : "bg-data-bear/15 text-data-bear"
                             }`}>
                               {trade.direction}
                             </span>
-                            <span className="text-[10px] font-mono text-text-muted bg-bg-raised px-1.5 py-0.5 rounded">
+                            <span className="text-xs font-mono text-text-muted bg-bg-raised px-1.5 py-0.5 rounded">
                               {trade.market.category}
                             </span>
-                            <span className="text-[10px] text-text-dim">{fmtTime(trade.createdAt)}</span>
+                            <span className="text-xs text-text-dim">{fmtTime(trade.createdAt)}</span>
                           </div>
                           <p className="text-xs text-text-primary leading-tight truncate">
                             {trade.market.symbol}
                           </p>
-                          <div className="flex items-center gap-3 mt-1.5 text-[10px] text-text-muted font-mono">
+                          <div className="flex items-center gap-3 mt-1.5 text-xs text-text-muted font-mono">
                             <span>{trade.shares} shares @ {fmtPrice(trade.entryPrice)}</span>
                             <span>Cost: {fmtUsd(trade.shares * trade.entryPrice)}</span>
                             {trade.market.status === "resolved" && trade.market.outcome && (
@@ -311,7 +311,7 @@ if (tab === "history") fetchHistory()
                           {trade.market.status === "resolved" && trade.market.outcome ? (
                             <button
                               onClick={() => handleResolve(trade.marketId, trade.market.outcome!)}
-                              className="text-[10px] font-mono px-2 py-1 bg-accent-cyan/15 text-accent-cyan rounded hover:bg-accent-cyan/25 transition-colors"
+                              className="text-xs font-mono px-2 py-1 bg-accent-cyan/15 text-accent-cyan rounded hover:bg-accent-cyan/25 transition-colors"
                             >
                               Resolve
                             </button>
@@ -325,7 +325,7 @@ if (tab === "history") fetchHistory()
                                 value={exitPrice}
                                 onChange={e => setExitPrice(e.target.value)}
                                 placeholder="Exit ¢"
-                                className="w-16 text-[10px] font-mono bg-bg-raised border border-bg-border rounded px-1.5 py-1 text-text-primary focus:outline-none focus:border-accent-cyan"
+                                className="w-16 text-xs font-mono bg-bg-raised border border-bg-border rounded px-1.5 py-1 text-text-primary focus:outline-none focus:border-accent-cyan"
                               />
                               <button
                                 onClick={() => handleCloseTrade(trade.id)}
@@ -343,7 +343,7 @@ if (tab === "history") fetchHistory()
                           ) : (
                             <button
                               onClick={() => setClosingTrade(trade.id)}
-                              className="text-[10px] font-mono px-2 py-1 bg-bg-raised text-text-secondary rounded hover:bg-bg-border transition-colors"
+                              className="text-xs font-mono px-2 py-1 bg-bg-raised text-text-secondary rounded hover:bg-bg-border transition-colors"
                             >
                               Close
                             </button>
@@ -370,7 +370,7 @@ if (tab === "history") fetchHistory()
                     />
                     <div className="max-h-48 overflow-auto space-y-1 scrollbar-thin">
                       {filteredMarkets.length === 0 ? (
-                        <div className="text-[10px] text-text-dim text-center py-4">No markets found</div>
+                        <div className="text-xs text-text-dim text-center py-4">No markets found</div>
                       ) : (
                         filteredMarkets.map(m => (
                           <button
@@ -384,12 +384,12 @@ if (tab === "history") fetchHistory()
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1 min-w-0">
-                                <span className="text-[10px] font-mono text-text-muted bg-bg-base px-1.5 py-0.5 rounded mr-2">
+                                <span className="text-xs font-mono text-text-muted bg-bg-base px-1.5 py-0.5 rounded mr-2">
                                   {m.category}
                                 </span>
                                 <span className="text-text-primary truncate">{m.symbol}</span>
                               </div>
-                              <span className="text-[10px] text-text-dim font-mono ml-2 shrink-0">
+                              <span className="text-xs text-text-dim font-mono ml-2 shrink-0">
                                 Vol: {fmtUsd(m.volume24h)}
                               </span>
                             </div>
@@ -430,7 +430,7 @@ if (tab === "history") fetchHistory()
                       {/* Price + Shares */}
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                          <label className="text-[10px] text-text-muted font-mono mb-1 block">ENTRY PRICE</label>
+                          <label className="text-xs text-text-muted font-mono mb-1 block">ENTRY PRICE</label>
                           <input
                             type="number"
                             step="0.01"
@@ -440,10 +440,10 @@ if (tab === "history") fetchHistory()
                             onChange={e => setEntryPrice(e.target.value)}
                             className="w-full text-xs font-mono bg-bg-raised border border-bg-border rounded px-3 py-2 text-text-primary focus:outline-none focus:border-accent-cyan"
                           />
-                          <span className="text-[10px] text-text-dim mt-0.5 block">{fmtPrice(parseFloat(entryPrice) || 0)}/share</span>
+                          <span className="text-xs text-text-dim mt-0.5 block">{fmtPrice(parseFloat(entryPrice) || 0)}/share</span>
                         </div>
                         <div>
-                          <label className="text-[10px] text-text-muted font-mono mb-1 block">SHARES</label>
+                          <label className="text-xs text-text-muted font-mono mb-1 block">SHARES</label>
                           <input
                             type="number"
                             step="1"
@@ -457,7 +457,7 @@ if (tab === "history") fetchHistory()
 
                       {/* Notes */}
                       <div>
-                        <label className="text-[10px] text-text-muted font-mono mb-1 block">NOTES (optional)</label>
+                        <label className="text-xs text-text-muted font-mono mb-1 block">NOTES (optional)</label>
                         <input
                           type="text"
                           value={tradeNote}
@@ -468,7 +468,7 @@ if (tab === "history") fetchHistory()
                       </div>
 
                       {/* Order Summary */}
-                      <div className="bg-bg-base rounded p-2.5 space-y-1 text-[10px] font-mono">
+                      <div className="bg-bg-base rounded p-2.5 space-y-1 text-xs font-mono">
                         <div className="flex justify-between text-text-muted">
                           <span>Direction</span>
                           <span className={direction === "YES" ? "text-accent-green" : "text-data-bear"}>{direction}</span>
@@ -490,7 +490,7 @@ if (tab === "history") fetchHistory()
                       <button
                         onClick={handlePlaceTrade}
                         disabled={tradingLoading || !selectedMarket || !shares || !entryPrice}
-                        className="w-full py-2.5 text-xs font-mono font-bold bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/40 rounded hover:bg-accent-cyan/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        className="w-full py-2.5 text-xs font-bold bg-accent-cyan/20 text-accent-cyan border border-accent-cyan/40 rounded hover:bg-accent-cyan/30 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
                         {tradingLoading ? "Placing..." : `Place ${direction} Order`}
                       </button>
@@ -514,26 +514,26 @@ if (tab === "history") fetchHistory()
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                            <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
                               trade.direction === "YES"
                                 ? "bg-accent-green/15 text-accent-green"
                                 : "bg-data-bear/15 text-data-bear"
                             }`}>
                               {trade.direction}
                             </span>
-                            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                            <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
                               trade.status === "resolved"
                                 ? "bg-accent-amber/15 text-accent-amber"
                                 : "bg-text-muted/15 text-text-muted"
                             }`}>
                               {trade.status}
                             </span>
-                            <span className="text-[10px] font-mono text-text-muted bg-bg-raised px-1.5 py-0.5 rounded">
+                            <span className="text-xs font-mono text-text-muted bg-bg-raised px-1.5 py-0.5 rounded">
                               {trade.market.category}
                             </span>
                           </div>
                           <p className="text-xs text-text-primary leading-tight truncate">{trade.market.symbol}</p>
-                          <div className="flex items-center gap-3 mt-1.5 text-[10px] text-text-muted font-mono">
+                          <div className="flex items-center gap-3 mt-1.5 text-xs text-text-muted font-mono">
                             <span>{fmtPrice(trade.entryPrice)} → {trade.exitPrice != null ? fmtPrice(trade.exitPrice) : "—"}</span>
                             <span>{trade.shares} shares</span>
                             {trade.closedAt && <span>{fmtTime(trade.closedAt)}</span>}
@@ -558,7 +558,7 @@ if (tab === "history") fetchHistory()
               <div className="p-3 space-y-2">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-accent-green font-mono">YES</span>
-                  <span className="text-text-muted text-[10px]">{stats.directionBreakdown.yes.count} trades · {fmtUsd(stats.directionBreakdown.yes.pnl)}</span>
+                  <span className="text-text-muted text-xs">{stats.directionBreakdown.yes.count} trades · {fmtUsd(stats.directionBreakdown.yes.pnl)}</span>
                 </div>
                 <div className="h-1.5 bg-bg-raised rounded-full overflow-hidden">
                   <div
@@ -568,7 +568,7 @@ if (tab === "history") fetchHistory()
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-data-bear font-mono">NO</span>
-                  <span className="text-text-muted text-[10px]">{stats.directionBreakdown.no.count} trades · {fmtUsd(stats.directionBreakdown.no.pnl)}</span>
+                  <span className="text-text-muted text-xs">{stats.directionBreakdown.no.count} trades · {fmtUsd(stats.directionBreakdown.no.pnl)}</span>
                 </div>
                 <div className="h-1.5 bg-bg-raised rounded-full overflow-hidden">
                   <div
@@ -587,16 +587,16 @@ if (tab === "history") fetchHistory()
                   .map(([cat, data]) => (
                     <div key={cat} className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono text-text-muted bg-bg-raised px-1.5 py-0.5 rounded">{cat}</span>
-                        <span className="text-text-dim text-[10px]">{data.count}x</span>
+                        <span className="text-xs font-mono text-text-muted bg-bg-raised px-1.5 py-0.5 rounded">{cat}</span>
+                        <span className="text-text-dim text-xs">{data.count}x</span>
                       </div>
-                      <span className={`font-mono text-[10px] ${pnlColor(data.pnl)}`}>
+                      <span className={`font-mono text-xs ${pnlColor(data.pnl)}`}>
                         {data.pnl >= 0 ? "+" : ""}{fmtUsd(data.pnl)}
                       </span>
                     </div>
                   ))}
                 {Object.keys(stats.categoryBreakdown).length === 0 && (
-                  <div className="text-[10px] text-text-dim text-center py-3">No data yet</div>
+                  <div className="text-xs text-text-dim text-center py-3">No data yet</div>
                 )}
               </div>
             </Panel>
@@ -610,7 +610,7 @@ if (tab === "history") fetchHistory()
 function KpiCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="bg-bg-panel border border-bg-border rounded-lg p-2.5">
-      <div className="text-[9px] font-mono text-text-dim uppercase tracking-wider">{label}</div>
+      <div className="text-xs font-mono text-text-dim uppercase tracking-wider">{label}</div>
       <div className={`text-sm font-mono font-bold mt-0.5 ${color}`}>{value}</div>
     </div>
   )

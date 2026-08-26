@@ -67,7 +67,7 @@ function RugcheckPageInner() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">🛡 RugCheck</h1>
-            <p className="text-[11px] text-text-muted font-mono">Honeypot / rug pull detector — check any token before buying</p>
+            <p className="text-xs text-text-muted">Honeypot / rug pull detector — check any token before buying</p>
           </div>
         </div>
 
@@ -89,7 +89,7 @@ function RugcheckPageInner() {
                 <option value="base">Base</option>
                 <option value="solana">Solana</option>
               </select>
-              <button onClick={check} disabled={loading} className="px-4 py-2 bg-teal-vivid text-bg-base rounded font-mono font-bold text-[12px] disabled:opacity-50">
+              <button onClick={check} disabled={loading} className="px-4 py-2 bg-teal-vivid text-bg-base rounded font-bold text-[12px] disabled:opacity-50">
                 {loading ? '...' : 'CHECK'}
               </button>
             </div>
@@ -112,8 +112,8 @@ function RugcheckPageInner() {
                   <div key={i} className="flex items-start gap-2 py-1">
                     <span className="text-[14px]">{item.icon}</span>
                     <div>
-                      <div className="text-[11px] font-mono font-bold text-text-primary">{item.title}</div>
-                      <div className="text-[10px] font-mono text-text-muted">{item.desc}</div>
+                      <div className="text-xs font-mono font-bold text-text-primary">{item.title}</div>
+                      <div className="text-xs font-mono text-text-muted">{item.desc}</div>
                     </div>
                   </div>
                 ))}
@@ -132,8 +132,8 @@ function RugcheckPageInner() {
                 ].map((t, i) => (
                   <button key={i} onClick={() => { setAddress(t.addr) }}
                     className="flex items-center justify-between w-full py-1.5 px-2 rounded hover:bg-bg-raised transition-colors text-left">
-                    <span className="text-[11px] font-mono text-text-primary">{t.name}</span>
-                    <span className="text-[10px] font-mono text-teal-vivid">Check →</span>
+                    <span className="text-xs font-mono text-text-primary">{t.name}</span>
+                    <span className="text-xs font-mono text-teal-vivid">Check →</span>
                   </button>
                 ))}
               </div>
@@ -168,10 +168,10 @@ function RugcheckPageInner() {
                     </span>
                     <div className="flex-1">
                       <div className="text-[12px] font-medium text-text-primary">{check.name}</div>
-                      <div className="text-[10px] text-text-muted">{check.detail}</div>
+                      <div className="text-xs text-text-muted">{check.detail}</div>
                     </div>
                     {check.weight > 0 && (
-                      <span className="text-[10px] font-mono text-data-bear">+{check.weight} risk</span>
+                      <span className="text-xs font-mono text-data-bear">+{check.weight} risk</span>
                     )}
                   </div>
                 ))}

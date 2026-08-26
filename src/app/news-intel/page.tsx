@@ -83,7 +83,7 @@ export default function NewsIntelPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">NEWS INTELLIGENCE</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               GDELT global news + SEC EDGAR filings + exchange status + sentiment aggregation
             </p>
           </div>
@@ -95,11 +95,11 @@ export default function NewsIntelPage() {
           <div className="grid grid-cols-3 gap-3">
             {sentiment.map(s => (
               <div key={s.source} className="bg-bg-panel border border-border-dim rounded-lg p-3">
-                <p className="text-[10px] text-text-muted font-mono uppercase">{s.source.replace(/-/g, ' ')}</p>
+                <p className="text-xs text-text-muted uppercase">{s.source.replace(/-/g, ' ')}</p>
                 <p className={`text-lg font-mono font-bold ${
                   s.score >= 60 ? 'text-data-bull' : s.score <= 40 ? 'text-data-bear' : 'text-text-primary'
                 }`}>{s.score}</p>
-                <p className="text-[10px] text-text-muted">{s.label}</p>
+                <p className="text-xs text-text-muted">{s.label}</p>
               </div>
             ))}
           </div>
@@ -113,7 +113,7 @@ export default function NewsIntelPage() {
                 <div key={ex.exchange} className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${ex.status === 'operational' ? 'bg-accent-green' : ex.status === 'degraded' ? 'bg-accent-amber' : 'bg-text-muted'}`} />
                   <span className="text-xs font-mono text-text-primary">{ex.exchange}</span>
-                  <span className="text-[10px] text-text-muted">{ex.message}</span>
+                  <span className="text-xs text-text-muted">{ex.message}</span>
                 </div>
               ))}
             </div>
@@ -122,7 +122,7 @@ export default function NewsIntelPage() {
 
         {/* Filters */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1 text-[10px] font-mono">
+          <div className="flex items-center gap-1 text-xs font-mono">
             <span className="text-text-muted">Category:</span>
             {categories.slice(0, 5).map(cat => (
               <button key={cat} onClick={() => setFilterCategory(cat)}
@@ -131,7 +131,7 @@ export default function NewsIntelPage() {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-1 text-[10px] font-mono">
+          <div className="flex items-center gap-1 text-xs font-mono">
             <span className="text-text-muted">Direction:</span>
             {['all', 'bullish', 'bearish', 'neutral'].map(dir => (
               <button key={dir} onClick={() => setFilterDirection(dir)}
@@ -145,7 +145,7 @@ export default function NewsIntelPage() {
         {/* News Feed */}
         <Panel title="News Feed" subtitle={`${filtered.length} events`}>
           {filtered.length === 0 ? (
-            <div className="text-text-muted text-[11px] p-4 text-center">Loading news intelligence...</div>
+            <div className="text-text-muted text-xs p-4 text-center">Loading news intelligence...</div>
           ) : (
             <div className="divide-y divide-border-dim/30">
               {filtered.map((event, i) => (
@@ -153,13 +153,13 @@ export default function NewsIntelPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted">{event.source}</span>
-                        <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                        <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted">{event.source}</span>
+                        <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
                           event.direction === 'bullish' ? 'bg-data-bull/20 text-data-bull' :
                           event.direction === 'bearish' ? 'bg-data-bear/20 text-data-bear' :
                           'bg-bg-raised text-text-muted'
                         }`}>{event.direction}</span>
-                        <span className="text-[9px] text-text-dim">{event.category}</span>
+                        <span className="text-xs text-text-dim">{event.category}</span>
                       </div>
                       <p className="text-xs text-text-primary">{event.headline}</p>
                       {event.entities.length > 0 && (
@@ -171,8 +171,8 @@ export default function NewsIntelPage() {
                       )}
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-[10px] text-text-dim">{new Date(event.publishedAt).toLocaleDateString()}</p>
-                      <p className="text-[9px] text-text-muted">R:{(event.relevanceScore * 100).toFixed(0)}% S:{(event.severityScore * 100).toFixed(0)}%</p>
+                      <p className="text-xs text-text-dim">{new Date(event.publishedAt).toLocaleDateString()}</p>
+                      <p className="text-xs text-text-muted">R:{(event.relevanceScore * 100).toFixed(0)}% S:{(event.severityScore * 100).toFixed(0)}%</p>
                     </div>
                   </div>
                 </div>

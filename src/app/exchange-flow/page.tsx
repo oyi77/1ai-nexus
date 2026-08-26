@@ -122,7 +122,7 @@ export default function ExchangeFlowPage() {
       header: 'Signal',
       width: 70,
       render: r => (
-        <span className={`text-[10px] font-mono font-bold ${r.signal === 'bullish' ? 'text-data-bull' : 'text-data-bear'}`}>
+        <span className={`text-xs font-mono font-bold ${r.signal === 'bullish' ? 'text-data-bull' : 'text-data-bear'}`}>
           {r.signal === 'bullish' ? '🟢 BULL' : '🔴 BEAR'}
         </span>
       ),
@@ -132,7 +132,7 @@ export default function ExchangeFlowPage() {
       header: 'Top Pairs',
       width: 200,
       render: r => (
-        <span className="text-[10px] text-text-muted font-mono truncate">
+        <span className="text-xs text-text-muted font-mono truncate">
           {(r.topSymbols ?? []).slice(0, 3).join(', ')}
         </span>
       ),
@@ -157,7 +157,7 @@ export default function ExchangeFlowPage() {
       header: 'Direction',
       width: 80,
       render: r => (
-        <span className={`text-[10px] font-mono ${r.direction === 'deposit' ? 'text-data-bear' : 'text-data-bull'}`}>
+        <span className={`text-xs font-mono ${r.direction === 'deposit' ? 'text-data-bear' : 'text-data-bull'}`}>
           {r.direction === 'deposit' ? '↓ DEPOSIT' : '↑ WITHDRAWAL'}
         </span>
       ),
@@ -187,7 +187,7 @@ export default function ExchangeFlowPage() {
       width: 50,
       align: 'right',
       render: r => (
-        <span className="text-[10px] tabular-nums text-text-muted">
+        <span className="text-xs tabular-nums text-text-muted">
           {Math.round(r.confidence * 100)}%
         </span>
       ),
@@ -200,7 +200,7 @@ export default function ExchangeFlowPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">💰 Exchange Flow</h1>
-            <p className="text-[11px] text-text-muted font-mono">Whale deposits/withdrawals to CEX — leading indicator for selling pressure</p>
+            <p className="text-xs text-text-muted">Whale deposits/withdrawals to CEX — leading indicator for selling pressure</p>
           </div>
           <LiveDot status={status} label />
         </div>
@@ -213,9 +213,9 @@ export default function ExchangeFlowPage() {
             { label: 'Signal', value: signal.toUpperCase(), color: signal === 'bullish' ? 'text-data-bull' : signal === 'bearish' ? 'text-data-bear' : 'text-text-muted', note: `${flows.length} exchanges tracked` },
           ].map((k, i) => (
             <div key={i} className="bg-bg-panel border border-bg-border px-3 py-2">
-              <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{k.label}</div>
+              <div className="text-xs text-text-muted font-mono uppercase mb-1">{k.label}</div>
               <div className={`text-[16px] font-head font-bold tabular-nums ${k.color}`}>{k.value}</div>
-              <div className="text-[9px] text-text-muted mt-0.5">{k.note}</div>
+              <div className="text-xs text-text-muted mt-0.5">{k.note}</div>
             </div>
           ))}
         </div>
@@ -228,7 +228,7 @@ export default function ExchangeFlowPage() {
             filterable
             filterPlaceholder="Filter exchanges…"
             rowHeight={32}
-            emptyState={<div className="text-text-muted text-[11px] p-4">No exchange flow data available</div>}
+            emptyState={<div className="text-text-muted text-xs p-4">No exchange flow data available</div>}
           />
         </Panel>
 
@@ -240,7 +240,7 @@ export default function ExchangeFlowPage() {
             filterable
             filterPlaceholder="Filter whale events…"
             rowHeight={28}
-            emptyState={<div className="text-text-muted text-[11px] p-4">No whale events detected</div>}
+            emptyState={<div className="text-text-muted text-xs p-4">No whale events detected</div>}
           />
         </Panel>
       </div>

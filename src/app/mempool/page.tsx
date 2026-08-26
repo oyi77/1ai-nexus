@@ -137,7 +137,7 @@ function MempoolPageInner() {
           href={`https://blockstream.info/tx/${r.txid}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="font-mono text-[11px] text-teal-vivid hover:underline"
+          className="font-mono text-xs text-teal-vivid hover:underline"
           title={r.txid}
         >
           {txidShort(r.txid)}
@@ -163,7 +163,7 @@ function MempoolPageInner() {
       align: 'right',
       sortable: true,
       render: r => (
-        <span className="font-mono text-[11px] text-text-primary tabular-nums">
+        <span className="font-mono text-xs text-text-primary tabular-nums">
           {formatUsd(r.valueUsd)}
         </span>
       ),
@@ -174,7 +174,7 @@ function MempoolPageInner() {
       width: 80,
       align: 'right',
       render: r => (
-        <span className="font-mono text-[11px] text-text-muted tabular-nums">
+        <span className="font-mono text-xs text-text-muted tabular-nums">
           {formatSats(r.fee)} sat
         </span>
       ),
@@ -186,7 +186,7 @@ function MempoolPageInner() {
       align: 'right',
       sortable: true,
       render: r => (
-        <span className={`font-mono text-[11px] tabular-nums ${r.rate > 50 ? 'text-data-bear' : r.rate > 20 ? 'text-data-warn' : 'text-data-bull'}`}>
+        <span className={`font-mono text-xs tabular-nums ${r.rate > 50 ? 'text-data-bear' : r.rate > 20 ? 'text-data-warn' : 'text-data-bull'}`}>
           {(r.rate ?? 0).toFixed(1)}
         </span>
       ),
@@ -197,7 +197,7 @@ function MempoolPageInner() {
       width: 70,
       align: 'right',
       render: r => (
-        <span className="font-mono text-[11px] text-text-muted">
+        <span className="font-mono text-xs text-text-muted">
           {formatVsize(r.vsize)}
         </span>
       ),
@@ -209,7 +209,7 @@ function MempoolPageInner() {
       align: 'right',
       sortable: true,
       render: r => (
-        <span className={`font-mono text-[11px] tabular-nums ${r.age > 600 ? 'text-data-bear' : 'text-text-muted'}`}>
+        <span className={`font-mono text-xs tabular-nums ${r.age > 600 ? 'text-data-bear' : 'text-text-muted'}`}>
           {formatAge(r.age)}
         </span>
       ),
@@ -229,7 +229,7 @@ function MempoolPageInner() {
             <Radio size={20} className="text-teal-vivid" />
             <div>
               <h1 className="text-[20px] font-head font-bold text-text-primary">Mempool Radar</h1>
-              <p className="text-[11px] text-text-muted font-mono">Pending whale transactions — alpha before confirmation</p>
+              <p className="text-xs text-text-muted">Pending whale transactions — alpha before confirmation</p>
             </div>
           </div>
           <LiveDot status={statsStatus} label />
@@ -242,11 +242,11 @@ function MempoolPageInner() {
               const isHot = fee.rate > 50
               return (
                 <div key={i} className="px-3 py-2 text-center">
-                  <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider mb-1">{fee.label}</div>
+                  <div className="text-xs text-text-muted font-mono uppercase tracking-wider mb-1">{fee.label}</div>
                   <div className={`text-[18px] font-head font-bold tabular-nums ${isHot ? 'text-data-bear' : fee.rate > 20 ? 'text-data-warn' : 'text-data-bull'}`}>
                     {fee.rate}
                   </div>
-                  <div className="text-[10px] text-text-muted font-mono">sat/vB · {fee.range}</div>
+                  <div className="text-xs text-text-muted font-mono">sat/vB · {fee.range}</div>
                 </div>
               )
             })}
@@ -284,7 +284,7 @@ function MempoolPageInner() {
             },
           ].map((k, i) => (
             <div key={i} className="bg-bg-panel border border-bg-border px-3 py-2">
-              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider mb-1">{k.label}</div>
+              <div className="text-xs text-text-muted font-mono uppercase tracking-wider mb-1">{k.label}</div>
               <div className={`text-[16px] font-head font-bold tabular-nums ${k.color}`}>
                 {k.badge ? (
                   <span className={`px-1.5 py-0.5 rounded text-[12px] ${k.badge}`}>{k.value}</span>
@@ -314,8 +314,8 @@ function MempoolPageInner() {
             emptyState={
               <div className="p-8 text-center">
                 <div className="text-[14px] text-text-primary mb-2">No whale transactions in mempool</div>
-                <div className="text-[11px] text-text-muted">Pending txs ≥ 10 BTC will appear here before confirmation</div>
-                <div className="text-[10px] text-text-muted mt-1">Auto-refreshes every 10 seconds</div>
+                <div className="text-xs text-text-muted">Pending txs ≥ 10 BTC will appear here before confirmation</div>
+                <div className="text-xs text-text-muted mt-1">Auto-refreshes every 10 seconds</div>
               </div>
             }
           />
@@ -323,7 +323,7 @@ function MempoolPageInner() {
 
         {/* How it works */}
         <Panel title="How Mempool Radar Works" subtitle="Detection methodology">
-          <div className="p-3 space-y-2 text-[11px] text-text-secondary">
+          <div className="p-3 space-y-2 text-xs text-text-secondary">
             <div className="flex items-start gap-2">
               <span className="text-teal-vivid font-bold">1.</span>
               <span>Monitor Bitcoin mempool via Blockstream API for pending (unconfirmed) transactions</span>

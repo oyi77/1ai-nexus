@@ -199,15 +199,15 @@ function ProfileHeader({ profile }: { profile: GateioLeaderProfile }) {
         <div className="flex items-center gap-2">
           <span className="text-lg font-semibold text-text-primary">{profile.nickname}</span>
           {profile.tier > 0 && (
-            <span className="rounded bg-bg-raised px-1.5 py-0.5 text-[10px] text-text-muted">T{profile.tier}</span>
+            <span className="rounded bg-bg-raised px-1.5 py-0.5 text-xs text-text-muted">T{profile.tier}</span>
           )}
           {profile.level > 0 && (
-            <span className="rounded bg-bg-raised px-1.5 py-0.5 text-[10px] text-text-muted">Lv{profile.level}</span>
+            <span className="rounded bg-bg-raised px-1.5 py-0.5 text-xs text-text-muted">Lv{profile.level}</span>
           )}
           {profile.status && <span className="capitalize text-xs text-text-muted">{profile.status}</span>}
         </div>
         {profile.nick && <div className="text-xs text-text-muted">{profile.nick}</div>}
-        {profile.style && <div className="mt-0.5 font-mono text-[11px] text-text-muted">{profile.style}</div>}
+        {profile.style && <div className="mt-0.5 font-mono text-xs text-text-muted">{profile.style}</div>}
       </div>
     </div>
   )
@@ -225,12 +225,12 @@ function LeaderRowHeader({ leader, tier = null }: { leader: CopyTradingLeader; t
         <div className="flex items-center gap-2">
           <span className="text-lg font-semibold text-text-primary">{leader.nick || leader.id}</span>
           {leader.level > 0 && (
-            <span className="rounded bg-bg-raised px-1.5 py-0.5 text-[10px] text-text-muted">Lv{leader.level}</span>
+            <span className="rounded bg-bg-raised px-1.5 py-0.5 text-xs text-text-muted">Lv{leader.level}</span>
           )}
-          {tier && <span className="rounded bg-bg-raised px-1.5 py-0.5 text-[10px] text-text-muted">{tier}</span>}
-          <span className="rounded bg-bg-raised px-1.5 py-0.5 text-[10px] text-text-muted">{platformLabel(leader.platform)}</span>
+          {tier && <span className="rounded bg-bg-raised px-1.5 py-0.5 text-xs text-text-muted">{tier}</span>}
+          <span className="rounded bg-bg-raised px-1.5 py-0.5 text-xs text-text-muted">{platformLabel(leader.platform)}</span>
           {leader.isPrivate && (
-            <span className="rounded bg-bg-raised px-1.5 py-0.5 text-[10px] text-text-muted">private</span>
+            <span className="rounded bg-bg-raised px-1.5 py-0.5 text-xs text-text-muted">private</span>
           )}
         </div>
         <div className="text-xs text-text-muted">{leader.id}</div>
@@ -527,7 +527,7 @@ function LeaderPerformanceInner() {
         onRefresh={fetchData}
         actions={
           degraded
-            ? [<span key="degraded" className="rounded bg-accent-amber/20 px-2 py-0.5 text-[10px] text-accent-amber">degraded</span>]
+            ? [<span key="degraded" className="rounded bg-accent-amber/20 px-2 py-0.5 text-xs text-accent-amber">degraded</span>]
             : undefined
         }
       >

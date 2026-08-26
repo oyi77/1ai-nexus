@@ -57,7 +57,7 @@ export function Sparkline({ data, width = 80, height = 20, color }: SparklinePro
     ctx.stroke()
   }, [data, width, height, color])
 
-  if (data.length < 2) return <span className="text-text-muted text-[10px]">—</span>
+  if (data.length < 2) return <span className="text-text-muted text-xs">—</span>
 
   return <canvas ref={canvasRef} style={{ width, height }} />
 }

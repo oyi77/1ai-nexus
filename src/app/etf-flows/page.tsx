@@ -74,7 +74,7 @@ export default function ETFFlowsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">ETF FLOWS + PREMIUMS</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Institutional demand signals — spot BTC/ETH ETF flows, Coinbase Premium, Korea Premium, futures basis
             </p>
           </div>
@@ -85,19 +85,19 @@ export default function ETFFlowsPage() {
         {summary && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">30D NET FLOW</p>
+              <p className="text-xs text-text-muted">30D NET FLOW</p>
               <p className={`text-lg font-mono font-bold ${summary.totalFlow >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>{fmtUsd(summary.totalFlow)}</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">CUMULATIVE</p>
-              <p className="text-lg font-mono font-bold">{fmtUsd(summary.cumulativeFlow)}</p>
+              <p className="text-xs text-text-muted">CUMULATIVE</p>
+              <p className="text-lg font-bold">{fmtUsd(summary.cumulativeFlow)}</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">POSITIVE DAYS</p>
-              <p className="text-lg font-mono font-bold text-data-bull">{summary.positiveDays}/{summary.dayCount}</p>
+              <p className="text-xs text-text-muted">POSITIVE DAYS</p>
+              <p className="text-lg font-bold text-data-bull">{summary.positiveDays}/{summary.dayCount}</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">TREND</p>
+              <p className="text-xs text-text-muted">TREND</p>
               <p className={`text-lg font-mono font-bold ${summary.trend === 'inflow' ? 'text-data-bull' : summary.trend === 'outflow' ? 'text-data-bear' : 'text-text-muted'}`}>{summary.trend}</p>
             </div>
           </div>
@@ -108,11 +108,11 @@ export default function ETFFlowsPage() {
           <div className="grid grid-cols-3 gap-3">
             {premiums.map((p, i) => (
               <div key={i} className="bg-bg-panel border border-border-dim rounded-lg p-3">
-                <p className="text-[10px] text-text-muted font-mono">{p.venuePair}</p>
+                <p className="text-xs text-text-muted">{p.venuePair}</p>
                 <p className={`text-lg font-mono font-bold ${p.premiumPct >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                   {p.premiumPct >= 0 ? '+' : ''}{p.premiumPct.toFixed(3)}%
                 </p>
-                <p className="text-[9px] text-text-dim mt-0.5">{p.description}</p>
+                <p className="text-xs text-text-dim mt-0.5">{p.description}</p>
               </div>
             ))}
           </div>
@@ -156,7 +156,7 @@ export default function ETFFlowsPage() {
         </Panel>
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <p className="text-[9px] text-text-dim font-mono">
+          <p className="text-xs text-text-dim">
             Sources: Public ETF holdings disclosures, Coinbase/Binance/Upbit APIs.
             ETF flows are the best public proxy for institutional crypto demand.
             Premium data updated every 5 minutes.

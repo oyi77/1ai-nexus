@@ -284,7 +284,7 @@ export function EntityGraph({ data }: { data: GraphData }) {
       <svg ref={svgRef} className="w-full h-full cursor-grab active:cursor-grabbing absolute inset-0" />
 
       {/* ── Legend ── */}
-      <div className="absolute top-4 left-4 bg-bg-base/80 p-3 border border-bg-border rounded backdrop-blur text-[10px] font-mono z-10">
+      <div className="absolute top-4 left-4 bg-bg-base/80 p-3 border border-bg-border rounded backdrop-blur text-xs font-mono z-10">
         <h3 className="text-text-primary font-bold mb-2">Arkham Entity Graph</h3>
         <div className="flex items-center gap-2 mb-1"><span className="w-2 h-2 rounded-full bg-[#00b8d9]"></span> Protocol</div>
         <div className="flex items-center gap-2 mb-1"><span className="w-2 h-2 rounded-full bg-[#f39c12]"></span> Exchange</div>
@@ -305,12 +305,12 @@ export function EntityGraph({ data }: { data: GraphData }) {
             value={query}
             onChange={e => handleSearchChange(e.target.value)}
             placeholder="Search entities...  /"
-            className="w-full bg-bg-base/90 border border-bg-border rounded pl-8 pr-8 py-1.5 text-[11px] font-mono text-text-primary placeholder:text-text-muted focus:outline-none focus:border-teal-vivid/50 backdrop-blur"
+            className="w-full bg-bg-base/90 border border-bg-border rounded pl-8 pr-8 py-1.5 text-xs font-mono text-text-primary placeholder:text-text-muted focus:outline-none focus:border-teal-vivid/50 backdrop-blur"
           />
           {query && (
             <button
               onClick={() => handleSearchChange('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-[10px]"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary text-xs"
             >
               ✕
             </button>
@@ -332,13 +332,13 @@ export function EntityGraph({ data }: { data: GraphData }) {
                     className="w-2 h-2 rounded-full shrink-0"
                     style={{ backgroundColor: ['#00b8d9','#f39c12','#6554c0','#ff5630','#36b37e','#888888'][n.group] ?? '#888888' }}
                   />
-                  <span className="text-[10px] font-mono text-text-primary truncate">{n.label}</span>
-                  <span className="text-[9px] font-mono text-text-muted ml-auto shrink-0">{n.type}</span>
+                  <span className="text-xs font-mono text-text-primary truncate">{n.label}</span>
+                  <span className="text-xs font-mono text-text-muted ml-auto shrink-0">{n.type}</span>
                 </button>
               )
             })}
             {matchCount > 20 && (
-              <div className="px-3 py-1 text-[9px] text-text-muted font-mono border-t border-bg-border">
+              <div className="px-3 py-1 text-xs text-text-muted font-mono border-t border-bg-border">
                 +{matchCount - 20} more
               </div>
             )}
@@ -347,7 +347,7 @@ export function EntityGraph({ data }: { data: GraphData }) {
 
         {query && matchCount === 0 && (
           <div className="mt-1 bg-bg-base/95 border border-bg-border rounded px-3 py-2 backdrop-blur">
-            <span className="text-[10px] font-mono text-text-muted">No matches</span>
+            <span className="text-xs font-mono text-text-muted">No matches</span>
           </div>
         )}
       </div>
@@ -356,33 +356,33 @@ export function EntityGraph({ data }: { data: GraphData }) {
       <div className="absolute bottom-4 right-4 flex flex-col gap-1 z-10">
         <button
           onClick={handleZoomIn}
-          className="w-7 h-7 bg-bg-base/80 border border-bg-border rounded flex items-center justify-center text-text-muted hover:text-teal-vivid hover:border-teal-vivid/30 transition-colors text-[14px] font-mono backdrop-blur"
+          className="w-7 h-7 bg-bg-base/80 border border-bg-border rounded flex items-center justify-center text-text-muted hover:text-teal-vivid hover:border-teal-vivid/30 transition-colors text-[14px] backdrop-blur"
           title="Zoom in"
         >
           +
         </button>
         <button
           onClick={handleZoomOut}
-          className="w-7 h-7 bg-bg-base/80 border border-bg-border rounded flex items-center justify-center text-text-muted hover:text-teal-vivid hover:border-teal-vivid/30 transition-colors text-[14px] font-mono backdrop-blur"
+          className="w-7 h-7 bg-bg-base/80 border border-bg-border rounded flex items-center justify-center text-text-muted hover:text-teal-vivid hover:border-teal-vivid/30 transition-colors text-[14px] backdrop-blur"
           title="Zoom out"
         >
           −
         </button>
         <button
           onClick={handleReset}
-          className="w-7 h-7 bg-bg-base/80 border border-bg-border rounded flex items-center justify-center text-text-muted hover:text-teal-vivid hover:border-teal-vivid/30 transition-colors text-[10px] font-mono backdrop-blur"
+          className="w-7 h-7 bg-bg-base/80 border border-bg-border rounded flex items-center justify-center text-text-muted hover:text-teal-vivid hover:border-teal-vivid/30 transition-colors text-xs backdrop-blur"
           title="Reset view & clear search"
         >
           ⟲
         </button>
-        <div className="text-center text-[9px] font-mono text-text-muted mt-0.5 tabular-nums">
+        <div className="text-center text-xs font-mono text-text-muted mt-0.5 tabular-nums">
           {Math.round(zoomLevel * 100)}%
         </div>
       </div>
 
       {/* ── Highlight count badge ── */}
       {query && matchCount > 0 && (
-        <div className="absolute bottom-4 left-4 bg-teal-vivid/10 border border-teal-vivid/30 rounded px-2.5 py-1 text-[10px] font-mono text-teal-vivid z-10">
+        <div className="absolute bottom-4 left-4 bg-teal-vivid/10 border border-teal-vivid/30 rounded px-2.5 py-1 text-xs font-mono text-teal-vivid z-10">
           {matchCount} match{matchCount !== 1 ? 'es' : ''}
         </div>
       )}

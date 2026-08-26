@@ -70,29 +70,29 @@ export default function TopTradersPage() {
 
   const columns: Column<Trader>[] = [
     { key: 'rank', header: '#', width: 50, render: (_r, i) => (
-      <span className="text-[11px] font-mono text-text-muted">#{i + 1}</span>
+      <span className="text-xs font-mono text-text-muted">#{i + 1}</span>
     )},
     { key: 'entity', header: 'Entity / Address', width: 240, render: r => (
       <div className="flex flex-col">
         {r.entityName ? (
           <>
-            <span className="text-[11px] font-mono font-bold text-text-primary">{r.entityName}</span>
-            <span className="text-[9px] font-mono text-text-muted">{r.address.slice(0, 16)}...</span>
+            <span className="text-xs font-mono font-bold text-text-primary">{r.entityName}</span>
+            <span className="text-xs font-mono text-text-muted">{r.address.slice(0, 16)}...</span>
           </>
         ) : (
-          <span className="text-[10px] font-mono text-text-muted">{r.address.slice(0, 24)}...</span>
+          <span className="text-xs font-mono text-text-muted">{r.address.slice(0, 24)}...</span>
         )}
       </div>
     )},
     { key: 'chain', header: 'Chain', width: 80, render: r => (
-      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-bg-raised text-teal-vivid uppercase">{r.chain}</span>
+      <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-bg-raised text-teal-vivid uppercase">{r.chain}</span>
     )},
     { key: 'type', header: 'Type', width: 100, render: r => (
       r.entityType ? (
-        <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${typeColors[r.entityType.toLowerCase()] ?? 'bg-bg-raised text-text-muted'}`}>
+        <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${typeColors[r.entityType.toLowerCase()] ?? 'bg-bg-raised text-text-muted'}`}>
           {r.entityType.toUpperCase()}
         </span>
-      ) : <span className="text-text-muted text-[10px]">Unknown</span>
+      ) : <span className="text-text-muted text-xs">Unknown</span>
     )},
     { key: 'txCount', header: 'Tx Count', width: 80, align: 'right', render: r => (
       <span className="text-[12px] font-mono font-bold text-text-primary tabular-nums">{r.txCount}</span>
@@ -101,7 +101,7 @@ export default function TopTradersPage() {
       <PriceTag value={r.totalVolume} size="sm" />
     )},
     { key: 'entityTvl', header: 'Entity TVL', width: 110, align: 'right', render: r => (
-      <span className="text-[11px] font-mono text-text-secondary tabular-nums">
+      <span className="text-xs font-mono text-text-secondary tabular-nums">
         {r.entityTvl > 0 ? fmtUsd(r.entityTvl) : '—'}
       </span>
     )},
@@ -120,7 +120,7 @@ export default function TopTradersPage() {
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">🏆</span> Top Traders Leaderboard
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               Most active wallets ranked by live transaction count. Entity attribution from DeFiLlama.
             </p>
           </div>
@@ -137,13 +137,13 @@ export default function TopTradersPage() {
 
         {/* Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono text-text-muted uppercase">Filter:</span>
+          <span className="text-xs font-mono text-text-muted uppercase">Filter:</span>
           <div className="flex bg-bg-raised p-1 rounded">
             {(['all', 'exchange', 'fund', 'protocol', 'whale', 'bridge'] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-3 py-1 text-[10px] font-mono rounded uppercase transition-colors ${filter === f ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
+                className={`px-3 py-1 text-xs font-mono rounded uppercase transition-colors ${filter === f ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
               >
                 {f}
               </button>
@@ -170,7 +170,7 @@ export default function TopTradersPage() {
 function KPI({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-bg-panel border border-bg-border p-3 rounded">
-      <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
+      <div className="text-xs text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className="text-[16px] font-head font-bold tabular-nums text-text-primary">{value}</div>
     </div>
   )

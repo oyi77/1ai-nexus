@@ -108,7 +108,7 @@ export default function StablecoinIntelPage() {
             <h1 className="page-title flex items-center gap-2">
               <DollarSign size={20} /> STABLECOIN INTELLIGENCE
             </h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Supply dynamics, dominance, and mint/burn tracking. The blood supply of crypto.
             </p>
           </div>
@@ -119,25 +119,25 @@ export default function StablecoinIntelPage() {
         {intel && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">TOTAL SUPPLY</p>
-              <p className="text-lg font-mono font-bold text-teal-vivid">{fmtB(intel.totalSupply)}</p>
+              <p className="text-xs text-text-muted">TOTAL SUPPLY</p>
+              <p className="text-lg font-bold text-teal-vivid">{fmtB(intel.totalSupply)}</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">DOMINANCE</p>
-              <p className="text-lg font-mono font-bold">{intel.dominance.toFixed(2)}%</p>
+              <p className="text-xs text-text-muted">DOMINANCE</p>
+              <p className="text-lg font-bold">{intel.dominance.toFixed(2)}%</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">SUPPLY CHANGE 24H</p>
+              <p className="text-xs text-text-muted">SUPPLY CHANGE 24H</p>
               <p className={`text-lg font-mono font-bold ${intel.supplyChange24h >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                 {intel.supplyChange24h >= 0 ? '+' : ''}{fmtB(intel.supplyChange24h)}
               </p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">SSR (BTC/STABLES)</p>
-              <p className="text-lg font-mono font-bold">{intel.ssr ? intel.ssr.toFixed(2) : '—'}</p>
+              <p className="text-xs text-text-muted">SSR (BTC/STABLES)</p>
+              <p className="text-lg font-bold">{intel.ssr ? intel.ssr.toFixed(2) : '—'}</p>
             </div>
             <div className={`rounded-lg p-3 border ${signalBg}`}>
-              <p className="text-[10px] text-text-muted font-mono">SIGNAL</p>
+              <p className="text-xs text-text-muted">SIGNAL</p>
               <p className={`text-lg font-mono font-bold uppercase ${signalColor}`}>
                 {intel.signal === 'risk-on' ? '🟢 RISK-ON' : intel.signal === 'risk-off' ? '🔴 RISK-OFF' : '⚪ NEUTRAL'}
               </p>
@@ -161,10 +161,10 @@ export default function StablecoinIntelPage() {
                   <p className={`text-sm font-mono font-bold ${signalColor}`}>
                     {intel.signal === 'risk-on' ? 'Risk-On Environment' : intel.signal === 'risk-off' ? 'Risk-Off Environment' : 'Neutral'}
                   </p>
-                  <p className="text-[11px] text-text-muted font-mono mt-1">{intel.signalReason}</p>
+                  <p className="text-xs text-text-muted mt-1">{intel.signalReason}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 mt-3 text-[11px] font-mono text-text-muted">
+              <div className="grid grid-cols-2 gap-3 mt-3 text-xs font-mono text-text-muted">
                 <div>
                   <span className="text-text-secondary">Rising dominance</span> = capital flowing into stablecoins (risk-off, potential buying power)
                 </div>
@@ -249,7 +249,7 @@ export default function StablecoinIntelPage() {
                           style={{ backgroundColor: COIN_COLORS[coin.symbol] ?? '#6b7280' }}
                         />
                         <span className="text-sm font-mono font-bold text-text-primary">{coin.symbol}</span>
-                        <span className="text-[10px] text-text-muted">{coin.name}</span>
+                        <span className="text-xs text-text-muted">{coin.name}</span>
                       </div>
                       <span className={`text-xs font-mono font-bold ${coin.change24h >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                         {coin.change24h >= 0 ? <TrendingUp size={10} className="inline mr-1" /> : <TrendingDown size={10} className="inline mr-1" />}
@@ -258,12 +258,12 @@ export default function StablecoinIntelPage() {
                     </div>
                     <div className="flex items-end justify-between">
                       <div>
-                        <p className="text-[10px] text-text-muted font-mono">MARKET CAP</p>
-                        <p className="text-lg font-mono font-bold text-teal-vivid">{fmtB(coin.marketCap)}</p>
+                        <p className="text-xs text-text-muted">MARKET CAP</p>
+                        <p className="text-lg font-bold text-teal-vivid">{fmtB(coin.marketCap)}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-[10px] text-text-muted font-mono">SHARE</p>
-                        <p className="text-lg font-mono font-bold">{share.toFixed(1)}%</p>
+                        <p className="text-xs text-text-muted">SHARE</p>
+                        <p className="text-lg font-bold">{share.toFixed(1)}%</p>
                       </div>
                     </div>
                     {/* Share bar */}
@@ -286,7 +286,7 @@ export default function StablecoinIntelPage() {
         {/* Loading */}
         {loading && (
           <div className="text-center p-8">
-            <p className="text-text-muted text-sm font-mono">Loading stablecoin intelligence...</p>
+            <p className="text-text-muted text-sm">Loading stablecoin intelligence...</p>
           </div>
         )}
       </div>

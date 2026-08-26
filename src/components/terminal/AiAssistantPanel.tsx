@@ -69,7 +69,7 @@ export function AiAssistantPanel() {
     return (
       <div className="flex flex-col h-full">
         <div className="p-3 border-b border-border-dim">
-          <h3 className="text-xs font-mono text-accent-cyan">NEXUS AI ▸</h3>
+          <h3 className="text-xs text-accent-cyan">NEXUS AI ▸</h3>
         </div>
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="text-center text-text-dim text-xs space-y-2">
@@ -90,7 +90,7 @@ export function AiAssistantPanel() {
   return (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b border-border-dim">
-        <h3 className="text-xs font-mono text-accent-cyan">NEXUS AI ▸</h3>
+        <h3 className="text-xs text-accent-cyan">NEXUS AI ▸</h3>
       </div>
 
       {/* Agent selector */}
@@ -98,7 +98,7 @@ export function AiAssistantPanel() {
         <div className="px-3 py-1.5 border-b border-border-dim flex gap-1 overflow-x-auto scrollbar-thin">
           <button
             onClick={() => setSelectedAgent('')}
-            className={`px-1.5 py-0.5 rounded text-[9px] border shrink-0 ${
+            className={`px-1.5 py-0.5 rounded text-xs border shrink-0 ${
               !selectedAgent ? 'bg-border-active border-border-active text-text-primary' : 'bg-bg-panel border-border-dim text-text-dim'
             }`}
           >GENERAL</button>
@@ -106,7 +106,7 @@ export function AiAssistantPanel() {
             <button
               key={a.id}
               onClick={() => setSelectedAgent(selectedAgent === a.id ? '' : a.id)}
-              className={`px-1.5 py-0.5 rounded text-[9px] border shrink-0 ${
+              className={`px-1.5 py-0.5 rounded text-xs border shrink-0 ${
                 selectedAgent === a.id ? 'bg-border-active border-border-active text-text-primary' : 'bg-bg-panel border-border-dim text-text-dim'
               }`}
             >{a.icon} {a.name.split(' ')[0].toUpperCase()}</button>
@@ -122,7 +122,7 @@ export function AiAssistantPanel() {
         )}
         {messages.map((msg, i) => (
           <div key={i} className={`text-xs ${msg.role === 'user' ? 'text-accent-cyan' : 'text-text-primary'}`}>
-            <p className="font-mono text-[10px] text-text-muted mb-0.5">
+            <p className="text-xs text-text-muted mb-0.5">
               {msg.role === 'user' ? 'You' : `NEXUS${msg.agent ? ` (${msg.agent})` : ''}`}
             </p>
             <p className="whitespace-pre-wrap">{msg.content}</p>

@@ -127,7 +127,7 @@ export default function ETFPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">ETF ANALYTICS</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               {ETF_LIST.length} ETFs across {categories.length - 1} categories
             </p>
           </div>
@@ -138,7 +138,7 @@ export default function ETFPage() {
         <div className="flex flex-wrap gap-2">
           {categories.map(cat => (
             <button key={cat} onClick={() => setFilter(cat)}
-              className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+              className={`px-3 py-1 text-xs font-mono rounded border transition-colors ${
                 filter === cat
                   ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
                   : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
@@ -203,29 +203,29 @@ export default function ETFPage() {
             <h3 className="text-xs font-semibold text-text-secondary mb-3">{selected} — {data[selected].name}</h3>
             <div className="grid grid-cols-4 gap-4">
               <div>
-                <p className="text-[10px] text-text-muted font-mono">Price</p>
-                <p className="text-lg font-bold font-mono text-text-primary">${fmt(data[selected].price)}</p>
+                <p className="text-xs text-text-muted">Price</p>
+                <p className="text-lg font-bold text-text-primary">${fmt(data[selected].price)}</p>
               </div>
               <div>
-                <p className="text-[10px] text-text-muted font-mono">Change</p>
+                <p className="text-xs text-text-muted">Change</p>
                 <p className={`text-lg font-bold font-mono ${data[selected].changePercent >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                   {data[selected].changePercent >= 0 ? '+' : ''}{fmt(data[selected].changePercent)}%
                 </p>
               </div>
               <div>
-                <p className="text-[10px] text-text-muted font-mono">AUM</p>
-                <p className="text-lg font-bold font-mono text-text-primary">{fmtB(data[selected].aum)}</p>
+                <p className="text-xs text-text-muted">AUM</p>
+                <p className="text-lg font-bold text-text-primary">{fmtB(data[selected].aum)}</p>
               </div>
               <div>
-                <p className="text-[10px] text-text-muted font-mono">Yield</p>
-                <p className="text-lg font-bold font-mono text-text-primary">{data[selected].yield != null ? `${(data[selected].yield! * 100).toFixed(2)}%` : '—'}</p>
+                <p className="text-xs text-text-muted">Yield</p>
+                <p className="text-lg font-bold text-text-primary">{data[selected].yield != null ? `${(data[selected].yield! * 100).toFixed(2)}%` : '—'}</p>
               </div>
             </div>
           </div>
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">SOURCE</h2>
+          <h2 className="text-xs text-accent-cyan mb-2">SOURCE</h2>
           <p className="text-xs text-text-dim">
             Yahoo Finance — 24 ETFs across US Broad, Sector, International, Fixed Income, Commodities, Thematic.
             AUM, yield, and volume are real-time. Holdings data requires ETF provider API integration.

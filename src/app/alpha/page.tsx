@@ -48,16 +48,16 @@ export default function AlphaFeedPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">Alpha Signal Feed</h1>
-            <p className="text-[11px] text-text-muted font-mono">Unified intelligence — TradFi + on-chain + news + weather + microstructure</p>
+            <p className="text-xs text-text-muted">Unified intelligence — TradFi + on-chain + news + weather + microstructure</p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-[10px] font-mono text-text-muted">{signals.length} signals</span>
+            <span className="text-xs font-mono text-text-muted">{signals.length} signals</span>
             <LiveDot status={status} label />
           </div>
         </div>
 
         {/* Type filter */}
-        <div className="flex items-center gap-1 text-[10px] font-mono overflow-x-auto">
+        <div className="flex items-center gap-1 text-xs font-mono overflow-x-auto">
           {types.map(t => (
             <button key={t} onClick={() => setFilterType(t)} className={`px-2 py-1 rounded whitespace-nowrap ${filterType === t ? 'bg-teal-dim/30 text-teal-vivid' : 'text-text-muted hover:text-text-secondary'}`}>
               {t === 'all' ? 'ALL' : `${typeIcons[t] || '•'} ${t.toUpperCase()}`}
@@ -76,17 +76,17 @@ export default function AlphaFeedPage() {
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-mono ${typeColors[signal.type] || 'text-text-muted'}`}>{signal.type.toUpperCase()}</span>
-                    <span className="text-[10px] font-mono text-text-muted">{signal.source}</span>
+                    <span className={`text-xs font-mono ${typeColors[signal.type] || 'text-text-muted'}`}>{signal.type.toUpperCase()}</span>
+                    <span className="text-xs font-mono text-text-muted">{signal.source}</span>
                     {signal.localOnlyScore && signal.localOnlyScore > 50 && (
-                      <span className="px-1 py-0 rounded bg-data-orange/20 text-data-orange text-[9px] font-mono">🔥 LOCAL EXCLUSIVE</span>
+                      <span className="px-1 py-0 rounded bg-data-orange/20 text-data-orange text-xs font-mono">🔥 LOCAL EXCLUSIVE</span>
                     )}
                     {signal.zScore && Math.abs(signal.zScore) > 2 && (
-                      <span className="px-1 py-0 rounded bg-data-warn/20 text-data-warn text-[9px] font-mono">Z={(signal.zScore ?? 0).toFixed(1)}</span>
+                      <span className="px-1 py-0 rounded bg-data-warn/20 text-data-warn text-xs font-mono">Z={(signal.zScore ?? 0).toFixed(1)}</span>
                     )}
                   </div>
                   <div className="text-[12px] font-medium text-text-primary mt-0.5">{signal.headline}</div>
-                  {signal.explanation && <div className="text-[10px] text-text-muted mt-0.5 line-clamp-2">{signal.explanation}</div>}
+                  {signal.explanation && <div className="text-xs text-text-muted mt-0.5 line-clamp-2">{signal.explanation}</div>}
                 </div>
 
                 {/* Strength & Direction */}
@@ -98,17 +98,17 @@ export default function AlphaFeedPage() {
                     {signal.direction === 'bullish' ? '▲' : signal.direction === 'bearish' ? '▼' : '—'} {signal.asset}
                   </div>
                   <div className="flex items-center gap-1">
-                    <span className="text-[9px] font-mono text-text-muted">STR</span>
-                    <span className="text-[10px] font-mono text-text-primary">{signal.strength}</span>
-                    <span className="text-[9px] font-mono text-text-muted">CONF</span>
-                    <span className="text-[10px] font-mono text-text-primary">{Math.round(signal.confidence * 100)}%</span>
+                    <span className="text-xs font-mono text-text-muted">STR</span>
+                    <span className="text-xs font-mono text-text-primary">{signal.strength}</span>
+                    <span className="text-xs font-mono text-text-muted">CONF</span>
+                    <span className="text-xs font-mono text-text-primary">{Math.round(signal.confidence * 100)}%</span>
                   </div>
-                  <span className="text-[9px] font-mono text-text-muted">{new Date(signal.timestamp).toLocaleTimeString()}</span>
+                  <span className="text-xs font-mono text-text-muted">{new Date(signal.timestamp).toLocaleTimeString()}</span>
                 </div>
               </div>
             ))}
             {filtered.length === 0 && (
-              <div className="p-8 text-center text-text-muted text-[11px]">
+              <div className="p-8 text-center text-text-muted text-xs">
                 {signals.length === 0 ? 'Loading signals...' : 'No signals matching filter'}
               </div>
             )}

@@ -32,7 +32,7 @@ export function FearGreedGauge({ data }: { data: FearGreedData }) {
 
   return (
     <div className="flex flex-col items-center p-4 bg-bg-panel border border-bg-border rounded">
-      <h3 className="text-[11px] font-mono text-text-muted uppercase mb-2">Fear & Greed Index</h3>
+      <h3 className="text-xs text-text-muted uppercase mb-2">Fear & Greed Index</h3>
       
       {/* Gauge */}
       <div className="relative w-48 h-24 mb-2">
@@ -60,13 +60,13 @@ export function FearGreedGauge({ data }: { data: FearGreedData }) {
       <div className="text-center">
         <div className="text-[32px] font-head font-bold tabular-nums" style={{ color }}>{score}</div>
         <div className="text-[12px] font-mono font-bold" style={{ color }}>{getLabel(score)}</div>
-        <div className="text-[10px] font-mono text-text-muted mt-1">
+        <div className="text-xs font-mono text-text-muted mt-1">
           {data.composite.change > 0 ? '+' : ''}{data.composite.change} from yesterday
         </div>
       </div>
 
       {/* Regime */}
-      <div className="mt-3 flex items-center gap-2 bg-bg-raised px-3 py-1 rounded text-[10px] font-mono">
+      <div className="mt-3 flex items-center gap-2 bg-bg-raised px-3 py-1 rounded text-xs font-mono">
         <span className="text-text-muted">Regime:</span>
         <span className="text-text-primary font-bold">{data.regime.state}</span>
         <span className="text-teal-vivid font-bold">→ {data.regime.stance}</span>
@@ -75,7 +75,7 @@ export function FearGreedGauge({ data }: { data: FearGreedData }) {
       {/* Category Breakdown */}
       <div className="mt-3 w-full space-y-1">
         {Object.entries(data.categories).map(([key, cat]) => (
-          <div key={key} className="flex items-center gap-2 text-[10px] font-mono">
+          <div key={key} className="flex items-center gap-2 text-xs font-mono">
             <span className="text-text-muted w-16 capitalize">{key}</span>
             <div className="flex-1 h-1.5 bg-bg-raised rounded-full overflow-hidden">
               <div className="h-full rounded-full" style={{ width: `${cat.score}%`, backgroundColor: getColor(cat.score) }} />
@@ -86,7 +86,7 @@ export function FearGreedGauge({ data }: { data: FearGreedData }) {
       </div>
 
       {/* Market Cap & BTC Dom */}
-      <div className="mt-3 flex items-center gap-4 text-[10px] font-mono text-text-muted">
+      <div className="mt-3 flex items-center gap-4 text-xs font-mono text-text-muted">
         <span>BTC Dom: <span className="text-text-primary font-bold">{data.headerMetrics.btcDom.toFixed(1)}%</span></span>
         <span>MCap: <span className="text-text-primary font-bold">${(data.headerMetrics.totalMcap / 1e12).toFixed(2)}T</span></span>
       </div>

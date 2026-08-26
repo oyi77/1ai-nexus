@@ -36,11 +36,11 @@ function fmtNum(n: number): string {
 }
 
 function MoMBadge({ change }: { change: number | null }) {
-  if (change === null) return <span className="text-[9px] text-text-dim font-mono">—</span>
+  if (change === null) return <span className="text-xs text-text-dim font-mono">—</span>
   const positive = change >= 0
   const color = positive ? 'text-data-bull' : 'text-data-bear'
   return (
-    <span className={`text-[10px] font-mono font-bold ${color}`}>
+    <span className={`text-xs font-mono font-bold ${color}`}>
       {positive ? '+' : ''}{change.toFixed(1)}%
     </span>
   )
@@ -86,7 +86,7 @@ export default function DevActivityPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">DEV ACTIVITY</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               npm download trends for crypto packages — MoM tracking for ecosystem growth signals
             </p>
           </div>
@@ -100,21 +100,21 @@ export default function DevActivityPage() {
               {sortedEcosystems.map((eco) => (
                 <div key={eco.ecosystem} className="bg-bg-elevated rounded-lg p-3 border border-border-dim/30">
                   <div className="flex items-center justify-between">
-                    <p className="text-[10px] text-text-muted font-mono">{eco.ecosystem.toUpperCase()}</p>
-                    <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                    <p className="text-xs text-text-muted">{eco.ecosystem.toUpperCase()}</p>
+                    <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
                       eco.signal === 'growing' ? 'bg-data-bull/20 text-data-bull' :
                       eco.signal === 'stable' ? 'bg-accent-amber/20 text-accent-amber' :
                       'bg-data-bear/20 text-data-bear'
                     }`}>{eco.signal}</span>
                   </div>
-                  <p className="text-lg font-mono font-bold mt-1">{fmtNum(eco.totalDownloads)}</p>
+                  <p className="text-lg font-bold mt-1">{fmtNum(eco.totalDownloads)}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <MoMBadge change={eco.changeMoM} />
                     {eco.previousDownloads !== null && (
-                      <span className="text-[9px] text-text-dim">vs {fmtNum(eco.previousDownloads)}</span>
+                      <span className="text-xs text-text-dim">vs {fmtNum(eco.previousDownloads)}</span>
                     )}
                   </div>
-                  <p className="text-[9px] text-text-dim mt-1">{eco.packageCount} packages</p>
+                  <p className="text-xs text-text-dim mt-1">{eco.packageCount} packages</p>
                 </div>
               ))}
             </div>
@@ -129,13 +129,13 @@ export default function DevActivityPage() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-text-muted border-b border-border-dim">
-                    <th className="text-left py-2 px-2 font-mono">#</th>
+                    <th className="text-left py-2 px-2">#</th>
                     <SortableTh controls={packagesTc} k="name" className="text-left py-2 px-2 font-mono">PACKAGE</SortableTh>
                     <SortableTh controls={packagesTc} k="ecosystem" className="text-left py-2 px-2 font-mono">ECOSYSTEM</SortableTh>
                     <SortableTh controls={packagesTc} k="downloads" className="text-right py-2 px-2 font-mono">DOWNLOADS</SortableTh>
                     <SortableTh controls={packagesTc} k="previousDownloads" className="text-right py-2 px-2 font-mono">PREV MONTH</SortableTh>
                     <SortableTh controls={packagesTc} k="changeMoM" className="text-right py-2 px-2 font-mono">MoM</SortableTh>
-                    <th className="text-left py-2 px-2 font-mono w-1/4">VOLUME</th>
+                    <th className="text-left py-2 px-2 w-1/4">VOLUME</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -177,7 +177,7 @@ export default function DevActivityPage() {
             <div className="p-4 space-y-3">
               {sortedEcosystems.filter(e => e.changeMoM !== null && Math.abs(e.changeMoM) > 10).map(eco => (
                 <div key={eco.ecosystem} className="flex items-center gap-3">
-                  <span className={`text-[10px] font-mono px-2 py-1 rounded ${
+                  <span className={`text-xs font-mono px-2 py-1 rounded ${
                     eco.changeMoM! > 0 ? 'bg-data-bull/20 text-data-bull' : 'bg-data-bear/20 text-data-bear'
                   }`}>
                     {eco.changeMoM! > 0 ? 'BULLISH' : 'BEARISH'}

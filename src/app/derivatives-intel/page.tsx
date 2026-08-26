@@ -138,7 +138,7 @@ export default function DerivativesIntelPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">DERIVATIVES INTELLIGENCE</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Binance, Bybit, OKX — funding rates, open interest, long/short ratios. Zero API keys.
             </p>
           </div>
@@ -149,20 +149,20 @@ export default function DerivativesIntelPage() {
         {summary && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">BTC FUNDING</p>
+              <p className="text-xs text-text-muted">BTC FUNDING</p>
               <p className={`text-lg font-mono font-bold ${fundingColor(summary.btcFunding ?? 0)}`}>{fmtPct(summary.btcFunding)}</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">ETH FUNDING</p>
+              <p className="text-xs text-text-muted">ETH FUNDING</p>
               <p className={`text-lg font-mono font-bold ${fundingColor(summary.ethFunding ?? 0)}`}>{fmtPct(summary.ethFunding)}</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">BTC OI</p>
-              <p className="text-lg font-mono font-bold">{summary.btcOI ? fmtUsd(summary.btcOI) : '—'}</p>
+              <p className="text-xs text-text-muted">BTC OI</p>
+              <p className="text-lg font-bold">{summary.btcOI ? fmtUsd(summary.btcOI) : '—'}</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">BTC L/S RATIO</p>
-              <p className="text-lg font-mono font-bold">{summary.btcLongShort?.toFixed(3) ?? '—'}</p>
+              <p className="text-xs text-text-muted">BTC L/S RATIO</p>
+              <p className="text-lg font-bold">{summary.btcLongShort?.toFixed(3) ?? '—'}</p>
             </div>
           </div>
         )}
@@ -173,8 +173,8 @@ export default function DerivativesIntelPage() {
             <div className="p-3 grid grid-cols-5 gap-2">
               {summary.topFunding.map((f, i) => (
                 <div key={i} className="text-center p-2 border border-border-dim/30 rounded">
-                  <p className="text-[10px] text-text-muted">{f.exchange}</p>
-                  <p className="text-xs font-mono font-bold text-teal-vivid">{f.symbol.replace('USDT', '')}</p>
+                  <p className="text-xs text-text-muted">{f.exchange}</p>
+                  <p className="text-xs font-bold text-teal-vivid">{f.symbol.replace('USDT', '')}</p>
                   <p className={`text-sm font-mono font-bold ${fundingColor(f.fundingRate)}`}>{fmtPct(f.fundingRate)}</p>
                 </div>
               ))}
@@ -184,7 +184,7 @@ export default function DerivativesIntelPage() {
 
         {/* Filters */}
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1 text-[10px] font-mono">
+          <div className="flex items-center gap-1 text-xs font-mono">
             <span className="text-text-muted">Exchange:</span>
             {['all', ...exchanges].map(ex => (
               <button key={ex} onClick={() => setFilterExchange(ex)}

@@ -47,7 +47,7 @@ function ScoreGauge({ score, label, size = 120 }: { score: number; label: string
       </svg>
       <div className="absolute flex flex-col items-center justify-center" style={{ width: size, height: size }}>
         <span className="text-2xl font-mono font-bold" style={{ color }}>{score}</span>
-        <span className="text-[9px] text-text-muted font-mono">{label}</span>
+        <span className="text-xs text-text-muted font-mono">{label}</span>
       </div>
     </div>
   )
@@ -55,7 +55,7 @@ function ScoreGauge({ score, label, size = 120 }: { score: number; label: string
 
 function DirectionBadge({ direction }: { direction: string }) {
   const color = direction === 'bullish' ? 'bg-data-bull/20 text-data-bull' : direction === 'bearish' ? 'bg-data-bear/20 text-data-bear' : 'bg-bg-raised text-text-muted'
-  return <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${color}`}>{direction}</span>
+  return <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${color}`}>{direction}</span>
 }
 
 export default function IntelligenceScorePage() {
@@ -105,7 +105,7 @@ export default function IntelligenceScorePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">INTELLIGENCE SCORE</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Unified score combining all 14 intelligence modules
             </p>
           </div>
@@ -119,8 +119,8 @@ export default function IntelligenceScorePage() {
               <ScoreGauge score={data.overall} label="OVERALL" size={160} />
             </div>
             <div className="text-center">
-              <p className="text-6xl font-mono font-bold" style={{ color: gradeColor }}>{data.grade}</p>
-              <p className="text-sm font-mono mt-1" style={{ color: regimeColor }}>
+              <p className="text-6xl font-bold" style={{ color: gradeColor }}>{data.grade}</p>
+              <p className="text-sm mt-1" style={{ color: regimeColor }}>
                 {data.regime.toUpperCase()} REGIME
               </p>
             </div>
@@ -139,10 +139,10 @@ export default function IntelligenceScorePage() {
                   </div>
                   <div className="space-y-1 mt-2">
                     {comp.signals.length === 0 ? (
-                      <p className="text-[10px] text-text-dim">No signals detected</p>
+                      <p className="text-xs text-text-dim">No signals detected</p>
                     ) : (
                       comp.signals.map((s, i) => (
-                        <p key={i} className="text-[10px] text-text-dim">{s}</p>
+                        <p key={i} className="text-xs text-text-dim">{s}</p>
                       ))
                     )}
                   </div>
@@ -159,20 +159,20 @@ export default function IntelligenceScorePage() {
               <div key={signal.id} className="bg-bg-elevated rounded-lg p-4 border border-border-dim/30">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-mono font-bold">{signal.name}</h3>
+                    <h3 className="text-sm font-bold">{signal.name}</h3>
                     <DirectionBadge direction={signal.direction} />
                   </div>
                   <div className="text-right">
-                    <p className="text-xs font-mono text-text-muted">Strength: {signal.strength}%</p>
+                    <p className="text-xs text-text-muted">Strength: {signal.strength}%</p>
                   </div>
                 </div>
-                <p className="text-[10px] text-text-dim mb-3">{signal.description}</p>
+                <p className="text-xs text-text-dim mb-3">{signal.description}</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                   {signal.components.map((c, i) => (
                     <div key={i} className="bg-bg-panel rounded p-2 border border-border-dim/20">
-                      <p className="text-[9px] text-text-muted font-mono">{c.module} / {c.metric}</p>
-                      <p className="text-xs font-mono font-bold">{typeof c.value === 'number' ? c.value.toFixed(2) : c.value}</p>
-                      <p className={`text-[9px] font-mono ${c.contribution > 0 ? 'text-data-bull' : c.contribution < 0 ? 'text-data-bear' : 'text-text-dim'}`}>
+                      <p className="text-xs text-text-muted">{c.module} / {c.metric}</p>
+                      <p className="text-xs font-bold">{typeof c.value === 'number' ? c.value.toFixed(2) : c.value}</p>
+                      <p className={`text-xs font-mono ${c.contribution > 0 ? 'text-data-bull' : c.contribution < 0 ? 'text-data-bear' : 'text-text-dim'}`}>
                         {c.contribution > 0 ? '+' : ''}{c.contribution.toFixed(0)} contribution
                       </p>
                     </div>

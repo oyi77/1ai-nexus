@@ -76,7 +76,7 @@ fetchScores()
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">📡</span> Market-Moving Score
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               Composite score from 10+ data sources · Positioning + On-Chain + Sentiment + Macro
             </p>
           </div>
@@ -97,7 +97,7 @@ fetchScores()
               <div className={`text-[28px] font-mono font-bold ${getScoreColor(score.compositeScore)}`}>
                 {score.compositeScore}
               </div>
-              <div className="text-[10px] font-mono text-text-muted mt-1">
+              <div className="text-xs font-mono text-text-muted mt-1">
                 {score.direction.toUpperCase()} · {(score.confidence * 100).toFixed(0)}% conf
               </div>
             </div>
@@ -116,16 +116,16 @@ fetchScores()
                     <div key={tier.tier} className="bg-bg-raised rounded-lg p-3">
                       <div className="flex items-center gap-2 mb-2">
                         <span>{meta.icon}</span>
-                        <span className="text-[11px] font-mono text-text-muted">{meta.label}</span>
+                        <span className="text-xs font-mono text-text-muted">{meta.label}</span>
                       </div>
                       <div className={`text-[20px] font-mono font-bold ${getScoreColor(tier.score)}`}>
                         {tier.score}
                       </div>
-                      <div className="text-[9px] font-mono text-text-muted mt-1">
+                      <div className="text-xs font-mono text-text-muted mt-1">
                         {tier.signalCount} signals · {(tier.confidence * 100).toFixed(0)}% conf
                       </div>
                       {tier.topSignal && (
-                        <div className="text-[9px] font-mono text-text-secondary mt-2 line-clamp-2">
+                        <div className="text-xs font-mono text-text-secondary mt-2 line-clamp-2">
                           {tier.topSignal}
                         </div>
                       )}
@@ -136,10 +136,10 @@ fetchScores()
 
               {/* Top Signals */}
               <div>
-                <h3 className="text-[11px] font-mono text-accent-cyan mb-2">TOP SIGNALS</h3>
+                <h3 className="text-xs text-accent-cyan mb-2">TOP SIGNALS</h3>
                 <div className="space-y-1">
                   {scores[0].topSignals.map((signal, i) => (
-                    <div key={i} className="flex items-start gap-2 text-[11px] font-mono text-text-secondary">
+                    <div key={i} className="flex items-start gap-2 text-xs font-mono text-text-secondary">
                       <span className="text-teal-vivid">{i + 1}.</span>
                       {signal}
                     </div>
@@ -148,7 +148,7 @@ fetchScores()
               </div>
 
               {/* Updated */}
-              <div className="text-[9px] font-mono text-text-muted">
+              <div className="text-xs font-mono text-text-muted">
                 Updated: {new Date(scores[0].fetchedAt).toLocaleTimeString()}
               </div>
             </div>
@@ -157,8 +157,8 @@ fetchScores()
 
         {/* How it works */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h3 className="text-[11px] font-mono text-accent-cyan mb-3">HOW IT WORKS</h3>
-          <div className="grid grid-cols-5 gap-4 text-[10px] font-mono text-text-secondary">
+          <h3 className="text-xs text-accent-cyan mb-3">HOW IT WORKS</h3>
+          <div className="grid grid-cols-5 gap-4 text-xs font-mono text-text-secondary">
             <div>
               <strong className="text-text-primary">Positioning (35%)</strong>
               <br />Funding rate, OI, liquidations, L/S ratio, options

@@ -96,7 +96,7 @@ function YieldsPageInner() {
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-data-bull">🌾</span> DeFi Yield Farming
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               Top yield opportunities from DeFiLlama. 15,975+ pools tracked. Real APY data.
             </p>
           </div>
@@ -114,13 +114,13 @@ function YieldsPageInner() {
 
         {/* Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono text-text-muted uppercase">Filter:</span>
+          <span className="text-xs font-mono text-text-muted uppercase">Filter:</span>
           <div className="flex bg-bg-raised p-1 rounded">
             {(['all', 'low-risk', 'high-apy'] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-3 py-1 text-[10px] font-mono rounded uppercase transition-colors ${filter === f ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
+                className={`px-3 py-1 text-xs font-mono rounded uppercase transition-colors ${filter === f ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
               >
                 {f}
               </button>
@@ -135,40 +135,40 @@ function YieldsPageInner() {
             <table className="w-full border-separate border-spacing-0">
               <thead>
                 <tr className="text-text-muted">
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">#</th>
-                  <SortableTh controls={tc} k="project" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Protocol</SortableTh>
-                  <SortableTh controls={tc} k="symbol" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Asset</SortableTh>
-                  <SortableTh controls={tc} k="chain" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Chain</SortableTh>
-                  <SortableTh controls={tc} k="tvlUsd" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">TVL</SortableTh>
-                  <SortableTh controls={tc} k="apy" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">APY</SortableTh>
-                  <SortableTh controls={tc} k="apyBase" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Base APY</SortableTh>
-                  <SortableTh controls={tc} k="apyReward" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Reward APY</SortableTh>
-                  <SortableTh controls={tc} k="ilRisk" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-center">IL Risk</SortableTh>
-                  <SortableTh controls={tc} k="prediction" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-center">Prediction</SortableTh>
+                  <th className="text-xs uppercase px-3 py-2 border-b border-bg-border text-left">#</th>
+                  <SortableTh controls={tc} k="project" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Protocol</SortableTh>
+                  <SortableTh controls={tc} k="symbol" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Asset</SortableTh>
+                  <SortableTh controls={tc} k="chain" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Chain</SortableTh>
+                  <SortableTh controls={tc} k="tvlUsd" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">TVL</SortableTh>
+                  <SortableTh controls={tc} k="apy" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">APY</SortableTh>
+                  <SortableTh controls={tc} k="apyBase" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Base APY</SortableTh>
+                  <SortableTh controls={tc} k="apyReward" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Reward APY</SortableTh>
+                  <SortableTh controls={tc} k="ilRisk" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-center">IL Risk</SortableTh>
+                  <SortableTh controls={tc} k="prediction" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-center">Prediction</SortableTh>
                 </tr>
               </thead>
               <tbody>
                 {view.map((pool, i) => (
                   <tr key={pool.pool} className="border-b border-bg-border/30 hover:bg-bg-raised transition-colors">
-                    <td className="text-[11px] font-mono px-3 py-1.5 text-text-muted">{i + 1}</td>
+                    <td className="text-xs font-mono px-3 py-1.5 text-text-muted">{i + 1}</td>
                     <td className="text-[12px] font-mono px-3 py-1.5 font-bold text-text-primary">{pool.project}</td>
-                    <td className="text-[11px] font-mono px-3 py-1.5 text-teal-vivid">{pool.symbol}</td>
-                    <td className={`text-[10px] font-mono px-3 py-1.5 ${chainColors[pool.chain] ?? 'text-text-muted'}`}>
+                    <td className="text-xs font-mono px-3 py-1.5 text-teal-vivid">{pool.symbol}</td>
+                    <td className={`text-xs font-mono px-3 py-1.5 ${chainColors[pool.chain] ?? 'text-text-muted'}`}>
                       {pool.chain}
                     </td>
-                    <td className="text-[11px] font-mono px-3 py-1.5 text-right text-text-secondary tabular-nums">{fmtUsd(pool.tvlUsd)}</td>
+                    <td className="text-xs font-mono px-3 py-1.5 text-right text-text-secondary tabular-nums">{fmtUsd(pool.tvlUsd)}</td>
                     <td className="text-[13px] font-mono px-3 py-1.5 text-right font-bold text-data-bull tabular-nums">{pool.apy.toFixed(2)}%</td>
-                    <td className="text-[11px] font-mono px-3 py-1.5 text-right text-text-primary tabular-nums">{(pool.apyBase ?? 0).toFixed(2)}%</td>
-                    <td className="text-[11px] font-mono px-3 py-1.5 text-right text-accent-amber tabular-nums">{(pool.apyReward ?? 0).toFixed(2)}%</td>
+                    <td className="text-xs font-mono px-3 py-1.5 text-right text-text-primary tabular-nums">{(pool.apyBase ?? 0).toFixed(2)}%</td>
+                    <td className="text-xs font-mono px-3 py-1.5 text-right text-accent-amber tabular-nums">{(pool.apyReward ?? 0).toFixed(2)}%</td>
                     <td className="px-3 py-1.5 text-center">
-                      <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                      <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
                         pool.ilRisk === 'no' ? 'bg-data-bull/20 text-data-bull' : 'bg-data-bear/20 text-data-bear'
                       }`}>
                         {pool.ilRisk === 'no' ? 'NO' : 'YES'}
                       </span>
                     </td>
                     <td className="px-3 py-1.5 text-center">
-                      <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                      <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
                         pool.prediction === 'Up' ? 'bg-data-bull/20 text-data-bull' :
                         pool.prediction === 'Down' ? 'bg-data-bear/20 text-data-bear' :
                         'bg-bg-raised text-text-muted'
@@ -189,12 +189,12 @@ function YieldsPageInner() {
             {stableYields.slice(0, 8).map((pool, i) => (
               <div key={i} className="bg-bg-raised p-3 rounded border border-bg-border">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[11px] font-mono font-bold text-text-primary">{pool.project}</span>
-                  <span className={`text-[10px] font-mono ${chainColors[pool.chain] ?? 'text-text-muted'}`}>{pool.chain}</span>
+                  <span className="text-xs font-mono font-bold text-text-primary">{pool.project}</span>
+                  <span className={`text-xs font-mono ${chainColors[pool.chain] ?? 'text-text-muted'}`}>{pool.chain}</span>
                 </div>
-                <div className="text-[10px] font-mono text-text-muted mb-2">{pool.symbol}</div>
+                <div className="text-xs font-mono text-text-muted mb-2">{pool.symbol}</div>
                 <div className="text-[20px] font-head font-bold text-data-bull tabular-nums">{pool.apy.toFixed(2)}%</div>
-                <div className="text-[10px] font-mono text-text-muted">TVL: {fmtUsd(pool.tvlUsd)}</div>
+                <div className="text-xs font-mono text-text-muted">TVL: {fmtUsd(pool.tvlUsd)}</div>
               </div>
             ))}
           </div>
@@ -207,7 +207,7 @@ function YieldsPageInner() {
 function KPI({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="bg-bg-panel border border-bg-border p-3 rounded">
-      <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
+      <div className="text-xs text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className={`text-[16px] font-head font-bold tabular-nums ${color ?? 'text-text-primary'}`}>{value}</div>
     </div>
   )

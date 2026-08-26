@@ -111,7 +111,7 @@ export default function ComparablesPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">COMPARABLE COMPANY ANALYSIS</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               {Object.keys(PEER_GROUP_NAMES).length} peer groups · IDX membership derived live from universe
             </p>
           </div>
@@ -122,7 +122,7 @@ export default function ComparablesPage() {
         <div className="flex flex-wrap gap-2">
           {Object.entries(PEER_GROUP_NAMES).map(([key, gname]) => (
             <button key={key} onClick={() => setSelected(key)}
-              className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+              className={`px-3 py-1 text-xs font-mono rounded border transition-colors ${
                 selected === key
                   ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
                   : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
@@ -146,8 +146,8 @@ export default function ComparablesPage() {
                 ['Avg Margin', averages.margin != null ? pct(averages.margin) : '—'],
               ].map(([label, value]) => (
                 <div key={label} className="text-center">
-                  <p className="text-[10px] text-text-muted font-mono">{label}</p>
-                  <p className="text-lg font-bold font-mono text-text-primary">{value}</p>
+                  <p className="text-xs text-text-muted">{label}</p>
+                  <p className="text-lg font-bold text-text-primary">{value}</p>
                 </div>
               ))}
             </div>
@@ -213,7 +213,7 @@ export default function ComparablesPage() {
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">METHODOLOGY</h2>
+          <h2 className="text-xs text-accent-cyan mb-2">METHODOLOGY</h2>
           <p className="text-xs text-text-dim">
             Comparable Company Analysis (Comps) — the most widely used valuation method in investment banking.
             Compare valuation multiples (P/E, P/B, P/S, EV/EBITDA) across peer groups to identify

@@ -28,8 +28,8 @@ export function PriceTag({
   }, [value, showFlash])
 
   const sizeClass = {
-    xs: 'text-[10px]',
-    sm: 'text-[11px]',
+    xs: 'text-xs',
+    sm: 'text-xs',
     md: 'text-[12px]',
     lg: 'text-[14px]',
   }[size]

@@ -37,10 +37,10 @@ export default function PredictionsLeaderboardPage() {
     <NexusLayout>
       <div className="h-full overflow-auto p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-sm font-mono font-bold text-accent-cyan flex items-center gap-2">
+          <h1 className="text-sm font-bold text-accent-cyan flex items-center gap-2">
             <Trophy size={14} /> PREDICTION LEADERBOARD
           </h1>
-          <span className="text-[10px] text-text-muted">Top markets by volume</span>
+          <span className="text-xs text-text-muted">Top markets by volume</span>
         </div>
 
         {/* Sort tabs */}
@@ -49,7 +49,7 @@ export default function PredictionsLeaderboardPage() {
             <button
               key={key}
               onClick={() => setSortBy(key)}
-              className={`text-[10px] px-2 py-1 rounded border transition-colors ${
+              className={`text-xs px-2 py-1 rounded border transition-colors ${
                 sortBy === key
                   ? "border-accent-cyan text-accent-cyan bg-bg-panel"
                   : "border-border-dim text-text-dim hover:border-border-active"
@@ -67,7 +67,7 @@ export default function PredictionsLeaderboardPage() {
         ) : (
           <div className="space-y-2">
             {/* Header */}
-            <div className="grid grid-cols-12 gap-2 px-3 py-2 text-[10px] text-text-muted font-mono border-b border-border-dim">
+            <div className="grid grid-cols-12 gap-2 px-3 py-2 text-xs text-text-muted font-mono border-b border-border-dim">
               <div className="col-span-1">#</div>
               <div className="col-span-5">Market</div>
               <div className="col-span-2 text-right">Volume</div>
@@ -87,9 +87,9 @@ export default function PredictionsLeaderboardPage() {
                 <div className="col-span-5">
                   <p className="text-xs text-text-primary leading-tight line-clamp-2">{m.question || 'Unknown'}</p>
                   <div className="flex gap-2 mt-0.5">
-                    {m.category && <span className="text-[9px] text-text-muted">{m.category}</span>}
+                    {m.category && <span className="text-xs text-text-muted">{m.category}</span>}
                     {m.status && (
-                      <span className={`text-[9px] ${m.status === 'open' ? 'text-green-500' : 'text-text-dim'}`}>
+                      <span className={`text-xs ${m.status === 'open' ? 'text-green-500' : 'text-text-dim'}`}>
                         {m.status === 'open' ? '●' : '○'} {m.status}
                       </span>
                     )}
@@ -116,7 +116,7 @@ export default function PredictionsLeaderboardPage() {
         )}
 
         <div className="text-center pt-2">
-          <Link href="/predictions" className="text-[10px] text-text-dim hover:text-accent-cyan transition-colors">
+          <Link href="/predictions" className="text-xs text-text-dim hover:text-accent-cyan transition-colors">
             ← Back to all markets
           </Link>
         </div>

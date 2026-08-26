@@ -85,9 +85,9 @@ export function TerminalContent() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         {tickers.map(t => (
           <div key={t.symbol} className="bg-bg-panel border border-border-dim rounded p-2.5">
-            <p className="text-[10px] text-text-muted font-mono">{t.symbol}</p>
-            <p className="text-sm font-mono font-bold text-text-primary">{t.price}</p>
-            <p className={`text-[11px] font-mono ${t.positive ? 'text-accent-green' : 'text-accent-red'}`}>
+            <p className="text-xs text-text-muted">{t.symbol}</p>
+            <p className="text-sm font-bold text-text-primary">{t.price}</p>
+            <p className={`text-xs font-mono ${t.positive ? 'text-accent-green' : 'text-accent-red'}`}>
               {t.positive ? <TrendingUp size={10} className="inline" /> : <TrendingDown size={10} className="inline" />}
               {' '}{t.change}
             </p>
@@ -98,7 +98,7 @@ export function TerminalContent() {
       {/* Fear & Greed + Global Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="bg-bg-panel border border-border-dim rounded p-3">
-          <p className="text-[10px] text-text-muted uppercase mb-1">Fear & Greed Index</p>
+          <p className="text-xs text-text-muted uppercase mb-1">Fear & Greed Index</p>
           {fearGreed ? (
             <div className="flex items-center gap-3">
               <span className="text-3xl font-mono font-bold" style={{
@@ -113,14 +113,14 @@ export function TerminalContent() {
           )}
         </div>
         <div className="bg-bg-panel border border-border-dim rounded p-3">
-          <p className="text-[10px] text-text-muted uppercase mb-1">Active Data Modules</p>
-          <p className="text-2xl font-mono font-bold text-accent-cyan">34</p>
-          <p className="text-[10px] text-text-dim">20 public-api · 1 oss-mirror · 11 re · 4 derived</p>
+          <p className="text-xs text-text-muted uppercase mb-1">Active Data Modules</p>
+          <p className="text-2xl font-bold text-accent-cyan">34</p>
+          <p className="text-xs text-text-dim">20 public-api · 1 oss-mirror · 11 re · 4 derived</p>
         </div>
         <div className="bg-bg-panel border border-border-dim rounded p-3">
-          <p className="text-[10px] text-text-muted uppercase mb-1">Data Sources</p>
-          <p className="text-2xl font-mono font-bold text-accent-green">100%</p>
-          <p className="text-[10px] text-text-dim">Zero API keys required</p>
+          <p className="text-xs text-text-muted uppercase mb-1">Data Sources</p>
+          <p className="text-2xl font-bold text-accent-green">100%</p>
+          <p className="text-xs text-text-dim">Zero API keys required</p>
         </div>
       </div>
 
@@ -130,7 +130,7 @@ export function TerminalContent() {
         <div className="bg-bg-panel border border-border-dim rounded">
           <div className="px-3 py-2 border-b border-border-dim flex items-center gap-2">
             <span className="text-xs font-mono text-accent-cyan">📰 LATEST NEWS</span>
-            <span className="text-[10px] text-text-muted">{news.length} items</span>
+            <span className="text-xs text-text-muted">{news.length} items</span>
           </div>
           <div className="max-h-[400px] overflow-y-auto scrollbar-thin">
             {loading ? (
@@ -142,8 +142,8 @@ export function TerminalContent() {
                 <div key={item.id ?? i} className="px-3 py-2 border-b border-border-dim/30 hover:bg-bg-elevated transition-colors">
                   <p className="text-xs text-text-primary leading-tight">{item.title || 'Untitled'}</p>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-[10px] text-accent-cyan font-mono">{item.sourceId}</span>
-                    <span className="text-[10px] text-text-muted">{formatTimeAgo(item.publishedAt)}</span>
+                    <span className="text-xs text-accent-cyan font-mono">{item.sourceId}</span>
+                    <span className="text-xs text-text-muted">{formatTimeAgo(item.publishedAt)}</span>
                   </div>
                 </div>
               ))
@@ -156,7 +156,7 @@ export function TerminalContent() {
           <div className="px-3 py-2 border-b border-border-dim flex items-center gap-2">
             <Layers size={12} className="text-accent-cyan" />
             <span className="text-xs font-mono text-accent-cyan">TOP DeFi BY TVL</span>
-            <span className="text-[10px] text-text-muted">{defi.length} protocols</span>
+            <span className="text-xs text-text-muted">{defi.length} protocols</span>
           </div>
           {!loading && defi.length > 0 && (
             <TableControlsBar idPrefix="terminal-defi" query={defiTc.query} onQueryChange={defiTc.setQuery} shown={defiTc.visible.length} total={defiTc.total} />
@@ -170,7 +170,7 @@ export function TerminalContent() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-text-muted">
-                    <th className="text-left py-1.5 px-3 font-mono">#</th>
+                    <th className="text-left py-1.5 px-3">#</th>
                     <SortableTh controls={defiTc} k="name" className="text-left py-1.5 px-3 font-mono">PROTOCOL</SortableTh>
                     <SortableTh controls={defiTc} k="chain" className="text-left py-1.5 px-3 font-mono">CHAIN</SortableTh>
                     <SortableTh controls={defiTc} k="tvl" className="text-right py-1.5 px-3 font-mono">TVL</SortableTh>
@@ -205,19 +205,19 @@ export function TerminalContent() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
           <div>
             <p className="text-text-muted">On-chain</p>
-            <p className="font-mono text-accent-green">6 modules active</p>
+            <p className="text-accent-green">6 modules active</p>
           </div>
           <div>
             <p className="text-text-muted">Market</p>
-            <p className="font-mono text-accent-green">5 modules active</p>
+            <p className="text-accent-green">5 modules active</p>
           </div>
           <div>
             <p className="text-text-muted">Macro</p>
-            <p className="font-mono text-accent-green">7 modules active</p>
+            <p className="text-accent-green">7 modules active</p>
           </div>
           <div>
             <p className="text-text-muted">News</p>
-            <p className="font-mono text-accent-green">4 modules active</p>
+            <p className="text-accent-green">4 modules active</p>
           </div>
         </div>
       </div>

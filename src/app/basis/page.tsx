@@ -87,7 +87,7 @@ fetchData()
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">⚡</span> Perp vs Spot Basis
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               Funding rate arbitrage scanner. Shows basis (perp-spot spread) and annualized funding for 20 major pairs.
             </p>
           </div>
@@ -115,7 +115,7 @@ fetchData()
                 }`}>
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[13px] font-mono font-bold text-text-primary">{r.symbol}</span>
-                    <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
                       r.signal === 'Short Basis' ? 'bg-data-bear/20 text-data-bear' :
                       r.signal === 'Long Basis' ? 'bg-data-bull/20 text-data-bull' :
                       'bg-bg-raised text-text-muted'
@@ -123,7 +123,7 @@ fetchData()
                       {r.signal}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 text-[10px] font-mono">
+                  <div className="flex items-center gap-4 text-xs font-mono">
                     <span className="text-text-muted">Basis: <span className={`font-bold ${r.basisPercent > 0 ? 'text-data-bull' : 'text-data-bear'}`}>{r.basisPercent > 0 ? '+' : ''}{r.basisPercent.toFixed(4)}%</span></span>
                     <span className="text-text-muted">Funding: <span className={`font-bold ${r.fundingRate > 0 ? 'text-data-bear' : 'text-data-bull'}`}>{(r.fundingRate * 100).toFixed(4)}%</span></span>
                     <span className="text-text-muted">Ann: <span className="text-text-primary font-bold">{r.annualizedFunding.toFixed(1)}%</span></span>
@@ -140,42 +140,42 @@ fetchData()
             <table className="w-full border-separate border-spacing-0">
               <thead>
                 <tr className="text-text-muted">
-                  <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">#</th>
-                  <SortableTh controls={tc} k="symbol" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Pair</SortableTh>
-                  <SortableTh controls={tc} k="spotPrice" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Spot</SortableTh>
-                  <SortableTh controls={tc} k="perpPrice" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Perp</SortableTh>
-                  <SortableTh controls={tc} k="basis" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Basis</SortableTh>
-                  <SortableTh controls={tc} k="basisPercent" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Basis %</SortableTh>
-                  <SortableTh controls={tc} k="fundingRate" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Funding</SortableTh>
-                  <SortableTh controls={tc} k="annualizedFunding" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Ann%</SortableTh>
-                  <SortableTh controls={tc} k="openInterest" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">OI</SortableTh>
-                  <SortableTh controls={tc} k="signal" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Signal</SortableTh>
+                  <th className="text-xs uppercase px-3 py-2 border-b border-bg-border text-left">#</th>
+                  <SortableTh controls={tc} k="symbol" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Pair</SortableTh>
+                  <SortableTh controls={tc} k="spotPrice" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Spot</SortableTh>
+                  <SortableTh controls={tc} k="perpPrice" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Perp</SortableTh>
+                  <SortableTh controls={tc} k="basis" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Basis</SortableTh>
+                  <SortableTh controls={tc} k="basisPercent" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Basis %</SortableTh>
+                  <SortableTh controls={tc} k="fundingRate" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Funding</SortableTh>
+                  <SortableTh controls={tc} k="annualizedFunding" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Ann%</SortableTh>
+                  <SortableTh controls={tc} k="openInterest" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">OI</SortableTh>
+                  <SortableTh controls={tc} k="signal" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Signal</SortableTh>
                 </tr>
               </thead>
               <tbody>
                 {tc.visible.map((r, i) => (
                   <tr key={r.symbol} className="border-b border-bg-border/30 hover:bg-bg-raised transition-colors">
-                    <td className="text-[11px] font-mono px-3 py-1.5 text-text-muted">{i + 1}</td>
+                    <td className="text-xs font-mono px-3 py-1.5 text-text-muted">{i + 1}</td>
                     <td className="text-[12px] font-mono px-3 py-1.5 font-bold text-teal-vivid">{r.symbol}</td>
-                    <td className="text-[11px] font-mono px-3 py-1.5 text-right text-text-primary tabular-nums">${r.spotPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                    <td className="text-[11px] font-mono px-3 py-1.5 text-right text-text-primary tabular-nums">${r.perpPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                    <td className={`text-[11px] font-mono px-3 py-1.5 text-right font-bold tabular-nums ${r.basis > 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                    <td className="text-xs font-mono px-3 py-1.5 text-right text-text-primary tabular-nums">${r.spotPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                    <td className="text-xs font-mono px-3 py-1.5 text-right text-text-primary tabular-nums">${r.perpPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                    <td className={`text-xs font-mono px-3 py-1.5 text-right font-bold tabular-nums ${r.basis > 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                       {r.basis > 0 ? '+' : ''}${r.basis.toFixed(2)}
                     </td>
-                    <td className={`text-[11px] font-mono px-3 py-1.5 text-right font-bold tabular-nums ${r.basisPercent > 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                    <td className={`text-xs font-mono px-3 py-1.5 text-right font-bold tabular-nums ${r.basisPercent > 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                       {r.basisPercent > 0 ? '+' : ''}{r.basisPercent.toFixed(4)}%
                     </td>
-                    <td className={`text-[11px] font-mono px-3 py-1.5 text-right font-bold tabular-nums ${r.fundingRate > 0 ? 'text-data-bear' : 'text-data-bull'}`}>
+                    <td className={`text-xs font-mono px-3 py-1.5 text-right font-bold tabular-nums ${r.fundingRate > 0 ? 'text-data-bear' : 'text-data-bull'}`}>
                       {(r.fundingRate * 100).toFixed(4)}%
                     </td>
-                    <td className="text-[11px] font-mono px-3 py-1.5 text-right text-text-primary tabular-nums">
+                    <td className="text-xs font-mono px-3 py-1.5 text-right text-text-primary tabular-nums">
                       {r.annualizedFunding.toFixed(1)}%
                     </td>
-                    <td className="text-[11px] font-mono px-3 py-1.5 text-right text-text-secondary tabular-nums">
+                    <td className="text-xs font-mono px-3 py-1.5 text-right text-text-secondary tabular-nums">
                       {fmtUsd(r.openInterest * r.perpPrice)}
                     </td>
                     <td className="px-3 py-1.5 text-right">
-                      <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                      <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
                         r.signal === 'Short Basis' ? 'bg-data-bear/20 text-data-bear' :
                         r.signal === 'Long Basis' ? 'bg-data-bull/20 text-data-bull' :
                         r.signal === 'Low Vol' ? 'bg-bg-raised text-text-muted' :
@@ -198,7 +198,7 @@ fetchData()
 function KPI({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="bg-bg-panel border border-bg-border p-3 rounded">
-      <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
+      <div className="text-xs text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className={`text-[16px] font-head font-bold tabular-nums ${color ?? 'text-text-primary'}`}>{value}</div>
     </div>
   )

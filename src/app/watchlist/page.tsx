@@ -138,7 +138,7 @@ export default function WatchlistPage() {
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">👁</span> Watchlist
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               Track tokens, wallets, and entities. Set price alerts. Live data from Binance.
             </p>
           </div>
@@ -149,7 +149,7 @@ export default function WatchlistPage() {
         <div className="bg-bg-panel border border-bg-border rounded p-3">
           <div className="flex items-end gap-2">
             <div className="flex-1">
-              <label className="text-[10px] font-mono text-text-muted uppercase mb-1 block">Symbol / Address</label>
+              <label className="text-xs font-mono text-text-muted uppercase mb-1 block">Symbol / Address</label>
               <input
                 type="text"
                 value={newSymbol}
@@ -161,19 +161,19 @@ export default function WatchlistPage() {
             </div>
             <button
               onClick={() => addItem('token', newSymbol)}
-              className="px-4 py-2 bg-teal-vivid text-bg-base rounded text-[11px] font-mono font-bold hover:bg-teal-vivid/80 transition-colors"
+              className="px-4 py-2 bg-teal-vivid text-bg-base rounded text-xs font-mono font-bold hover:bg-teal-vivid/80 transition-colors"
             >
               Add Token
             </button>
             <button
               onClick={() => addItem('wallet', newSymbol)}
-              className="px-4 py-2 bg-bg-raised text-text-primary border border-bg-border rounded text-[11px] font-mono font-bold hover:border-teal-vivid transition-colors"
+              className="px-4 py-2 bg-bg-raised text-text-primary border border-bg-border rounded text-xs font-mono font-bold hover:border-teal-vivid transition-colors"
             >
               Add Wallet
             </button>
             <button
               onClick={() => addItem('entity', newSymbol)}
-              className="px-4 py-2 bg-bg-raised text-text-primary border border-bg-border rounded text-[11px] font-mono font-bold hover:border-teal-vivid transition-colors"
+              className="px-4 py-2 bg-bg-raised text-text-primary border border-bg-border rounded text-xs font-mono font-bold hover:border-teal-vivid transition-colors"
             >
               Add Entity
             </button>
@@ -195,7 +195,7 @@ export default function WatchlistPage() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-3 py-1 text-[10px] font-mono rounded uppercase transition-colors ${filter === f ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
+                className={`px-3 py-1 text-xs font-mono rounded uppercase transition-colors ${filter === f ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
               >
                 {f}
               </button>
@@ -217,14 +217,14 @@ export default function WatchlistPage() {
               <table className="w-full border-separate border-spacing-0">
                 <thead>
                   <tr className="text-text-muted">
-                    <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left w-12">#</th>
-                    <SortableTh controls={tc} k="symbol" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Symbol</SortableTh>
-                    <SortableTh controls={tc} k="type" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left w-16">Type</SortableTh>
-                    <SortableTh controls={tc} k="price" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Price</SortableTh>
-                    <SortableTh controls={tc} k="change24h" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">24h</SortableTh>
-                    <SortableTh controls={tc} k="volume24h" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right hidden sm:table-cell">Volume</SortableTh>
-                    <SortableTh controls={tc} k="addedAt" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Added</SortableTh>
-                    <th className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right w-10"></th>
+                    <th className="text-xs uppercase px-3 py-2 border-b border-bg-border text-left w-12">#</th>
+                    <SortableTh controls={tc} k="symbol" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Symbol</SortableTh>
+                    <SortableTh controls={tc} k="type" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-left w-16">Type</SortableTh>
+                    <SortableTh controls={tc} k="price" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Price</SortableTh>
+                    <SortableTh controls={tc} k="change24h" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">24h</SortableTh>
+                    <SortableTh controls={tc} k="volume24h" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right hidden sm:table-cell">Volume</SortableTh>
+                    <SortableTh controls={tc} k="addedAt" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Added</SortableTh>
+                    <th className="text-xs uppercase px-3 py-2 border-b border-bg-border text-right w-10"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -232,7 +232,7 @@ export default function WatchlistPage() {
                     const p = item.type === 'token' ? prices.get(item.symbol) : null
                     return (
                       <tr key={item.id} className="border-b border-bg-border/30 hover:bg-bg-raised transition-colors">
-                        <td className="text-[11px] font-mono px-3 py-2 text-text-muted">{i + 1}</td>
+                        <td className="text-xs font-mono px-3 py-2 text-text-muted">{i + 1}</td>
                         <td className="px-3 py-2">
                           <div className="flex items-center gap-2">
                             {p && (p.change24h >= 0 ? <TrendingUp size={12} className="text-data-bull" /> : <TrendingDown size={12} className="text-data-bear" />)}
@@ -240,7 +240,7 @@ export default function WatchlistPage() {
                           </div>
                         </td>
                         <td className="px-3 py-2">
-                          <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                          <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
                             item.type === 'token' ? 'bg-teal-vivid/20 text-teal-vivid' :
                             item.type === 'wallet' ? 'bg-accent-amber/20 text-accent-amber' :
                             'bg-purple-400/20 text-purple-400'
@@ -251,13 +251,13 @@ export default function WatchlistPage() {
                         <td className="text-[12px] font-mono px-3 py-2 text-right tabular-nums">
                           {p ? <PriceTag value={p.price} size="sm" /> : <span className="text-text-muted">—</span>}
                         </td>
-                        <td className="text-[11px] font-mono px-3 py-2 text-right">
+                        <td className="text-xs font-mono px-3 py-2 text-right">
                           {p ? <DeltaBadge value={p.change24h} size="xs" /> : <span className="text-text-muted">—</span>}
                         </td>
-                        <td className="text-[10px] font-mono px-3 py-2 text-right text-text-muted hidden sm:table-cell tabular-nums">
+                        <td className="text-xs font-mono px-3 py-2 text-right text-text-muted hidden sm:table-cell tabular-nums">
                           {p ? fmtUsd(p.volume24h) : '—'}
                         </td>
-                        <td className="text-[10px] font-mono px-3 py-2 text-right text-text-muted tabular-nums">
+                        <td className="text-xs font-mono px-3 py-2 text-right text-text-muted tabular-nums">
                           {new Date(item.addedAt).toLocaleDateString()}
                         </td>
                         <td className="px-3 py-2 text-right">
@@ -289,7 +289,7 @@ export default function WatchlistPage() {
                     <div className="flex items-center gap-2">
                       <Eye size={14} className="text-data-bear" />
                       <span className="text-[12px] font-mono font-bold text-text-primary">{item.symbol}</span>
-                      <span className="text-[10px] font-mono text-text-muted">
+                      <span className="text-xs font-mono text-text-muted">
                         {item.alertAbove && p && p.price > item.alertAbove && `Above $${item.alertAbove.toLocaleString()}`}
                         {item.alertBelow && p && p.price < item.alertBelow && `Below $${item.alertBelow.toLocaleString()}`}
                       </span>
@@ -311,7 +311,7 @@ export default function WatchlistPage() {
 function StatCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className={`bg-bg-panel border rounded p-3 ${highlight ? 'border-data-bear' : 'border-bg-border'}`}>
-      <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
+      <div className="text-xs text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className={`text-[18px] font-head font-bold tabular-nums ${highlight ? 'text-data-bear' : 'text-text-primary'}`}>{value}</div>
     </div>
   )

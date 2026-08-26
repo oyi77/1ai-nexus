@@ -46,21 +46,21 @@ export default function StablecoinsPage() {
     { key: 'symbol', header: 'Token', width: 80, render: r => <span className="text-teal-vivid font-bold">{r.symbol}</span> },
     { key: 'price', header: 'Price', width: 90, align: 'right', render: r => <span className={`font-mono ${Math.abs((r.price ?? 0) - 1) > 0.005 ? 'text-data-bear' : 'text-data-bull'}`}>${(r.price ?? 0).toFixed(4)}</span> },
     { key: 'deviation', header: 'Peg Dev', width: 70, align: 'right', render: r => <span className={`font-mono ${(r.deviation ?? 0) > 0.5 ? 'text-data-bear' : 'text-data-bull'}`}>{(r.deviation ?? 0).toFixed(3)}%</span> },
-    { key: 'pegStatus', header: 'Status', width: 70, render: r => <span className={`text-[10px] font-mono font-bold ${r.pegStatus === 'ON PEG' ? 'text-data-bull' : 'text-data-bear'}`}>{r.pegStatus ?? '—'}</span> },
+    { key: 'pegStatus', header: 'Status', width: 70, render: r => <span className={`text-xs font-mono font-bold ${r.pegStatus === 'ON PEG' ? 'text-data-bull' : 'text-data-bear'}`}>{r.pegStatus ?? '—'}</span> },
     { key: 'marketCap', header: 'MCap', width: 100, align: 'right', render: r => <PriceTag value={r.marketCap ?? 0} size="sm" /> },
-    { key: 'volume24h', header: 'Vol 24h', width: 90, align: 'right', render: r => <span className="text-text-muted font-mono text-[10px]">{r.volume24h ? fmtVol(r.volume24h) : '—'}</span> },
+    { key: 'volume24h', header: 'Vol 24h', width: 90, align: 'right', render: r => <span className="text-text-muted font-mono text-xs">{r.volume24h ? fmtVol(r.volume24h) : '—'}</span> },
   ]
 
   return (
     <NexusLayout>
       <div className="p-3 space-y-3">
         <div className="flex items-center justify-between">
-          <div><h1 className="text-[20px] font-head font-bold text-text-primary">Stablecoins</h1><p className="text-[11px] text-text-muted font-mono">Peg stability and market data</p></div>
+          <div><h1 className="text-[20px] font-head font-bold text-text-primary">Stablecoins</h1><p className="text-xs text-text-muted">Peg stability and market data</p></div>
           <LiveDot status={status} label />
         </div>
-        {status === 'error' && <div className="text-data-bear text-[11px] font-mono p-4">Error: Failed to fetch stablecoin data</div>}
+        {status === 'error' && <div className="text-data-bear text-xs font-mono p-4">Error: Failed to fetch stablecoin data</div>}
         <Panel title="Stablecoin Monitor" subtitle={`${stablecoins.length} tracked`} liveStatus={status} onRefresh={refresh} maxHeight={600}>
-          <DataTable columns={columns as unknown as Column<Record<string, unknown>>[]} data={stablecoins as unknown as Record<string, unknown>[]} sortable filterable filterPlaceholder="Filter stablecoins…" rowHeight={28} emptyState={<div className="text-text-muted text-[11px] p-4">Loading...</div>} />
+          <DataTable columns={columns as unknown as Column<Record<string, unknown>>[]} data={stablecoins as unknown as Record<string, unknown>[]} sortable filterable filterPlaceholder="Filter stablecoins…" rowHeight={28} emptyState={<div className="text-text-muted text-xs p-4">Loading...</div>} />
         </Panel>
       </div>
     </NexusLayout>

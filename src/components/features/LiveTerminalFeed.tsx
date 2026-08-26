@@ -148,11 +148,11 @@ export function LiveTerminalFeed() {
       <div className="flex items-center justify-between px-3 py-1.5 border-b border-bg-border">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-data-bull animate-pulse" />
-          <span className="text-[10px] font-mono text-text-muted">{items.length} events</span>
+          <span className="text-xs font-mono text-text-muted">{items.length} events</span>
         </div>
         <button
           onClick={() => setPaused(!paused)}
-          className={`text-[10px] font-mono px-2 py-0.5 rounded ${paused ? 'bg-data-bear/20 text-data-bear' : 'bg-data-bull/20 text-data-bull'}`}
+          className={`text-xs font-mono px-2 py-0.5 rounded ${paused ? 'bg-data-bear/20 text-data-bear' : 'bg-data-bull/20 text-data-bull'}`}
         >
           {paused ? '▶ RESUME' : '⏸ PAUSE'}
         </button>
@@ -163,21 +163,21 @@ export function LiveTerminalFeed() {
             key={`${item.id}-${i}`}
             className="flex items-start gap-2 px-3 py-1.5 border-b border-bg-border/50 hover:bg-bg-raised transition-colors"
           >
-            <span className="text-[10px] font-mono text-text-muted w-16 shrink-0 tabular-nums">{item.timestamp}</span>
+            <span className="text-xs font-mono text-text-muted w-16 shrink-0 tabular-nums">{item.timestamp}</span>
             <span className="text-[12px] shrink-0">{typeIcon(item.type)}</span>
             <div className="flex-1 min-w-0">
-              <span className={`text-[11px] font-mono ${typeColor(item.type)} break-words`}>
+              <span className={`text-xs font-mono ${typeColor(item.type)} break-words`}>
                 {item.link ? (
                   <a href={item.link} target="_blank" rel="noopener noreferrer" className="hover:underline">{item.headline}</a>
                 ) : item.headline}
               </span>
-              {item.detail && <span className="text-[10px] font-mono text-teal-vivid ml-2">{item.detail}</span>}
+              {item.detail && <span className="text-xs font-mono text-teal-vivid ml-2">{item.detail}</span>}
             </div>
-            <span className="text-[9px] font-mono text-text-muted uppercase shrink-0">{item.source}</span>
+            <span className="text-xs font-mono text-text-muted uppercase shrink-0">{item.source}</span>
           </div>
         ))}
         {items.length === 0 && (
-          <div className="flex items-center justify-center h-full text-[11px] font-mono text-text-muted">
+          <div className="flex items-center justify-center h-full text-xs font-mono text-text-muted">
             Aggregating live data from all sources...
           </div>
         )}

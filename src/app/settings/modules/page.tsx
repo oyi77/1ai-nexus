@@ -124,11 +124,11 @@ function ModuleRow({ module: m }: { module: ModuleInfo }) {
         <span className="font-medium text-sm flex-1" style={{ fontFamily: 'JetBrains Mono, monospace' }}>
           {m.name}
         </span>
-        <span className={`px-2 py-0.5 rounded text-[10px] border ${badge.color}`}>
+        <span className={`px-2 py-0.5 rounded text-xs border ${badge.color}`}>
           {badge.label}
         </span>
         {m.sourceType === 're' && (
-          <span className="text-[10px] text-amber-400/60">⚠️ Unofficial</span>
+          <span className="text-xs text-amber-400/60">⚠️ Unofficial</span>
         )}
       </button>
 

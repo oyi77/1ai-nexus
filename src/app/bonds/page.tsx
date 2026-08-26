@@ -133,7 +133,7 @@ export default function BondsPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">INDONESIAN GOVERNMENT BONDS (SUN)</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Surat Utang Negara — {SUN_BONDS.length} bonds (IDR + USD)
             </p>
           </div>
@@ -144,7 +144,7 @@ export default function BondsPage() {
         <div className="flex gap-2">
           {(['All', 'Fixed', 'USD'] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+              className={`px-3 py-1 text-xs font-mono rounded border transition-colors ${
                 filter === f
                   ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
                   : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
@@ -158,25 +158,25 @@ export default function BondsPage() {
         {!loading && Object.keys(quotes).length > 0 && (
           <div className="grid grid-cols-4 gap-4">
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">SHORT (2-3Y)</p>
-              <p className="text-lg font-bold font-mono text-text-primary">
+              <p className="text-xs text-text-muted">SHORT (2-3Y)</p>
+              <p className="text-lg font-bold text-text-primary">
                 {quotes['FR0087']?.yield.toFixed(2) ?? '—'}%
               </p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">MEDIUM (5-7Y)</p>
-              <p className="text-lg font-bold font-mono text-text-primary">
+              <p className="text-xs text-text-muted">MEDIUM (5-7Y)</p>
+              <p className="text-lg font-bold text-text-primary">
                 {quotes['FR0089']?.yield.toFixed(2) ?? '—'}%
               </p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">LONG (10Y+)</p>
-              <p className="text-lg font-bold font-mono text-text-primary">
+              <p className="text-xs text-text-muted">LONG (10Y+)</p>
+              <p className="text-lg font-bold text-text-primary">
                 {quotes['FR0092']?.yield.toFixed(2) ?? '—'}%
               </p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">USD SPREAD</p>
+              <p className="text-xs text-text-muted">USD SPREAD</p>
               <p className="page-title text-lg">
                 {quotes['INDO28']?.spread.toFixed(0) ?? '—'}bp
               </p>
@@ -230,7 +230,7 @@ export default function BondsPage() {
 
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">METHODOLOGY</h2>
+          <h2 className="text-xs text-accent-cyan mb-2">METHODOLOGY</h2>
           <p className="text-xs text-text-dim">
             IDR bond yields estimated from BI Rate + term premium (simplified Nelson-Siegel).
             USD bond yields from US Treasury + Indonesia sovereign spread (~550bp).

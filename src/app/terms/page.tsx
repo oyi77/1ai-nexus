@@ -7,8 +7,8 @@ export default function TermsOfServicePage() {
     <NexusLayout>
       <div className="max-w-4xl mx-auto p-6 space-y-8">
         <div>
-          <h1 className="text-2xl font-bold font-mono text-text-primary">Terms of Service</h1>
-          <p className="text-sm text-text-muted font-mono mt-2">Last updated: {new Date().toLocaleDateString()}</p>
+          <h1 className="text-2xl font-bold text-text-primary">Terms of Service</h1>
+          <p className="text-sm text-text-muted mt-2">Last updated: {new Date().toLocaleDateString()}</p>
         </div>
 
         <section className="space-y-4">
@@ -22,7 +22,7 @@ export default function TermsOfServicePage() {
         <section className="space-y-4">
           <h2 className="page-title text-lg">2. Not Financial Advice</h2>
           <div className="bg-data-bear/10 border border-data-bear/30 rounded-lg p-4">
-            <p className="text-sm text-data-bear font-bold font-mono mb-2">⚠️ IMPORTANT DISCLAIMER</p>
+            <p className="text-sm text-data-bear font-bold mb-2">⚠️ IMPORTANT DISCLAIMER</p>
             <p className="text-sm text-text-secondary">
               The signals, analysis, and information provided through this Service are for <strong>educational and informational purposes only</strong>.
               They do NOT constitute financial advice, investment advice, trading advice, or any other form of professional advice.

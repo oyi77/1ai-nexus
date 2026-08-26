@@ -131,9 +131,9 @@ export function DataTable<T extends Record<string, unknown>>({
             value={activeFilter}
             onChange={e => handleFilterChange(e.target.value)}
             placeholder={filterPlaceholder}
-            className="w-full max-w-xs bg-bg-base border border-bg-border rounded px-2 py-1.5 text-[11px] font-mono text-text-primary placeholder:text-text-muted focus:outline-none focus:border-teal-vivid"
+            className="w-full max-w-xs bg-bg-base border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-text-primary placeholder:text-text-muted focus:outline-none focus:border-teal-vivid"
           />
-          <span className="text-[10px] font-mono text-text-muted" aria-live="polite">{sorted.length}/{safeData.length} rows</span>
+          <span className="text-xs font-mono text-text-muted" aria-live="polite">{sorted.length}/{safeData.length} rows</span>
         </div>
       )}
       <div ref={containerRef} className={`overflow-auto scrollbar-thin ${className}`} style={{ maxHeight: maxHeight || undefined }} onScroll={handleScroll}>
@@ -141,7 +141,7 @@ export function DataTable<T extends Record<string, unknown>>({
           <thead role="rowgroup" className={stickyHeader ? 'sticky top-0 z-10' : ''}>
             <tr role="row" className="bg-bg-raised border-b border-bg-border">
               {columns.map(col => (
-                <th key={col.key} role="columnheader" aria-sort={sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined} className={`px-2 py-1.5 text-[10px] font-mono font-medium text-text-muted uppercase tracking-wider ${alignClass(col.align)} ${sortable && col.sortable !== false ? 'cursor-pointer hover:text-text-secondary select-none focus-visible:outline focus-visible:outline-teal-vivid' : ''}`} style={{ width: col.width }} onClick={() => sortable && col.sortable !== false && handleSort(col.key)} tabIndex={sortable && col.sortable !== false ? 0 : undefined} onKeyDown={e => { if (sortable && col.sortable !== false && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handleSort(col.key) } }}>
+                <th key={col.key} role="columnheader" aria-sort={sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined} className={`px-2 py-1.5 text-xs font-mono font-medium text-text-muted uppercase tracking-wider ${alignClass(col.align)} ${sortable && col.sortable !== false ? 'cursor-pointer hover:text-text-secondary select-none focus-visible:outline focus-visible:outline-teal-vivid' : ''}`} style={{ width: col.width }} onClick={() => sortable && col.sortable !== false && handleSort(col.key)} tabIndex={sortable && col.sortable !== false ? 0 : undefined} onKeyDown={e => { if (sortable && col.sortable !== false && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handleSort(col.key) } }}>
                   <span className="inline-flex items-center gap-1">{col.header}{sortKey === col.key && <span className="text-teal-vivid">{sortDir === 'asc' ? '↑' : '↓'}</span>}</span>
                 </th>
               ))}
@@ -152,7 +152,7 @@ export function DataTable<T extends Record<string, unknown>>({
               const actualIndex = startIndex + i
               return (
                 <tr role="row" key={actualIndex} className={`border-b border-bg-border/50 hover:bg-bg-raised/50 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`} style={{ height: rowHeight }} onClick={() => onRowClick?.(row, actualIndex)}>
-                  {columns.map(col => <td role="cell" key={col.key} className={`px-2 text-[11px] font-mono text-text-primary ${alignClass(col.align)}`}>{col.render ? col.render(row, actualIndex) : String(row[col.key] ?? '')}</td>)}
+                  {columns.map(col => <td role="cell" key={col.key} className={`px-2 text-xs font-mono text-text-primary ${alignClass(col.align)}`}>{col.render ? col.render(row, actualIndex) : String(row[col.key] ?? '')}</td>)}
                 </tr>
               )
             })}

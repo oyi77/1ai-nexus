@@ -143,7 +143,7 @@ export default function LandingPage() {
               <div className="col-span-9 md:col-span-10 p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold">Bandarmology — IDX Foreign Flow</span>
-                  <span className="text-text-muted text-[10px]">session 2026-08-24 · 843 stocks</span>
+                  <span className="text-text-muted text-xs">session 2026-08-24 · 843 stocks</span>
                 </div>
                 <div className="grid grid-cols-4 gap-2">
                   {[
@@ -153,15 +153,15 @@ export default function LandingPage() {
                     ['BTC', '$2,495M vol', '+2.55%'],
                   ].map(([n, v, c]) => (
                     <div key={n} className="rounded-lg border border-bg-border p-2.5 bg-bg-base">
-                      <div className="text-[10px] text-text-muted">{n}</div>
+                      <div className="text-xs text-text-muted">{n}</div>
                       <div className="text-sm font-semibold tabular-nums">{v}</div>
-                      <div className={`text-[10px] tabular-nums ${c.startsWith('-') ? 'text-data-bear' : 'text-data-bull'}`}>{c}</div>
+                      <div className={`text-xs tabular-nums ${c.startsWith('-') ? 'text-data-bear' : 'text-data-bull'}`}>{c}</div>
                     </div>
                   ))}
                 </div>
                 {/* foreign flow bars mock */}
                 <div className="rounded-lg border border-bg-border p-3">
-                  <div className="text-[10px] text-text-muted mb-2">Foreign net value / session — Rp B</div>
+                  <div className="text-xs text-text-muted mb-2">Foreign net value / session — Rp B</div>
                   <div className="flex items-end gap-1 h-14">
                     {[38, 52, -30, 64, -22, 45, -70, 30, 55, -40, 62, 28, -48, 58, 35, -25, 70, 42, -55, 50].map((v, i) => (
                       <div key={i} className="flex-1 flex flex-col justify-end h-full">
@@ -263,7 +263,7 @@ export default function LandingPage() {
                   <td className="px-5 py-3.5 font-semibold">
                     {r.name}
                     {r.highlight && (
-                      <span className="ml-2 px-1.5 py-0.5 rounded bg-teal-vivid text-bg-void text-[10px] font-bold align-middle">FREE</span>
+                      <span className="ml-2 px-1.5 py-0.5 rounded bg-teal-vivid text-bg-void text-xs font-bold align-middle">FREE</span>
                     )}
                   </td>
                   <td className={`px-5 py-3.5 text-right tabular-nums ${r.highlight ? 'text-teal-vivid font-semibold' : 'text-text-secondary'}`}>{r.price}</td>
@@ -338,7 +338,7 @@ export default function LandingPage() {
           </div>
         </div>
         <div className="border-t border-bg-border/60">
-          <div className="max-w-6xl mx-auto px-6 py-4 text-[11px] text-text-muted flex flex-col md:flex-row justify-between gap-2">
+          <div className="max-w-6xl mx-auto px-6 py-4 text-xs text-text-muted flex flex-col md:flex-row justify-between gap-2">
             <span>© 2026 NEXUS — BerkahKarya. Data for research; not financial advice.</span>
             <span>Datasets refresh nightly · served from memory</span>
           </div>

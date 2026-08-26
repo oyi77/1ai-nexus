@@ -55,12 +55,12 @@ function DeFiPageInner() {
         <div className="sticky top-0 bg-bg-deep z-10 px-4 py-3 border-b border-border-dim">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
-              <h1 className="text-sm font-mono font-bold text-accent-cyan flex items-center gap-2">
+              <h1 className="text-sm font-bold text-accent-cyan flex items-center gap-2">
                 <Layers size={14} /> DeFi DASHBOARD
               </h1>
               <span className="text-xs text-text-dim">Total TVL: <span className="text-accent-green font-mono">${formatTvl(totalTvl)}</span></span>
             </div>
-            <span className="text-[10px] text-text-muted">{protocols.length} protocols · DeFiLlama</span>
+            <span className="text-xs text-text-muted">{protocols.length} protocols · DeFiLlama</span>
           </div>
           <div className="flex gap-2">
             <div className="flex gap-1">
@@ -68,7 +68,7 @@ function DeFiPageInner() {
                 <button
                   key={c}
                   onClick={() => setChain(c)}
-                  className={`px-2 py-0.5 rounded text-[10px] border font-mono transition-colors ${
+                  className={`px-2 py-0.5 rounded text-xs border font-mono transition-colors ${
                     chain === c ? 'bg-border-active border-border-active text-text-primary' : 'bg-bg-panel border-border-dim text-text-dim hover:border-border-active'
                   }`}
                 >
@@ -90,8 +90,8 @@ function DeFiPageInner() {
               ) : (
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-text-muted text-[10px] uppercase">
-                  <th className="text-left py-2 px-2 font-mono">#</th>
+                <tr className="text-text-muted text-xs uppercase">
+                  <th className="text-left py-2 px-2">#</th>
                   <SortableTh controls={tc} k="name" className="text-left py-2 px-2 font-mono">PROTOCOL</SortableTh>
                   <SortableTh controls={tc} k="chain" className="text-left py-2 px-2 font-mono">CHAIN</SortableTh>
                   <SortableTh controls={tc} k="category" className="text-left py-2 px-2 font-mono">CATEGORY</SortableTh>

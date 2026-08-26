@@ -20,7 +20,7 @@ export default function PredictionsLayout({ children }: { children: ReactNode })
         <div className="flex-1" />
         <div className="flex items-center gap-1.5">
           <span className="inline-block h-2 w-2 animate-[live-dot_2s_ease-in-out_infinite] rounded-full bg-accent-green" />
-          <span className="text-[10px] text-text-muted">LIVE</span>
+          <span className="text-xs text-text-muted">LIVE</span>
         </div>
       </nav>
       <main className="flex-1">{children}</main>

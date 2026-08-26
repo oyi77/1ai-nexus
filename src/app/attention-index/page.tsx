@@ -117,7 +117,7 @@ export default function AttentionIndexPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">ATTENTION INDEX</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               GitHub developer velocity + search attention — weighted composite signal
             </p>
           </div>
@@ -130,26 +130,26 @@ export default function AttentionIndexPage() {
             <div className="p-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-bg-elevated rounded-lg p-4 border border-border-dim/30 text-center">
-                  <p className="text-[10px] text-text-muted font-mono">ATTENTION INDEX</p>
-                  <p className="text-3xl font-mono font-bold mt-1">{data.composite.attentionIndex}</p>
-                  <span className={`inline-block mt-2 text-[10px] font-mono px-2 py-0.5 rounded ${signalColor(data.composite.signal)}`}>
+                  <p className="text-xs text-text-muted">ATTENTION INDEX</p>
+                  <p className="text-3xl font-bold mt-1">{data.composite.attentionIndex}</p>
+                  <span className={`inline-block mt-2 text-xs font-mono px-2 py-0.5 rounded ${signalColor(data.composite.signal)}`}>
                     {data.composite.signal.toUpperCase()}
                   </span>
                 </div>
                 <div className="bg-bg-elevated rounded-lg p-4 border border-border-dim/30 text-center">
-                  <p className="text-[10px] text-text-muted font-mono">GITHUB SCORE</p>
-                  <p className="text-3xl font-mono font-bold mt-1 text-accent-green">{data.composite.githubScore}</p>
-                  <p className="text-[9px] text-text-dim mt-1">{fmtNum(data.github.totals.totalWeeklyCommits)} commits/wk</p>
+                  <p className="text-xs text-text-muted">GITHUB SCORE</p>
+                  <p className="text-3xl font-bold mt-1 text-accent-green">{data.composite.githubScore}</p>
+                  <p className="text-xs text-text-dim mt-1">{fmtNum(data.github.totals.totalWeeklyCommits)} commits/wk</p>
                 </div>
                 <div className="bg-bg-elevated rounded-lg p-4 border border-border-dim/30 text-center">
-                  <p className="text-[10px] text-text-muted font-mono">SEARCH SCORE</p>
-                  <p className="text-3xl font-mono font-bold mt-1 text-accent-amber">{data.composite.searchScore}</p>
-                  <p className="text-[9px] text-text-dim mt-1">Trending proxy</p>
+                  <p className="text-xs text-text-muted">SEARCH SCORE</p>
+                  <p className="text-3xl font-bold mt-1 text-accent-amber">{data.composite.searchScore}</p>
+                  <p className="text-xs text-text-dim mt-1">Trending proxy</p>
                 </div>
                 <div className="bg-bg-elevated rounded-lg p-4 border border-border-dim/30 text-center">
-                  <p className="text-[10px] text-text-muted font-mono">TOTAL STARS</p>
-                  <p className="text-3xl font-mono font-bold mt-1">{fmtNum(data.github.totals.totalStars)}</p>
-                  <p className="text-[9px] text-text-dim mt-1">{data.github.repos.length} repos tracked</p>
+                  <p className="text-xs text-text-muted">TOTAL STARS</p>
+                  <p className="text-3xl font-bold mt-1">{fmtNum(data.github.totals.totalStars)}</p>
+                  <p className="text-xs text-text-dim mt-1">{data.github.repos.length} repos tracked</p>
                 </div>
               </div>
             </div>
@@ -164,14 +164,14 @@ export default function AttentionIndexPage() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-text-muted border-b border-border-dim">
-                    <th className="text-left py-2 px-2 font-mono">#</th>
+                    <th className="text-left py-2 px-2">#</th>
                     <SortableTh controls={tc} k="repo" className="text-left py-2 px-2 font-mono">REPO</SortableTh>
                     <SortableTh controls={tc} k="stars" className="text-right py-2 px-2 font-mono">STARS</SortableTh>
                     <SortableTh controls={tc} k="forks" className="text-right py-2 px-2 font-mono">FORKS</SortableTh>
                     <SortableTh controls={tc} k="openIssues" className="text-right py-2 px-2 font-mono">ISSUES</SortableTh>
                     <SortableTh controls={tc} k="contributorCount" className="text-right py-2 px-2 font-mono">CONTRIBS</SortableTh>
                     <SortableTh controls={tc} k="weeklyCommits" className="text-right py-2 px-2 font-mono">COMMITS/WK</SortableTh>
-                    <th className="text-left py-2 px-2 font-mono w-24">TREND</th>
+                    <th className="text-left py-2 px-2 w-24">TREND</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -209,26 +209,26 @@ export default function AttentionIndexPage() {
           <Panel title="Search Attention" subtitle="CoinGecko trending proxy — coins with highest community attention">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-3">
               <div className="bg-bg-elevated rounded-lg p-3 border border-border-dim/30">
-                <p className="text-[10px] text-text-muted font-mono">BITCOIN TREND</p>
-                <p className="text-xl font-mono font-bold mt-1">{Math.round(data.search.bitcoinTrend)}</p>
+                <p className="text-xs text-text-muted">BITCOIN TREND</p>
+                <p className="text-xl font-bold mt-1">{Math.round(data.search.bitcoinTrend)}</p>
               </div>
               <div className="bg-bg-elevated rounded-lg p-3 border border-border-dim/30">
-                <p className="text-[10px] text-text-muted font-mono">ETHEREUM TREND</p>
-                <p className="text-xl font-mono font-bold mt-1">{Math.round(data.search.ethereumTrend)}</p>
+                <p className="text-xs text-text-muted">ETHEREUM TREND</p>
+                <p className="text-xl font-bold mt-1">{Math.round(data.search.ethereumTrend)}</p>
               </div>
               <div className="bg-bg-elevated rounded-lg p-3 border border-border-dim/30">
-                <p className="text-[10px] text-text-muted font-mono">CRYPTO TREND</p>
-                <p className="text-xl font-mono font-bold mt-1">{Math.round(data.search.cryptoTrend)}</p>
+                <p className="text-xs text-text-muted">CRYPTO TREND</p>
+                <p className="text-xl font-bold mt-1">{Math.round(data.search.cryptoTrend)}</p>
               </div>
             </div>
             {data.search.trendingCoins.length > 0 && (
               <div className="p-3 pt-0">
-                <p className="text-[10px] text-text-muted font-mono mb-2">TRENDING COINS (CoinGecko)</p>
+                <p className="text-xs text-text-muted mb-2">TRENDING COINS (CoinGecko)</p>
                 <div className="flex flex-wrap gap-2">
                   {data.search.trendingCoins.map(coin => (
                     <span
                       key={coin.symbol}
-                      className="text-[10px] font-mono px-2 py-1 rounded bg-bg-raised border border-border-dim/30"
+                      className="text-xs font-mono px-2 py-1 rounded bg-bg-raised border border-border-dim/30"
                     >
                       {coin.symbol.toUpperCase()} <span className="text-text-dim">#{coin.rank}</span>
                     </span>
@@ -244,20 +244,20 @@ export default function AttentionIndexPage() {
           <Panel title="Aggregate Summary" subtitle="Combined GitHub metrics across all tracked repos">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3">
               <div className="bg-bg-elevated rounded-lg p-3 border border-border-dim/30">
-                <p className="text-[10px] text-text-muted font-mono">TOTAL STARS</p>
-                <p className="text-lg font-mono font-bold mt-1">{fmtNum(data.github.totals.totalStars)}</p>
+                <p className="text-xs text-text-muted">TOTAL STARS</p>
+                <p className="text-lg font-bold mt-1">{fmtNum(data.github.totals.totalStars)}</p>
               </div>
               <div className="bg-bg-elevated rounded-lg p-3 border border-border-dim/30">
-                <p className="text-[10px] text-text-muted font-mono">TOTAL FORKS</p>
-                <p className="text-lg font-mono font-bold mt-1">{fmtNum(data.github.totals.totalForks)}</p>
+                <p className="text-xs text-text-muted">TOTAL FORKS</p>
+                <p className="text-lg font-bold mt-1">{fmtNum(data.github.totals.totalForks)}</p>
               </div>
               <div className="bg-bg-elevated rounded-lg p-3 border border-border-dim/30">
-                <p className="text-[10px] text-text-muted font-mono">TOTAL COMMITS/WK</p>
-                <p className="text-lg font-mono font-bold mt-1">{fmtNum(data.github.totals.totalWeeklyCommits)}</p>
+                <p className="text-xs text-text-muted">TOTAL COMMITS/WK</p>
+                <p className="text-lg font-bold mt-1">{fmtNum(data.github.totals.totalWeeklyCommits)}</p>
               </div>
               <div className="bg-bg-elevated rounded-lg p-3 border border-border-dim/30">
-                <p className="text-[10px] text-text-muted font-mono">AVG COMMITS/WK</p>
-                <p className="text-lg font-mono font-bold mt-1">{Math.round(data.github.totals.avgWeeklyCommits)}</p>
+                <p className="text-xs text-text-muted">AVG COMMITS/WK</p>
+                <p className="text-lg font-bold mt-1">{Math.round(data.github.totals.avgWeeklyCommits)}</p>
               </div>
             </div>
           </Panel>

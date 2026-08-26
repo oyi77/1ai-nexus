@@ -34,7 +34,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="text-data-bear text-[12px] font-mono font-bold mb-1">
               Something went wrong
             </div>
-            <div className="text-text-muted text-[10px] font-mono">
+            <div className="text-text-muted text-xs font-mono">
               {this.state.error?.message}
             </div>
           </div>

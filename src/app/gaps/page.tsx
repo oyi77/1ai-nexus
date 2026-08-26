@@ -49,7 +49,7 @@ function KimchiGauge({ premium, label }: { premium: number; label: string }) {
   return (
     <div className="flex-1 min-w-[140px]">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] font-mono text-text-muted uppercase tracking-wider">{label}</span>
+        <span className="text-xs font-mono text-text-muted uppercase tracking-wider">{label}</span>
         <span className={`text-[14px] font-head font-bold tabular-nums ${
           isHot ? 'text-data-bear' : isCold ? 'text-data-bull' : 'text-text-primary'
         }`}>
@@ -115,7 +115,7 @@ export default function GapsPage() {
       render: r => (
         <div className="flex items-center gap-1.5">
           {r.alert && <span className="w-1.5 h-1.5 rounded-full bg-data-bear animate-pulse" />}
-          <span className="text-teal-vivid font-bold text-[11px]">{r.pairLabel}</span>
+          <span className="text-teal-vivid font-bold text-xs">{r.pairLabel}</span>
         </div>
       ),
     },
@@ -123,27 +123,27 @@ export default function GapsPage() {
       key: 'venueA',
       header: 'Venue A',
       width: 80,
-      render: r => <span className="text-text-secondary text-[10px] capitalize">{r.venueA}</span>,
+      render: r => <span className="text-text-secondary text-xs capitalize">{r.venueA}</span>,
     },
     {
       key: 'venueB',
       header: 'Venue B',
       width: 80,
-      render: r => <span className="text-text-secondary text-[10px] capitalize">{r.venueB}</span>,
+      render: r => <span className="text-text-secondary text-xs capitalize">{r.venueB}</span>,
     },
     {
       key: 'priceA',
       header: 'Price A',
       width: 100,
       align: 'right',
-      render: r => <span className="text-text-primary font-mono text-[10px] tabular-nums">${r.priceA.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>,
+      render: r => <span className="text-text-primary font-mono text-xs tabular-nums">${r.priceA.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>,
     },
     {
       key: 'priceB',
       header: 'Price B',
       width: 100,
       align: 'right',
-      render: r => <span className="text-text-primary font-mono text-[10px] tabular-nums">${r.priceB.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>,
+      render: r => <span className="text-text-primary font-mono text-xs tabular-nums">${r.priceB.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>,
     },
     {
       key: 'spreadPct',
@@ -160,7 +160,7 @@ export default function GapsPage() {
       render: r => {
         const absZ = Math.abs(r.zScore)
         const color = absZ > 2 ? 'text-data-bear' : absZ > 1 ? 'text-amber-400' : 'text-text-secondary'
-        return <span className={`font-mono font-bold text-[11px] tabular-nums ${color}`}>{r.zScore.toFixed(2)}</span>
+        return <span className={`font-mono font-bold text-xs tabular-nums ${color}`}>{r.zScore.toFixed(2)}</span>
       },
     },
     {
@@ -201,13 +201,13 @@ export default function GapsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">Gap & Dislocation Board</h1>
-            <p className="text-[11px] text-text-muted font-mono">
+            <p className="text-xs text-text-muted">
               Kimchi premium, cross-exchange basis, weekend drifts — all Tier 0
             </p>
           </div>
           <div className="flex items-center gap-2">
             {alertCount > 0 && (
-              <span className="px-2 py-0.5 rounded bg-data-bear/20 text-data-bear text-[10px] font-mono animate-pulse">
+              <span className="px-2 py-0.5 rounded bg-data-bear/20 text-data-bear text-xs font-mono animate-pulse">
                 {alertCount} ALERT{alertCount > 1 ? 'S' : ''}
               </span>
             )}
@@ -224,21 +224,21 @@ export default function GapsPage() {
                 ))
               : ['BTC/KRW', 'ETH/KRW'].map(l => (
                   <div key={l} className="flex-1 min-w-[140px]">
-                    <div className="text-[10px] font-mono text-text-muted uppercase tracking-wider mb-1">{l}</div>
+                    <div className="text-xs font-mono text-text-muted uppercase tracking-wider mb-1">{l}</div>
                     <div className="h-2 bg-bg-raised rounded-full animate-pulse" />
-                    <div className="text-[11px] text-text-muted font-mono mt-1">Loading...</div>
+                    <div className="text-xs text-text-muted font-mono mt-1">Loading...</div>
                   </div>
                 ))}
             <div className="flex-1 min-w-[140px]">
-              <div className="text-[10px] font-mono text-text-muted uppercase tracking-wider mb-1">Z-Score Alert</div>
+              <div className="text-xs font-mono text-text-muted uppercase tracking-wider mb-1">Z-Score Alert</div>
               <div className="flex items-center gap-2 mt-1">
                 {kimchiPremium.filter(k => k.alert).length > 0
                   ? kimchiPremium.filter(k => k.alert).map(k => (
-                      <span key={k.asset} className="px-2 py-0.5 rounded bg-data-bear/20 text-data-bear text-[10px] font-mono">
+                      <span key={k.asset} className="px-2 py-0.5 rounded bg-data-bear/20 text-data-bear text-xs font-mono">
                         {k.asset}: {k.zScore.toFixed(1)}σ
                       </span>
                     ))
-                  : <span className="text-[11px] text-text-muted font-mono">No alerts — normal range</span>}
+                  : <span className="text-xs text-text-muted font-mono">No alerts — normal range</span>}
               </div>
             </div>
           </div>
@@ -251,9 +251,9 @@ export default function GapsPage() {
             placeholder="Search pair or venue..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="bg-bg-panel border border-bg-border rounded px-3 py-1.5 text-[11px] font-mono text-text-primary placeholder:text-text-muted outline-none w-48"
+            className="bg-bg-panel border border-bg-border rounded px-3 py-1.5 text-xs font-mono text-text-primary placeholder:text-text-muted outline-none w-48"
           />
-          <div className="flex items-center gap-1 text-[10px] font-mono">
+          <div className="flex items-center gap-1 text-xs font-mono">
             {(['all', 'kimchi', 'basis', 'weekend'] as const).map(f => (
               <button
                 key={f}
@@ -266,7 +266,7 @@ export default function GapsPage() {
               </button>
             ))}
           </div>
-          <span className="ml-auto text-[10px] text-text-muted font-mono">{filtered.length} signals</span>
+          <span className="ml-auto text-xs text-text-muted font-mono">{filtered.length} signals</span>
         </div>
 
         {/* Signals Table */}
@@ -284,7 +284,7 @@ export default function GapsPage() {
             filterPlaceholder="Filter gaps…"
             rowHeight={32}
             emptyState={
-              <div className="text-text-muted text-[11px] p-4 text-center">
+              <div className="text-text-muted text-xs p-4 text-center">
                 {status === 'error' ? 'Failed to load data — check network' : 'Gathering signals...'}
               </div>
             }

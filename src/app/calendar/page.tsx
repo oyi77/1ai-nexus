@@ -86,7 +86,7 @@ fetchData()
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">📅</span> Economic Calendar
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               Upcoming macro events from Federal Reserve, ECB, BOJ, and major economic indicators.
             </p>
           </div>
@@ -103,13 +103,13 @@ fetchData()
 
         {/* Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono text-text-muted uppercase">Impact:</span>
+          <span className="text-xs font-mono text-text-muted uppercase">Impact:</span>
           <div className="flex bg-bg-raised p-1 rounded">
             {(['all', 'high', 'medium', 'low'] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-3 py-1 text-[10px] font-mono rounded uppercase transition-colors ${filter === f ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
+                className={`px-3 py-1 text-xs font-mono rounded uppercase transition-colors ${filter === f ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
               >
                 {f}
               </button>
@@ -124,13 +124,13 @@ fetchData()
               {dayEvents.map((event, i) => (
                 <div key={i} className="flex items-center gap-3 py-2 border-b border-bg-border/50 last:border-0">
                   {/* Time */}
-                  <span className="text-[11px] font-mono text-text-muted w-14 tabular-nums">{event.time}</span>
+                  <span className="text-xs font-mono text-text-muted w-14 tabular-nums">{event.time}</span>
 
                   {/* Country */}
                   <span className="text-[14px] w-6">{countryFlags[event.country] ?? event.country}</span>
 
                   {/* Impact */}
-                  <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded w-14 text-center ${impactColors[event.impact]}`}>
+                  <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded w-14 text-center ${impactColors[event.impact]}`}>
                     {event.impact.toUpperCase()}
                   </span>
 
@@ -140,16 +140,16 @@ fetchData()
                   {/* Data Columns */}
                   <div className="flex items-center gap-4">
                     <div className="text-right w-16">
-                      <div className="text-[9px] font-mono text-text-muted">Previous</div>
-                      <div className="text-[11px] font-mono text-text-primary tabular-nums">{event.previous || '—'}</div>
+                      <div className="text-xs font-mono text-text-muted">Previous</div>
+                      <div className="text-xs font-mono text-text-primary tabular-nums">{event.previous || '—'}</div>
                     </div>
                     <div className="text-right w-16">
-                      <div className="text-[9px] font-mono text-text-muted">Forecast</div>
-                      <div className="text-[11px] font-mono text-text-primary tabular-nums">{event.forecast || '—'}</div>
+                      <div className="text-xs font-mono text-text-muted">Forecast</div>
+                      <div className="text-xs font-mono text-text-primary tabular-nums">{event.forecast || '—'}</div>
                     </div>
                     <div className="text-right w-16">
-                      <div className="text-[9px] font-mono text-text-muted">Actual</div>
-                      <div className={`text-[11px] font-mono font-bold tabular-nums ${event.actual ? 'text-teal-vivid' : 'text-text-muted'}`}>
+                      <div className="text-xs font-mono text-text-muted">Actual</div>
+                      <div className={`text-xs font-mono font-bold tabular-nums ${event.actual ? 'text-teal-vivid' : 'text-text-muted'}`}>
                         {event.actual ?? '—'}
                       </div>
                     </div>
@@ -171,7 +171,7 @@ fetchData()
 function KPI({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="bg-bg-panel border border-bg-border p-3 rounded">
-      <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
+      <div className="text-xs text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className={`text-[14px] font-head font-bold tabular-nums truncate ${color ?? 'text-text-primary'}`}>{value}</div>
     </div>
   )

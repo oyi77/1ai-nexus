@@ -78,7 +78,7 @@ fetchData()
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-accent-amber">🎯</span> Prediction Markets
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               Aggregated prediction markets from Polymarket and Kalshi. Find edge in crowd wisdom.
             </p>
           </div>
@@ -93,13 +93,13 @@ fetchData()
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono text-text-muted uppercase">Filter:</span>
+          <span className="text-xs font-mono text-text-muted uppercase">Filter:</span>
           <div className="flex bg-bg-raised p-1 rounded">
             {(['all', 'crypto', 'economics'] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`px-3 py-1 text-[10px] font-mono rounded uppercase transition-colors ${filter === f ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
+                className={`px-3 py-1 text-xs font-mono rounded uppercase transition-colors ${filter === f ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
               >
                 {f}
               </button>
@@ -112,21 +112,21 @@ fetchData()
             {filtered.slice(0, 20).map((m, i) => (
               <div key={i} className="bg-bg-raised p-4 rounded border border-bg-border hover:border-teal-vivid transition-colors">
                 <div className="flex items-start justify-between mb-2">
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted uppercase">{m.source}</span>
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber">{m.category}</span>
+                  <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted uppercase">{m.source}</span>
+                  <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber">{m.category}</span>
                 </div>
-                <p className="text-[12px] font-mono text-text-primary leading-tight mb-3 line-clamp-2">{m.question}</p>
+                <p className="text-[12px] text-text-primary leading-tight mb-3 line-clamp-2">{m.question}</p>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-mono text-data-bull">YES</span>
+                    <span className="text-xs font-mono text-data-bull">YES</span>
                     <span className="text-[16px] font-mono font-bold text-data-bull tabular-nums">{(m.probability * 100).toFixed(1)}¢</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[16px] font-mono font-bold text-data-bear tabular-nums">{((1 - m.probability) * 100).toFixed(1)}¢</span>
-                    <span className="text-[10px] font-mono text-data-bear">NO</span>
+                    <span className="text-xs font-mono text-data-bear">NO</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] font-mono text-text-muted">
+                <div className="flex items-center justify-between text-xs font-mono text-text-muted">
                   <span>Vol: {fmtUsd(m.volume24h)}</span>
                   <span>{m.endDate ? new Date(m.endDate).toLocaleDateString() : "—"}</span>
                   {Math.abs(m.probability - 0.5) > 0.1 && (
@@ -145,7 +145,7 @@ fetchData()
 function KPI({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="bg-bg-panel border border-bg-border p-3 rounded">
-      <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
+      <div className="text-xs text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className={`text-[16px] font-head font-bold tabular-nums ${color ?? 'text-text-primary'}`}>{value}</div>
     </div>
   )

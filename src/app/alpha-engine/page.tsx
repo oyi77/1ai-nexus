@@ -255,7 +255,7 @@ function AlphaEnginePageInner() {
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">🧠</span> Alpha Engine
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               Cross-correlated signals from trade flow, whale alerts, funding rates, and sentiment.
               Paper trading predictions tracked over time.
             </p>
@@ -277,7 +277,7 @@ function AlphaEnginePageInner() {
         {marketScore && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-3 flex items-center gap-6">
             <div>
-              <span className="text-[10px] font-mono text-text-muted">MARKET SCORE</span>
+              <span className="text-xs font-mono text-text-muted">MARKET SCORE</span>
               <span className={`ml-2 text-[20px] font-mono font-bold ${
                 marketScore.compositeScore >= 60 ? 'text-data-bull' : marketScore.compositeScore <= 40 ? 'text-data-bear' : 'text-data-orange'
               }`}>
@@ -285,7 +285,7 @@ function AlphaEnginePageInner() {
               </span>
             </div>
             <div>
-              <span className="text-[10px] font-mono text-text-muted">DIRECTION</span>
+              <span className="text-xs font-mono text-text-muted">DIRECTION</span>
               <span className={`ml-2 text-[12px] font-mono font-bold ${
                 marketScore.direction === 'bullish' ? 'text-data-bull' : marketScore.direction === 'bearish' ? 'text-data-bear' : 'text-text-muted'
               }`}>
@@ -293,12 +293,12 @@ function AlphaEnginePageInner() {
               </span>
             </div>
             <div>
-              <span className="text-[10px] font-mono text-text-muted">CONF</span>
+              <span className="text-xs font-mono text-text-muted">CONF</span>
               <span className="ml-2 text-[12px] font-mono text-text-primary">{(marketScore.confidence * 100).toFixed(0)}%</span>
             </div>
             <div className="flex-1">
-              <span className="text-[10px] font-mono text-text-muted">TOP SIGNALS</span>
-              <span className="ml-2 text-[10px] font-mono text-text-secondary">
+              <span className="text-xs font-mono text-text-muted">TOP SIGNALS</span>
+              <span className="ml-2 text-xs font-mono text-text-secondary">
                 {marketScore.topSignals.slice(0, 2).join(' · ')}
               </span>
             </div>
@@ -311,7 +311,7 @@ function AlphaEnginePageInner() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2 text-[11px] font-mono rounded uppercase transition-colors ${tab === t ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary bg-bg-raised'}`}
+              className={`px-4 py-2 text-xs font-mono rounded uppercase transition-colors ${tab === t ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary bg-bg-raised'}`}
             >
               {t}
             </button>
@@ -336,7 +336,7 @@ function AlphaEnginePageInner() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
                           <span className="text-[12px] font-mono font-bold text-teal-vivid">{s.symbol}</span>
-                          <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                          <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
                             s.direction === 'bullish' ? 'bg-data-bull/20 text-data-bull' :
                             s.direction === 'bearish' ? 'bg-data-bear/20 text-data-bear' :
                             'bg-bg-raised text-text-muted'
@@ -344,28 +344,28 @@ function AlphaEnginePageInner() {
                             {s.direction.toUpperCase()}
                           </span>
                           {s.sources.map((src, j) => (
-                            <span key={j} className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted">{src}</span>
+                            <span key={j} className="text-xs font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted">{src}</span>
                           ))}
-                          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                          <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
                             isExpired ? 'bg-data-bear/20 text-data-bear' : 'bg-data-bull/20 text-data-bull'
                           }`}>
                             {isExpired ? 'EXPIRED' : periodLabel[s.validPeriod]}
                           </span>
                         </div>
-                        <div className="text-[11px] text-text-secondary mt-1">{s.reasoning}</div>
+                        <div className="text-xs text-text-secondary mt-1">{s.reasoning}</div>
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
                         <div className="flex items-center gap-2">
-                          <span className="text-[9px] font-mono text-text-muted">STR</span>
+                          <span className="text-xs font-mono text-text-muted">STR</span>
                           <span className="text-[12px] font-mono font-bold text-text-primary">{s.strength}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[9px] font-mono text-text-muted">CONF</span>
+                          <span className="text-xs font-mono text-text-muted">CONF</span>
                           <span className="text-[12px] font-mono font-bold text-text-primary">{s.confidence}%</span>
                         </div>
                         {s.entry && s.tp1 && s.sl && (
                           <div className="flex items-center gap-2">
-                            <span className="text-[9px] font-mono text-text-muted">R:R</span>
+                            <span className="text-xs font-mono text-text-muted">R:R</span>
                             <span className={`text-[12px] font-mono font-bold ${
                               ((s.tp1 - s.entry) / (s.entry - s.sl)) > 2 ? 'text-data-bull' :
                               ((s.tp1 - s.entry) / (s.entry - s.sl)) > 1 ? 'text-data-orange' :
@@ -380,7 +380,7 @@ function AlphaEnginePageInner() {
 
                     {/* Trading levels row */}
                     {s.entry && (
-                      <div className="flex items-center gap-3 ml-8 text-[10px] font-mono">
+                      <div className="flex items-center gap-3 ml-8 text-xs font-mono">
                         <span className="text-text-muted">ENTRY</span>
                         <span className="text-text-primary font-bold">{formatPriceUSD(s.entry)}</span>
                         {s.tp1 && (
@@ -435,13 +435,13 @@ function AlphaEnginePageInner() {
                 value={historySearch}
                 onChange={e => setHistorySearch(e.target.value)}
                 placeholder="Search symbol..."
-                className="flex-1 max-w-[200px] bg-bg-base border border-bg-border rounded px-2 py-1.5 text-[11px] font-mono text-text-primary placeholder-text-muted focus:outline-none focus:border-teal-vivid"
+                className="flex-1 max-w-[200px] bg-bg-base border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-text-primary placeholder-text-muted focus:outline-none focus:border-teal-vivid"
               />
               {/* Outcome filter */}
               <select
                 value={historyOutcome}
                 onChange={e => setHistoryOutcome(e.target.value)}
-                className="bg-bg-base border border-bg-border rounded px-2 py-1.5 text-[11px] font-mono text-text-primary focus:outline-none focus:border-teal-vivid cursor-pointer"
+                className="bg-bg-base border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:border-teal-vivid cursor-pointer"
               >
                 <option value="all">All Outcomes</option>
                 <option value="win">✅ Wins</option>
@@ -452,14 +452,14 @@ function AlphaEnginePageInner() {
               <select
                 value={historySort}
                 onChange={e => setHistorySort(e.target.value)}
-                className="bg-bg-base border border-bg-border rounded px-2 py-1.5 text-[11px] font-mono text-text-primary focus:outline-none focus:border-teal-vivid cursor-pointer"
+                className="bg-bg-base border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:border-teal-vivid cursor-pointer"
               >
                 <option value="date">📅 Newest</option>
                 <option value="pnl">💰 Best PnL</option>
                 <option value="outcome">📊 By Outcome</option>
               </select>
               {/* Result count */}
-              <span className="text-[10px] font-mono text-text-muted ml-auto">
+              <span className="text-xs font-mono text-text-muted ml-auto">
                 {history.length} loaded{historyHasMore ? ' · scroll for more' : ''}
               </span>
             </div>
@@ -481,7 +481,7 @@ function AlphaEnginePageInner() {
                     {/* Symbol & Direction */}
                     <div className="flex items-center gap-2 min-w-[100px]">
                       <span className="text-[12px] font-mono font-bold text-teal-vivid">{s.symbol}</span>
-                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                      <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
                         s.direction === 'bullish' ? 'bg-data-bull/20 text-data-bull' : 'bg-data-bear/20 text-data-bear'
                       }`}>
                         {s.direction.toUpperCase()}
@@ -489,7 +489,7 @@ function AlphaEnginePageInner() {
                     </div>
 
                     {/* Trading Levels */}
-                    <div className="flex items-center gap-3 text-[10px] font-mono">
+                    <div className="flex items-center gap-3 text-xs font-mono">
                       <span className="text-text-muted">ENTRY</span>
                       <span className="text-text-primary">{formatPriceUSD(s.entry)}</span>
                       {s.tp1 && (
@@ -509,7 +509,7 @@ function AlphaEnginePageInner() {
                     {/* Outcome & PnL */}
                     <div className="flex items-center gap-3 ml-auto">
                       {s.hitTarget && (
-                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                        <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
                           s.hitTarget.startsWith('tp') ? 'bg-data-bull/20 text-data-bull' : 'bg-data-bear/20 text-data-bear'
                         }`}>
                           {s.hitTarget.toUpperCase()}
@@ -521,11 +521,11 @@ function AlphaEnginePageInner() {
                         </span>
                       )}
                       {s.durationHours !== null && (
-                        <span className="text-[10px] font-mono text-text-muted">
+                        <span className="text-xs font-mono text-text-muted">
                           {s.durationHours < 1 ? '<1h' : `${s.durationHours.toFixed(0)}h`}
                         </span>
                       )}
-                      <span className="text-[9px] font-mono text-text-muted">{s.source}</span>
+                      <span className="text-xs font-mono text-text-muted">{s.source}</span>
                     </div>
                   </div>
                 )
@@ -534,7 +534,7 @@ function AlphaEnginePageInner() {
               {historyHasMore && <div ref={sentinelRef} className="h-4" />}
               {/* Loading spinner */}
               {historyLoading && (
-                <div className="p-4 text-center text-text-muted text-[11px] font-mono animate-pulse">
+                <div className="p-4 text-center text-text-muted text-xs font-mono animate-pulse">
                   Loading more signals...
                 </div>
               )}
@@ -554,21 +554,21 @@ function AlphaEnginePageInner() {
               <div className="space-y-1 p-2">
                 {predictions.open.map((p, i) => (
                   <div key={i} className="flex items-center gap-3 py-2 px-3 border-b border-bg-border/50">
-                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                    <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
                       p.direction === 'long' ? 'bg-data-bull/20 text-data-bull' : 'bg-data-bear/20 text-data-bear'
                     }`}>
                       {p.direction.toUpperCase()}
                     </span>
                     <span className="text-[12px] font-mono font-bold text-teal-vivid">{p.symbol}</span>
-                    <span className="text-[11px] font-mono text-text-primary tabular-nums">Entry: {formatPriceUSD(p.entryPrice)}</span>
-                    {p.targetPrice && <span className="text-[11px] font-mono text-data-bull tabular-nums">Target: {formatPriceUSD(p.targetPrice)}</span>}
-                    {p.stopLoss && <span className="text-[11px] font-mono text-data-bear tabular-nums">SL: {formatPriceUSD(p.stopLoss)}</span>}
-                    <span className="text-[10px] font-mono text-text-muted">Conf: {p.confidence}%</span>
-                    <span className="text-[9px] font-mono text-text-muted ml-auto">{p.source}</span>
+                    <span className="text-xs font-mono text-text-primary tabular-nums">Entry: {formatPriceUSD(p.entryPrice)}</span>
+                    {p.targetPrice && <span className="text-xs font-mono text-data-bull tabular-nums">Target: {formatPriceUSD(p.targetPrice)}</span>}
+                    {p.stopLoss && <span className="text-xs font-mono text-data-bear tabular-nums">SL: {formatPriceUSD(p.stopLoss)}</span>}
+                    <span className="text-xs font-mono text-text-muted">Conf: {p.confidence}%</span>
+                    <span className="text-xs font-mono text-text-muted ml-auto">{p.source}</span>
                   </div>
                 ))}
                 {predictions.open.length === 0 && (
-                  <div className="p-4 text-center text-text-muted text-[11px] font-mono">No open predictions</div>
+                  <div className="p-4 text-center text-text-muted text-xs font-mono">No open predictions</div>
                 )}
               </div>
             </Panel>
@@ -577,16 +577,16 @@ function AlphaEnginePageInner() {
               <div className="space-y-1 p-2 max-h-[300px] overflow-y-auto">
                 {predictions.closed.slice(0, 20).map((p, i) => (
                   <div key={i} className="flex items-center gap-3 py-1.5 px-3 border-b border-bg-border/50">
-                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                    <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
                       p.outcome === 'win' ? 'bg-data-bull/20 text-data-bull' :
                       p.outcome === 'loss' ? 'bg-data-bear/20 text-data-bear' :
                       'bg-bg-raised text-text-muted'
                     }`}>
                       {p.outcome?.toUpperCase()}
                     </span>
-                    <span className="text-[11px] font-mono font-bold text-teal-vivid">{p.symbol}</span>
-                    <span className="text-[11px] font-mono text-text-primary tabular-nums">{formatPriceUSD(p.entryPrice)} → {formatPriceUSD(p.exitPrice ?? 0)}</span>
-                    <span className={`text-[11px] font-mono font-bold tabular-nums ${(p.pnlPercent ?? 0) >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                    <span className="text-xs font-mono font-bold text-teal-vivid">{p.symbol}</span>
+                    <span className="text-xs font-mono text-text-primary tabular-nums">{formatPriceUSD(p.entryPrice)} → {formatPriceUSD(p.exitPrice ?? 0)}</span>
+                    <span className={`text-xs font-mono font-bold tabular-nums ${(p.pnlPercent ?? 0) >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                       {(p.pnlPercent ?? 0) > 0 ? '+' : ''}{(p.pnlPercent ?? 0).toFixed(2)}%
                     </span>
                   </div>
@@ -640,7 +640,7 @@ function AlphaEnginePageInner() {
 function KPI({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="bg-bg-panel border border-bg-border p-3 rounded">
-      <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
+      <div className="text-xs text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className={`text-[16px] font-head font-bold tabular-nums ${color ?? 'text-text-primary'}`}>{value}</div>
     </div>
   )

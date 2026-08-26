@@ -72,7 +72,7 @@ fetchData()
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">🏛</span> Macro Command Center
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">Global macro indicators, yield curves, and crypto sentiment</p>
+            <p className="text-[12px] text-text-muted mt-1">Global macro indicators, yield curves, and crypto sentiment</p>
           </div>
           <LiveDot status={status} label />
         </div>
@@ -93,7 +93,7 @@ fetchData()
                 {macro?.yieldCurve && (
                   <div className="border-t border-bg-border pt-2 mt-2">
                     <MacroRow label="Yield Spread (10Y-2Y)" value={`${macro.yieldCurve.spread10Y2Y.toFixed(2)}%`} />
-                    <div className="text-[10px] font-mono mt-1">
+                    <div className="text-xs font-mono mt-1">
                       Signal: <span className={`font-bold ${macro.yieldCurve.signal === 'Recession Risk' ? 'text-data-bear' : 'text-data-bull'}`}>{macro.yieldCurve.signal}</span>
                     </div>
                   </div>
@@ -110,16 +110,16 @@ fetchData()
               <div className="grid grid-cols-2 gap-3 p-2">
                 {(macro?.indicators ?? []).map((ind, i) => (
                   <div key={i} className="bg-bg-raised p-3 rounded border border-bg-border">
-                    <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{ind.name}</div>
+                    <div className="text-xs text-text-muted font-mono uppercase mb-1">{ind.name}</div>
                     <div className="text-[20px] font-head font-bold text-text-primary tabular-nums">
                       {ind.latestValue?.toLocaleString(undefined, { maximumFractionDigits: 2 }) ?? '—'}
-                      <span className="text-[10px] text-text-muted ml-1">{ind.unit}</span>
+                      <span className="text-xs text-text-muted ml-1">{ind.unit}</span>
                     </div>
                     <div className="flex items-center justify-between mt-1">
-                      <span className={`text-[10px] font-mono font-bold ${(ind.changePercent ?? 0) >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                      <span className={`text-xs font-mono font-bold ${(ind.changePercent ?? 0) >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                         {(ind.changePercent ?? 0) >= 0 ? '+' : ''}{(ind.changePercent ?? 0).toFixed(2)}%
                       </span>
-                      <span className="text-[9px] font-mono text-text-muted">{ind.category} · {ind.latestDate}</span>
+                      <span className="text-xs font-mono text-text-muted">{ind.category} · {ind.latestDate}</span>
                     </div>
                   </div>
                 ))}
@@ -136,13 +136,13 @@ fetchData()
                     </div>
                     <div>
                       <div className="text-[14px] font-mono font-bold text-text-primary">{fg.regime.state}</div>
-                      <div className="text-[11px] font-mono text-teal-vivid">Recommended: {fg.regime.stance}</div>
-                      <div className="text-[10px] font-mono text-text-muted mt-1">
+                      <div className="text-xs font-mono text-teal-vivid">Recommended: {fg.regime.stance}</div>
+                      <div className="text-xs font-mono text-text-muted mt-1">
                         Market Cap: ${(fg.headerMetrics.totalMcap / 1e12).toFixed(2)}T ({fg.headerMetrics.mcapChange24h > 0 ? '+' : ''}{fg.headerMetrics.mcapChange24h.toFixed(1)}%)
                       </div>
                     </div>
                   </div>
-                  <div className="text-[11px] font-mono text-text-secondary leading-relaxed">
+                  <div className="text-xs font-mono text-text-secondary leading-relaxed">
                     {fg.composite.score <= 30 && "Market is in extreme fear. Historically, this has been a good buying opportunity for long-term investors. Consider dollar-cost averaging into quality assets."}
                     {fg.composite.score > 30 && fg.composite.score <= 50 && "Market sentiment is bearish but stabilizing. Watch for reversal signals and maintain hedged positions. Avoid high-leverage trades."}
                     {fg.composite.score > 50 && fg.composite.score <= 70 && "Market is neutral with balanced sentiment. Good environment for swing trading and accumulating positions on dips."}
@@ -161,7 +161,7 @@ fetchData()
 function MacroRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[11px] font-mono text-text-muted">{label}</span>
+      <span className="text-xs font-mono text-text-muted">{label}</span>
       <span className="text-[12px] font-mono font-bold text-text-primary tabular-nums">{value}</span>
     </div>
   )

@@ -113,11 +113,11 @@ function CurrencySelector() {
 
   return (
     <div className="flex items-center gap-1">
-      <span className="text-[10px] text-text-muted">CURR:</span>
+      <span className="text-xs text-text-muted">CURR:</span>
       <select
         value={currency}
         onChange={(e) => setCurrency(e.target.value as BaseCurrency)}
-        className="bg-transparent text-text-muted hover:text-text-primary outline-none cursor-pointer border-none font-mono text-[10px] uppercase font-bold"
+        className="bg-transparent text-text-muted hover:text-text-primary outline-none cursor-pointer border-none font-mono text-xs uppercase font-bold"
       >
         <option value="USD">USD</option>
         <option value="IDR">IDR</option>

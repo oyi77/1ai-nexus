@@ -191,7 +191,7 @@ export function NexusLayout({ children }: NexusLayoutProps) {
           </button>
           <Link href="/" className="flex items-center gap-2">
             <span className="text-teal-vivid font-bold text-base tracking-tight">◆ NEXUS</span>
-            <span className="text-[10px] text-text-muted hidden sm:inline">v2</span>
+            <span className="text-xs text-text-muted hidden sm:inline">v2</span>
           </Link>
           <div className="hidden md:block">
             <CommandBar />
@@ -203,11 +203,11 @@ export function NexusLayout({ children }: NexusLayoutProps) {
 
         {/* Right: Status + Actions */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-[10px] font-mono">
+          <div className="flex items-center gap-1.5 text-xs font-mono">
             <LiveDot status="live" size={5} />
             <span className="text-text-muted hidden sm:inline">LIVE</span>
           </div>
-          <span className="text-[11px] font-mono text-text-secondary tabular-nums">{time}</span>
+          <span className="text-xs font-mono text-text-secondary tabular-nums">{time}</span>
           <NotificationTray />
         </div>
       </header>
@@ -255,7 +255,7 @@ export function NexusLayout({ children }: NexusLayoutProps) {
                   {!collapsed && (
                     <button
                       onClick={toggleSection}
-                      className="flex items-center justify-between w-full px-3 pt-3 pb-1 text-[10px] font-semibold uppercase tracking-wider text-text-muted hover:text-text-secondary transition-colors"
+                      className="flex items-center justify-between w-full px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-text-muted hover:text-text-secondary transition-colors"
                     >
                       <span>{section.title}</span>
                       <ChevronDown

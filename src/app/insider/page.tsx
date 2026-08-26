@@ -47,7 +47,7 @@ function InsiderPageInner() {
           <div className="w-8 h-1.5 bg-bg-border rounded-full overflow-hidden">
             <div className={`h-full rounded-full ${r.riskScore >= 70 ? 'bg-data-bear' : r.riskScore >= 50 ? 'bg-data-warn' : 'bg-data-bull'}`} style={{ width: `${r.riskScore}%` }} />
           </div>
-          <span className={`text-[11px] font-mono font-bold ${r.riskScore >= 70 ? 'text-data-bear' : r.riskScore >= 50 ? 'text-data-warn' : 'text-data-bull'}`}>{r.riskScore}</span>
+          <span className={`text-xs font-mono font-bold ${r.riskScore >= 70 ? 'text-data-bear' : r.riskScore >= 50 ? 'text-data-warn' : 'text-data-bull'}`}>{r.riskScore}</span>
         </div>
       ),
     },
@@ -61,7 +61,7 @@ function InsiderPageInner() {
       key: 'chain',
       header: 'Chain',
       width: 60,
-      render: r => <span className="text-text-muted text-[10px] font-mono">{r.chain}</span>,
+      render: r => <span className="text-text-muted text-xs font-mono">{r.chain}</span>,
     },
     {
       key: 'totalTxs',
@@ -91,7 +91,7 @@ function InsiderPageInner() {
       render: r => (
         <div className="flex flex-wrap gap-1">
           {r.suspicionReasons.slice(0, 2).map((reason, i) => (
-            <span key={i} className="px-1.5 py-0.5 rounded bg-data-bear/10 text-data-bear text-[9px] font-mono">
+            <span key={i} className="px-1.5 py-0.5 rounded bg-data-bear/10 text-data-bear text-xs font-mono">
               {reason}
             </span>
           ))}
@@ -103,7 +103,7 @@ function InsiderPageInner() {
       header: 'Detected',
       width: 70,
       align: 'right',
-      render: r => <span className="text-text-muted text-[10px]">{new Date(r.detectedAt).toLocaleString()}</span>,
+      render: r => <span className="text-text-muted text-xs">{new Date(r.detectedAt).toLocaleString()}</span>,
     },
   ]
 
@@ -116,11 +116,11 @@ function InsiderPageInner() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">🔍 Insider Detector</h1>
-            <p className="text-[11px] text-text-muted font-mono">Fresh wallets with sudden large transactions — classic insider accumulation pattern</p>
+            <p className="text-xs text-text-muted">Fresh wallets with sudden large transactions — classic insider accumulation pattern</p>
           </div>
           <LiveDot status={status} label />
         </div>
-        {status === 'error' && <div className="text-data-bear text-[11px] font-mono p-4">Error: Failed to fetch insider signals</div>}
+        {status === 'error' && <div className="text-data-bear text-xs font-mono p-4">Error: Failed to fetch insider signals</div>}
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-1">
@@ -131,7 +131,7 @@ function InsiderPageInner() {
             { label: 'Detection Window', value: 'Last 30 days', color: 'text-text-secondary' },
           ].map((k, i) => (
             <div key={i} className="bg-bg-panel border border-bg-border px-3 py-2">
-              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider mb-1">{k.label}</div>
+              <div className="text-xs text-text-muted font-mono uppercase tracking-wider mb-1">{k.label}</div>
               <div className={`text-[16px] font-head font-bold tabular-nums ${k.color}`}>{k.value}</div>
             </div>
           ))}
@@ -155,8 +155,8 @@ function InsiderPageInner() {
             emptyState={
               <div className="p-8 text-center">
                 <div className="text-[14px] text-text-primary mb-2">No insider signals detected</div>
-                <div className="text-[11px] text-text-muted">This is good — means no suspicious fresh wallet activity</div>
-                <div className="text-[10px] text-text-muted mt-2">Signals appear when wallets with &lt;10 transactions move &gt;$100K</div>
+                <div className="text-xs text-text-muted">This is good — means no suspicious fresh wallet activity</div>
+                <div className="text-xs text-text-muted mt-2">Signals appear when wallets with &lt;10 transactions move &gt;$100K</div>
               </div>
             }
           />
@@ -164,7 +164,7 @@ function InsiderPageInner() {
 
         {/* How it works */}
         <Panel title="How It Works" subtitle="Detection methodology">
-          <div className="p-3 space-y-2 text-[11px] text-text-secondary">
+          <div className="p-3 space-y-2 text-xs text-text-secondary">
             <div className="flex items-start gap-2">
               <span className="text-teal-vivid font-bold">1.</span>
               <span>Scan all transactions with value &gt;$100K</span>

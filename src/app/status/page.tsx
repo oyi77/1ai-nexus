@@ -134,7 +134,7 @@ export default function StatusPage() {
               Object.entries(data.byCategory).map(([cat, services]) =>
                 services.length > 0 ? (
                   <div key={cat}>
-                    <h2 className="text-[10px] font-mono text-text-muted mb-2 uppercase tracking-wider">
+                    <h2 className="text-xs text-text-muted mb-2 uppercase tracking-wider">
                       {CATEGORY_LABELS[cat] ?? cat}
                     </h2>
                     <div className="grid gap-2">

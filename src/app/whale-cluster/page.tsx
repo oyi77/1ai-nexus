@@ -134,7 +134,7 @@ function WhaleClusterPageInner() {
             size="xs"
           />
           {r.verified && (
-            <span className="text-teal-vivid text-[10px]" title="Verified entity">✓</span>
+            <span className="text-teal-vivid text-xs" title="Verified entity">✓</span>
           )}
         </div>
       ),
@@ -176,13 +176,13 @@ function WhaleClusterPageInner() {
           {r.chains.slice(0, 3).map(ch => (
             <span
               key={ch}
-              className={`text-[9px] font-mono px-1 py-0.5 rounded ${CHAIN_COLORS[ch] ?? 'bg-bg-raised text-text-muted'}`}
+              className={`text-xs font-mono px-1 py-0.5 rounded ${CHAIN_COLORS[ch] ?? 'bg-bg-raised text-text-muted'}`}
             >
               {ch}
             </span>
           ))}
           {r.chains.length > 3 && (
-            <span className="text-[9px] text-text-muted">+{r.chains.length - 3}</span>
+            <span className="text-xs text-text-muted">+{r.chains.length - 3}</span>
           )}
         </div>
       ),
@@ -194,13 +194,13 @@ function WhaleClusterPageInner() {
       render: r => (
         <div className="flex flex-wrap gap-1">
           {r.topTokens.slice(0, 3).map(t => (
-            <span key={t.symbol} className="text-[10px] font-mono text-text-secondary">
+            <span key={t.symbol} className="text-xs font-mono text-text-secondary">
               {t.symbol}
               <span className="text-text-muted ml-0.5">{fmtUsd(t.usdValue)}</span>
             </span>
           ))}
           {r.topTokens.length === 0 && (
-            <span className="text-[10px] text-text-muted">—</span>
+            <span className="text-xs text-text-muted">—</span>
           )}
         </div>
       ),
@@ -222,7 +222,7 @@ function WhaleClusterPageInner() {
                 style={{ width: `${pct}%` }}
               />
             </div>
-            <span className={`font-mono tabular-nums text-[10px] ${color}`}>{pct}%</span>
+            <span className={`font-mono tabular-nums text-xs ${color}`}>{pct}%</span>
           </div>
         )
       },
@@ -236,7 +236,7 @@ function WhaleClusterPageInner() {
       render: r => {
         const score = r.avgRiskScore
         const color = score <= 30 ? 'text-data-bull' : score <= 60 ? 'text-data-warn' : 'text-data-bear'
-        return <span className={`font-mono tabular-nums text-[10px] ${color}`}>{score}</span>
+        return <span className={`font-mono tabular-nums text-xs ${color}`}>{score}</span>
       },
     },
     {
@@ -246,7 +246,7 @@ function WhaleClusterPageInner() {
       align: 'right',
       sortable: true,
       render: r => (
-        <span className="text-text-primary font-mono tabular-nums text-[10px]">
+        <span className="text-text-primary font-mono tabular-nums text-xs">
           {r.recentTxCount}
         </span>
       ),
@@ -258,7 +258,7 @@ function WhaleClusterPageInner() {
       align: 'right',
       sortable: true,
       render: r => (
-        <span className="text-text-muted font-mono text-[10px]">
+        <span className="text-text-muted font-mono text-xs">
           {timeAgo(r.lastActivity)}
         </span>
       ),
@@ -271,7 +271,7 @@ function WhaleClusterPageInner() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         {/* Wallet list */}
         <div className="lg:col-span-2">
-          <div className="text-[10px] text-text-muted font-mono uppercase mb-2">
+          <div className="text-xs text-text-muted font-mono uppercase mb-2">
             Wallets ({cluster.walletCount})
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
@@ -281,21 +281,21 @@ function WhaleClusterPageInner() {
                 className="flex items-center gap-2 bg-bg-panel px-2 py-1 rounded"
               >
                 <AddressChip address={w.address} truncate={6} size="xs" />
-                <span className={`text-[9px] font-mono px-1 py-0.5 rounded ${CHAIN_COLORS[w.chain] ?? 'bg-bg-elevated text-text-muted'}`}>
+                <span className={`text-xs font-mono px-1 py-0.5 rounded ${CHAIN_COLORS[w.chain] ?? 'bg-bg-elevated text-text-muted'}`}>
                   {w.chain}
                 </span>
                 {w.riskScore > 60 && (
-                  <span className="text-[9px] text-data-bear font-mono">⚠ {w.riskScore}</span>
+                  <span className="text-xs text-data-bear font-mono">⚠ {w.riskScore}</span>
                 )}
                 {w.topHolding && (
-                  <span className="text-[9px] text-text-muted font-mono">
+                  <span className="text-xs text-text-muted font-mono">
                     {w.topHolding.symbol} {fmtUsd(w.topHolding.usdValue)}
                   </span>
                 )}
               </div>
             ))}
             {cluster.wallets.length > 8 && (
-              <div className="text-[10px] text-text-muted px-2 py-1">
+              <div className="text-xs text-text-muted px-2 py-1">
                 +{cluster.wallets.length - 8} more wallets
               </div>
             )}
@@ -304,7 +304,7 @@ function WhaleClusterPageInner() {
 
         {/* Token breakdown */}
         <div>
-          <div className="text-[10px] text-text-muted font-mono uppercase mb-2">
+          <div className="text-xs text-text-muted font-mono uppercase mb-2">
             Top Token Holdings
           </div>
           <div className="space-y-1">
@@ -314,21 +314,21 @@ function WhaleClusterPageInner() {
                 : 0
               return (
                 <div key={t.symbol} className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono text-text-primary w-12">{t.symbol}</span>
+                  <span className="text-xs font-mono text-text-primary w-12">{t.symbol}</span>
                   <div className="flex-1 h-1.5 rounded-full bg-bg-elevated overflow-hidden">
                     <div
                       className="h-full rounded-full bg-teal-vivid"
                       style={{ width: `${Math.min(pct, 100)}%` }}
                     />
                   </div>
-                  <span className="text-[10px] font-mono text-text-muted w-16 text-right">
+                  <span className="text-xs font-mono text-text-muted w-16 text-right">
                     {fmtUsd(t.usdValue)}
                   </span>
                 </div>
               )
             })}
             {cluster.topTokens.length === 0 && (
-              <div className="text-[10px] text-text-muted">No holdings data</div>
+              <div className="text-xs text-text-muted">No holdings data</div>
             )}
           </div>
         </div>
@@ -343,7 +343,7 @@ function WhaleClusterPageInner() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">🐋 Whale Clusters</h1>
-            <p className="text-[11px] text-text-muted font-mono">
+            <p className="text-xs text-text-muted">
               Identify connected wallets controlled by the same entity — cross-chain intelligence
             </p>
           </div>
@@ -353,38 +353,38 @@ function WhaleClusterPageInner() {
         {/* Summary stat cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1">
           <div className="bg-bg-panel border border-bg-border px-3 py-2">
-            <div className="text-[10px] text-text-muted font-mono uppercase mb-1">Total Clusters</div>
+            <div className="text-xs text-text-muted font-mono uppercase mb-1">Total Clusters</div>
             <div className="text-[18px] font-head font-bold text-text-primary tabular-nums">
               {summary?.totalClusters ?? 0}
             </div>
-            <div className="text-[9px] text-text-muted mt-0.5">
+            <div className="text-xs text-text-muted mt-0.5">
               {summary?.verifiedCount ?? 0} verified entities
             </div>
           </div>
           <div className="bg-bg-panel border border-bg-border px-3 py-2">
-            <div className="text-[10px] text-text-muted font-mono uppercase mb-1">Total AUM</div>
+            <div className="text-xs text-text-muted font-mono uppercase mb-1">Total AUM</div>
             <div className="text-[18px] font-head font-bold text-teal-vivid tabular-nums">
               {fmtUsd(summary?.totalAum ?? 0)}
             </div>
-            <div className="text-[9px] text-text-muted mt-0.5">
+            <div className="text-xs text-text-muted mt-0.5">
               Across all tracked entities
             </div>
           </div>
           <div className="bg-bg-panel border border-bg-border px-3 py-2">
-            <div className="text-[10px] text-text-muted font-mono uppercase mb-1">Avg Confidence</div>
+            <div className="text-xs text-text-muted font-mono uppercase mb-1">Avg Confidence</div>
             <div className="text-[18px] font-head font-bold text-data-bull tabular-nums">
               {Math.round((summary?.avgConfidence ?? 0) * 100)}%
             </div>
-            <div className="text-[9px] text-text-muted mt-0.5">
+            <div className="text-xs text-text-muted mt-0.5">
               Cluster identification accuracy
             </div>
           </div>
           <div className="bg-bg-panel border border-bg-border px-3 py-2">
-            <div className="text-[10px] text-text-muted font-mono uppercase mb-1">Entity Types</div>
+            <div className="text-xs text-text-muted font-mono uppercase mb-1">Entity Types</div>
             <div className="text-[18px] font-head font-bold text-text-primary tabular-nums">
               {Object.keys(summary?.typeBreakdown ?? {}).length}
             </div>
-            <div className="text-[9px] text-text-muted mt-0.5">
+            <div className="text-xs text-text-muted mt-0.5">
               {Object.entries(summary?.chainBreakdown ?? {})
                 .sort((a, b) => b[1] - a[1])
                 .slice(0, 3)
@@ -397,13 +397,13 @@ function WhaleClusterPageInner() {
         {/* Type breakdown bar */}
         {summary && Object.keys(summary.typeBreakdown).length > 0 && (
           <div className="flex items-center gap-3 px-1">
-            <span className="text-[10px] text-text-muted font-mono">Type:</span>
+            <span className="text-xs text-text-muted font-mono">Type:</span>
             {Object.entries(summary.typeBreakdown)
               .sort((a, b) => b[1] - a[1])
               .map(([type, count]) => (
                 <div key={type} className="flex items-center gap-1">
                   <EntityLabel type={ENTITY_TYPE_MAP[type] ?? 'unknown'} size="xs" />
-                  <span className="text-[10px] text-text-muted font-mono">{count}</span>
+                  <span className="text-xs text-text-muted font-mono">{count}</span>
                 </div>
               ))}
           </div>
@@ -411,12 +411,12 @@ function WhaleClusterPageInner() {
 
         {/* Filters */}
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-text-muted font-mono">Filter:</span>
+          <span className="text-xs text-text-muted font-mono">Filter:</span>
           {entityTypes.map(t => (
             <button
               key={t}
               onClick={() => setFilterType(t)}
-              className={`px-2 py-1 rounded text-[10px] font-mono transition-colors ${
+              className={`px-2 py-1 rounded text-xs font-mono transition-colors ${
                 filterType === t
                   ? 'bg-teal-dim/30 text-teal-vivid'
                   : 'text-text-muted hover:text-text-secondary'
@@ -447,7 +447,7 @@ function WhaleClusterPageInner() {
               setExpandedId(prev => prev === cluster.id ? null : cluster.id)
             }}
             emptyState={
-              <div className="text-text-muted text-[11px] p-4">
+              <div className="text-text-muted text-xs p-4">
                 {status === 'error' ? 'Failed to load cluster data' : 'Loading cluster data...'}
               </div>
             }
@@ -486,7 +486,7 @@ function WhaleClusterPageInner() {
                     : 0
                   return (
                     <div key={chain} className="flex items-center gap-2">
-                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${CHAIN_COLORS[chain] ?? 'bg-bg-raised text-text-muted'}`}>
+                      <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${CHAIN_COLORS[chain] ?? 'bg-bg-raised text-text-muted'}`}>
                         {chain}
                       </span>
                       <div className="flex-1 h-1.5 rounded-full bg-bg-elevated overflow-hidden">
@@ -495,7 +495,7 @@ function WhaleClusterPageInner() {
                           style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <span className="text-[10px] font-mono text-text-muted tabular-nums w-8 text-right">
+                      <span className="text-xs font-mono text-text-muted tabular-nums w-8 text-right">
                         {count}
                       </span>
                     </div>

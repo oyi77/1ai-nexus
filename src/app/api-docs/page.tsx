@@ -364,7 +364,7 @@ export default function ApiDocsPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">API DOCUMENTATION</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               {API_ENDPOINTS.length} endpoints · REST API · JSON responses · No API key required for public endpoints
             </p>
           </div>
@@ -385,7 +385,7 @@ export default function ApiDocsPage() {
         <div className="flex flex-wrap gap-2">
           {['All', ...CATEGORIES].map(cat => (
             <button key={cat} onClick={() => setSelectedCategory(cat)}
-              className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+              className={`px-3 py-1 text-xs font-mono rounded border transition-colors ${
                 selectedCategory === cat
                   ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
                   : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
@@ -410,7 +410,7 @@ export default function ApiDocsPage() {
                   onClick={() => setExpandedEndpoint(isExpanded ? null : key)}
                   className="w-full p-3 flex items-center justify-between hover:bg-bg-elevated transition-colors">
                   <div className="flex items-center gap-3">
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-bold ${
+                    <span className={`text-xs font-mono px-2 py-0.5 rounded font-bold ${
                       ep.method === 'GET' ? 'bg-data-bull/20 text-data-bull' :
                       ep.method === 'POST' ? 'bg-accent-cyan/20 text-accent-cyan' :
                       ep.method === 'DELETE' ? 'bg-data-bear/20 text-data-bear' :
@@ -420,7 +420,7 @@ export default function ApiDocsPage() {
                     </span>
                     <span className="text-xs font-mono text-text-primary">{ep.path}</span>
                   </div>
-                  <span className="text-[10px] text-text-muted">{ep.description}</span>
+                  <span className="text-xs text-text-muted">{ep.description}</span>
                 </button>
 
                 {isExpanded && (
@@ -429,14 +429,14 @@ export default function ApiDocsPage() {
 
                     {ep.params && (
                       <div>
-                        <p className="text-[10px] font-mono text-accent-cyan mb-1">PARAMETERS</p>
-                        <p className="text-xs font-mono text-text-dim bg-bg-elevated p-2 rounded">{ep.params}</p>
+                        <p className="text-xs text-accent-cyan mb-1">PARAMETERS</p>
+                        <p className="text-xs text-text-dim bg-bg-elevated p-2 rounded">{ep.params}</p>
                       </div>
                     )}
 
                     {ep.example && (
                       <div>
-                        <p className="text-[10px] font-mono text-accent-cyan mb-1">EXAMPLE</p>
+                        <p className="text-xs text-accent-cyan mb-1">EXAMPLE</p>
                         <code className="text-xs font-mono text-text-dim bg-bg-elevated p-2 rounded block overflow-x-auto">
                           {ep.example}
                         </code>
@@ -445,7 +445,7 @@ export default function ApiDocsPage() {
 
                     {ep.response && (
                       <div>
-                        <p className="text-[10px] font-mono text-accent-cyan mb-1">RESPONSE</p>
+                        <p className="text-xs text-accent-cyan mb-1">RESPONSE</p>
                         <code className="text-xs font-mono text-text-dim bg-bg-elevated p-2 rounded block overflow-x-auto">
                           {ep.response}
                         </code>
@@ -463,31 +463,31 @@ export default function ApiDocsPage() {
           <h2 className="text-xs font-semibold text-text-secondary mb-3">INTEGRATION GUIDE</h2>
           <div className="space-y-3 text-xs text-text-dim">
             <div>
-              <p className="font-mono text-text-primary mb-1">1. Fetch Market Data</p>
+              <p className="text-text-primary mb-1">1. Fetch Market Data</p>
               <code className="block bg-bg-elevated p-2 rounded font-mono">
                 GET /api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=AAPL,BTC-USD
               </code>
             </div>
             <div>
-              <p className="font-mono text-text-primary mb-1">2. Get OHLCV Candles</p>
+              <p className="text-text-primary mb-1">2. Get OHLCV Candles</p>
               <code className="block bg-bg-elevated p-2 rounded font-mono">
                 GET /api/v1/ohlcv?symbol=BTC-USD&interval=1d&range=1mo
               </code>
             </div>
             <div>
-              <p className="font-mono text-text-primary mb-1">3. Stream Real-Time Data</p>
+              <p className="text-text-primary mb-1">3. Stream Real-Time Data</p>
               <code className="block bg-bg-elevated p-2 rounded font-mono">
                 WebSocket: wss://tracker.aitradepulse.com/socket.io/?EIO=4&transport=websocket
               </code>
             </div>
             <div>
-              <p className="font-mono text-text-primary mb-1">4. Fetch DEX Pairs</p>
+              <p className="text-text-primary mb-1">4. Fetch DEX Pairs</p>
               <code className="block bg-bg-elevated p-2 rounded font-mono">
                 GET /api/v1/dex/trending?network=solana
               </code>
             </div>
             <div>
-              <p className="font-mono text-text-primary mb-1">5. Get Macro Data</p>
+              <p className="text-text-primary mb-1">5. Get Macro Data</p>
               <code className="block bg-bg-elevated p-2 rounded font-mono">
                 GET /api/v1/macro (US) | GET /api/v1/indonesia-macro (Indonesia)
               </code>

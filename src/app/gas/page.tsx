@@ -35,7 +35,7 @@ export default function GasPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">⛽ Gas Tracker</h1>
-            <p className="text-[11px] text-text-muted font-mono">Real-time gas prices across all chains</p>
+            <p className="text-xs text-text-muted">Real-time gas prices across all chains</p>
           </div>
           <LiveDot status={status} label />
         </div>
@@ -44,7 +44,7 @@ export default function GasPage() {
           {prices.map((gas, i) => (
             <Panel key={i} title={gas.chain} subtitle={gas.unit}>
               <div className="p-3 space-y-3">
-                <div className={`text-center text-[10px] font-mono ${congestionColor(gas.congestion)}`}>
+                <div className={`text-center text-xs font-mono ${congestionColor(gas.congestion)}`}>
                   {gas.congestion.toUpperCase()} CONGESTION
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -54,11 +54,11 @@ export default function GasPage() {
                     { label: 'Fast', value: gas.fast, color: 'text-data-bear' },
                   ].map((tier, j) => (
                     <div key={j} className="text-center">
-                      <div className="text-[9px] text-text-muted font-mono uppercase">{tier.label}</div>
+                      <div className="text-xs text-text-muted font-mono uppercase">{tier.label}</div>
                       <div className={`text-[16px] font-head font-bold tabular-nums ${tier.color}`}>
                         {gas.unit === 'gwei' ? (tier.value ?? 0).toFixed(2) : tier.value}
                       </div>
-                      <div className="text-[9px] text-text-muted">{gas.unit}</div>
+                      <div className="text-xs text-text-muted">{gas.unit}</div>
                     </div>
                   ))}
                 </div>

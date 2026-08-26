@@ -102,25 +102,25 @@ export default function WalletDetailPage() {
 
   const txColumns: Column<WalletTransaction>[] = [
     { key: 'txHash', header: 'Tx Hash', width: 180, render: r => (
-      <span className="text-text-muted font-mono text-[10px]">{String(r.txHash).slice(0, 18)}...</span>
+      <span className="text-text-muted font-mono text-xs">{String(r.txHash).slice(0, 18)}...</span>
     )},
     { key: 'chain', header: 'Chain', width: 80, render: r => (
-      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-bg-raised text-teal-vivid uppercase">{r.chain}</span>
+      <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-bg-raised text-teal-vivid uppercase">{r.chain}</span>
     )},
     { key: 'from', header: 'From', width: 120, render: r => (
-      <span className="text-text-muted font-mono text-[10px]">{r.from ? `${r.from.slice(0, 10)}...` : '—'}</span>
+      <span className="text-text-muted font-mono text-xs">{r.from ? `${r.from.slice(0, 10)}...` : '—'}</span>
     )},
     { key: 'to', header: 'To', width: 120, render: r => (
-      <span className="text-text-muted font-mono text-[10px]">{r.to ? `${r.to.slice(0, 10)}...` : '—'}</span>
+      <span className="text-text-muted font-mono text-xs">{r.to ? `${r.to.slice(0, 10)}...` : '—'}</span>
     )},
     { key: 'amountUsd', header: 'USD Value', width: 100, align: 'right', render: r => (
       <PriceTag value={r.amountUsd} size="sm" />
     )},
     { key: 'tokenSymbol', header: 'Token', width: 80, render: r => (
-      <span className="text-text-primary font-mono text-[10px]">{r.tokenSymbol ?? 'ETH'}</span>
+      <span className="text-text-primary font-mono text-xs">{r.tokenSymbol ?? 'ETH'}</span>
     )},
     { key: 'isMEV', header: 'MEV', width: 50, align: 'center', render: r => (
-      r.isMEV ? <span className="text-accent-amber text-[10px] font-bold">⚠</span> : <span className="text-text-muted text-[10px]">—</span>
+      r.isMEV ? <span className="text-accent-amber text-xs font-bold">⚠</span> : <span className="text-text-muted text-xs">—</span>
     )},
   ]
 
@@ -136,7 +136,7 @@ export default function WalletDetailPage() {
             <div className="flex items-center gap-2 mt-1">
               <AddressChip address={address} />
               {data?.entity && (
-                <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
                   data.entity.type === 'exchange' ? 'bg-accent-amber/20 text-accent-amber' :
                   data.entity.type === 'fund' ? 'bg-purple-400/20 text-purple-400' :
                   data.entity.type === 'whale' ? 'bg-data-bull/20 text-data-bull' :
@@ -214,7 +214,7 @@ export default function WalletDetailPage() {
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-bg-panel border border-bg-border p-3 rounded">
-      <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
+      <div className="text-xs text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className="text-[18px] font-head font-bold tabular-nums text-text-primary">{value}</div>
     </div>
   )

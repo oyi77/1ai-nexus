@@ -83,7 +83,7 @@ export default function CorrelationPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">CROSS-ASSET CORRELATION MATRIX</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Live cross-asset correlations from CoinGecko, Fear &amp; Greed, Binance, Yahoo Finance
             </p>
           </div>
@@ -92,7 +92,7 @@ export default function CorrelationPage() {
 
         <Panel title="Correlation Matrix" subtitle={`${assets.length} assets`} liveStatus={status} onRefresh={refresh} maxHeight={600}>
           {assets.length === 0 ? (
-            <div className="text-text-muted text-[11px] p-8 text-center">Calculating correlations...</div>
+            <div className="text-text-muted text-xs p-8 text-center">Calculating correlations...</div>
           ) : (
             <div className="overflow-x-auto p-3">
               <table className="text-xs">
@@ -100,7 +100,7 @@ export default function CorrelationPage() {
                   <tr>
                     <th className="p-1" />
                     {assets.map((asset) => (
-                      <th key={asset} className="p-1 text-[9px] font-mono text-text-muted" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', height: '80px' }}>
+                      <th key={asset} className="p-1 text-xs text-text-muted" style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', height: '80px' }}>
                         <span className="w-2 h-2 rounded-full inline-block mr-1" style={{ backgroundColor: CATEGORY_COLORS[asset] ?? '#6b7280' }} />
                         {asset.replace('Fear & Greed Index', 'FGI').replace(' Avg Funding Rate', 'Funding')}
                       </th>
@@ -110,7 +110,7 @@ export default function CorrelationPage() {
                 <tbody>
                   {assets.map((asset, i) => (
                     <tr key={asset}>
-                      <td className="p-1 text-[9px] font-mono text-text-muted text-right whitespace-nowrap pr-2">
+                      <td className="p-1 text-xs font-mono text-text-muted text-right whitespace-nowrap pr-2">
                         <span className="w-2 h-2 rounded-full inline-block mr-1" style={{ backgroundColor: CATEGORY_COLORS[asset] ?? '#6b7280' }} />
                         {asset.replace('Fear & Greed Index', 'FGI').replace(' Avg Funding Rate', 'Funding')}
                       </td>
@@ -138,22 +138,22 @@ export default function CorrelationPage() {
 
         {/* Legend */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">INTERPRETATION</h2>
+          <h2 className="text-xs text-accent-cyan mb-2">INTERPRETATION</h2>
           <div className="grid grid-cols-2 gap-4 text-xs text-text-dim">
             <div>
-              <p className="font-mono text-data-bull mb-1">High Positive (+0.6 to +1.0)</p>
+              <p className="text-data-bull mb-1">High Positive (+0.6 to +1.0)</p>
               <p>Assets move together. Diversification benefit is low.</p>
             </div>
             <div>
-              <p className="font-mono text-data-bear mb-1">High Negative (-0.6 to -1.0)</p>
+              <p className="text-data-bear mb-1">High Negative (-0.6 to -1.0)</p>
               <p>Assets move opposite. Strong hedge opportunity.</p>
             </div>
             <div>
-              <p className="font-mono text-text-muted mb-1">Near Zero (-0.2 to +0.2)</p>
+              <p className="text-text-muted mb-1">Near Zero (-0.2 to +0.2)</p>
               <p>Assets are uncorrelated. Best diversification.</p>
             </div>
             <div>
-              <p className="font-mono text-accent-cyan mb-1">Grey Cells</p>
+              <p className="text-accent-cyan mb-1">Grey Cells</p>
               <p>No direct correlation data available for that pair.</p>
             </div>
           </div>

@@ -195,7 +195,7 @@ export default function OptionsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">OPTIONS CHAIN</h1>
-            <p className="text-xs text-text-muted font-mono">
+            <p className="text-xs text-text-muted">
               Real-time Deribit options data — bid/ask, IV, Greeks, OI
             </p>
           </div>
@@ -207,36 +207,36 @@ export default function OptionsPage() {
                 {c}
               </button>
             ))}
-            <button onClick={fetchChain} className="px-2 py-1 text-xs font-mono text-text-muted hover:text-text-primary">
+            <button onClick={fetchChain} className="px-2 py-1 text-xs text-text-muted hover:text-text-primary">
               Refresh
             </button>
           </div>
         </div>
 
-        {error && <div className="text-data-bear text-[11px] font-mono p-3 bg-bg-panel rounded">Error: {error}</div>}
+        {error && <div className="text-data-bear text-xs font-mono p-3 bg-bg-panel rounded">Error: {error}</div>}
 
         {/* Summary strip */}
         {chainData && (
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted">INDEX PRICE</p>
-              <p className="text-lg font-mono font-bold">${fmt(indexPrice, 2)}</p>
+              <p className="text-xs text-text-muted">INDEX PRICE</p>
+              <p className="text-lg font-bold">${fmt(indexPrice, 2)}</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted">ATM IV</p>
-              <p className="text-lg font-mono font-bold">{chainData.atmIv?.toFixed(1) ?? '—'}%</p>
+              <p className="text-xs text-text-muted">ATM IV</p>
+              <p className="text-lg font-bold">{chainData.atmIv?.toFixed(1) ?? '—'}%</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted">PUT/CALL RATIO</p>
-              <p className="text-lg font-mono font-bold">{chainData.putCallRatio.toFixed(2)}</p>
+              <p className="text-xs text-text-muted">PUT/CALL RATIO</p>
+              <p className="text-lg font-bold">{chainData.putCallRatio.toFixed(2)}</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted">TOTAL OI</p>
-              <p className="text-lg font-mono font-bold">{fmt(chainData.totalOI, 0)}</p>
+              <p className="text-xs text-text-muted">TOTAL OI</p>
+              <p className="text-lg font-bold">{fmt(chainData.totalOI, 0)}</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted">FUNDING RATE</p>
-              <p className="text-lg font-mono font-bold">{aggData?.[currency.toLowerCase() as 'btc' | 'eth']?.fundingRate != null ? fmtPct(aggData[currency.toLowerCase() as 'btc' | 'eth'].fundingRate!) : '—'}</p>
+              <p className="text-xs text-text-muted">FUNDING RATE</p>
+              <p className="text-lg font-bold">{aggData?.[currency.toLowerCase() as 'btc' | 'eth']?.fundingRate != null ? fmtPct(aggData[currency.toLowerCase() as 'btc' | 'eth'].fundingRate!) : '—'}</p>
             </div>
           </div>
         )}
@@ -246,14 +246,14 @@ export default function OptionsPage() {
           <div className="flex items-center gap-1.5">
             {chainData.expiries.map((exp, i) => (
               <button key={exp.label} onClick={() => setSelectedExpiry(i)}
-                className={`px-3 py-1.5 text-[11px] font-mono rounded transition-colors ${
+                className={`px-3 py-1.5 text-xs font-mono rounded transition-colors ${
                   selectedExpiry === i ? 'bg-teal-dim/30 text-teal-vivid font-bold' : 'text-text-muted hover:text-text-secondary'
                 }`}>
                 {exp.label} ({exp.daysToExpiry}d)
               </button>
             ))}
             <button onClick={() => setShowCalc(!showCalc)}
-              className={`ml-auto px-3 py-1.5 text-[10px] font-mono rounded ${showCalc ? 'bg-accent-amber/20 text-accent-amber' : 'text-text-muted hover:text-text-secondary'}`}>
+              className={`ml-auto px-3 py-1.5 text-xs font-mono rounded ${showCalc ? 'bg-accent-amber/20 text-accent-amber' : 'text-text-muted hover:text-text-secondary'}`}>
               BS Calc
             </button>
           </div>
@@ -262,38 +262,38 @@ export default function OptionsPage() {
         {/* BS Calculator (collapsible) */}
         {showCalc && (
           <div className="bg-bg-panel border border-accent-amber/30 rounded-lg p-4">
-            <h3 className="text-xs font-mono text-accent-amber mb-3">BLACK-SCHOLES CALCULATOR</h3>
+            <h3 className="text-xs text-accent-amber mb-3">BLACK-SCHOLES CALCULATOR</h3>
             <div className="grid grid-cols-5 gap-3 mb-3">
               <div>
-                <label className="text-[9px] text-text-muted font-mono block mb-1">Underlying</label>
+                <label className="text-xs text-text-muted font-mono block mb-1">Underlying</label>
                 <input type="text" value={`$${fmt(indexPrice)}`} readOnly className="w-full px-2 py-1.5 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-muted" />
               </div>
               <div>
-                <label className="text-[9px] text-text-muted font-mono block mb-1">Strike</label>
+                <label className="text-xs text-text-muted font-mono block mb-1">Strike</label>
                 <input type="number" value={calcStrike} onChange={e => setCalcStrike(e.target.value)} placeholder={fmt(indexPrice)} className="w-full px-2 py-1.5 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
               </div>
               <div>
-                <label className="text-[9px] text-text-muted font-mono block mb-1">Days to Expiry</label>
+                <label className="text-xs text-text-muted font-mono block mb-1">Days to Expiry</label>
                 <input type="number" value={calcExpiry} onChange={e => setCalcExpiry(e.target.value)} className="w-full px-2 py-1.5 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
               </div>
               <div>
-                <label className="text-[9px] text-text-muted font-mono block mb-1">IV (%)</label>
+                <label className="text-xs text-text-muted font-mono block mb-1">IV (%)</label>
                 <input type="number" value={calcIv} onChange={e => setCalcIv(e.target.value)} className="w-full px-2 py-1.5 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
               </div>
               <div>
-                <label className="text-[9px] text-text-muted font-mono block mb-1">Type</label>
+                <label className="text-xs text-text-muted font-mono block mb-1">Type</label>
                 <select value={calcIsCall ? 'call' : 'put'} onChange={e => setCalcIsCall(e.target.value === 'call')} className="w-full px-2 py-1.5 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary">
                   <option value="call">Call</option><option value="put">Put</option>
                 </select>
               </div>
             </div>
             <div className="grid grid-cols-6 gap-3 text-center">
-              <div><p className="text-[9px] text-text-muted">PRICE</p><p className="text-sm font-mono font-bold">${calcResult.price.toFixed(2)}</p></div>
-              <div><p className="text-[9px] text-text-muted">DELTA</p><p className="text-sm font-mono">{calcResult.delta.toFixed(4)}</p></div>
-              <div><p className="text-[9px] text-text-muted">GAMMA</p><p className="text-sm font-mono">{calcResult.gamma.toFixed(6)}</p></div>
-              <div><p className="text-[9px] text-text-muted">THETA</p><p className="text-sm font-mono text-data-bear">{calcResult.theta.toFixed(2)}</p></div>
-              <div><p className="text-[9px] text-text-muted">VEGA</p><p className="text-sm font-mono">{calcResult.vega.toFixed(2)}</p></div>
-              <div><p className="text-[9px] text-text-muted">RHO</p><p className="text-sm font-mono">{calcResult.rho.toFixed(2)}</p></div>
+              <div><p className="text-xs text-text-muted">PRICE</p><p className="text-sm font-bold">${calcResult.price.toFixed(2)}</p></div>
+              <div><p className="text-xs text-text-muted">DELTA</p><p className="text-sm">{calcResult.delta.toFixed(4)}</p></div>
+              <div><p className="text-xs text-text-muted">GAMMA</p><p className="text-sm">{calcResult.gamma.toFixed(6)}</p></div>
+              <div><p className="text-xs text-text-muted">THETA</p><p className="text-sm text-data-bear">{calcResult.theta.toFixed(2)}</p></div>
+              <div><p className="text-xs text-text-muted">VEGA</p><p className="text-sm">{calcResult.vega.toFixed(2)}</p></div>
+              <div><p className="text-xs text-text-muted">RHO</p><p className="text-sm">{calcResult.rho.toFixed(2)}</p></div>
             </div>
           </div>
         )}
@@ -303,7 +303,7 @@ export default function OptionsPage() {
           <div className="text-text-dim text-xs p-8 text-center">Loading {currency} options chain from Deribit...</div>
         ) : expiry && strikes.length > 0 ? (
           <div className="bg-bg-panel border border-border-dim rounded-lg overflow-x-auto">
-            <table className="w-full text-[10px] font-mono">
+            <table className="w-full text-xs font-mono">
               <thead>
                 <tr className="border-b border-border-dim text-text-muted">
                   <th colSpan={7} className="text-center py-1.5 text-accent-green border-r border-border-dim">{currency} CALLS</th>
@@ -365,8 +365,8 @@ export default function OptionsPage() {
 
         {/* Greeks legend */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-          <h2 className="text-[10px] font-mono text-accent-cyan mb-2">GREEKS</h2>
-          <div className="grid grid-cols-5 gap-2 text-[9px] text-text-dim">
+          <h2 className="text-xs text-accent-cyan mb-2">GREEKS</h2>
+          <div className="grid grid-cols-5 gap-2 text-xs text-text-dim">
             <div><span className="text-text-primary font-bold">Delta</span> — Price sensitivity to $1 move in underlying</div>
             <div><span className="text-text-primary font-bold">Gamma</span> — Rate of change of delta</div>
             <div><span className="text-text-primary font-bold">Theta</span> — Time decay per day (negative = losing value)</div>
@@ -375,7 +375,7 @@ export default function OptionsPage() {
           </div>
         </div>
 
-        <div className="text-[9px] text-text-muted font-mono">
+        <div className="text-xs text-text-muted font-mono">
           Data: Deribit Public API (unofficial). {strikes.length} strikes for {expiry?.label ?? '—'}. Prices delayed ~1s. ATM strikes marked with *.
         </div>
       </div>

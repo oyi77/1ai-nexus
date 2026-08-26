@@ -109,16 +109,16 @@ export default function PnlPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">💰 Smart Money Wallet Tracker</h1>
-            <p className="text-[11px] text-text-muted font-mono mt-1">Top wallets ranked by Smart Money Score. Entity data from DeFiLlama.</p>
+            <p className="text-xs text-text-muted mt-1">Top wallets ranked by Smart Money Score. Entity data from DeFiLlama.</p>
           </div>
-          <div className="text-[10px] font-mono text-text-muted">{wallets.length} wallets tracked</div>
+          <div className="text-xs font-mono text-text-muted">{wallets.length} wallets tracked</div>
         </div>
 
         {/* Single Wallet Lookup */}
         <div className="bg-bg-panel border border-bg-border rounded p-3">
           <div className="flex items-end gap-2">
             <div className="flex-1">
-              <label className="text-[10px] font-mono text-text-muted uppercase mb-1 block">Wallet Address</label>
+              <label className="text-xs font-mono text-text-muted uppercase mb-1 block">Wallet Address</label>
               <input
                 type="text"
                 value={lookupAddr}
@@ -128,7 +128,7 @@ export default function PnlPage() {
               />
             </div>
             <div>
-              <label className="text-[10px] font-mono text-text-muted uppercase mb-1 block">Chain</label>
+              <label className="text-xs font-mono text-text-muted uppercase mb-1 block">Chain</label>
               <select
                 value={lookupChain}
                 onChange={e => setLookupChain(e.target.value)}
@@ -145,7 +145,7 @@ export default function PnlPage() {
             <button
               onClick={lookupWallet}
               disabled={lookupLoading}
-              className="px-4 py-2 bg-teal-vivid text-bg-base rounded text-[11px] font-mono font-bold hover:bg-teal-vivid/80 transition-colors disabled:opacity-50"
+              className="px-4 py-2 bg-teal-vivid text-bg-base rounded text-xs font-bold hover:bg-teal-vivid/80 transition-colors disabled:opacity-50"
             >
               {lookupLoading ? 'Scanning...' : 'Analyze'}
             </button>
@@ -155,26 +155,26 @@ export default function PnlPage() {
             <div className="mt-3 bg-bg-raised rounded p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[12px] font-mono text-text-primary font-bold">{formatAddress(singleWallet.address)}</span>
-                <span className="text-[10px] font-mono text-teal-vivid">{singleWallet.chain}</span>
+                <span className="text-xs font-mono text-teal-vivid">{singleWallet.chain}</span>
               </div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                 <div>
-                  <span className="text-text-muted text-[10px] font-mono">Total PnL</span>
+                  <span className="text-text-muted text-xs font-mono">Total PnL</span>
                   <p className={`font-mono font-bold ${singleWallet.totalPnl >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                     {formatUsd(singleWallet.totalPnl)}
                   </p>
                 </div>
                 <div>
-                  <span className="text-text-muted text-[10px] font-mono">Win Rate</span>
-                  <p className="font-mono text-text-primary">{(singleWallet.winRate * 100).toFixed(1)}%</p>
+                  <span className="text-text-muted text-xs font-mono">Win Rate</span>
+                  <p className="text-text-primary">{(singleWallet.winRate * 100).toFixed(1)}%</p>
                 </div>
                 <div>
-                  <span className="text-text-muted text-[10px] font-mono">Trades</span>
-                  <p className="font-mono text-text-primary">{singleWallet.totalTrades}</p>
+                  <span className="text-text-muted text-xs font-mono">Trades</span>
+                  <p className="text-text-primary">{singleWallet.totalTrades}</p>
                 </div>
                 <div>
-                  <span className="text-text-muted text-[10px] font-mono">Avg Size</span>
-                  <p className="font-mono text-text-primary">{formatUsd(singleWallet.avgTradeSize)}</p>
+                  <span className="text-text-muted text-xs font-mono">Avg Size</span>
+                  <p className="text-text-primary">{formatUsd(singleWallet.avgTradeSize)}</p>
                 </div>
               </div>
             </div>
@@ -184,13 +184,13 @@ export default function PnlPage() {
         {/* Leaderboard */}
         <div className="bg-bg-panel border border-bg-border rounded">
           <div className="px-3 py-2 border-b border-bg-border flex items-center justify-between">
-            <span className="text-[11px] font-mono font-bold text-text-primary">TOP 50 WALLETS BY SMART MONEY SCORE</span>
+            <span className="text-xs font-mono font-bold text-text-primary">TOP 50 WALLETS BY SMART MONEY SCORE</span>
           </div>
 
           {loading ? (
-            <div className="p-8 text-text-muted text-[11px] font-mono text-center">Loading leaderboard...</div>
+            <div className="p-8 text-text-muted text-xs font-mono text-center">Loading leaderboard...</div>
           ) : wallets.length === 0 ? (
-            <div className="p-8 text-text-muted text-[11px] font-mono text-center">No wallet data available</div>
+            <div className="p-8 text-text-muted text-xs font-mono text-center">No wallet data available</div>
           ) : (
             <>
               <TableControlsBar idPrefix="pnl" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
@@ -198,12 +198,12 @@ export default function PnlPage() {
               <table className="w-full border-separate border-spacing-0">
                 <thead>
                   <tr className="text-text-muted">
-                    <th className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left w-12">Rank</th>
-                    <SortableTh controls={tc} k="entityName" className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left">Entity / Address</SortableTh>
-                    <SortableTh controls={tc} k="chain" className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left w-20">Chain</SortableTh>
-                    <SortableTh controls={tc} k="entityType" className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left w-20">Type</SortableTh>
-                    <SortableTh controls={tc} k="smartMoneyScore" className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-right w-16">Score</SortableTh>
-                    <SortableTh controls={tc} k="entityTvl" className="text-[10px] font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-right hidden sm:table-cell">TVL</SortableTh>
+                    <th className="text-xs font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left w-12">Rank</th>
+                    <SortableTh controls={tc} k="entityName" className="text-xs font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left">Entity / Address</SortableTh>
+                    <SortableTh controls={tc} k="chain" className="text-xs font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left w-20">Chain</SortableTh>
+                    <SortableTh controls={tc} k="entityType" className="text-xs font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-left w-20">Type</SortableTh>
+                    <SortableTh controls={tc} k="smartMoneyScore" className="text-xs font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-right w-16">Score</SortableTh>
+                    <SortableTh controls={tc} k="entityTvl" className="text-xs font-mono font-normal uppercase px-2 py-1 border-b border-bg-border sticky top-0 bg-bg-base z-10 text-right hidden sm:table-cell">TVL</SortableTh>
                   </tr>
                 </thead>
                 <tbody>
@@ -216,19 +216,19 @@ export default function PnlPage() {
                         setLookupChain(w.chain.toLowerCase())
                       }}
                     >
-                      <td className="text-[11px] font-mono px-2 py-1.5 text-text-muted">{i + 1}</td>
+                      <td className="text-xs font-mono px-2 py-1.5 text-text-muted">{i + 1}</td>
                       <td className="px-2 py-1.5">
                         <div className="flex flex-col">
                           {w.entityName && (
-                            <span className="text-[11px] font-mono font-bold text-text-primary">{w.entityName}</span>
+                            <span className="text-xs font-mono font-bold text-text-primary">{w.entityName}</span>
                           )}
-                          <span className="text-[10px] font-mono text-text-muted">{formatAddress(w.address)}</span>
+                          <span className="text-xs font-mono text-text-muted">{formatAddress(w.address)}</span>
                         </div>
                       </td>
-                      <td className="text-[10px] font-mono px-2 py-1.5 text-teal-vivid">{w.chain}</td>
+                      <td className="text-xs font-mono px-2 py-1.5 text-teal-vivid">{w.chain}</td>
                       <td className="px-2 py-1.5">
                         {w.entityType && (
-                          <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${typeColors[w.entityType.toLowerCase()] ?? 'bg-bg-raised text-text-muted'}`}>
+                          <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${typeColors[w.entityType.toLowerCase()] ?? 'bg-bg-raised text-text-muted'}`}>
                             {w.entityType.toUpperCase()}
                           </span>
                         )}
@@ -236,14 +236,14 @@ export default function PnlPage() {
                       <td className="text-[12px] font-mono px-2 py-1.5 text-right font-bold text-text-primary tabular-nums">
                         {w.smartMoneyScore ?? '—'}
                       </td>
-                      <td className="text-[11px] font-mono px-2 py-1.5 text-right text-text-secondary hidden sm:table-cell tabular-nums">
+                      <td className="text-xs font-mono px-2 py-1.5 text-right text-text-secondary hidden sm:table-cell tabular-nums">
                         {w.entityTvl ? formatUsd(w.entityTvl) : '—'}
                       </td>
                     </tr>
                   ))}
                   {tc.visible.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-4 text-center text-[11px] font-mono text-text-muted">No wallets match the current filter.</td>
+                      <td colSpan={6} className="py-4 text-center text-xs font-mono text-text-muted">No wallets match the current filter.</td>
                     </tr>
                   )}
                 </tbody>

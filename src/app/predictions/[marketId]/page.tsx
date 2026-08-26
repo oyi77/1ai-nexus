@@ -52,7 +52,7 @@ export default function PredictionMarketPage() {
           <Link href="/predictions" className="text-text-dim hover:text-accent-cyan transition-colors">
             <ArrowLeft size={14} />
           </Link>
-          <h1 className="text-sm font-mono font-bold text-accent-cyan flex items-center gap-2">
+          <h1 className="text-sm font-bold text-accent-cyan flex items-center gap-2">
             <Target size={14} /> MARKET DETAIL
           </h1>
         </div>
@@ -74,16 +74,16 @@ export default function PredictionMarketPage() {
                 {market.question}
               </p>
               <div className="flex flex-wrap items-center gap-3">
-                <span className="text-[10px] px-2 py-0.5 rounded bg-bg-base border border-border-dim text-text-dim">
+                <span className="text-xs px-2 py-0.5 rounded bg-bg-base border border-border-dim text-text-dim">
                   {market.status === 'open' ? '🟢 Open' : market.status === 'closed' ? '🔴 Closed' : market.status ?? 'Unknown'}
                 </span>
                 {market.category && (
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-bg-base border border-border-dim text-text-muted">
+                  <span className="text-xs px-2 py-0.5 rounded bg-bg-base border border-border-dim text-text-muted">
                     {market.category}
                   </span>
                 )}
                 {market.traderCount != null && (
-                  <span className="text-[10px] text-text-dim">
+                  <span className="text-xs text-text-dim">
                     {formatNum(market.traderCount)} traders
                   </span>
                 )}
@@ -94,14 +94,14 @@ export default function PredictionMarketPage() {
             {(market.yesPrice != null || market.noPrice != null) && (
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-                  <p className="text-[10px] text-text-muted mb-1">YES</p>
-                  <p className="text-lg font-mono font-bold text-accent-cyan">
+                  <p className="text-xs text-text-muted mb-1">YES</p>
+                  <p className="text-lg font-bold text-accent-cyan">
                     {market.yesPrice != null ? `${(market.yesPrice * 100).toFixed(1)}¢` : '—'}
                   </p>
                 </div>
                 <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-                  <p className="text-[10px] text-text-muted mb-1">NO</p>
-                  <p className="text-lg font-mono font-bold text-text-dim">
+                  <p className="text-xs text-text-muted mb-1">NO</p>
+                  <p className="text-lg font-bold text-text-dim">
                     {market.noPrice != null ? `${(market.noPrice * 100).toFixed(1)}¢` : '—'}
                   </p>
                 </div>
@@ -111,20 +111,20 @@ export default function PredictionMarketPage() {
             {/* Volume & Liquidity */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-                <p className="text-[10px] text-text-muted mb-1">Total Volume</p>
-                <p className="text-sm font-mono font-bold text-accent-cyan">
+                <p className="text-xs text-text-muted mb-1">Total Volume</p>
+                <p className="text-sm font-bold text-accent-cyan">
                   {market.totalVolume != null ? `$${formatNum(market.totalVolume)}` : '—'}
                 </p>
               </div>
               <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-                <p className="text-[10px] text-text-muted mb-1">24h Volume</p>
-                <p className="text-sm font-mono font-bold text-accent-cyan">
+                <p className="text-xs text-text-muted mb-1">24h Volume</p>
+                <p className="text-sm font-bold text-accent-cyan">
                   {market.volume24h != null ? `$${formatNum(market.volume24h)}` : '—'}
                 </p>
               </div>
               <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-                <p className="text-[10px] text-text-muted mb-1">Liquidity</p>
-                <p className="text-sm font-mono font-bold text-accent-cyan">
+                <p className="text-xs text-text-muted mb-1">Liquidity</p>
+                <p className="text-sm font-bold text-accent-cyan">
                   {market.liquidity != null ? `$${formatNum(market.liquidity)}` : '—'}
                 </p>
               </div>
@@ -132,7 +132,7 @@ export default function PredictionMarketPage() {
 
             {/* Metadata */}
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted mb-2">Market Info</p>
+              <p className="text-xs text-text-muted mb-2">Market Info</p>
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-text-muted">ID: </span>

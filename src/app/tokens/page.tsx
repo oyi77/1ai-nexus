@@ -179,7 +179,7 @@ export default function TokensPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">Token Intelligence</h1>
-            <p className="text-[11px] text-text-muted font-mono">Per-token deep dive — price, liquidity, holders, signals</p>
+            <p className="text-xs text-text-muted">Per-token deep dive — price, liquidity, holders, signals</p>
           </div>
           <LiveDot status={feedStatus} label />
         </div>
@@ -191,9 +191,9 @@ export default function TokensPage() {
             placeholder="Search token..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="bg-bg-panel border border-bg-border rounded px-3 py-1.5 text-[11px] font-mono text-text-primary placeholder:text-text-muted outline-none w-48"
+            className="bg-bg-panel border border-bg-border rounded px-3 py-1.5 text-xs font-mono text-text-primary placeholder:text-text-muted outline-none w-48"
           />
-          <div className="flex items-center gap-1 text-[10px] font-mono">
+          <div className="flex items-center gap-1 text-xs font-mono">
             <span className="text-text-muted">Sort:</span>
             {(['volume', 'price', 'change'] as const).map(s => (
               <button
@@ -205,7 +205,7 @@ export default function TokensPage() {
               </button>
             ))}
           </div>
-          <span className="ml-auto text-[10px] text-text-muted font-mono">{filtered.length} tokens</span>
+          <span className="ml-auto text-xs text-text-muted font-mono">{filtered.length} tokens</span>
         </div>
 
         {/* Main Grid */}
@@ -227,7 +227,7 @@ export default function TokensPage() {
                 filterPlaceholder="Filter tokens…"
                 rowHeight={28}
                 onRowClick={(row) => setSelectedToken(row)}
-                emptyState={<div className="text-text-muted text-[11px] p-4">Loading tokens...</div>}
+                emptyState={<div className="text-text-muted text-xs p-4">Loading tokens...</div>}
               />
             </Panel>
           </div>
@@ -260,7 +260,7 @@ export default function TokensPage() {
                     { label: '7d Change', value: `${(selectedToken.change7d ?? 0).toFixed(2)}%` },
                   ].map((stat, i) => (
                     <div key={i} className="bg-bg-raised rounded p-2">
-                      <div className="text-[9px] text-text-muted font-mono uppercase">{stat.label}</div>
+                      <div className="text-xs text-text-muted font-mono uppercase">{stat.label}</div>
                       <div className="text-[12px] font-mono text-text-primary">{stat.value}</div>
                     </div>
                   ))}
@@ -268,12 +268,12 @@ export default function TokensPage() {
 
                 {/* Sparkline */}
                 <div className="bg-bg-raised rounded p-3">
-                  <div className="text-[10px] text-text-muted font-mono mb-2">7D PRICE ACTION</div>
+                  <div className="text-xs text-text-muted font-mono mb-2">7D PRICE ACTION</div>
                   <Sparkline data={selectedToken.sparkline} width={240} height={60} />
                 </div>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-full text-text-muted text-[11px]">
+              <div className="flex items-center justify-center h-full text-text-muted text-xs">
                 Select a token from the list
               </div>
             )}

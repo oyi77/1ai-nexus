@@ -242,7 +242,7 @@ export default function AiSignalsPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">AI TRADING SIGNALS</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               {signals.length} signals computed from real market data · Yahoo Finance + FRED
             </p>
           </div>
@@ -250,7 +250,7 @@ export default function AiSignalsPage() {
         </div>
 
         {error && (
-          <div className="text-data-bear text-[11px] font-mono p-4 bg-bg-panel border border-border-dim rounded">
+          <div className="text-data-bear text-xs font-mono p-4 bg-bg-panel border border-border-dim rounded">
             Error: {error}
           </div>
         )}
@@ -261,7 +261,7 @@ export default function AiSignalsPage() {
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2 text-[11px] font-mono rounded uppercase transition-colors ${tab === t ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary bg-bg-raised'}`}
+              className={`px-4 py-2 text-xs font-mono rounded uppercase transition-colors ${tab === t ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary bg-bg-raised'}`}
             >
               {t}
             </button>
@@ -273,27 +273,27 @@ export default function AiSignalsPage() {
         {/* Signal Summary */}
         <div className="grid grid-cols-6 gap-4">
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <p className="text-[10px] text-text-muted font-mono">SIGNALS</p>
-            <p className="text-xl font-bold font-mono text-text-primary">{signals.length}</p>
+            <p className="text-xs text-text-muted">SIGNALS</p>
+            <p className="text-xl font-bold text-text-primary">{signals.length}</p>
           </div>
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <p className="text-[10px] text-text-muted font-mono">LONG</p>
-            <p className="text-xl font-bold font-mono text-data-bull">{longCount}</p>
+            <p className="text-xs text-text-muted">LONG</p>
+            <p className="text-xl font-bold text-data-bull">{longCount}</p>
           </div>
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <p className="text-[10px] text-text-muted font-mono">SHORT</p>
-            <p className="text-xl font-bold font-mono text-data-bear">{shortCount}</p>
+            <p className="text-xs text-text-muted">SHORT</p>
+            <p className="text-xl font-bold text-data-bear">{shortCount}</p>
           </div>
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <p className="text-[10px] text-text-muted font-mono">WIN RATE</p>
-            <p className="text-xl font-bold font-mono text-text-primary">{signalStats.winRate.toFixed(1)}%</p>
+            <p className="text-xs text-text-muted">WIN RATE</p>
+            <p className="text-xl font-bold text-text-primary">{signalStats.winRate.toFixed(1)}%</p>
           </div>
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <p className="text-[10px] text-text-muted font-mono">COMPLETED</p>
-            <p className="text-xl font-bold font-mono text-text-primary">{signalStats.completed}</p>
+            <p className="text-xs text-text-muted">COMPLETED</p>
+            <p className="text-xl font-bold text-text-primary">{signalStats.completed}</p>
           </div>
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-            <p className="text-[10px] text-text-muted font-mono">TOTAL PNL</p>
+            <p className="text-xs text-text-muted">TOTAL PNL</p>
             <p className={`text-xl font-bold font-mono ${signalStats.totalPnl >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
               {signalStats.totalPnl >= 0 ? '+' : ''}{signalStats.totalPnl.toFixed(2)}%
             </p>
@@ -307,9 +307,9 @@ export default function AiSignalsPage() {
             <div className="grid grid-cols-4 gap-2">
               {macro.map(m => (
                 <div key={m.indicator} className="bg-bg-elevated p-2 rounded">
-                  <p className="text-[10px] text-text-muted font-mono">{m.indicator}</p>
-                  <p className="text-sm font-bold font-mono text-text-primary">{m.value}</p>
-                  <p className="text-[9px] text-text-dim">{m.date}</p>
+                  <p className="text-xs text-text-muted">{m.indicator}</p>
+                  <p className="text-sm font-bold text-text-primary">{m.value}</p>
+                  <p className="text-xs text-text-dim">{m.date}</p>
                 </div>
               ))}
             </div>
@@ -324,7 +324,7 @@ export default function AiSignalsPage() {
             <div className="flex flex-wrap gap-2">
               {['All', 'Equity', 'Crypto', 'Forex', 'Commodity'].map(cls => (
                 <button key={cls} onClick={() => setFilter(cls)}
-                  className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+                  className={`px-3 py-1 text-xs font-mono rounded border transition-colors ${
                     filter === cls
                       ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
                       : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
@@ -350,37 +350,37 @@ export default function AiSignalsPage() {
                         </span>
                         <span className="text-sm font-mono font-bold text-accent-cyan">{signal.symbol}</span>
                         <span className="text-xs text-text-dim">{signal.name}</span>
-                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-bg-elevated text-text-muted">
+                        <span className="text-xs font-mono px-2 py-0.5 rounded bg-bg-elevated text-text-muted">
                           {signal.assetClass.toUpperCase()}
                         </span>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right">
-                          <p className="text-[10px] text-text-muted font-mono">PRICE</p>
-                          <p className="text-sm font-mono font-bold text-text-primary">{formatPriceUSD(signal.price)}</p>
+                          <p className="text-xs text-text-muted">PRICE</p>
+                          <p className="text-sm font-bold text-text-primary">{formatPriceUSD(signal.price)}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-[10px] text-text-muted font-mono">CHG</p>
+                          <p className="text-xs text-text-muted">CHG</p>
                           <p className={`text-sm font-mono font-bold ${signal.change >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                             {signal.change >= 0 ? '+' : ''}{signal.change.toFixed(2)}%
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-[10px] text-text-muted font-mono">STRENGTH</p>
-                          <p className="text-sm font-mono font-bold text-accent-cyan">{signal.strength}%</p>
+                          <p className="text-xs text-text-muted">STRENGTH</p>
+                          <p className="text-sm font-bold text-accent-cyan">{signal.strength}%</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-[10px] text-text-muted font-mono">CONF</p>
-                          <p className="text-sm font-mono font-bold text-text-primary">{signal.confidence}%</p>
+                          <p className="text-xs text-text-muted">CONF</p>
+                          <p className="text-sm font-bold text-text-primary">{signal.confidence}%</p>
                         </div>
                       </div>
                     </div>
 
                     <div className="mt-2 pt-2 border-t border-border-dim">
-                      <p className="text-[10px] text-accent-cyan font-mono mb-1">SIGNAL FACTORS ({signal.signals.length})</p>
+                      <p className="text-xs text-accent-cyan mb-1">SIGNAL FACTORS ({signal.signals.length})</p>
                       <ul className="space-y-0.5">
                         {signal.signals.map((s, i) => (
-                          <li key={i} className="text-[10px] text-text-dim flex items-start gap-2">
+                          <li key={i} className="text-xs text-text-dim flex items-start gap-2">
                             <span className="text-accent-cyan">•</span>
                             {s}
                           </li>
@@ -391,7 +391,7 @@ export default function AiSignalsPage() {
                     {/* Trading Levels */}
                     {signal.entry && (
                       <div className="mt-2 pt-2 border-t border-border-dim">
-                        <div className="flex items-center gap-4 text-[11px] font-mono">
+                        <div className="flex items-center gap-4 text-xs font-mono">
                           <span className="text-text-muted">VALID</span>
                           <span className={`px-1.5 py-0.5 rounded ${
                             // eslint-disable-next-line react-hooks/purity
@@ -441,27 +441,27 @@ export default function AiSignalsPage() {
             {/* History Summary */}
             <div className="grid grid-cols-6 gap-4">
               <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                <p className="text-[10px] text-text-muted font-mono">TOTAL</p>
-                <p className="text-xl font-bold font-mono text-text-primary">{historyTotal}</p>
+                <p className="text-xs text-text-muted">TOTAL</p>
+                <p className="text-xl font-bold text-text-primary">{historyTotal}</p>
               </div>
               <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                <p className="text-[10px] text-text-muted font-mono">WINS</p>
-                <p className="text-xl font-bold font-mono text-data-bull">{historyWins}</p>
+                <p className="text-xs text-text-muted">WINS</p>
+                <p className="text-xl font-bold text-data-bull">{historyWins}</p>
               </div>
               <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                <p className="text-[10px] text-text-muted font-mono">LOSSES</p>
-                <p className="text-xl font-bold font-mono text-data-bear">{historyLosses}</p>
+                <p className="text-xs text-text-muted">LOSSES</p>
+                <p className="text-xl font-bold text-data-bear">{historyLosses}</p>
               </div>
               <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                <p className="text-[10px] text-text-muted font-mono">ACTIVE</p>
-                <p className="text-xl font-bold font-mono text-teal-vivid">{historyActive}</p>
+                <p className="text-xs text-text-muted">ACTIVE</p>
+                <p className="text-xl font-bold text-teal-vivid">{historyActive}</p>
               </div>
               <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                <p className="text-[10px] text-text-muted font-mono">WIN RATE</p>
-                <p className="text-xl font-bold font-mono text-text-primary">{historyWinRate.toFixed(1)}%</p>
+                <p className="text-xs text-text-muted">WIN RATE</p>
+                <p className="text-xl font-bold text-text-primary">{historyWinRate.toFixed(1)}%</p>
               </div>
               <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                <p className="text-[10px] text-text-muted font-mono">AVG PNL</p>
+                <p className="text-xs text-text-muted">AVG PNL</p>
                 <p className={`text-xl font-bold font-mono ${historyAvgPnl >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                   {historyAvgPnl >= 0 ? '+' : ''}{historyAvgPnl.toFixed(2)}%
                 </p>
@@ -471,49 +471,49 @@ export default function AiSignalsPage() {
             {/* Simulation Panel */}
             <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs font-mono text-accent-cyan">COMPOUND SIMULATION</h2>
-                <span className="text-[9px] font-mono text-text-muted">{signalStats.sim.positionSizePct}% position sizing · ${signalStats.sim.initialCapital} initial capital · {signalStats.sim.tradeCount} trades</span>
+                <h2 className="text-xs text-accent-cyan">COMPOUND SIMULATION</h2>
+                <span className="text-xs font-mono text-text-muted">{signalStats.sim.positionSizePct}% position sizing · ${signalStats.sim.initialCapital} initial capital · {signalStats.sim.tradeCount} trades</span>
               </div>
               <div className="grid grid-cols-4 gap-3">
                 <div>
-                  <p className="text-[10px] text-text-muted font-mono">FINAL EQUITY</p>
-                  <p className="text-lg font-bold font-mono text-text-primary">${signalStats.sim.finalEquity.toFixed(2)}</p>
+                  <p className="text-xs text-text-muted">FINAL EQUITY</p>
+                  <p className="text-lg font-bold text-text-primary">${signalStats.sim.finalEquity.toFixed(2)}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-text-muted font-mono">TOTAL RETURN</p>
+                  <p className="text-xs text-text-muted">TOTAL RETURN</p>
                   <p className={`text-lg font-bold font-mono ${signalStats.sim.totalReturnPct >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                     {signalStats.sim.totalReturnPct >= 0 ? '+' : ''}{signalStats.sim.totalReturnPct.toFixed(2)}%
-                    <span className="text-[10px] ml-1 opacity-70">(${signalStats.sim.totalReturnUsd >= 0 ? '+' : ''}{signalStats.sim.totalReturnUsd.toFixed(2)})</span>
+                    <span className="text-xs ml-1 opacity-70">(${signalStats.sim.totalReturnUsd >= 0 ? '+' : ''}{signalStats.sim.totalReturnUsd.toFixed(2)})</span>
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-text-muted font-mono">MAX DRAWDOWN</p>
-                  <p className="text-lg font-bold font-mono text-data-bear">-{signalStats.sim.maxDrawdownPct.toFixed(2)}%</p>
+                  <p className="text-xs text-text-muted">MAX DRAWDOWN</p>
+                  <p className="text-lg font-bold text-data-bear">-{signalStats.sim.maxDrawdownPct.toFixed(2)}%</p>
                 </div>
                 <div>
-                  <p className="text-[10px] text-text-muted font-mono">BEST / WORST</p>
-                  <p className="text-sm font-mono">
+                  <p className="text-xs text-text-muted">BEST / WORST</p>
+                  <p className="text-sm">
                     <span className="text-data-bull">+{signalStats.sim.bestTradePct.toFixed(2)}%</span>
                     <span className="text-text-muted mx-1">/</span>
                     <span className="text-data-bear">{signalStats.sim.worstTradePct.toFixed(2)}%</span>
                   </p>
                 </div>
               </div>
-              <p className="text-[9px] text-text-muted font-mono mt-3 opacity-60">Simulated performance. Not financial advice. Past results do not guarantee future returns.</p>
+              <p className="text-xs text-text-muted mt-3 opacity-60">Simulated performance. Not financial advice. Past results do not guarantee future returns.</p>
             </div>
             {/* History Outcome Filter */}
             <div className="p-4 border-b border-border-dim">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-sm font-mono text-accent-cyan">Signal History</h2>
-                  <p className="text-[10px] text-text-muted font-mono mt-1">{filteredHistory.length} of {historyTotal} signals</p>
+                  <h2 className="text-sm text-accent-cyan">Signal History</h2>
+                  <p className="text-xs text-text-muted mt-1">{filteredHistory.length} of {historyTotal} signals</p>
                 </div>
                 <div className="flex gap-2">
                   {(['All', 'Win', 'Loss', 'Expired', 'Active'] as const).map(outcome => (
                     <button
                       key={outcome}
                       onClick={() => setHistoryOutcomeFilter(outcome)}
-                      className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+                      className={`px-3 py-1 text-xs font-mono rounded border transition-colors ${
                         historyOutcomeFilter === outcome
                           ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
                           : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
@@ -546,14 +546,14 @@ export default function AiSignalsPage() {
 
                       <div className="flex items-center gap-2 min-w-[100px]">
                         <span className="text-[12px] font-mono font-bold text-teal-vivid">{s.symbol}</span>
-                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                        <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
                           s.direction === 'bullish' ? 'bg-data-bull/20 text-data-bull' : 'bg-data-bear/20 text-data-bear'
                         }`}>
                           {s.direction.toUpperCase()}
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-3 text-[10px] font-mono">
+                      <div className="flex items-center gap-3 text-xs font-mono">
                         <span className="text-text-muted">ENTRY</span>
                         <span className="text-text-primary">{formatPriceUSD(s.entry)}</span>
                         {s.tp1 && (
@@ -572,7 +572,7 @@ export default function AiSignalsPage() {
 
                       <div className="flex items-center gap-3 ml-auto">
                         {s.hitTarget && (
-                          <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                          <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
                             s.hitTarget.startsWith('tp') ? 'bg-data-bull/20 text-data-bull' : 'bg-data-bear/20 text-data-bear'
                           }`}>
                             {s.hitTarget.toUpperCase()}
@@ -584,11 +584,11 @@ export default function AiSignalsPage() {
                           </span>
                         )}
                         {s.durationHours !== null && (
-                          <span className="text-[10px] font-mono text-text-muted">
+                          <span className="text-xs font-mono text-text-muted">
                             {s.durationHours < 1 ? '<1h' : `${s.durationHours.toFixed(0)}h`}
                           </span>
                         )}
-                        <span className="text-[9px] font-mono text-text-muted">{s.source}</span>
+                        <span className="text-xs font-mono text-text-muted">{s.source}</span>
                       </div>
                     </div>
                   )
@@ -599,8 +599,8 @@ export default function AiSignalsPage() {
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">DATA SOURCES</h2>
-          <p className="text-[10px] text-text-dim font-mono">
+          <h2 className="text-xs text-accent-cyan mb-2">DATA SOURCES</h2>
+          <p className="text-xs text-text-dim">
             Yahoo Finance (equities, forex, commodities) · FRED (macro indicators) · Binance (crypto)
           </p>
         </div>

@@ -71,10 +71,10 @@ export default function EntityDetailPage() {
               {entity?.name ?? slug}
               {entity?.verified && <span className="text-teal-vivid text-[14px]">✓ Verified</span>}
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               {entity ? (
                 <>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${typeColors[entity.type.toLowerCase()] ?? 'bg-bg-raised text-text-muted'}`}>
+                  <span className={`px-2 py-0.5 rounded text-xs font-bold ${typeColors[entity.type.toLowerCase()] ?? 'bg-bg-raised text-text-muted'}`}>
                     {entity.type.toUpperCase()}
                   </span>
                   {entity.chains.length > 0 && (
@@ -94,19 +94,19 @@ export default function EntityDetailPage() {
               <Panel title="Entity Overview" subtitle={entity.type}>
                 <div className="p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono text-text-muted">Total Value</span>
+                    <span className="text-xs font-mono text-text-muted">Total Value</span>
                     <PriceTag value={entity.totalUsdValue} size="lg" />
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono text-text-muted">Wallets</span>
+                    <span className="text-xs font-mono text-text-muted">Wallets</span>
                     <span className="text-[14px] font-mono font-bold text-text-primary">{entity.wallets.length}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono text-text-muted">Chains</span>
+                    <span className="text-xs font-mono text-text-muted">Chains</span>
                     <span className="text-[14px] font-mono font-bold text-text-primary">{entity.chains.length}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono text-text-muted">Status</span>
+                    <span className="text-xs font-mono text-text-muted">Status</span>
                     <span className={`text-[12px] font-mono font-bold ${entity.verified ? 'text-data-bull' : 'text-accent-amber'}`}>
                       {entity.verified ? 'Verified' : 'Unverified'}
                     </span>
@@ -116,7 +116,7 @@ export default function EntityDetailPage() {
 
               {/* AI Analysis */}
               <Panel title="AI Entity Analysis" subtitle="Automated intelligence">
-                <div className="p-4 space-y-2 text-[11px] font-mono text-text-secondary leading-relaxed">
+                <div className="p-4 space-y-2 text-xs font-mono text-text-secondary leading-relaxed">
                   {entity.type.toLowerCase() === 'exchange' && (
                     <p>{entity.name} is a centralized exchange with {entity.wallets.length} tracked wallets. Monitor for large outflows that may signal market-moving events.</p>
                   )}
@@ -147,14 +147,14 @@ export default function EntityDetailPage() {
                       className="flex items-center justify-between p-2 hover:bg-bg-raised rounded transition-colors group"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted uppercase">{w.chain}</span>
+                        <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted uppercase">{w.chain}</span>
                         <AddressChip address={w.address} />
                       </div>
-                      <span className="text-[10px] text-teal-vivid opacity-0 group-hover:opacity-100 transition-opacity">View →</span>
+                      <span className="text-xs text-teal-vivid opacity-0 group-hover:opacity-100 transition-opacity">View →</span>
                     </a>
                   ))}
                   {entity.wallets.length === 0 && (
-                    <div className="text-[11px] font-mono text-text-muted p-4 text-center">No wallets tracked yet</div>
+                    <div className="text-xs font-mono text-text-muted p-4 text-center">No wallets tracked yet</div>
                   )}
                 </div>
               </Panel>

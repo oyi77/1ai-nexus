@@ -106,7 +106,7 @@ export default function ScreenerPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">MULTI-ASSET SCREENER</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               {Object.keys(data).length} stocks across {EXCHANGES.length} exchanges
             </p>
           </div>
@@ -132,7 +132,7 @@ export default function ScreenerPage() {
             <option value="All">All Exchanges</option>
             {EXCHANGES.map(e => <option key={e} value={e}>{e}</option>)}
           </select>
-          <span className="text-[10px] text-text-muted font-mono">{filtered.length} results</span>
+          <span className="text-xs text-text-muted font-mono">{filtered.length} results</span>
         </div>
 
         {/* Results Table */}

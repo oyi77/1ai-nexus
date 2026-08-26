@@ -123,7 +123,7 @@ export default function FinancialsPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">FINANCIAL STATEMENTS</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Income statement, balance sheet, cash flow — {SYMBOLS.length} companies
             </p>
           </div>
@@ -134,7 +134,7 @@ export default function FinancialsPage() {
         <div className="flex flex-wrap gap-2">
           {SYMBOLS.map(sym => (
             <button key={sym} onClick={() => setSelected(sym)}
-              className={`px-2 py-1 text-[10px] font-mono rounded border transition-colors ${
+              className={`px-2 py-1 text-xs font-mono rounded border transition-colors ${
                 selected === sym
                   ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
                   : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
@@ -152,13 +152,13 @@ export default function FinancialsPage() {
             <div className="col-span-12 bg-bg-panel border border-border-dim rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-bold font-mono text-text-primary">{data.symbol}</h2>
+                  <h2 className="text-lg font-bold text-text-primary">{data.symbol}</h2>
                   <p className="text-sm text-text-dim">{data.name}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-text-muted font-mono">Market Cap</p>
-                  <p className="text-xl font-bold font-mono text-text-primary">{fmtB(data.marketCap)}</p>
-                  <p className="text-[10px] text-text-muted font-mono">EV: {fmtB(data.enterpriseValue)}</p>
+                  <p className="text-xs text-text-muted">Market Cap</p>
+                  <p className="text-xl font-bold text-text-primary">{fmtB(data.marketCap)}</p>
+                  <p className="text-xs text-text-muted">EV: {fmtB(data.enterpriseValue)}</p>
                 </div>
               </div>
             </div>
@@ -229,7 +229,7 @@ export default function FinancialsPage() {
               </div>
 
               <div className="mt-4 pt-3 border-t border-border-dim">
-                <h4 className="text-[10px] font-mono text-accent-cyan mb-2">KEY RATIOS</h4>
+                <h4 className="text-xs text-accent-cyan mb-2">KEY RATIOS</h4>
                 <div className="space-y-2">
                   {[
                     ['P/E', data.eps != null && data.eps > 0 ? fmt((data.marketCap ?? 0) / (data.netIncome ?? 1), 1) : '—'],
@@ -252,7 +252,7 @@ export default function FinancialsPage() {
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">SOURCE</h2>
+          <h2 className="text-xs text-accent-cyan mb-2">SOURCE</h2>
           <p className="text-xs text-text-dim">
             Yahoo Finance — Income statement, balance sheet, cash flow, key ratios.
             Data is trailing twelve months (TTM). For historical financials (10+ years),

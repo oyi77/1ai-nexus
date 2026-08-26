@@ -152,7 +152,7 @@ export default function PortfolioPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">PORTFOLIO RISK ANALYTICS</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               {positions.length} positions · VaR, Sharpe, Beta, concentration · Alpaca Paper Trading
             </p>
           </div>
@@ -161,7 +161,7 @@ export default function PortfolioPage() {
 
         {!isConfigured && !loading && (
           <div className="bg-accent-cyan/10 border border-accent-cyan rounded-lg p-4">
-            <p className="text-xs font-mono text-accent-cyan">
+            <p className="text-xs text-accent-cyan">
               Connect Alpaca to see your portfolio risk analytics.
               Set ALPACA_API_KEY and ALPACA_SECRET_KEY in .env.local.
               Free paper trading account at alpaca.markets.
@@ -170,7 +170,7 @@ export default function PortfolioPage() {
         )}
 
         {error && (
-          <div className="text-data-bear text-[11px] font-mono p-4 bg-bg-panel border border-border-dim rounded">
+          <div className="text-data-bear text-xs font-mono p-4 bg-bg-panel border border-border-dim rounded">
             Error: {error}
           </div>
         )}
@@ -186,22 +186,22 @@ export default function PortfolioPage() {
             {/* Summary Cards */}
             <div className="grid grid-cols-4 gap-4">
               <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                <p className="text-[10px] text-text-muted font-mono">TOTAL VALUE</p>
-                <p className="text-xl font-bold font-mono text-text-primary">{fmtB(risk.totalValue)}</p>
+                <p className="text-xs text-text-muted">TOTAL VALUE</p>
+                <p className="text-xl font-bold text-text-primary">{fmtB(risk.totalValue)}</p>
                 <p className={`text-xs font-mono ${risk.totalPnl >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                   {risk.totalPnl >= 0 ? '+' : ''}{fmtB(risk.totalPnl)} ({risk.totalPnlPercent.toFixed(2)}%)
                 </p>
               </div>
               <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                <p className="text-[10px] text-text-muted font-mono">DAILY VaR (95%)</p>
-                <p className="text-xl font-bold font-mono text-data-bear">{fmtB(risk.dailyVaR95)}</p>
+                <p className="text-xs text-text-muted">DAILY VaR (95%)</p>
+                <p className="text-xl font-bold text-data-bear">{fmtB(risk.dailyVaR95)}</p>
               </div>
               <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                <p className="text-[10px] text-text-muted font-mono">PORTFOLIO BETA</p>
-                <p className="text-xl font-bold font-mono text-text-primary">{risk.beta.toFixed(2)}</p>
+                <p className="text-xs text-text-muted">PORTFOLIO BETA</p>
+                <p className="text-xl font-bold text-text-primary">{risk.beta.toFixed(2)}</p>
               </div>
               <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                <p className="text-[10px] text-text-muted font-mono">CONCENTRATION</p>
+                <p className="text-xs text-text-muted">CONCENTRATION</p>
                 <p className={`text-xl font-bold font-mono ${
                   risk.concentrationRisk === 'HIGH' ? 'text-data-bear' :
                   risk.concentrationRisk === 'MEDIUM' ? 'text-accent-cyan' : 'text-data-bull'
@@ -257,7 +257,7 @@ export default function PortfolioPage() {
         ) : null}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">SOURCE</h2>
+          <h2 className="text-xs text-accent-cyan mb-2">SOURCE</h2>
           <p className="text-xs text-text-dim">
             Positions from Alpaca Paper Trading API. Prices from Yahoo Finance.
             Risk metrics computed from real portfolio data.

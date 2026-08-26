@@ -87,10 +87,10 @@ fetchData()
       <div className="h-full overflow-auto p-4 space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-sm font-mono font-bold text-accent-cyan flex items-center gap-2">
+          <h1 className="text-sm font-bold text-accent-cyan flex items-center gap-2">
             <Target size={14} /> PREDICTION MARKETS
           </h1>
-          <span className="text-[10px] text-text-muted">
+          <span className="text-xs text-text-muted">
             {data?.totalMarkets ?? 0} markets · {data ? Object.keys(data.sources).length : 0} sources
           </span>
         </div>
@@ -101,7 +101,7 @@ fetchData()
             {Object.entries(data.sources).map(([key, src]) => (
               <div
                 key={key}
-                className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded border border-border-dim bg-bg-panel"
+                className="flex items-center gap-1.5 text-xs px-2 py-1 rounded border border-border-dim bg-bg-panel"
               >
                 <span className={src.status === "ok" ? "text-green-400" : "text-red-400"}>
                   {src.status === "ok" ? "●" : "○"}
@@ -120,7 +120,7 @@ fetchData()
           <select
             value={source}
             onChange={(e) => setSource(e.target.value)}
-            className="text-[10px] bg-bg-panel border border-border-dim rounded px-2 py-1 text-text-primary"
+            className="text-xs bg-bg-panel border border-border-dim rounded px-2 py-1 text-text-primary"
           >
             {SOURCES.map((s) => (
               <option key={s} value={s}>{s === "all" ? "All Sources" : s}</option>
@@ -129,7 +129,7 @@ fetchData()
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="text-[10px] bg-bg-panel border border-border-dim rounded px-2 py-1 text-text-primary"
+            className="text-xs bg-bg-panel border border-border-dim rounded px-2 py-1 text-text-primary"
           >
             {CATEGORIES.map((c) => (
               <option key={c} value={c}>{c === "all" ? "All Categories" : c}</option>
@@ -138,7 +138,7 @@ fetchData()
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value)}
-            className="text-[10px] bg-bg-panel border border-border-dim rounded px-2 py-1 text-text-primary"
+            className="text-xs bg-bg-panel border border-border-dim rounded px-2 py-1 text-text-primary"
           >
             {SORT_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -146,7 +146,7 @@ fetchData()
           </select>
           <button
             onClick={() => setOrder(order === "desc" ? "asc" : "desc")}
-            className="text-[10px] bg-bg-panel border border-border-dim rounded px-2 py-1 text-text-primary hover:border-border-active transition-colors"
+            className="text-xs bg-bg-panel border border-border-dim rounded px-2 py-1 text-text-primary hover:border-border-active transition-colors"
           >
             {order === "desc" ? "↓" : "↑"}
           </button>
@@ -196,7 +196,7 @@ function MarketCard({ market }: { market: NormalizedMarket }) {
       <div className="mb-2">
         <div className="flex items-center justify-between mb-1">
           <span className={`text-sm font-mono font-bold ${probColor}`}>{prob}%</span>
-          <span className={`text-[9px] px-1.5 py-0.5 rounded ${sourceBadge}`}>
+          <span className={`text-xs px-1.5 py-0.5 rounded ${sourceBadge}`}>
             {market.source}
           </span>
         </div>
@@ -212,7 +212,7 @@ function MarketCard({ market }: { market: NormalizedMarket }) {
       </div>
 
       {/* Stats */}
-      <div className="flex items-center justify-between text-[10px]">
+      <div className="flex items-center justify-between text-xs">
         <div className="flex items-center gap-1 text-text-dim">
           <BarChart3 size={10} />
           <span>${formatNum(market.volume24h)}</span>

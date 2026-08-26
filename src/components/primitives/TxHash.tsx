@@ -26,7 +26,7 @@ export function TxHash({
   const display = `${hash.slice(0, truncate)}…${hash.slice(-truncate)}`
 
   return (
-    <span className={`inline-flex items-center gap-1 font-mono text-[11px] ${className}`}>
+    <span className={`inline-flex items-center gap-1 font-mono text-xs ${className}`}>
       <button
         onClick={copy}
         className="text-data-info hover:text-data-info/80 transition-colors cursor-pointer"
@@ -34,12 +34,12 @@ export function TxHash({
       >
         {display}
       </button>
-      {copied && <span className="text-teal-vivid text-[9px]">✓</span>}
+      {copied && <span className="text-teal-vivid text-xs">✓</span>}
       <a
         href={`${explorerUrl}${hash}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-text-muted hover:text-data-info transition-colors text-[9px]"
+        className="text-text-muted hover:text-data-info transition-colors text-xs"
         title="View on explorer"
       >
         ↗

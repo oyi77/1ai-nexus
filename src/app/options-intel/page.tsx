@@ -96,10 +96,10 @@ function MaxPainChart({ item }: { item: MaxPainItem }) {
       <div className="flex items-center justify-between">
         <div>
           <span className="text-sm font-mono font-bold text-accent-cyan">{item.expiry}</span>
-          <span className="text-[10px] text-text-dim ml-2">({item.daysToExpiry}d)</span>
+          <span className="text-xs text-text-dim ml-2">({item.daysToExpiry}d)</span>
         </div>
         <div className="text-right">
-          <span className="text-[11px] font-mono text-text-secondary">
+          <span className="text-xs font-mono text-text-secondary">
             Max Pain: <span className="text-accent-amber font-bold">{fmtPrice(item.maxPainStrike)}</span>
           </span>
         </div>
@@ -140,7 +140,7 @@ function MaxPainChart({ item }: { item: MaxPainItem }) {
       </div>
 
       {/* Current vs Max Pain */}
-      <div className="flex items-center gap-4 text-[10px] font-mono">
+      <div className="flex items-center gap-4 text-xs font-mono">
         <div className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-accent-cyan inline-block" />
           <span className="text-text-muted">Spot: {fmtPrice(item.currentPrice)}</span>
@@ -214,7 +214,7 @@ fetchData()
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">OPTIONS INTEL</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Deribit options max pain, futures term structure, cross-exchange funding heatmap — all public APIs
             </p>
           </div>
@@ -232,27 +232,27 @@ fetchData()
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {data.termStructure.map((ts) => (
               <div key={ts.asset} className="bg-bg-panel border border-border-dim rounded-lg p-3">
-                <p className="text-[10px] text-text-muted font-mono">{ts.asset} TERM STRUCTURE</p>
-                <p className="text-lg font-mono font-bold" style={{ color: regimeColor(ts.regime) }}>
+                <p className="text-xs text-text-muted">{ts.asset} TERM STRUCTURE</p>
+                <p className="text-lg font-bold" style={{ color: regimeColor(ts.regime) }}>
                   {ts.regime.toUpperCase()}
                 </p>
-                <p className="text-[10px] font-mono text-text-dim">
+                <p className="text-xs text-text-dim">
                   {ts.annualizedBasis > 0 ? '+' : ''}{ts.annualizedBasis}% annualized
                 </p>
-                <p className="text-[10px] font-mono mt-1">{signalEmoji(ts.signal)} {ts.signal}</p>
+                <p className="text-xs mt-1">{signalEmoji(ts.signal)} {ts.signal}</p>
               </div>
             ))}
 
             {data.maxPain.length > 0 && (
               <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-                <p className="text-[10px] text-text-muted font-mono">BTC MAX PAIN (NEAREST)</p>
-                <p className="text-lg font-mono font-bold text-accent-amber">
+                <p className="text-xs text-text-muted">BTC MAX PAIN (NEAREST)</p>
+                <p className="text-lg font-bold text-accent-amber">
                   {fmtPrice(data.maxPain[0]?.maxPainStrike ?? 0)}
                 </p>
-                <p className="text-[10px] font-mono text-text-dim">
+                <p className="text-xs text-text-dim">
                   Spot: {fmtPrice(data.maxPain[0]?.currentPrice ?? 0)}
                 </p>
-                <p className={`text-[10px] font-mono mt-1 ${data.maxPain[0]?.signal === 'above' ? 'text-data-bull' : 'text-data-bear'}`}>
+                <p className={`text-xs font-mono mt-1 ${data.maxPain[0]?.signal === 'above' ? 'text-data-bull' : 'text-data-bear'}`}>
                   {data.maxPain[0]?.distance > 0 ? '+' : ''}{data.maxPain[0]?.distance ?? 0}% to max pain
                 </p>
               </div>
@@ -260,8 +260,8 @@ fetchData()
 
             {data.fundingHeatmap.length > 0 && (
               <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-                <p className="text-[10px] text-text-muted font-mono">FUNDING SIGNAL</p>
-                <p className="text-lg font-mono font-bold">
+                <p className="text-xs text-text-muted">FUNDING SIGNAL</p>
+                <p className="text-lg font-bold">
                   {data.fundingHeatmap.filter(e => e.direction === 'longs_pay').length > data.fundingHeatmap.filter(e => e.direction === 'shorts_pay').length
                     ? <span className="text-data-bull">LONGS PAYING</span>
                     : data.fundingHeatmap.filter(e => e.direction === 'shorts_pay').length > data.fundingHeatmap.filter(e => e.direction === 'longs_pay').length
@@ -269,7 +269,7 @@ fetchData()
                       : <span className="text-text-dim">NEUTRAL</span>
                   }
                 </p>
-                <p className="text-[10px] font-mono text-text-dim">
+                <p className="text-xs text-text-dim">
                   {data.fundingHeatmap.filter(e => e.magnitude === 'extreme').length} extreme rates
                 </p>
               </div>
@@ -284,7 +284,7 @@ fetchData()
           liveStatus={loading ? 'stale' : 'live'}
         >
           {!data || data.maxPain.length === 0 ? (
-            <div className="text-text-muted text-[11px] p-4 text-center">
+            <div className="text-text-muted text-xs p-4 text-center">
               {loading ? 'Loading options data...' : 'No max pain data available'}
             </div>
           ) : (
@@ -303,7 +303,7 @@ fetchData()
           liveStatus={loading ? 'stale' : 'live'}
         >
           {!data || data.termStructure.length === 0 ? (
-            <div className="text-text-muted text-[11px] p-4 text-center">
+            <div className="text-text-muted text-xs p-4 text-center">
               {loading ? 'Loading term structure...' : 'No term structure data'}
             </div>
           ) : (
@@ -313,7 +313,7 @@ fetchData()
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-mono font-bold text-accent-cyan">{ts.asset}</span>
                     <span
-                      className="text-[11px] font-mono font-bold px-2 py-0.5 rounded"
+                      className="text-xs font-mono font-bold px-2 py-0.5 rounded"
                       style={{
                         color: regimeColor(ts.regime),
                         backgroundColor: `${regimeColor(ts.regime)}20`,
@@ -323,28 +323,28 @@ fetchData()
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3 text-[11px] font-mono">
+                  <div className="grid grid-cols-3 gap-3 text-xs font-mono">
                     <div className="bg-bg-raised rounded p-2">
-                      <p className="text-text-dim text-[9px]">SPOT INDEX</p>
+                      <p className="text-text-dim text-xs">SPOT INDEX</p>
                       <p className="font-bold">{fmtPrice(ts.spotIndex)}</p>
                     </div>
                     {ts.currentQuarter && (
                       <div className="bg-bg-raised rounded p-2">
-                        <p className="text-text-dim text-[9px]">CURRENT Q</p>
+                        <p className="text-text-dim text-xs">CURRENT Q</p>
                         <p className="font-bold">{fmtPrice(ts.currentQuarter.price)}</p>
-                        <p className="text-[9px] text-text-dim truncate">{ts.currentQuarter.label}</p>
+                        <p className="text-xs text-text-dim truncate">{ts.currentQuarter.label}</p>
                       </div>
                     )}
                     {ts.nextQuarter && (
                       <div className="bg-bg-raised rounded p-2">
-                        <p className="text-text-dim text-[9px]">NEXT Q</p>
+                        <p className="text-text-dim text-xs">NEXT Q</p>
                         <p className="font-bold">{fmtPrice(ts.nextQuarter.price)}</p>
-                        <p className="text-[9px] text-text-dim truncate">{ts.nextQuarter.label}</p>
+                        <p className="text-xs text-text-dim truncate">{ts.nextQuarter.label}</p>
                       </div>
                     )}
                   </div>
 
-                  <div className="text-[10px] font-mono text-text-secondary">
+                  <div className="text-xs font-mono text-text-secondary">
                     Annualized basis: <span className="font-bold" style={{ color: ts.annualizedBasis > 0 ? '#36b37e' : ts.annualizedBasis < 0 ? '#ff5630' : '#6b778c' }}>
                       {ts.annualizedBasis > 0 ? '+' : ''}{ts.annualizedBasis}%
                     </span>
@@ -362,7 +362,7 @@ fetchData()
           liveStatus={loading ? 'stale' : 'live'}
         >
           {!data || topSymbols.length === 0 ? (
-            <div className="text-text-muted text-[11px] p-4 text-center">
+            <div className="text-text-muted text-xs p-4 text-center">
               {loading ? 'Loading funding rates...' : 'No funding data'}
             </div>
           ) : (
@@ -370,11 +370,11 @@ fetchData()
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-text-muted border-b border-border-dim">
-                    <th className="text-left py-2 px-2 font-mono sticky left-0 bg-bg-panel">PAIR</th>
-                    <th className="text-center py-2 px-2 font-mono">BINANCE</th>
-                    <th className="text-center py-2 px-2 font-mono">BYBIT</th>
-                    <th className="text-center py-2 px-2 font-mono">OKX</th>
-                    <th className="text-center py-2 px-2 font-mono">SIGNAL</th>
+                    <th className="text-left py-2 px-2 sticky left-0 bg-bg-panel">PAIR</th>
+                    <th className="text-center py-2 px-2">BINANCE</th>
+                    <th className="text-center py-2 px-2">BYBIT</th>
+                    <th className="text-center py-2 px-2">OKX</th>
+                    <th className="text-center py-2 px-2">SIGNAL</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -398,7 +398,7 @@ fetchData()
                           <td key={i} className="py-2 px-2 text-center font-mono">
                             {entry ? (
                               <span
-                                className="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                                className="px-1.5 py-0.5 rounded text-xs font-bold"
                                 style={{
                                   color: fundingColor(entry),
                                   backgroundColor: `${fundingColor(entry)}15`,
@@ -411,7 +411,7 @@ fetchData()
                             )}
                           </td>
                         ))}
-                        <td className="py-2 px-2 text-center text-[10px] font-mono">
+                        <td className="py-2 px-2 text-center text-xs font-mono">
                           <span style={{ color: fundingColor(dominant) }}>
                             {dominant.direction === 'longs_pay' ? '↑ L pay' : dominant.direction === 'shorts_pay' ? '↓ S pay' : '— neutral'}
                           </span>
@@ -427,7 +427,7 @@ fetchData()
 
         {/* ─── Signal Guide ─────────────────────────────────── */}
         <Panel title="Signal Guide" subtitle="How to interpret these derivatives indicators">
-          <div className="p-4 space-y-4 text-[11px] font-mono text-text-secondary leading-relaxed">
+          <div className="p-4 space-y-4 text-xs font-mono text-text-secondary leading-relaxed">
             <div>
               <p className="text-accent-amber font-bold mb-1">MAX PAIN</p>
               <p>
@@ -460,7 +460,7 @@ fetchData()
 
         {/* Timestamp */}
         {data?.timestamp && (
-          <p className="text-[10px] text-text-dim font-mono text-right">
+          <p className="text-xs text-text-dim text-right">
             Last updated: {new Date(data.timestamp).toLocaleString()}
           </p>
         )}

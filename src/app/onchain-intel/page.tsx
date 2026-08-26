@@ -68,7 +68,7 @@ export default function OnchainIntelPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">ON-CHAIN INTELLIGENCE</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Mempool congestion, bridge flows, staking queue — all from public APIs
             </p>
           </div>
@@ -79,22 +79,22 @@ export default function OnchainIntelPage() {
         {staking && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">NET STAKED ETH</p>
-              <p className="text-lg font-mono font-bold">{staking.netStaked ? `${(staking.netStaked / 1e6).toFixed(1)}M` : '—'}</p>
+              <p className="text-xs text-text-muted">NET STAKED ETH</p>
+              <p className="text-lg font-bold">{staking.netStaked ? `${(staking.netStaked / 1e6).toFixed(1)}M` : '—'}</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">ENTRY QUEUE</p>
-              <p className="text-lg font-mono font-bold text-data-bull">{staking.entryQueue ?? '—'}</p>
-              <p className="text-[9px] text-text-dim">{staking.entryWaitDays ? `~${staking.entryWaitDays}d wait` : ''}</p>
+              <p className="text-xs text-text-muted">ENTRY QUEUE</p>
+              <p className="text-lg font-bold text-data-bull">{staking.entryQueue ?? '—'}</p>
+              <p className="text-xs text-text-dim">{staking.entryWaitDays ? `~${staking.entryWaitDays}d wait` : ''}</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">EXIT QUEUE</p>
-              <p className="text-lg font-mono font-bold text-data-bear">{staking.exitQueue ?? '—'}</p>
-              <p className="text-[9px] text-text-dim">{staking.exitWaitDays ? `~${staking.exitWaitDays}d wait` : ''}</p>
+              <p className="text-xs text-text-muted">EXIT QUEUE</p>
+              <p className="text-lg font-bold text-data-bear">{staking.exitQueue ?? '—'}</p>
+              <p className="text-xs text-text-dim">{staking.exitWaitDays ? `~${staking.exitWaitDays}d wait` : ''}</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted font-mono">SIGNAL</p>
-              <p className="text-sm font-mono font-bold">
+              <p className="text-xs text-text-muted">SIGNAL</p>
+              <p className="text-sm font-bold">
                 {(staking.exitQueue ?? 0) > 10000 ? 'Exit pressure — sell signal' : (staking.entryQueue ?? 0) > 10000 ? 'Entry demand — bullish' : 'Neutral'}
               </p>
             </div>
@@ -104,17 +104,17 @@ export default function OnchainIntelPage() {
         {/* Mempool Events */}
         <Panel title="Mempool Alerts" subtitle={`${mempool.length} events`}>
           {mempool.length === 0 ? (
-            <div className="text-text-muted text-[11px] p-4 text-center">No mempool alerts — normal conditions</div>
+            <div className="text-text-muted text-xs p-4 text-center">No mempool alerts — normal conditions</div>
           ) : (
             <div className="divide-y divide-border-dim/30">
               {mempool.map((e, i) => (
                 <div key={i} className="p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber">{e.chain}</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted">{e.type}</span>
+                      <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber">{e.chain}</span>
+                      <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted">{e.type}</span>
                     </div>
-                    <span className="text-[10px] text-text-dim">{new Date(e.detectedAt).toLocaleString()}</span>
+                    <span className="text-xs text-text-dim">{new Date(e.detectedAt).toLocaleString()}</span>
                   </div>
                   <p className="text-xs text-text-primary mt-1">{String(e.metadata?.signal ?? 'Mempool activity detected')}</p>
                 </div>

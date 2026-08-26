@@ -147,7 +147,7 @@ export default function TokenGodModePage() {
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">🔬</span> Token God Mode
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               Deep analysis of any token — holders, pools, entity attribution. Inspired by Nansen.
             </p>
           </div>
@@ -181,7 +181,7 @@ export default function TokenGodModePage() {
               <button
                 onClick={fetchToken}
                 disabled={status === 'loading'}
-                className="px-4 py-2 bg-teal-vivid text-bg-base rounded text-[11px] font-mono font-bold hover:bg-teal-vivid/80 transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-teal-vivid text-bg-base rounded text-xs font-bold hover:bg-teal-vivid/80 transition-colors disabled:opacity-50"
               >
                 {status === 'loading' ? 'Scanning...' : 'ANALYZE'}
               </button>
@@ -195,12 +195,12 @@ export default function TokenGodModePage() {
             {/* Trending tokens from DexScreener */}
             {trending.length > 0 && (
               <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-                <h3 className="text-xs font-mono text-accent-amber mb-2">TRENDING NOW (DexScreener)</h3>
-                <p className="text-[10px] text-text-muted mb-3">Top boosted tokens — click to analyze</p>
+                <h3 className="text-xs text-accent-amber mb-2">TRENDING NOW (DexScreener)</h3>
+                <p className="text-xs text-text-muted mb-3">Top boosted tokens — click to analyze</p>
                 <div className="flex flex-wrap gap-2">
                   {trending.map(token => (
                     <button key={token.address} onClick={() => { setAddress(token.address); setNetwork(token.network) }}
-                      className="px-3 py-1.5 text-[10px] font-mono border border-accent-amber/30 rounded hover:border-accent-amber hover:bg-bg-elevated transition-colors">
+                      className="px-3 py-1.5 text-xs font-mono border border-accent-amber/30 rounded hover:border-accent-amber hover:bg-bg-elevated transition-colors">
                       <span className="text-accent-amber font-bold">{token.symbol}</span>
                       <span className="text-text-muted ml-1">{token.network}</span>
                     </button>
@@ -211,12 +211,12 @@ export default function TokenGodModePage() {
 
             {/* Popular blue-chip tokens */}
             <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-              <h3 className="text-xs font-mono text-accent-cyan mb-2">BLUE CHIPS</h3>
-              <p className="text-[10px] text-text-muted mb-3">Major tokens — click to analyze</p>
+              <h3 className="text-xs text-accent-cyan mb-2">BLUE CHIPS</h3>
+              <p className="text-xs text-text-muted mb-3">Major tokens — click to analyze</p>
               <div className="flex flex-wrap gap-2">
                 {POPULAR_TOKENS.map(token => (
                   <button key={token.address} onClick={() => { setAddress(token.address); setNetwork(token.network) }}
-                    className="px-3 py-1.5 text-[10px] font-mono border border-border-dim rounded hover:border-teal-vivid hover:bg-bg-elevated transition-colors">
+                    className="px-3 py-1.5 text-xs font-mono border border-border-dim rounded hover:border-teal-vivid hover:bg-bg-elevated transition-colors">
                     <span className="text-accent-cyan font-bold">{token.name}</span>
                     <span className="text-text-muted ml-1">{token.network}</span>
                   </button>
@@ -245,21 +245,21 @@ export default function TokenGodModePage() {
                 <table className="w-full border-separate border-spacing-0">
                   <thead>
                     <tr className="text-text-muted">
-                      <SortableTh controls={poolsTc} k="name" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Pool</SortableTh>
-                      <SortableTh controls={poolsTc} k="dex" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-left">DEX</SortableTh>
-                      <SortableTh controls={poolsTc} k="priceUsd" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Price</SortableTh>
-                      <SortableTh controls={poolsTc} k="volume24h" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Volume 24h</SortableTh>
-                      <SortableTh controls={poolsTc} k="liquidity" className="text-[10px] font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Liquidity</SortableTh>
+                      <SortableTh controls={poolsTc} k="name" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-left">Pool</SortableTh>
+                      <SortableTh controls={poolsTc} k="dex" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-left">DEX</SortableTh>
+                      <SortableTh controls={poolsTc} k="priceUsd" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Price</SortableTh>
+                      <SortableTh controls={poolsTc} k="volume24h" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Volume 24h</SortableTh>
+                      <SortableTh controls={poolsTc} k="liquidity" className="text-xs font-mono uppercase px-3 py-2 border-b border-bg-border text-right">Liquidity</SortableTh>
                     </tr>
                   </thead>
                   <tbody>
                     {poolsTc.visible.map((p, i) => (
                       <tr key={i} className="border-b border-bg-border/30 hover:bg-bg-raised transition-colors">
-                        <td className="text-[11px] font-mono px-3 py-1.5 text-text-primary font-bold">{p.name}</td>
-                        <td className="text-[10px] font-mono px-3 py-1.5 text-teal-vivid">{p.dex}</td>
-                        <td className="text-[11px] font-mono px-3 py-1.5 text-right text-text-primary tabular-nums">${p.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 6 })}</td>
-                        <td className="text-[11px] font-mono px-3 py-1.5 text-right text-text-secondary tabular-nums">{fmtUsd(p.volume24h)}</td>
-                        <td className="text-[11px] font-mono px-3 py-1.5 text-right text-text-secondary tabular-nums">{fmtUsd(p.liquidity)}</td>
+                        <td className="text-xs font-mono px-3 py-1.5 text-text-primary font-bold">{p.name}</td>
+                        <td className="text-xs font-mono px-3 py-1.5 text-teal-vivid">{p.dex}</td>
+                        <td className="text-xs font-mono px-3 py-1.5 text-right text-text-primary tabular-nums">${p.priceUsd.toLocaleString(undefined, { maximumFractionDigits: 6 })}</td>
+                        <td className="text-xs font-mono px-3 py-1.5 text-right text-text-secondary tabular-nums">{fmtUsd(p.volume24h)}</td>
+                        <td className="text-xs font-mono px-3 py-1.5 text-right text-text-secondary tabular-nums">{fmtUsd(p.liquidity)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -274,18 +274,18 @@ export default function TokenGodModePage() {
                   <div key={i} className="bg-bg-raised p-3 rounded border border-bg-border">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-[12px] font-mono font-bold text-text-primary">{h.entityName ?? 'Unknown'}</span>
-                      {h.verified && <span className="text-teal-vivid text-[10px]">✓</span>}
+                      {h.verified && <span className="text-teal-vivid text-xs">✓</span>}
                     </div>
                     <div className="flex items-center gap-2 mb-1">
                       {h.entityType && (
-                        <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${typeColors[h.entityType] ?? 'bg-bg-raised text-text-muted'}`}>
+                        <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${typeColors[h.entityType] ?? 'bg-bg-raised text-text-muted'}`}>
                           {h.entityType.toUpperCase()}
                         </span>
                       )}
-                      <span className="text-[10px] font-mono text-text-muted">{h.chain}</span>
+                      <span className="text-xs font-mono text-text-muted">{h.chain}</span>
                     </div>
-                    <div className="text-[10px] font-mono text-text-muted">TVL: {fmtUsd(h.entityTvl)}</div>
-                    <div className="text-[10px] font-mono text-text-muted mt-1">{h.address.slice(0, 16)}...</div>
+                    <div className="text-xs font-mono text-text-muted">TVL: {fmtUsd(h.entityTvl)}</div>
+                    <div className="text-xs font-mono text-text-muted mt-1">{h.address.slice(0, 16)}...</div>
                   </div>
                 ))}
               </div>
@@ -296,9 +296,9 @@ export default function TokenGodModePage() {
               <div className="p-3 grid grid-cols-5 gap-3">
                 {Object.entries(data.entityDistribution).map(([type, dist]) => (
                   <div key={type} className="bg-bg-raised p-3 rounded border border-bg-border">
-                    <div className="text-[10px] font-mono text-text-muted uppercase mb-1">{type}</div>
+                    <div className="text-xs font-mono text-text-muted uppercase mb-1">{type}</div>
                     <div className="text-[16px] font-head font-bold text-text-primary">{dist.count}</div>
-                    <div className="text-[10px] font-mono text-text-muted">TVL: {fmtUsd(dist.tvl)}</div>
+                    <div className="text-xs font-mono text-text-muted">TVL: {fmtUsd(dist.tvl)}</div>
                   </div>
                 ))}
               </div>
@@ -313,7 +313,7 @@ export default function TokenGodModePage() {
 function KPI({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="bg-bg-panel border border-bg-border p-3 rounded">
-      <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
+      <div className="text-xs text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className={`text-[16px] font-head font-bold tabular-nums ${color ?? 'text-text-primary'}`}>{value}</div>
     </div>
   )

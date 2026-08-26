@@ -84,9 +84,9 @@ export function TableControlsBar({ idPrefix, query, onQueryChange, shown, total,
         value={query}
         onChange={e => onQueryChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full min-w-0 bg-bg-base border border-bg-border rounded px-2 py-1.5 text-[11px] font-mono text-text-primary placeholder:text-text-muted focus:outline-none focus:border-teal-vivid sm:w-auto sm:flex-1 sm:max-w-xs"
+        className="w-full min-w-0 bg-bg-base border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-text-primary placeholder:text-text-muted focus:outline-none focus:border-teal-vivid sm:w-auto sm:flex-1 sm:max-w-xs"
       />
-      <span className="text-[10px] font-mono text-text-muted whitespace-nowrap" aria-live="polite">{shown}/{total} rows</span>
+      <span className="text-xs font-mono text-text-muted whitespace-nowrap" aria-live="polite">{shown}/{total} rows</span>
     </div>
   )
 }

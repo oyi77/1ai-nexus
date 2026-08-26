@@ -95,7 +95,7 @@ export function CommandBar() {
           onBlur={() => setTimeout(() => setIsOpen(false), 200)}
           onKeyDown={handleKeyDown}
           placeholder="BTC GP 1Y · KIMCHI · NEWS ID · /help"
-          className="bg-transparent text-[11px] font-mono text-text-primary placeholder:text-text-muted outline-none w-full"
+          className="bg-transparent text-xs font-mono text-text-primary placeholder:text-text-muted outline-none w-full"
         />
         {input && (
           <button onClick={() => { setInput(''); setError(null) }} className="text-text-muted hover:text-text-secondary">
@@ -108,11 +108,11 @@ export function CommandBar() {
       {/* Suggestions dropdown */}
       {isOpen && (suggestions.length > 0 || error) && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-bg-panel border border-bg-border rounded shadow-lg z-50">
-          {error && <div className="px-3 py-1.5 text-[10px] text-data-bear font-mono">{error}</div>}
+          {error && <div className="px-3 py-1.5 text-xs text-data-bear font-mono">{error}</div>}
           {suggestions.map((s, i) => (
             <button
               key={i}
-              className="w-full text-left px-3 py-1.5 text-[11px] font-mono text-text-secondary hover:bg-bg-raised hover:text-text-primary transition-colors flex items-center gap-2"
+              className="w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:bg-bg-raised hover:text-text-primary transition-colors flex items-center gap-2"
               onMouseDown={() => { setInput(s.split(' — ')[0]); execute() }}
             >
               <ChevronRight size={10} className="text-teal-vivid" />
@@ -120,7 +120,7 @@ export function CommandBar() {
             </button>
           ))}
           {getHistory().length > 0 && (
-            <div className="border-t border-bg-border px-3 py-1 text-[9px] text-text-muted font-mono flex items-center gap-1">
+            <div className="border-t border-bg-border px-3 py-1 text-xs text-text-muted font-mono flex items-center gap-1">
               <Clock size={8} /> ↑↓ for history · Enter to execute
             </div>
           )}

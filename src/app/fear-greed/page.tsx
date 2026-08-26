@@ -26,7 +26,7 @@ export default function FearGreedPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">Fear & Greed Index</h1>
-            <p className="text-[11px] text-text-muted font-mono">Market sentiment composite</p>
+            <p className="text-xs text-text-muted">Market sentiment composite</p>
           </div>
           <LiveDot status={status} label />
         </div>
@@ -45,10 +45,10 @@ export default function FearGreedPage() {
               <div className="p-3 grid grid-cols-2 lg:grid-cols-3 gap-2">
                 {d.categories && (Array.isArray(d.categories) ? d.categories : Object.entries(d.categories).map(([name, cat]) => ({ name, ...(cat as { score: number; weight: number }) }))).map((cat, i) => (
                   <div key={i} className="bg-bg-raised rounded p-3">
-                    <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider mb-1">{cat.name}</div>
+                    <div className="text-xs text-text-muted font-mono uppercase tracking-wider mb-1">{cat.name}</div>
                     <div className="flex items-baseline gap-2">
                       <span className={`text-[20px] font-head font-bold tabular-nums ${scoreColor(cat.score)}`}>{cat.score}</span>
-                      <span className="text-[10px] text-text-muted font-mono">×{cat.weight}</span>
+                      <span className="text-xs text-text-muted font-mono">×{cat.weight}</span>
                     </div>
                     <div className="mt-2 h-1.5 bg-bg-border rounded-full overflow-hidden">
                       <div className={`h-full rounded-full transition-all duration-500 ${cat.score > 50 ? 'bg-data-bull' : cat.score > 30 ? 'bg-data-warn' : 'bg-data-bear'}`} style={{ width: `${cat.score}%` }} />

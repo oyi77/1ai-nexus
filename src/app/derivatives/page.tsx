@@ -89,7 +89,7 @@ fetchData()
 
   const columns: Column<DerivPair>[] = [
     { key: 'symbol', header: 'Pair', width: 100, render: r => (
-      <span className="text-teal-vivid font-bold text-[11px]">{r.baseAsset}</span>
+      <span className="text-teal-vivid font-bold text-xs">{r.baseAsset}</span>
     )},
     { key: 'price', header: 'Price', width: 100, align: 'right', render: r => (
       <PriceTag value={r.price} size="sm" />
@@ -98,33 +98,33 @@ fetchData()
       <DeltaBadge value={r.priceChange24h} size="xs" />
     )},
     { key: 'volume24h', header: 'Vol 24h', width: 100, align: 'right', render: r => (
-      <span className="text-text-secondary font-mono text-[10px]">{fmtUsd(r.volume24h)}</span>
+      <span className="text-text-secondary font-mono text-xs">{fmtUsd(r.volume24h)}</span>
     )},
     { key: 'openInterest', header: 'Open Interest', width: 110, align: 'right', render: r => (
-      <span className="text-text-primary font-mono text-[11px] font-bold tabular-nums">
+      <span className="text-text-primary font-mono text-xs font-bold tabular-nums">
         {r.openInterest > 0 ? `${r.openInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })} ${r.baseAsset}` : '—'}
       </span>
     )},
     { key: 'fundingRate', header: 'Funding Rate', width: 120, align: 'right', render: r => (
       <div className="flex flex-col items-end">
-        <span className={`font-mono text-[11px] font-bold ${fundingColor(r.fundingRate)}`}>
+        <span className={`font-mono text-xs font-bold ${fundingColor(r.fundingRate)}`}>
           {(r.fundingRate * 100).toFixed(4)}%
         </span>
-        <span className="text-[9px] font-mono text-text-muted">{fundingLabel(r.fundingRate)}</span>
+        <span className="text-xs font-mono text-text-muted">{fundingLabel(r.fundingRate)}</span>
       </div>
     )},
     { key: 'nextFundingTime', header: 'Next Funding', width: 100, align: 'right', render: r => {
-      if (!r.nextFundingTime) return <span className="text-text-muted text-[10px]">—</span>
+      if (!r.nextFundingTime) return <span className="text-text-muted text-xs">—</span>
       const mins = Math.floor((r.nextFundingTime - Date.now()) / 60000)
       const hrs = Math.floor(mins / 60)
       const remMins = mins % 60
-      return <span className="text-text-muted font-mono text-[10px]">{hrs}h {remMins}m</span>
+      return <span className="text-text-muted font-mono text-xs">{hrs}h {remMins}m</span>
     }},
     { key: 'high24h', header: '24h High', width: 90, align: 'right', render: r => (
-      <span className="text-data-bull font-mono text-[10px]">{r.high24h > 0 ? `$${r.high24h.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</span>
+      <span className="text-data-bull font-mono text-xs">{r.high24h > 0 ? `$${r.high24h.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</span>
     )},
     { key: 'low24h', header: '24h Low', width: 90, align: 'right', render: r => (
-      <span className="text-data-bear font-mono text-[10px]">{r.low24h > 0 ? `$${r.low24h.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</span>
+      <span className="text-data-bear font-mono text-xs">{r.low24h > 0 ? `$${r.low24h.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</span>
     )},
   ]
 
@@ -145,7 +145,7 @@ fetchData()
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">📊</span> Derivatives Terminal
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               Real-time funding rates, open interest, and liquidation levels from Binance Futures
             </p>
           </div>
@@ -169,20 +169,20 @@ fetchData()
                 <div key={i} className="flex items-center justify-between bg-bg-raised p-2 rounded">
                   <div className="flex items-center gap-2">
                     <span className="text-teal-vivid font-bold text-[12px]">{p.baseAsset}</span>
-                    <span className={`text-[10px] font-mono ${fundingColor(p.fundingRate)}`}>
+                    <span className={`text-xs font-mono ${fundingColor(p.fundingRate)}`}>
                       {(p.fundingRate * 100).toFixed(4)}%
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-mono text-text-muted">OI: {p.openInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                    <span className={`text-[10px] font-mono font-bold ${p.fundingRate > 0 ? 'text-data-bear' : 'text-data-bull'}`}>
+                    <span className="text-xs font-mono text-text-muted">OI: {p.openInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                    <span className={`text-xs font-mono font-bold ${p.fundingRate > 0 ? 'text-data-bear' : 'text-data-bull'}`}>
                       {p.fundingRate > 0 ? 'SHORTS PAID' : 'LONGS PAID'}
                     </span>
                   </div>
                 </div>
               ))}
               {extremeFunding.length === 0 && (
-                <div className="text-text-muted text-[11px] font-mono p-4 text-center">No extreme funding rates detected</div>
+                <div className="text-text-muted text-xs font-mono p-4 text-center">No extreme funding rates detected</div>
               )}
             </div>
           </Panel>
@@ -192,14 +192,14 @@ fetchData()
               {topOI.map((p, i) => (
                 <div key={i} className="flex items-center justify-between bg-bg-raised p-2 rounded">
                   <div className="flex items-center gap-2">
-                    <span className="text-text-muted font-mono text-[10px]">#{i + 1}</span>
+                    <span className="text-text-muted font-mono text-xs">#{i + 1}</span>
                     <span className="text-teal-vivid font-bold text-[12px]">{p.baseAsset}</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-[11px] font-mono font-bold text-text-primary tabular-nums">
+                    <span className="text-xs font-mono font-bold text-text-primary tabular-nums">
                       {p.openInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })} {p.baseAsset}
                     </span>
-                    <span className="text-[10px] font-mono text-text-muted">
+                    <span className="text-xs font-mono text-text-muted">
                       ${((p.openInterest * p.price) / 1e6).toFixed(1)}M
                     </span>
                   </div>
@@ -212,12 +212,12 @@ fetchData()
         {/* Full Table */}
         <Panel title="All Perpetual Contracts" subtitle={`${sorted.length} pairs from Binance Futures`} liveStatus={status} onRefresh={fetchData}>
           <div className="flex items-center gap-1 p-2 border-b border-bg-border">
-            <span className="text-[10px] font-mono text-text-muted mr-2">Sort by:</span>
+            <span className="text-xs font-mono text-text-muted mr-2">Sort by:</span>
             {(['volume', 'funding', 'oi'] as const).map(s => (
               <button
                 key={s}
                 onClick={() => setSortBy(s)}
-                className={`px-3 py-1 text-[10px] font-mono rounded uppercase transition-colors ${sortBy === s ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary bg-bg-raised'}`}
+                className={`px-3 py-1 text-xs font-mono rounded uppercase transition-colors ${sortBy === s ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary bg-bg-raised'}`}
               >
                 {s === 'oi' ? 'Open Interest' : s}
               </button>
@@ -240,7 +240,7 @@ fetchData()
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="bg-bg-panel border border-bg-border p-3 rounded">
-      <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
+      <div className="text-xs text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className="text-[16px] font-head font-bold tabular-nums text-text-primary">{value}</div>
     </div>
   )

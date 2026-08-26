@@ -153,7 +153,7 @@ function GaugeCircle({
           {unit ?? ''}
         </text>
       </svg>
-      <span className="text-[11px] font-mono text-text-muted">{label}</span>
+      <span className="text-xs font-mono text-text-muted">{label}</span>
     </div>
   )
 }
@@ -171,7 +171,7 @@ function Sparkline({
   height?: number
   color?: string
 }) {
-  if (data.length < 2) return <div className="text-[10px] text-text-muted">No history yet</div>
+  if (data.length < 2) return <div className="text-xs text-text-muted">No history yet</div>
 
   const min = Math.min(...data)
   const max = Math.max(...data)
@@ -224,7 +224,7 @@ function IndicatorCard({
           unit={unit}
           size={140}
         />
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded border text-[11px] font-mono font-bold ${zoneBg(ind.zone)}`}>
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-mono font-bold ${zoneBg(ind.zone)}`}>
           {zoneLabel(ind.zone)}
         </span>
         {historyValues.length > 0 && (
@@ -323,7 +323,7 @@ function CycleIndicatorsPageInner() {
             <Activity size={20} className="text-teal-vivid" />
             <div>
               <h1 className="text-[20px] font-head font-bold text-text-primary">Cycle Indicators</h1>
-              <p className="text-[11px] text-text-muted font-mono">
+              <p className="text-xs text-text-muted">
                 MVRV, NUPL, SSR — on-chain cycle position from CoinGecko data
               </p>
             </div>
@@ -335,7 +335,7 @@ function CycleIndicatorsPageInner() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-1">
           {summaryStats.map((s, i) => (
             <div key={i} className="bg-bg-panel border border-bg-border px-3 py-2">
-              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider mb-1">{s.label}</div>
+              <div className="text-xs text-text-muted font-mono uppercase tracking-wider mb-1">{s.label}</div>
               <div className={`text-[15px] font-head font-bold tabular-nums ${s.color}`}>{s.value}</div>
             </div>
           ))}
@@ -360,14 +360,14 @@ function CycleIndicatorsPageInner() {
 
         {/* Methodology */}
         <Panel title="Methodology" subtitle="How these indicators work">
-          <div className="p-3 space-y-3 text-[11px] text-text-secondary">
+          <div className="p-3 space-y-3 text-xs text-text-secondary">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-teal-vivid font-bold">MVRV Z-Score</span>
-                  <span className="text-[9px] font-mono text-text-muted">(Market Value to Realized Value)</span>
+                  <span className="text-xs font-mono text-text-muted">(Market Value to Realized Value)</span>
                 </div>
-                <p className="text-[10px] leading-relaxed">
+                <p className="text-xs leading-relaxed">
                   Measures how far market cap deviates from realized cap in standard deviations.
                   Computed as: <span className="font-mono text-teal-vivid">(Market Cap − Realized Cap Proxy) / StdDev</span>.
                   Uses FDV as a proxy for realized cap. &gt;7 = extreme overvaluation, &lt;−0.5 = capitulation.
@@ -377,9 +377,9 @@ function CycleIndicatorsPageInner() {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-teal-vivid font-bold">NUPL</span>
-                  <span className="text-[9px] font-mono text-text-muted">(Net Unrealized Profit/Loss)</span>
+                  <span className="text-xs font-mono text-text-muted">(Net Unrealized Profit/Loss)</span>
                 </div>
-                <p className="text-[10px] leading-relaxed">
+                <p className="text-xs leading-relaxed">
                   Ratio of unrealized profit to total market cap.
                   Computed as: <span className="font-mono text-teal-vivid">1 − (Realized Cap / Market Cap)</span>.
                   &gt;0.75 = euphoria (most holders in profit), &lt;0 = capitulation (aggregate loss).
@@ -389,9 +389,9 @@ function CycleIndicatorsPageInner() {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-teal-vivid font-bold">SSR</span>
-                  <span className="text-[9px] font-mono text-text-muted">(Stablecoin Supply Ratio)</span>
+                  <span className="text-xs font-mono text-text-muted">(Stablecoin Supply Ratio)</span>
                 </div>
-                <p className="text-[10px] leading-relaxed">
+                <p className="text-xs leading-relaxed">
                   Ratio of BTC market cap to total stablecoin market cap.
                   Low SSR = stablecoins have high purchasing power relative to BTC — potential buying pressure.
                   High SSR = stablecoins are relatively scarce, less sidelined capital.
@@ -400,9 +400,9 @@ function CycleIndicatorsPageInner() {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-teal-vivid font-bold">Stablecoin Dominance</span>
-                  <span className="text-[9px] font-mono text-text-muted">(% of total market)</span>
+                  <span className="text-xs font-mono text-text-muted">(% of total market)</span>
                 </div>
-                <p className="text-[10px] leading-relaxed">
+                <p className="text-xs leading-relaxed">
                   Stablecoin market cap as a percentage of total crypto market cap.
                   Rising dominance = capital flowing to safety (risk-off).
                   Falling dominance = capital rotating into risk assets (risk-on).
@@ -423,7 +423,7 @@ function CycleIndicatorsPageInner() {
                   { zone: 'accumulation', label: 'Accumulation', color: 'text-cyan-400' },
                   { zone: 'capitulation', label: 'Capitulation', color: 'text-red-400' },
                 ].map(z => (
-                  <span key={z.zone} className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-mono ${zoneBg(z.zone)}`}>
+                  <span key={z.zone} className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-mono ${zoneBg(z.zone)}`}>
                     {z.label}
                   </span>
                 ))}
@@ -434,7 +434,7 @@ function CycleIndicatorsPageInner() {
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-teal-vivid font-bold">Data Source</span>
               </div>
-              <p className="text-[10px] leading-relaxed">
+              <p className="text-xs leading-relaxed">
                 CoinGecko free API — <span className="font-mono">/api/v3/global</span> for total market cap,
                 <span className="font-mono"> /coins/bitcoin</span> for BTC market cap + FDV,
                 <span className="font-mono"> /global/decentralized_finance_defi</span> for stablecoin supply.

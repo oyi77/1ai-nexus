@@ -156,7 +156,7 @@ export default function WeatherPage() {
       header: 'Region',
       width: 110,
       render: (r) => (
-        <span className="text-teal-vivid font-bold text-[11px]">
+        <span className="text-teal-vivid font-bold text-xs">
           {REGION_LABELS[r.region] || r.region}
         </span>
       ),
@@ -171,7 +171,7 @@ export default function WeatherPage() {
           : r.metric === 'precipitation_sum'
             ? 'Precipitation'
             : r.metric.replace(/_/g, ' ')
-        return <span className="text-text-primary text-[11px] capitalize">{label}</span>
+        return <span className="text-text-primary text-xs capitalize">{label}</span>
       },
     },
     {
@@ -184,7 +184,7 @@ export default function WeatherPage() {
         const pct = Math.min(100, (r.absZ / 4) * 100)
         return (
           <div className="flex items-center gap-2">
-            <span className={`font-mono font-bold text-[11px] tabular-nums w-10 ${zScoreColor(r.zScore)}`}>
+            <span className={`font-mono font-bold text-xs tabular-nums w-10 ${zScoreColor(r.zScore)}`}>
               {r.zScore > 0 ? '+' : ''}{r.zScore.toFixed(2)}
             </span>
             <div className="flex-1 h-1.5 bg-bg-raised rounded-full overflow-hidden">
@@ -203,7 +203,7 @@ export default function WeatherPage() {
       width: 80,
       align: 'right',
       render: (r) => (
-        <span className="text-text-primary font-mono text-[10px] tabular-nums">
+        <span className="text-text-primary font-mono text-xs tabular-nums">
           {r.currentValue.toFixed(1)}
         </span>
       ),
@@ -214,7 +214,7 @@ export default function WeatherPage() {
       width: 80,
       align: 'right',
       render: (r) => (
-        <span className="text-text-muted font-mono text-[10px] tabular-nums">
+        <span className="text-text-muted font-mono text-xs tabular-nums">
           {r.historicalMean.toFixed(1)}
         </span>
       ),
@@ -250,13 +250,13 @@ export default function WeatherPage() {
             {items.slice(0, 4).map((t) => (
               <span
                 key={t}
-                className="px-1 py-0.5 rounded bg-bg-raised text-[9px] font-mono text-teal-vivid"
+                className="px-1 py-0.5 rounded bg-bg-raised text-xs font-mono text-teal-vivid"
               >
                 {t}
               </span>
             ))}
             {items.length > 4 && (
-              <span className="text-[9px] font-mono text-text-muted">
+              <span className="text-xs font-mono text-text-muted">
                 +{items.length - 4}
               </span>
             )}
@@ -277,13 +277,13 @@ export default function WeatherPage() {
             <h1 className="text-[20px] font-head font-bold text-text-primary">
               Weather Signals
             </h1>
-            <p className="text-[11px] text-text-muted font-mono">
+            <p className="text-xs text-text-muted">
               Open-Meteo anomaly detection — z-score vs 30-day historical baseline
             </p>
           </div>
           <div className="flex items-center gap-3">
             {criticalCount > 0 && (
-              <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-[10px] font-mono animate-pulse">
+              <span className="px-2 py-0.5 rounded bg-red-500/20 text-red-400 text-xs font-mono animate-pulse">
                 {criticalCount} CRITICAL
               </span>
             )}
@@ -300,7 +300,7 @@ export default function WeatherPage() {
         >
           <div className="p-3">
             {results.length === 0 ? (
-              <div className="text-center text-[11px] text-text-muted py-4">
+              <div className="text-center text-xs text-text-muted py-4">
                 {status === 'error'
                   ? 'Failed to load data — check network'
                   : 'Scanning regions for anomalies...'}
@@ -331,7 +331,7 @@ export default function WeatherPage() {
                             {REGION_LABELS[r.region] || r.region}
                           </span>
                         </div>
-                        <span className={`text-[10px] font-mono uppercase tracking-wider ${
+                        <span className={`text-xs font-mono uppercase tracking-wider ${
                           severity === 'critical' ? 'text-red-400' :
                           severity === 'high' ? 'text-orange-400' :
                           severity === 'elevated' ? 'text-amber-400' : 'text-text-muted'
@@ -353,10 +353,10 @@ export default function WeatherPage() {
                               key={a.metric}
                               className={`flex items-center gap-1.5 px-2 py-1 rounded ${zScoreBg(a.zScore)}`}
                             >
-                              <span className="text-[9px] font-mono text-text-muted uppercase">
+                              <span className="text-xs font-mono text-text-muted uppercase">
                                 {label}
                               </span>
-                              <span className={`text-[10px] font-mono font-bold tabular-nums ${zScoreColor(a.zScore)}`}>
+                              <span className={`text-xs font-mono font-bold tabular-nums ${zScoreColor(a.zScore)}`}>
                                 {a.zScore > 0 ? '+' : ''}{a.zScore.toFixed(1)}σ
                               </span>
                             </div>
@@ -382,7 +382,7 @@ export default function WeatherPage() {
                           (t) => (
                             <span
                               key={t}
-                              className="px-1 py-0.5 rounded bg-bg-raised text-[9px] font-mono text-teal-vivid"
+                              className="px-1 py-0.5 rounded bg-bg-raised text-xs font-mono text-teal-vivid"
                             >
                               {t}
                             </span>
@@ -399,7 +399,7 @@ export default function WeatherPage() {
 
         {/* Region filters */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-[10px] font-mono">
+          <div className="flex items-center gap-1 text-xs font-mono">
             <button
               onClick={() => setRegionFilter('all')}
               className={`px-2 py-1 rounded ${
@@ -424,7 +424,7 @@ export default function WeatherPage() {
               </button>
             ))}
           </div>
-          <span className="ml-auto text-[10px] text-text-muted font-mono">
+          <span className="ml-auto text-xs text-text-muted font-mono">
             {totalAnomalies} anomal{totalAnomalies === 1 ? 'y' : 'ies'}
           </span>
         </div>
@@ -445,7 +445,7 @@ export default function WeatherPage() {
             filterPlaceholder="Filter weather signals…"
             rowHeight={36}
             emptyState={
-              <div className="text-text-muted text-[11px] p-4 text-center">
+              <div className="text-text-muted text-xs p-4 text-center">
                 {status === 'error'
                   ? 'Failed to load data — check network'
                   : 'No anomalies detected across scanned regions'}

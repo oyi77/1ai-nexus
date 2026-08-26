@@ -133,12 +133,12 @@ export default function ComparePage() {
         Crypto: 'text-teal-vivid', Macro: 'text-data-purple', Forex: 'text-data-info',
         Commodities: 'text-accent-amber', Indices: 'text-accent-green',
       }
-      return <span className={`text-[10px] font-mono ${colors[r.category] || 'text-text-muted'}`}>{r.category}</span>
+      return <span className={`text-xs font-mono ${colors[r.category] || 'text-text-muted'}`}>{r.category}</span>
     }},
     { key: 'name', header: 'Asset', width: 160, render: r => <span className="text-text-primary font-medium">{r.name}</span> },
-    { key: 'symbol', header: 'Symbol', width: 80, render: r => <span className="text-text-dim text-[10px] font-mono">{r.symbol}</span> },
+    { key: 'symbol', header: 'Symbol', width: 80, render: r => <span className="text-text-dim text-xs font-mono">{r.symbol}</span> },
     { key: 'price', header: 'Value', width: 100, align: 'right', render: r => <PriceTag value={r.price} size="sm" /> },
-    { key: 'change', header: 'Change', width: 70, align: 'right', render: r => r.change !== 0 ? <DeltaBadge value={r.change} size="xs" /> : <span className="text-text-muted text-[10px]">—</span> },
+    { key: 'change', header: 'Change', width: 70, align: 'right', render: r => r.change !== 0 ? <DeltaBadge value={r.change} size="xs" /> : <span className="text-text-muted text-xs">—</span> },
   ]
 
   // Category counts
@@ -154,7 +154,7 @@ export default function ComparePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">Cross-Market Compare</h1>
-            <p className="text-[11px] text-text-muted font-mono">
+            <p className="text-xs text-text-muted">
               {assets.length} assets across {Object.keys(categoryCounts).length} markets — Crypto, Forex, Commodities, Indices, Macro
             </p>
           </div>
@@ -165,7 +165,7 @@ export default function ComparePage() {
         <div className="flex items-center gap-1.5">
           {categories.map(cat => (
             <button key={cat} onClick={() => setFilter(cat)}
-              className={`px-2.5 py-1 text-[10px] font-mono rounded capitalize ${
+              className={`px-2.5 py-1 text-xs font-mono rounded capitalize ${
                 filter === cat ? 'bg-teal-dim/30 text-teal-vivid' : 'text-text-muted hover:text-text-secondary'
               }`}>
               {cat} {cat !== 'all' ? `(${categoryCounts[cat] ?? 0})` : `(${assets.length})`}
@@ -181,7 +181,7 @@ export default function ComparePage() {
             filterable
             filterPlaceholder="Filter assets…"
             rowHeight={28}
-            emptyState={<div className="text-text-muted text-[11px] p-4">Loading cross-market data...</div>}
+            emptyState={<div className="text-text-muted text-xs p-4">Loading cross-market data...</div>}
           />
         </Panel>
       </div>

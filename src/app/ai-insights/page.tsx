@@ -146,7 +146,7 @@ export default function AiInsightsPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">AI MARKET INSIGHTS</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               {insights.length} insights from real data · FRED + Yahoo Finance + World Bank
             </p>
           </div>
@@ -154,7 +154,7 @@ export default function AiInsightsPage() {
         </div>
 
         {error && (
-          <div className="text-data-bear text-[11px] font-mono p-4 bg-bg-panel border border-border-dim rounded">
+          <div className="text-data-bear text-xs font-mono p-4 bg-bg-panel border border-border-dim rounded">
             Error: {error}
           </div>
         )}
@@ -170,10 +170,10 @@ export default function AiInsightsPage() {
                   {insights.filter(i => i.category === cat).map(insight => (
                     <div key={insight.id} className="flex items-center justify-between py-1 border-b border-border-dim/30">
                       <div>
-                        <p className="text-xs font-mono text-text-primary">{insight.title}</p>
-                        <p className="text-[10px] text-text-dim">{insight.data}</p>
+                        <p className="text-xs text-text-primary">{insight.title}</p>
+                        <p className="text-xs text-text-dim">{insight.data}</p>
                       </div>
-                      <span className="text-[9px] font-mono text-text-muted">{insight.source}</span>
+                      <span className="text-xs font-mono text-text-muted">{insight.source}</span>
                     </div>
                   ))}
                 </div>
@@ -183,7 +183,7 @@ export default function AiInsightsPage() {
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">DATA SOURCES</h2>
+          <h2 className="text-xs text-accent-cyan mb-2">DATA SOURCES</h2>
           <p className="text-xs text-text-dim">
             All insights generated from real-time data. No hardcoded values.
             Sources: FRED API (22 macro series), Yahoo Finance (market data),

@@ -159,7 +159,7 @@ function DexMonitorPageInner() {
       render: (row) => (
         <div className="flex items-center gap-1">
           <EntityLabel type={row.walletType as 'whale' | 'dex' | 'cex'} size="xs" />
-          <span className="text-text-muted text-[10px]">{row.wallet}</span>
+          <span className="text-text-muted text-xs">{row.wallet}</span>
         </div>
       ),
     },
@@ -228,14 +228,14 @@ function DexMonitorPageInner() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">DEX / Swap Monitor</h1>
-            <p className="text-[11px] text-text-muted font-mono">GMGN-style live swap radar — spot large trades, price impact, MEV</p>
+            <p className="text-xs text-text-muted">GMGN-style live swap radar — spot large trades, price impact, MEV</p>
           </div>
           <LiveDot status={feedStatus} label />
         </div>
 
         {/* Filters */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-[10px] font-mono">
+          <div className="flex items-center gap-1 text-xs font-mono">
             <span className="text-text-muted">Min Value:</span>
             {[1000, 10000, 50000, 100000].map(v => (
               <button
@@ -247,7 +247,7 @@ function DexMonitorPageInner() {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-1 text-[10px] font-mono">
+          <div className="flex items-center gap-1 text-xs font-mono">
             <span className="text-text-muted">DEX:</span>
             {['all', 'Uniswap V3', 'PancakeSwap', 'SushiSwap', 'Curve'].map(d => (
               <button
@@ -275,7 +275,7 @@ function DexMonitorPageInner() {
                 columns={swapColumns}
                 data={filteredSwaps}
                 rowHeight={28}
-                emptyState={<div className="text-text-muted text-[11px] p-4">No swaps matching filters</div>}
+                emptyState={<div className="text-text-muted text-xs p-4">No swaps matching filters</div>}
               />
             </Panel>
           </div>
@@ -294,7 +294,7 @@ function DexMonitorPageInner() {
             filterPlaceholder="Filter pairs…"
               sortable
               rowHeight={28}
-              emptyState={<div className="text-text-muted text-[11px] p-4">Loading pair data...</div>}
+              emptyState={<div className="text-text-muted text-xs p-4">Loading pair data...</div>}
             />
           </Panel>
         </div>

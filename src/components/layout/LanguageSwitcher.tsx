@@ -27,7 +27,7 @@ export function LanguageSwitcher() {
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1 px-2 py-1 text-[10px] font-mono text-text-muted hover:text-text-primary transition-colors"
+        className="flex items-center gap-1 px-2 py-1 text-xs font-mono text-text-muted hover:text-text-primary transition-colors"
         title="Language / Bahasa"
       >
         <Globe size={12} />

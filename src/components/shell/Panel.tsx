@@ -50,7 +50,7 @@ export function Panel({
             {title}
           </h3>
           {subtitle && (
-            <span className="text-[10px] text-text-muted font-mono hidden sm:inline">
+            <span className="text-xs text-text-muted font-mono hidden sm:inline">
               {subtitle}
             </span>
           )}

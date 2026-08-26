@@ -46,14 +46,14 @@ export function TerminalShell({ children }: { children: React.ReactNode }) {
               <a
                 key={tab.href}
                 href={tab.href}
-                className="px-2 py-0.5 text-[10px] text-text-dim hover:text-text-primary hover:bg-bg-elevated rounded transition-colors font-mono"
+                className="px-2 py-0.5 text-xs text-text-dim hover:text-text-primary hover:bg-bg-elevated rounded transition-colors font-mono"
               >
                 {tab.label}
               </a>
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-2 text-[10px] font-mono">
+        <div className="flex items-center gap-2 text-xs font-mono">
           <span className="hidden sm:inline text-text-dim">{time}</span>
           <button
             onClick={() => setShowAi(!showAi)}
@@ -69,7 +69,7 @@ export function TerminalShell({ children }: { children: React.ReactNode }) {
       <TickerStrip />
 
       {/* Context Bar — hidden on very small screens */}
-      <div className="hidden md:flex items-center gap-4 px-3 py-0.5 bg-bg-panel border-b border-border-dim text-[10px] font-mono shrink-0">
+      <div className="hidden md:flex items-center gap-4 px-3 py-0.5 bg-bg-panel border-b border-border-dim text-xs font-mono shrink-0">
         <span className="text-text-dim">MODULES: <span className="text-accent-cyan">45</span></span>
         <span className="text-text-dim">SOURCES: <span className="text-accent-cyan">100+</span></span>
         <span className="text-text-dim">ENTITIES: <span className="text-accent-cyan">153</span></span>

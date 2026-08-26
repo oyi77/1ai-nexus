@@ -26,8 +26,8 @@ export function DeltaBadge({
     : 'text-data-neutral'
 
   const sizeClass = {
-    xs: 'text-[10px] px-1',
-    sm: 'text-[11px] px-1.5',
+    xs: 'text-xs px-1',
+    sm: 'text-xs px-1.5',
     md: 'text-[12px] px-2',
   }[size]
 

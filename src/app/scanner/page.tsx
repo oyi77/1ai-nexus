@@ -201,24 +201,24 @@ fetchData()
     { key: 'name', header: 'Token Pair', width: 200, render: r => (
       <div className="flex flex-col">
         <span className="text-teal-vivid font-bold text-[12px] truncate">{r.name}</span>
-        <span className="text-text-muted font-mono text-[9px]">{r.address}</span>
+        <span className="text-text-muted font-mono text-xs">{r.address}</span>
       </div>
     )},
     { key: 'ageMinutes', header: 'Age', width: 80, align: 'right', render: r => (
-      <span className={`font-mono text-[11px] ${r.ageMinutes < 15 ? 'text-data-bull font-bold animate-pulse' : 'text-text-primary'}`}>
+      <span className={`font-mono text-xs ${r.ageMinutes < 15 ? 'text-data-bull font-bold animate-pulse' : 'text-text-primary'}`}>
         {r.ageMinutes}m
       </span>
     )},
     { key: 'liquidity', header: 'Liquidity', width: 100, align: 'right', render: r => (
-      <span className={`font-mono text-[11px] ${r.liquidity < 5000 ? 'text-data-bear' : 'text-text-primary'}`}>
+      <span className={`font-mono text-xs ${r.liquidity < 5000 ? 'text-data-bear' : 'text-text-primary'}`}>
         {fmtUsd(r.liquidity)}
       </span>
     )},
     { key: 'fdv', header: 'FDV', width: 100, align: 'right', render: r => (
-      <span className="font-mono text-[11px] text-text-secondary">{fmtUsd(r.fdv)}</span>
+      <span className="font-mono text-xs text-text-secondary">{fmtUsd(r.fdv)}</span>
     )},
     { key: 'txs', header: 'TXs (5m)', width: 100, align: 'right', render: r => (
-      <div className="flex items-center justify-end space-x-2 text-[10px] font-mono">
+      <div className="flex items-center justify-end space-x-2 text-xs font-mono">
         <span className="text-data-bull">{r.buys5m} B</span>
         <span className="text-text-muted">/</span>
         <span className="text-data-bear">{r.sells5m} S</span>
@@ -226,7 +226,7 @@ fetchData()
     )},
     { key: 'rugRisk', header: 'Rug Risk', width: 100, align: 'right', render: r => (
       <div className="flex items-center justify-end gap-2">
-        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+        <span className={`text-xs font-bold px-2 py-0.5 rounded ${
           r.rugRisk === 'High' ? 'bg-data-bear/20 text-data-bear' : 
           r.rugRisk === 'Low' ? 'bg-data-bull/20 text-data-bull' : 
           'bg-accent-amber/20 text-accent-amber'
@@ -240,7 +240,7 @@ fetchData()
         href={`https://dexscreener.com/${network}/${r.address}`} 
         target="_blank" 
         rel="noopener noreferrer"
-        className="px-2 py-1 bg-teal-vivid/10 text-teal-vivid hover:bg-teal-vivid hover:text-bg-base transition-colors rounded text-[10px] font-bold uppercase tracking-wider"
+        className="px-2 py-1 bg-teal-vivid/10 text-teal-vivid hover:bg-teal-vivid hover:text-bg-base transition-colors rounded text-xs font-bold uppercase tracking-wider"
       >
         Snipe
       </a>
@@ -255,7 +255,7 @@ fetchData()
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">⚡</span> GMGN Degen Sniper
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               {wsConnected ? '🟢 Real-time WS' : '🔴 REST polling'} — Live monitoring of newly created liquidity pools. Extreme volatility warning.
             </p>
           </div>
@@ -265,7 +265,7 @@ fetchData()
                 <button
                   key={n}
                   onClick={() => setNetwork(n)}
-                  className={`px-3 py-1 text-[11px] font-mono rounded uppercase transition-colors ${network === n ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
+                  className={`px-3 py-1 text-xs font-mono rounded uppercase transition-colors ${network === n ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
                 >
                   {n}
                 </button>
@@ -273,7 +273,7 @@ fetchData()
             </div>
             <div className="flex items-center gap-2 bg-bg-panel px-3 py-1.5 border border-bg-border rounded">
               <LiveDot status={feedStatus} />
-              <span className="text-[10px] font-mono text-text-muted">Updated {lastUpdated.toLocaleTimeString()}</span>
+              <span className="text-xs font-mono text-text-muted">Updated {lastUpdated.toLocaleTimeString()}</span>
             </div>
           </div>
         </div>
@@ -281,21 +281,21 @@ fetchData()
         {/* Global Stats Strip */}
         <div className="grid grid-cols-4 gap-2">
           <div className="bg-bg-panel border border-bg-border p-3 rounded">
-            <div className="text-[10px] text-text-muted font-mono uppercase mb-1">New Pairs (Last 15m)</div>
+            <div className="text-xs text-text-muted font-mono uppercase mb-1">New Pairs (Last 15m)</div>
             <div className="text-[20px] font-mono font-bold text-teal-vivid">{pairs.filter(p => p.ageMinutes < 15).length}</div>
           </div>
           <div className="bg-bg-panel border border-bg-border p-3 rounded">
-            <div className="text-[10px] text-text-muted font-mono uppercase mb-1">High Risk (Honeypots)</div>
+            <div className="text-xs text-text-muted font-mono uppercase mb-1">High Risk (Honeypots)</div>
             <div className="text-[20px] font-mono font-bold text-data-bear">{pairs.filter(p => p.rugRisk === 'High').length}</div>
           </div>
           <div className="bg-bg-panel border border-bg-border p-3 rounded">
-            <div className="text-[10px] text-text-muted font-mono uppercase mb-1">Average Initial LP</div>
+            <div className="text-xs text-text-muted font-mono uppercase mb-1">Average Initial LP</div>
             <div className="text-[20px] font-mono font-bold text-text-primary">
               {fmtUsd(pairs.reduce((acc, p) => acc + p.liquidity, 0) / (pairs.length || 1))}
             </div>
           </div>
           <div className="bg-bg-panel border border-bg-border p-3 rounded">
-            <div className="text-[10px] text-text-muted font-mono uppercase mb-1">Active Network</div>
+            <div className="text-xs text-text-muted font-mono uppercase mb-1">Active Network</div>
             <div className="text-[20px] font-mono font-bold text-text-primary capitalize">{network}</div>
           </div>
         </div>

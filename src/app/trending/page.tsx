@@ -75,7 +75,7 @@ function TrendingCoinsPageInner() {
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-accent-amber">🔥</span> Trending Coins
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               Top 15 trending tokens from CoinGecko. Updated every 2 minutes.
             </p>
           </div>
@@ -106,7 +106,7 @@ function TrendingCoinsPageInner() {
                   {token.thumb && <img src={token.thumb} alt={token.name} className="w-6 h-6 rounded-full" />}
                   <div>
                     <span className="text-[13px] font-mono font-bold text-text-primary">{token.symbol}</span>
-                    <span className="text-[11px] font-mono text-text-muted ml-2">{token.name}</span>
+                    <span className="text-xs font-mono text-text-muted ml-2">{token.name}</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
@@ -120,10 +120,10 @@ function TrendingCoinsPageInner() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between mt-1">
-                  <span className="text-[10px] font-mono text-text-muted">
+                  <span className="text-xs font-mono text-text-muted">
                     Rank: #{token.marketCapRank}
                   </span>
-                  <span className="text-[10px] font-mono text-teal-vivid">
+                  <span className="text-xs font-mono text-teal-vivid">
                     Score: {token.score}
                   </span>
                 </div>
@@ -139,7 +139,7 @@ function TrendingCoinsPageInner() {
 function KPI({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="bg-bg-panel border border-bg-border p-3 rounded">
-      <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
+      <div className="text-xs text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className={`text-[16px] font-head font-bold tabular-nums ${color ?? 'text-text-primary'}`}>{value}</div>
     </div>
   )

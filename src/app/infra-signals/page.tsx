@@ -122,7 +122,7 @@ function ScoreGauge({ score }: { score: number }) {
       <div className={`text-[28px] font-head font-bold tabular-nums ${scoreColor(score)}`}>
         {score}
       </div>
-      <div className="text-[10px] text-text-muted font-mono">/ 100</div>
+      <div className="text-xs text-text-muted font-mono">/ 100</div>
     </div>
   )
 }
@@ -172,7 +172,7 @@ function InfraSignalsPageInner() {
             <Radio size={20} className="text-teal-vivid" />
             <div>
               <h1 className="text-[20px] font-head font-bold text-text-primary">Infrastructure Signals</h1>
-              <p className="text-[11px] text-text-muted font-mono">Lightning, mempool, hash rate — real adoption vs speculation</p>
+              <p className="text-xs text-text-muted">Lightning, mempool, hash rate — real adoption vs speculation</p>
             </div>
           </div>
           <LiveDot status={status} label />
@@ -184,7 +184,7 @@ function InfraSignalsPageInner() {
           <Panel title="Adoption Signal" subtitle="Composite infrastructure score">
             <div className="p-4 flex flex-col items-center gap-3">
               <ScoreGauge score={snapshot?.compositeScore ?? 50} />
-              <div className={`text-center px-3 py-1 rounded text-[11px] font-mono ${scoreBg(snapshot?.compositeScore ?? 50)}`}>
+              <div className={`text-center px-3 py-1 rounded text-xs font-mono ${scoreBg(snapshot?.compositeScore ?? 50)}`}>
                 {snapshot?.compositeLabel ?? 'Loading…'}
               </div>
             </div>
@@ -224,7 +224,7 @@ function InfraSignalsPageInner() {
                 },
               ].map((item, i) => (
                 <div key={i} className="px-3 py-3 flex flex-col gap-1">
-                  <div className="flex items-center gap-1.5 text-[10px] text-text-muted font-mono uppercase tracking-wider">
+                  <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono uppercase tracking-wider">
                     <item.icon size={10} />
                     {item.label}
                   </div>
@@ -232,7 +232,7 @@ function InfraSignalsPageInner() {
                     {item.value}
                   </div>
                   {item.sub && (
-                    <div className="text-[10px] text-text-muted font-mono">{item.sub}</div>
+                    <div className="text-xs text-text-muted font-mono">{item.sub}</div>
                   )}
                 </div>
               ))}
@@ -249,7 +249,7 @@ function InfraSignalsPageInner() {
                   { label: 'Channels', value: ln?.channelCount ? formatCount(ln.channelCount) : '—', color: 'text-text-primary' },
                 ].map((item, i) => (
                   <div key={i} className="text-center">
-                    <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider mb-1">{item.label}</div>
+                    <div className="text-xs text-text-muted font-mono uppercase tracking-wider mb-1">{item.label}</div>
                     <div className={`text-[16px] font-head font-bold tabular-nums ${item.color}`}>{item.value}</div>
                   </div>
                 ))}
@@ -258,13 +258,13 @@ function InfraSignalsPageInner() {
               {ln?.capacityBtc && ln?.nodeCount ? (
                 <div className="border-t border-bg-border pt-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-text-muted font-mono">Avg capacity / node</span>
+                    <span className="text-xs text-text-muted font-mono">Avg capacity / node</span>
                     <span className="text-[12px] font-mono text-text-secondary tabular-nums">
                       {(ln.capacityBtc / ln.nodeCount).toFixed(3)} BTC
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-1">
-                    <span className="text-[10px] text-text-muted font-mono">Channels / node</span>
+                    <span className="text-xs text-text-muted font-mono">Channels / node</span>
                     <span className="text-[12px] font-mono text-text-secondary tabular-nums">
                       {ln.nodeCount > 0 ? (ln.channelCount! / ln.nodeCount).toFixed(1) : '—'}
                     </span>
@@ -282,11 +282,11 @@ function InfraSignalsPageInner() {
             <div className="grid grid-cols-4 divide-x divide-bg-border">
               {feeStrip.map((fee, i) => (
                 <div key={i} className="px-3 py-2 text-center">
-                  <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider mb-1">{fee.label}</div>
+                  <div className="text-xs text-text-muted font-mono uppercase tracking-wider mb-1">{fee.label}</div>
                   <div className={`text-[20px] font-head font-bold tabular-nums ${fee.value != null ? feeColor(fee.value) : 'text-text-muted'}`}>
                     {fee.value ?? '—'}
                   </div>
-                  <div className="text-[10px] text-text-muted font-mono">sat/vB · {fee.desc}</div>
+                  <div className="text-xs text-text-muted font-mono">sat/vB · {fee.desc}</div>
                 </div>
               ))}
             </div>
@@ -311,7 +311,7 @@ function InfraSignalsPageInner() {
                 },
               ].map((item, i) => (
                 <div key={i} className="bg-bg-raised px-3 py-2 text-center">
-                  <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider mb-1">{item.label}</div>
+                  <div className="text-xs text-text-muted font-mono uppercase tracking-wider mb-1">{item.label}</div>
                   <div className={`text-[16px] font-head font-bold tabular-nums ${item.color}`}>{item.value}</div>
                 </div>
               ))}
@@ -321,8 +321,8 @@ function InfraSignalsPageInner() {
             {mp?.fastestFee != null && (
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] text-text-muted font-mono">Network Congestion</span>
-                  <span className="text-[10px] font-mono text-text-secondary">
+                  <span className="text-xs text-text-muted font-mono">Network Congestion</span>
+                  <span className="text-xs font-mono text-text-secondary">
                     {mp.fastestFee > 50 ? 'HIGH' : mp.fastestFee > 20 ? 'MODERATE' : mp.fastestFee > 10 ? 'NORMAL' : 'LOW'}
                   </span>
                 </div>
@@ -383,12 +383,12 @@ function InfraSignalsPageInner() {
                 },
               ].map((item, i) => (
                 <div key={i} className="bg-bg-raised px-3 py-3 flex flex-col gap-1">
-                  <div className="flex items-center gap-1.5 text-[10px] text-text-muted font-mono uppercase tracking-wider">
+                  <div className="flex items-center gap-1.5 text-xs text-text-muted font-mono uppercase tracking-wider">
                     <item.icon size={10} />
                     {item.label}
                   </div>
                   <div className={`text-[16px] font-head font-bold tabular-nums ${item.color}`}>{item.value}</div>
-                  <div className="text-[9px] text-text-muted font-mono">{item.sub}</div>
+                  <div className="text-xs text-text-muted font-mono">{item.sub}</div>
                 </div>
               ))}
             </div>
@@ -397,7 +397,7 @@ function InfraSignalsPageInner() {
 
         {/* Methodology */}
         <Panel title="Methodology" subtitle="How infrastructure signals work">
-          <div className="p-3 space-y-2 text-[11px] text-text-secondary">
+          <div className="p-3 space-y-2 text-xs text-text-secondary">
             <div className="flex items-start gap-2">
               <span className="text-teal-vivid font-bold">1.</span>
               <span><b>Lightning Network</b> — capacity, node count, and channel count from 1ml.com API. Growing Lightning = real BTC payment adoption.</span>

@@ -91,7 +91,7 @@ export default function HeatmapPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">MARKET HEATMAP</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               {data.length} stocks across {sectors.length} sectors — size by market cap, color by daily change
             </p>
           </div>
@@ -99,7 +99,7 @@ export default function HeatmapPage() {
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-4 text-[10px] font-mono text-text-muted">
+        <div className="flex items-center gap-4 text-xs font-mono text-text-muted">
           <span>Color: daily % change</span>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded" style={{ backgroundColor: '#166534' }} />
@@ -132,8 +132,8 @@ export default function HeatmapPage() {
               <div key={sector.name} className="bg-bg-panel border border-border-dim rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <div className="w-3 h-3 rounded" style={{ backgroundColor: SECTOR_COLORS[sector.name] ?? '#6b7280' }} />
-                  <h2 className="text-xs font-mono text-accent-cyan">{sector.name.toUpperCase()}</h2>
-                  <span className="text-[10px] text-text-muted font-mono">
+                  <h2 className="text-xs text-accent-cyan">{sector.name.toUpperCase()}</h2>
+                  <span className="text-xs text-text-muted font-mono">
                     ${sector.totalCap >= 1e12 ? `${(sector.totalCap / 1e12).toFixed(1)}T` : `${(sector.totalCap / 1e9).toFixed(0)}B`}
                   </span>
                 </div>
@@ -153,8 +153,8 @@ export default function HeatmapPage() {
                         }}
                         title={`${stock.name}: ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%`}
                       >
-                        <span className="text-[10px] font-mono font-bold">{stock.symbol.replace('.JK', '')}</span>
-                        <span className="text-[9px] font-mono">
+                        <span className="text-xs font-mono font-bold">{stock.symbol.replace('.JK', '')}</span>
+                        <span className="text-xs font-mono">
                           {stock.change >= 0 ? '+' : ''}{stock.change.toFixed(2)}%
                         </span>
                       </div>

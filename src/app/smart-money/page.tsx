@@ -153,7 +153,7 @@ function SmartMoneyPageInner() {
       header: 'Action',
       width: 90,
       render: (row) => (
-        <span className={`font-mono text-[10px] ${
+        <span className={`font-mono text-xs ${
           row.action === 'Accumulated' ? 'text-data-bull' :
           row.action === 'Exited' ? 'text-data-bear' :
           'text-data-orange'
@@ -258,14 +258,14 @@ function SmartMoneyPageInner() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">Smart Money</h1>
-            <p className="text-[11px] text-text-muted font-mono">Track high-win-rate wallets and their moves</p>
+            <p className="text-xs text-text-muted">Track high-win-rate wallets and their moves</p>
           </div>
           <LiveDot status={feedStatus} label />
         </div>
 
         {/* Filters */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 text-[10px] font-mono">
+          <div className="flex items-center gap-1 text-xs font-mono">
             <span className="text-text-muted">Action:</span>
             {['all', 'Accumulated', 'Exited', 'Swapped', 'Bridged'].map(a => (
               <button
@@ -294,7 +294,7 @@ function SmartMoneyPageInner() {
               rowHeight={28}
             filterable
             filterPlaceholder="Filter signals…"
-              emptyState={<div className="text-text-muted text-[11px] p-4">No signals matching filter</div>}
+              emptyState={<div className="text-text-muted text-xs p-4">No signals matching filter</div>}
             />
           </Panel>
 
@@ -312,7 +312,7 @@ function SmartMoneyPageInner() {
             filterPlaceholder="Filter wallets…"
               sortable
               rowHeight={28}
-              emptyState={<div className="text-text-muted text-[11px] p-4">Loading wallet rankings...</div>}
+              emptyState={<div className="text-text-muted text-xs p-4">Loading wallet rankings...</div>}
             />
           </Panel>
         </div>
@@ -324,13 +324,13 @@ function SmartMoneyPageInner() {
               {cohorts.map(cohort => (
                 <div key={cohort.id} className="flex items-center justify-between border-b border-border-dim/30 py-2">
                   <div>
-                    <p className="text-[11px] font-mono text-text-primary font-bold">{cohort.name}</p>
-                    <p className="text-[10px] text-text-muted">{cohort.description}</p>
-                    <p className="text-[9px] text-text-dim mt-0.5">Top: {cohort.topAssets.join(', ') || 'N/A'}</p>
+                    <p className="text-xs text-text-primary font-bold">{cohort.name}</p>
+                    <p className="text-xs text-text-muted">{cohort.description}</p>
+                    <p className="text-xs text-text-dim mt-0.5">Top: {cohort.topAssets.join(', ') || 'N/A'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-mono font-bold">{cohort.walletCount} wallets</p>
-                    <p className={`text-[10px] font-mono ${cohort.netFlow24h >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                    <p className="text-sm font-bold">{cohort.walletCount} wallets</p>
+                    <p className={`text-xs font-mono ${cohort.netFlow24h >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                       {cohort.netFlow24h >= 0 ? '+' : ''}{(cohort.netFlow24h / 1e6).toFixed(1)}M 24h
                     </p>
                   </div>
@@ -347,18 +347,18 @@ function SmartMoneyPageInner() {
               {cohortSignals.slice(0, 10).map((sig, i) => (
                 <div key={i} className="flex items-center justify-between border-b border-border-dim/30 py-1.5">
                   <div className="flex items-center gap-2">
-                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                    <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
                       sig.action === 'accumulating' ? 'bg-data-bull/20 text-data-bull' :
                       sig.action === 'distributing' ? 'bg-data-bear/20 text-data-bear' :
                       sig.action === 'rotating' ? 'bg-accent-amber/20 text-accent-amber' :
                       'bg-bg-raised text-text-muted'
                     }`}>{sig.action}</span>
-                    <span className="text-[11px] font-mono text-teal-vivid font-bold">{sig.asset}</span>
-                    <span className="text-[10px] text-text-muted">from {sig.cohortName}</span>
+                    <span className="text-xs font-mono text-teal-vivid font-bold">{sig.asset}</span>
+                    <span className="text-xs text-text-muted">from {sig.cohortName}</span>
                   </div>
                   <div className="text-right">
                     <PriceTag value={sig.amountUsd} size="sm" />
-                    <span className="text-[9px] text-text-dim ml-1">{(sig.confidence * 100).toFixed(0)}%</span>
+                    <span className="text-xs text-text-dim ml-1">{(sig.confidence * 100).toFixed(0)}%</span>
                   </div>
                 </div>
               ))}

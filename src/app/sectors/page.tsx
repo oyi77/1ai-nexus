@@ -103,11 +103,11 @@ function SectorsPageInner() {
   const columns: Column<ChainRow>[] = [
     { key: 'name', header: 'Chain', width: 120, render: r => <span className="text-teal-vivid font-bold">{r.name}</span> },
     { key: 'tvl', header: 'TVL', width: 100, align: 'right', render: r => <PriceTag value={r.tvl} size="sm" /> },
-    { key: 'change1d', header: '24h%', width: 70, align: 'right', render: r => r.change1d != null ? <DeltaBadge value={r.change1d} size="xs" /> : <span className="text-text-muted text-[10px] font-mono">—</span> },
-    { key: 'change7d', header: '7d%', width: 70, align: 'right', render: r => r.change7d != null ? <DeltaBadge value={r.change7d} size="xs" /> : <span className="text-text-muted text-[10px] font-mono">—</span> },
+    { key: 'change1d', header: '24h%', width: 70, align: 'right', render: r => r.change1d != null ? <DeltaBadge value={r.change1d} size="xs" /> : <span className="text-text-muted text-xs font-mono">—</span> },
+    { key: 'change7d', header: '7d%', width: 70, align: 'right', render: r => r.change7d != null ? <DeltaBadge value={r.change7d} size="xs" /> : <span className="text-text-muted text-xs font-mono">—</span> },
     { key: 'dominance', header: 'Dom', width: 60, align: 'right', render: r => <span className="text-text-primary">{r.dominance.toFixed(2)}%</span> },
-    { key: 'protocolCount', header: 'Protocols', width: 70, align: 'right', render: r => <span className="text-text-dim text-[10px]">{r.protocolCount}</span> },
-    { key: 'topProtocol', header: 'Top Protocol', width: 120, render: r => <span className="text-text-dim text-[10px]">{r.topProtocol}</span> },
+    { key: 'protocolCount', header: 'Protocols', width: 70, align: 'right', render: r => <span className="text-text-dim text-xs">{r.protocolCount}</span> },
+    { key: 'topProtocol', header: 'Top Protocol', width: 120, render: r => <span className="text-text-dim text-xs">{r.topProtocol}</span> },
   ]
 
   return (
@@ -116,10 +116,10 @@ function SectorsPageInner() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">DeFi Sectors</h1>
-            <p className="text-[11px] text-text-muted font-mono">Chain TVL breakdown with 24h/7d changes — weighted by protocol TVL</p>
+            <p className="text-xs text-text-muted">Chain TVL breakdown with 24h/7d changes — weighted by protocol TVL</p>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-text-muted font-mono">{chains.length} chains</span>
+            <span className="text-xs text-text-muted font-mono">{chains.length} chains</span>
             <LiveDot status={status} label />
           </div>
         </div>
@@ -128,23 +128,23 @@ function SectorsPageInner() {
         {chains.length > 0 && (
           <div className="grid grid-cols-4 gap-3">
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted">TOTAL TVL</p>
+              <p className="text-xs text-text-muted">TOTAL TVL</p>
               <PriceTag value={chains.reduce((s, c) => s + c.tvl, 0)} size="md" />
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted">TOP CHAIN</p>
-              <p className="text-sm font-mono font-bold text-teal-vivid">{chains[0]?.name}</p>
-              <p className="text-[10px] text-text-dim">{chains[0]?.dominance.toFixed(1)}% dominance</p>
+              <p className="text-xs text-text-muted">TOP CHAIN</p>
+              <p className="text-sm font-bold text-teal-vivid">{chains[0]?.name}</p>
+              <p className="text-xs text-text-dim">{chains[0]?.dominance.toFixed(1)}% dominance</p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted">BIGGEST 24h GAIN</p>
+              <p className="text-xs text-text-muted">BIGGEST 24h GAIN</p>
               {(() => {
                 const best = chains.reduce((b, c) => (c.change1d ?? -Infinity) > (b.change1d ?? -Infinity) ? c : b, chains[0])
                 return best?.change1d != null ? <DeltaBadge value={best.change1d} size="sm" /> : <span className="text-text-dim">—</span>
               })()}
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted">BIGGEST 24h DROP</p>
+              <p className="text-xs text-text-muted">BIGGEST 24h DROP</p>
               {(() => {
                 const worst = chains.reduce((w, c) => (c.change1d ?? Infinity) < (w.change1d ?? Infinity) ? c : w, chains[0])
                 return worst?.change1d != null ? <DeltaBadge value={worst.change1d} size="sm" /> : <span className="text-text-dim">—</span>
@@ -161,7 +161,7 @@ function SectorsPageInner() {
             filterable
             filterPlaceholder="Filter chains…"
             rowHeight={28}
-            emptyState={<div className="text-text-muted text-[11px] p-4">{status === 'error' ? 'Failed to load' : 'Loading DeFi sector data...'}</div>}
+            emptyState={<div className="text-text-muted text-xs p-4">{status === 'error' ? 'Failed to load' : 'Loading DeFi sector data...'}</div>}
           />
         </Panel>
       </div>

@@ -36,7 +36,7 @@ export function LiveDot({
         style={{ width: size, height: size }}
       />
       {label && (
-        <span className="text-[9px] font-mono text-text-secondary uppercase tracking-wider">
+        <span className="text-xs font-mono text-text-secondary uppercase tracking-wider">
           {labelMap[status]}
         </span>
       )}

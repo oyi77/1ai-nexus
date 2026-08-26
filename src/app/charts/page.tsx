@@ -208,7 +208,7 @@ export default function ChartsPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">PROFESSIONAL CHARTS</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               {CHART_SYMBOLS.length} symbols · Drawing tools · Technical indicators
             </p>
           </div>
@@ -219,7 +219,7 @@ export default function ChartsPage() {
         <div className="flex flex-wrap gap-2">
           {CHART_SYMBOLS.map(s => (
             <button key={s.symbol} onClick={() => setSelected(s.symbol)}
-              className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+              className={`px-3 py-1 text-xs font-mono rounded border transition-colors ${
                 selected === s.symbol
                   ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
                   : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
@@ -234,7 +234,7 @@ export default function ChartsPage() {
           <div className="flex gap-1">
             {['1h', '1d', '1wk'].map(tf => (
               <button key={tf} onClick={() => setTimeframe(tf)}
-                className={`px-2 py-1 text-[10px] font-mono rounded border transition-colors ${
+                className={`px-2 py-1 text-xs font-mono rounded border transition-colors ${
                   timeframe === tf
                     ? 'bg-border-active border-border-active text-text-primary'
                     : 'bg-bg-panel border-border-dim text-text-dim hover:border-border-active'
@@ -249,7 +249,7 @@ export default function ChartsPage() {
           <div className="flex gap-1">
             {(['crosshair', 'trendline', 'horizontal', 'fibonacci', 'rectangle', 'text'] as DrawingTool[]).map(tool => (
               <button key={tool} onClick={() => setActiveTool(tool)}
-                className={`px-2 py-1 text-[10px] font-mono rounded border transition-colors ${
+                className={`px-2 py-1 text-xs font-mono rounded border transition-colors ${
                   activeTool === tool
                     ? 'text-bg-base font-bold'
                     : 'bg-bg-panel border-border-dim text-text-dim hover:border-border-active'
@@ -262,7 +262,7 @@ export default function ChartsPage() {
 
           {drawings.length > 0 && (
             <button onClick={() => setDrawings([])}
-              className="px-2 py-1 text-[10px] font-mono rounded border border-data-bear text-data-bear hover:bg-data-bear/10">
+              className="px-2 py-1 text-xs font-mono rounded border border-data-bear text-data-bear hover:bg-data-bear/10">
               Clear All
             </button>
           )}
@@ -285,7 +285,7 @@ export default function ChartsPage() {
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-2 text-[10px] font-mono text-text-muted">
+              <div className="flex items-center gap-2 text-xs font-mono text-text-muted">
                 <span className="w-3 h-0.5 bg-[#ff9800] inline-block" /> SMA 20
                 <span className="w-3 h-0.5 bg-[#2196f3] inline-block" /> SMA 50
               </div>
@@ -295,7 +295,7 @@ export default function ChartsPage() {
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">DRAWING TOOLS</h2>
+          <h2 className="text-xs text-accent-cyan mb-2">DRAWING TOOLS</h2>
           <p className="text-xs text-text-dim">
             Select a tool above, then click on the chart to place it.
             Trendline: click start point, then click end point.

@@ -274,7 +274,7 @@ export function CanvasChart({
       />
       {/* OHLCV tooltip */}
       {hover?.candle && (
-        <div className="absolute top-1 left-2 text-[10px] font-mono pointer-events-none z-10">
+        <div className="absolute top-1 left-2 text-xs font-mono pointer-events-none z-10">
           <span className="text-text-dim">O</span>
           <span className={hover.candle.close >= hover.candle.open ? 'text-accent-green' : 'text-accent-red'}>
             {fmtPrice(hover.candle.open)}

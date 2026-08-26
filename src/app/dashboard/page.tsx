@@ -157,27 +157,27 @@ fetchData()
 
   const newsColumns: Column<NewsItem>[] = [
     { key: 'title', header: 'Headline (Bloomberg / Macro)', width: 300, render: r => (
-      <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-[11px] text-text-primary hover:text-teal-vivid truncate block">
+      <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-xs text-text-primary hover:text-teal-vivid truncate block">
         {r.title}
       </a>
     )},
-    { key: 'category', header: 'Cat', width: 80, render: r => <span className="text-[10px] text-text-muted font-mono">{r.category}</span> },
-    { key: 'sourceId', header: 'Source', width: 100, align: 'right', render: r => <span className="text-[10px] text-text-muted font-mono uppercase">{r.sourceId}</span> },
+    { key: 'category', header: 'Cat', width: 80, render: r => <span className="text-xs text-text-muted font-mono">{r.category}</span> },
+    { key: 'sourceId', header: 'Source', width: 100, align: 'right', render: r => <span className="text-xs text-text-muted font-mono uppercase">{r.sourceId}</span> },
   ]
 
   const dexColumns: Column<DexTrending>[] = [
-    { key: 'name', header: 'Trending Pair (GMGN)', width: 150, render: r => <span className="text-teal-vivid font-bold text-[11px] truncate">{r.name}</span> },
+    { key: 'name', header: 'Trending Pair (GMGN)', width: 150, render: r => <span className="text-teal-vivid font-bold text-xs truncate">{r.name}</span> },
     { key: 'priceUsd', header: 'Price', width: 80, align: 'right', render: r => <PriceTag value={r.priceUsd} size="sm" /> },
     { key: 'priceChange24h', header: '24h', width: 60, align: 'right', render: r => <DeltaBadge value={r.priceChange24h} size="xs" /> },
-    { key: 'volume24h', header: 'Vol(24h)', width: 80, align: 'right', render: r => <span className="text-text-secondary font-mono text-[10px]">{fmtUsd(r.volume24h)}</span> },
+    { key: 'volume24h', header: 'Vol(24h)', width: 80, align: 'right', render: r => <span className="text-text-secondary font-mono text-xs">{fmtUsd(r.volume24h)}</span> },
   ]
 
   const whaleColumns: Column<WhaleMove>[] = [
     { key: 'from', header: 'Multi-Chain Flow (Whale Alert)', width: 250, render: r => (
       <div className="flex items-center space-x-1 truncate">
-        <span className="text-text-primary text-[11px] truncate max-w-[100px]">{r.from}</span>
-        <span className="text-text-muted text-[10px]">→</span>
-        <span className="text-text-primary text-[11px] truncate max-w-[100px]">{r.to}</span>
+        <span className="text-text-primary text-xs truncate max-w-[100px]">{r.from}</span>
+        <span className="text-text-muted text-xs">→</span>
+        <span className="text-text-primary text-xs truncate max-w-[100px]">{r.to}</span>
         {r.link && (
           <a href={r.link} target="_blank" rel="noopener noreferrer" className="ml-1 text-teal-vivid hover:underline">
             ↗
@@ -186,18 +186,18 @@ fetchData()
       </div>
     )},
     { key: 'amount', header: 'Amount', width: 100, align: 'right', render: r => (
-      <span className="text-teal-vivid font-bold tabular-nums text-[11px]">
-        {r.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-[9px] text-text-muted">{r.symbol}</span>
+      <span className="text-teal-vivid font-bold tabular-nums text-xs">
+        {r.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })} <span className="text-xs text-text-muted">{r.symbol}</span>
       </span>
     )},
     { key: 'usd', header: 'USD', width: 80, align: 'right', render: r => <PriceTag value={r.usd} size="sm" /> },
   ]
 
   const activityColumns: Column<ActivityEvent>[] = [
-    { key: 'headline', header: 'Entity / Smart Money Signal (Nansen)', width: 250, render: r => <span className="text-text-primary text-[11px] truncate block">{r.headline}</span> },
-    { key: 'asset', header: 'Asset', width: 60, render: r => <span className="text-teal-vivid font-mono text-[10px]">{r.asset}</span> },
+    { key: 'headline', header: 'Entity / Smart Money Signal (Nansen)', width: 250, render: r => <span className="text-text-primary text-xs truncate block">{r.headline}</span> },
+    { key: 'asset', header: 'Asset', width: 60, render: r => <span className="text-teal-vivid font-mono text-xs">{r.asset}</span> },
     { key: 'direction', header: 'Dir', width: 50, render: r => (
-      <span className={`text-[10px] font-mono font-bold ${r.direction === 'bullish' ? 'text-data-bull' : r.direction === 'bearish' ? 'text-data-bear' : 'text-text-muted'}`}>
+      <span className={`text-xs font-mono font-bold ${r.direction === 'bullish' ? 'text-data-bull' : r.direction === 'bearish' ? 'text-data-bear' : 'text-text-muted'}`}>
         {r.direction === 'bullish' ? '🟢' : r.direction === 'bearish' ? '🔴' : '⚪'}
       </span>
     )},
@@ -209,7 +209,7 @@ fetchData()
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">Command Center</h1>
-            <p className="text-[11px] text-text-muted font-mono">Global Market View — News, Trending DEX, On-chain Flows</p>
+            <p className="text-xs text-text-muted">Global Market View — News, Trending DEX, On-chain Flows</p>
           </div>
           <LiveDot status={feedStatus} label />
         </div>
@@ -218,12 +218,12 @@ fetchData()
         <div className="grid grid-cols-4 gap-1">
           {kpis.map((kpi, i) => (
             <div key={i} className="bg-bg-panel border border-bg-border px-3 py-2">
-              <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{kpi.label}</div>
+              <div className="text-xs text-text-muted font-mono uppercase mb-1">{kpi.label}</div>
               <div className="text-[18px] font-head font-bold tabular-nums text-text-primary">
                 {kpi.prefix}{kpi.value}{kpi.suffix}
               </div>
               {kpi.delta !== undefined && kpi.delta !== 0 && (
-                <div className={`text-[10px] font-mono ${kpi.delta > 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                <div className={`text-xs font-mono ${kpi.delta > 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                   {kpi.delta > 0 ? '+' : ''}{(kpi.delta ?? 0).toFixed(2)}%
                 </div>
               )}
@@ -238,7 +238,7 @@ fetchData()
               columns={newsColumns as unknown as Column<Record<string, unknown>>[]}
               data={news as unknown as Record<string, unknown>[]}
               rowHeight={28}
-              emptyState={<div className="text-text-muted text-[11px] p-4">Aggregating global news...</div>}
+              emptyState={<div className="text-text-muted text-xs p-4">Aggregating global news...</div>}
             />
           </Panel>
 
@@ -247,7 +247,7 @@ fetchData()
               columns={dexColumns as unknown as Column<Record<string, unknown>>[]}
               data={dex as unknown as Record<string, unknown>[]}
               rowHeight={28}
-              emptyState={<div className="text-text-muted text-[11px] p-4">Scanning liquidity pools...</div>}
+              emptyState={<div className="text-text-muted text-xs p-4">Scanning liquidity pools...</div>}
             />
           </Panel>
         </div>
@@ -259,7 +259,7 @@ fetchData()
               columns={activityColumns as unknown as Column<Record<string, unknown>>[]}
               data={activity as unknown as Record<string, unknown>[]}
               rowHeight={28}
-              emptyState={<div className="text-text-muted text-[11px] p-4">Waiting for smart money signals...</div>}
+              emptyState={<div className="text-text-muted text-xs p-4">Waiting for smart money signals...</div>}
             />
           </Panel>
 
@@ -268,7 +268,7 @@ fetchData()
               columns={whaleColumns as unknown as Column<Record<string, unknown>>[]}
               data={whaleMoves as unknown as Record<string, unknown>[]}
               rowHeight={28}
-              emptyState={<div className="text-text-muted text-[11px] p-4">Monitoring mempool for whale TXs...</div>}
+              emptyState={<div className="text-text-muted text-xs p-4">Monitoring mempool for whale TXs...</div>}
             />
           </Panel>
         </div>

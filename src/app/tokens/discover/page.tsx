@@ -52,8 +52,8 @@ export default function TokenDiscoverPage() {
         <div className="sticky top-0 bg-bg-deep z-10 px-4 py-3 border-b border-border-dim">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h1 className="text-sm font-mono font-bold text-accent-cyan">TOKEN DISCOVERY</h1>
-              <span className="text-[10px] text-text-muted">{tokens.length} tokens</span>
+              <h1 className="text-sm font-bold text-accent-cyan">TOKEN DISCOVERY</h1>
+              <span className="text-xs text-text-muted">{tokens.length} tokens</span>
             </div>
             <div className="flex gap-1">
               {([
@@ -65,7 +65,7 @@ export default function TokenDiscoverPage() {
                 <button
                   key={s.key}
                   onClick={() => setSort(s.key)}
-                  className={`px-2 py-0.5 rounded text-[10px] border font-mono transition-colors ${
+                  className={`px-2 py-0.5 rounded text-xs border font-mono transition-colors ${
                     sort === s.key
                       ? 'bg-border-active border-border-active text-text-primary'
                       : 'bg-bg-panel border-border-dim text-text-dim hover:border-border-active'
@@ -89,8 +89,8 @@ export default function TokenDiscoverPage() {
             <TableControlsBar idPrefix="tokens-discover" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-text-muted text-[10px] uppercase">
-                  <th className="text-left py-2 px-2 font-mono">#</th>
+                <tr className="text-text-muted text-xs uppercase">
+                  <th className="text-left py-2 px-2">#</th>
                   <SortableTh controls={tc} k="symbol" className="text-left py-2 px-2 font-mono">TOKEN</SortableTh>
                   <SortableTh controls={tc} k="network" className="text-left py-2 px-2 font-mono">CHAIN</SortableTh>
                   <SortableTh controls={tc} k="priceUsd" className="text-right py-2 px-2 font-mono">PRICE</SortableTh>
@@ -110,12 +110,12 @@ export default function TokenDiscoverPage() {
                     <td className="py-2 px-2 text-text-muted">{i + 1}</td>
                     <td className="py-2 px-2">
                       <div>
-                        <p className="font-mono text-text-primary text-[11px]">{t.symbol}</p>
-                        <p className="text-[9px] text-text-muted truncate max-w-[140px]">{t.address}</p>
+                        <p className="text-text-primary text-xs">{t.symbol}</p>
+                        <p className="text-xs text-text-muted truncate max-w-[140px]">{t.address}</p>
                       </div>
                     </td>
                     <td className="py-2 px-2">
-                      <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded ${
+                      <span className={`font-mono text-xs px-1.5 py-0.5 rounded ${
                         t.network === 'solana' ? 'bg-purple-900/30 text-purple-400' :
                         t.network === 'eth' ? 'bg-blue-900/30 text-blue-400' :
                         'bg-gray-800 text-gray-400'
@@ -154,7 +154,7 @@ export default function TokenDiscoverPage() {
                     <td className="py-2 px-2">
                       <div className="flex flex-wrap gap-1">
                         {t.badges.map((b, j) => (
-                          <span key={j} className="text-[9px] px-1 py-0.5 rounded bg-bg-elevated text-text-dim">
+                          <span key={j} className="text-xs px-1 py-0.5 rounded bg-bg-elevated text-text-dim">
                             {b}
                           </span>
                         ))}
@@ -180,7 +180,7 @@ export default function TokenDiscoverPage() {
 function RugScoreBadge({ score }: { score: number }) {
   if (score >= 70) {
     return (
-      <span className="inline-flex items-center gap-0.5 text-[10px] font-mono text-accent-red">
+      <span className="inline-flex items-center gap-0.5 text-xs font-mono text-accent-red">
         <AlertTriangle size={10} />
         {score}
       </span>
@@ -188,14 +188,14 @@ function RugScoreBadge({ score }: { score: number }) {
   }
   if (score >= 40) {
     return (
-      <span className="inline-flex items-center gap-0.5 text-[10px] font-mono text-accent-amber">
+      <span className="inline-flex items-center gap-0.5 text-xs font-mono text-accent-amber">
         <AlertTriangle size={10} />
         {score}
       </span>
     )
   }
   return (
-    <span className="text-[10px] font-mono text-accent-green">{score}</span>
+    <span className="text-xs font-mono text-accent-green">{score}</span>
   )
 }
 

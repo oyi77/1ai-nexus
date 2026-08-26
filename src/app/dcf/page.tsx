@@ -122,7 +122,7 @@ setResult(r)
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">DCF VALUATION MODEL</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Discounted Cash Flow — {PRESETS.length} preset companies
             </p>
           </div>
@@ -132,7 +132,7 @@ setResult(r)
         <div className="flex flex-wrap gap-2">
           {PRESETS.map(p => (
             <button key={p.symbol} onClick={() => handlePreset(p)}
-              className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+              className={`px-3 py-1 text-xs font-mono rounded border transition-colors ${
                 selected.symbol === p.symbol
                   ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
                   : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
@@ -158,7 +158,7 @@ setResult(r)
                   ['Net Debt ($)', 'netDebt'],
                 ].map(([label, key]) => (
                   <div key={key} className="flex items-center justify-between">
-                    <label className="text-[10px] text-text-muted font-mono">{label}</label>
+                    <label className="text-xs text-text-muted font-mono">{label}</label>
                     <input
                       type="number"
                       value={key.includes('Rate') || key.includes('growth') || key.includes('discount')
@@ -187,12 +187,12 @@ setResult(r)
                   <h3 className="text-xs font-semibold text-text-secondary mb-3">VALUATION RESULT</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-[10px] text-text-muted font-mono">INTRINSIC VALUE</p>
-                      <p className="text-2xl font-bold font-mono text-text-primary">${fmt(result.intrinsicValue)}</p>
-                      <p className="text-xs text-text-muted font-mono">Current: ${fmt(inputs.currentPrice)}</p>
+                      <p className="text-xs text-text-muted">INTRINSIC VALUE</p>
+                      <p className="text-2xl font-bold text-text-primary">${fmt(result.intrinsicValue)}</p>
+                      <p className="text-xs text-text-muted">Current: ${fmt(inputs.currentPrice)}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-text-muted font-mono">UPSIDE / DOWNSIDE</p>
+                      <p className="text-xs text-text-muted">UPSIDE / DOWNSIDE</p>
                       <p className={`text-2xl font-bold font-mono ${result.upside >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                         {result.upside >= 0 ? '+' : ''}{result.upside}%
                       </p>
@@ -205,7 +205,7 @@ setResult(r)
                       result.upside >= -20 ? 'bg-data-bear/10 text-data-bear' :
                       'bg-data-bear/20 text-data-bear'
                     }`}>
-                      <p className="text-sm font-mono font-bold">
+                      <p className="text-sm font-bold">
                         {result.upside >= 20 ? 'STRONG BUY' : result.upside >= 0 ? 'BUY' : result.upside >= -20 ? 'HOLD' : 'SELL'}
                       </p>
                     </div>
@@ -214,14 +214,14 @@ setResult(r)
 
                 <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
                   <h3 className="text-xs font-semibold text-text-secondary mb-3">SENSITIVITY ANALYSIS</h3>
-                  <p className="text-[10px] text-text-muted font-mono mb-2">Intrinsic Value by Growth × Discount Rate</p>
+                  <p className="text-xs text-text-muted mb-2">Intrinsic Value by Growth × Discount Rate</p>
                   <div className="overflow-x-auto">
-                    <table className="text-[10px]">
+                    <table className="text-xs">
                       <thead>
                         <tr className="text-text-muted">
-                          <th className="p-1 text-right font-mono">Growth</th>
+                          <th className="p-1 text-right">Growth</th>
                           {[-0.02, -0.01, 0, 0.01, 0.02].map(delta => (
-                            <th key={delta} className="p-1 text-right font-mono">WACC {((inputs.discountRate + delta) * 100).toFixed(0)}%</th>
+                            <th key={delta} className="p-1 text-right">WACC {((inputs.discountRate + delta) * 100).toFixed(0)}%</th>
                           ))}
                         </tr>
                       </thead>

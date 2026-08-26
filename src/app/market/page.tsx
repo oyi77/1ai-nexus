@@ -78,10 +78,10 @@ export default function MarketPage() {
     <NexusLayout>
       <div className="h-full overflow-auto p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-sm font-mono font-bold text-accent-cyan flex items-center gap-2">
+          <h1 className="text-sm font-bold text-accent-cyan flex items-center gap-2">
             <BarChart3 size={14} /> MARKET OVERVIEW
           </h1>
-          <span className="text-[10px] text-text-muted">Live from CoinGecko + Binance</span>
+          <span className="text-xs text-text-muted">Live from CoinGecko + Binance</span>
         </div>
 
         {/* Global Stats */}
@@ -102,7 +102,7 @@ export default function MarketPage() {
         <div className="bg-bg-panel border border-border-dim rounded">
           <div className="px-3 py-2 border-b border-border-dim flex items-center gap-2">
             <span className="text-xs font-mono text-accent-cyan">LIVE PRICES</span>
-            <span className="text-[10px] text-text-muted">{tickers.length} assets</span>
+            <span className="text-xs text-text-muted">{tickers.length} assets</span>
           </div>
           {loading ? (
             <div className="p-8 text-center text-text-dim text-xs">Loading market data...</div>
@@ -111,12 +111,12 @@ export default function MarketPage() {
               <TableControlsBar idPrefix="market" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-text-muted text-[10px] uppercase">
-                    <th className="text-left py-2 px-3 font-mono">#</th>
+                  <tr className="text-text-muted text-xs uppercase">
+                    <th className="text-left py-2 px-3">#</th>
                     <SortableTh controls={tc} k="symbol" className="text-left py-2 px-3 font-mono">ASSET</SortableTh>
                     <SortableTh controls={tc} k="price" className="text-right py-2 px-3 font-mono">PRICE</SortableTh>
                     <SortableTh controls={tc} k="change" className="text-right py-2 px-3 font-mono">24H CHANGE</SortableTh>
-                    <th className="text-right py-2 px-3 font-mono">SPARKLINE</th>
+                    <th className="text-right py-2 px-3">SPARKLINE</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -148,22 +148,22 @@ export default function MarketPage() {
 
         {/* Data Sources */}
         <div className="bg-bg-panel border border-border-dim rounded p-3">
-          <h3 className="text-xs font-mono text-accent-cyan mb-2">DATA SOURCES</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[10px]">
+          <h3 className="text-xs text-accent-cyan mb-2">DATA SOURCES</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
             <div className="bg-bg-elevated rounded p-2">
-              <p className="text-text-primary font-mono">CoinGecko</p>
+              <p className="text-text-primary">CoinGecko</p>
               <p className="text-text-dim">18K+ coins, prices, market caps</p>
             </div>
             <div className="bg-bg-elevated rounded p-2">
-              <p className="text-text-primary font-mono">Binance</p>
+              <p className="text-text-primary">Binance</p>
               <p className="text-text-dim">Spot + futures, order book, OHLCV</p>
             </div>
             <div className="bg-bg-elevated rounded p-2">
-              <p className="text-text-primary font-mono">Fear & Greed</p>
+              <p className="text-text-primary">Fear & Greed</p>
               <p className="text-text-dim">Crypto sentiment index</p>
             </div>
             <div className="bg-bg-elevated rounded p-2">
-              <p className="text-text-primary font-mono">DeFiLlama</p>
+              <p className="text-text-primary">DeFiLlama</p>
               <p className="text-text-dim">TVL, yields, stablecoins</p>
             </div>
           </div>
@@ -178,7 +178,7 @@ function StatCard({ label, value, icon, color }: { label: string; value: string;
     <div className="bg-bg-panel border border-border-dim rounded p-2.5">
       <div className="flex items-center gap-1.5 mb-1">
         <span className="text-text-dim">{icon}</span>
-        <span className="text-[10px] text-text-muted uppercase">{label}</span>
+        <span className="text-xs text-text-muted uppercase">{label}</span>
       </div>
       <p className={`text-sm font-mono font-bold ${color ?? 'text-text-primary'}`}>{value}</p>
     </div>

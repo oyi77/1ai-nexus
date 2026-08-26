@@ -118,7 +118,7 @@ setDetail(data.find(i => i.symbol === selected) ?? null)
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">COMPANY FUNDAMENTALS</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               {data.length} companies across US, IDX, EU, Asia
             </p>
           </div>
@@ -129,7 +129,7 @@ setDetail(data.find(i => i.symbol === selected) ?? null)
         <div className="flex flex-wrap gap-2">
           {WATCHLIST.map(sym => (
             <button key={sym} onClick={() => setSelected(sym)}
-              className={`px-2 py-1 text-[10px] font-mono rounded border transition-colors ${
+              className={`px-2 py-1 text-xs font-mono rounded border transition-colors ${
                 selected === sym
                   ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
                   : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
@@ -147,14 +147,14 @@ setDetail(data.find(i => i.symbol === selected) ?? null)
             <div className="col-span-12 bg-bg-panel border border-border-dim rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-lg font-bold font-mono text-text-primary">{detail.symbol}</h2>
+                  <h2 className="text-lg font-bold text-text-primary">{detail.symbol}</h2>
                   <p className="text-sm text-text-dim">{detail.name}</p>
-                  <p className="text-[10px] text-text-muted font-mono">{detail.sector} · {detail.industry}</p>
+                  <p className="text-xs text-text-muted">{detail.sector} · {detail.industry}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs text-text-muted font-mono">Market Cap</p>
-                  <p className="text-xl font-bold font-mono text-text-primary">{fmtB(detail.marketCap)}</p>
-                  <p className="text-[10px] text-text-muted font-mono">EV: {fmtB(detail.enterpriseValue)}</p>
+                  <p className="text-xs text-text-muted">Market Cap</p>
+                  <p className="text-xl font-bold text-text-primary">{fmtB(detail.marketCap)}</p>
+                  <p className="text-xs text-text-muted">EV: {fmtB(detail.enterpriseValue)}</p>
                 </div>
               </div>
             </div>
@@ -232,7 +232,7 @@ setDetail(data.find(i => i.symbol === selected) ?? null)
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">SOURCE</h2>
+          <h2 className="text-xs text-accent-cyan mb-2">SOURCE</h2>
           <p className="text-xs text-text-dim">
             Yahoo Finance — 30+ fundamental metrics per company. Free, no API key.
             Covers US, IDX (.JK), EU, Asia exchanges.

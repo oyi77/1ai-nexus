@@ -97,13 +97,13 @@ function EntitiesPageInner() {
       key: 'type',
       header: 'Type',
       width: 80,
-      render: (row) => <span className="text-text-secondary text-[10px]">{row.type}</span>,
+      render: (row) => <span className="text-text-secondary text-xs">{row.type}</span>,
     },
     {
       key: 'chains',
       header: 'Chain',
       width: 80,
-      render: (row) => <span className="text-text-muted text-[10px]">{row.chains[0]}</span>,
+      render: (row) => <span className="text-text-muted text-xs">{row.chains[0]}</span>,
     },
     {
       key: 'totalUsdValue',
@@ -127,7 +127,7 @@ function EntitiesPageInner() {
       key: 'verified',
       header: 'Status',
       width: 60,
-      render: (row) => row.verified ? <span className="text-data-bull text-[10px]">✓</span> : <span className="text-text-muted text-[10px]">—</span>,
+      render: (row) => row.verified ? <span className="text-data-bull text-xs">✓</span> : <span className="text-text-muted text-xs">—</span>,
     },
   ]
 
@@ -138,7 +138,7 @@ function EntitiesPageInner() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">Wallet / Entity Intelligence</h1>
-            <p className="text-[11px] text-text-muted font-mono">Arkham-style wallet profiling — label, cluster, history, PnL</p>
+            <p className="text-xs text-text-muted">Arkham-style wallet profiling — label, cluster, history, PnL</p>
           </div>
           <LiveDot status={feedStatus} label />
         </div>
@@ -150,9 +150,9 @@ function EntitiesPageInner() {
             placeholder="Search address or entity..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="bg-bg-panel border border-bg-border rounded px-3 py-1.5 text-[11px] font-mono text-text-primary placeholder:text-text-muted outline-none w-64"
+            className="bg-bg-panel border border-bg-border rounded px-3 py-1.5 text-xs font-mono text-text-primary placeholder:text-text-muted outline-none w-64"
           />
-          <div className="flex items-center gap-1 text-[10px] font-mono">
+          <div className="flex items-center gap-1 text-xs font-mono">
             {entityTypes.map(t => (
               <button
                 key={t}
@@ -163,7 +163,7 @@ function EntitiesPageInner() {
               </button>
             ))}
           </div>
-          <span className="ml-auto text-[10px] text-text-muted font-mono">{filtered.length} entities</span>
+          <span className="ml-auto text-xs text-text-muted font-mono">{filtered.length} entities</span>
         </div>
 
         {/* Main Grid */}
@@ -185,7 +185,7 @@ function EntitiesPageInner() {
                 filterPlaceholder="Filter entities…"
                 rowHeight={32}
                 onRowClick={(row) => setSelectedEntity(row)}
-                emptyState={<div className="text-text-muted text-[11px] p-4">Loading entities...</div>}
+                emptyState={<div className="text-text-muted text-xs p-4">Loading entities...</div>}
               />
             </Panel>
           </div>
@@ -219,7 +219,7 @@ function EntitiesPageInner() {
                     { label: 'Status', value: selectedEntity.verified ? 'Verified' : 'Unverified' },
                   ].map((stat, i) => (
                     <div key={i} className="bg-bg-raised rounded p-2">
-                      <div className="text-[9px] text-text-muted font-mono uppercase">{stat.label}</div>
+                      <div className="text-xs text-text-muted font-mono uppercase">{stat.label}</div>
                       <div className="text-[12px] font-mono text-text-primary">{stat.value}</div>
                     </div>
                   ))}
@@ -228,10 +228,10 @@ function EntitiesPageInner() {
                 {/* Wallets */}
                 {selectedEntity.wallets.length > 0 && (
                   <div>
-                    <div className="text-[10px] text-text-muted font-mono mb-1">WALLETS ({selectedEntity.wallets.length})</div>
+                    <div className="text-xs text-text-muted font-mono mb-1">WALLETS ({selectedEntity.wallets.length})</div>
                     <div className="space-y-1 max-h-[200px] overflow-y-auto">
                       {selectedEntity.wallets.slice(0, 5).map((w, i) => (
-                        <div key={i} className="flex items-center gap-2 text-[10px] font-mono">
+                        <div key={i} className="flex items-center gap-2 text-xs font-mono">
                           <span className="px-1.5 py-0.5 rounded bg-bg-raised text-text-muted uppercase">{w.chain}</span>
                           <AddressChip address={w.address} truncate={12} size="sm" />
                         </div>
@@ -241,7 +241,7 @@ function EntitiesPageInner() {
                 )}
               </div>
             ) : (
-              <div className="flex items-center justify-center h-full text-text-muted text-[11px]">
+              <div className="flex items-center justify-center h-full text-text-muted text-xs">
                 Select an entity from the list
               </div>
             )}

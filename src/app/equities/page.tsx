@@ -233,7 +233,7 @@ export default function EquitiesPage() {
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between gap-4">
           <h1 className="page-title">GLOBAL EQUITIES</h1>
-          <span className="text-[10px] text-text-muted font-mono">
+          <span className="text-xs text-text-muted font-mono">
             {market && marketStocks
               ? `${marketStocks.length} listings · ${marketName ?? market}`
               : `${allStocks.length} stocks · ${INDEX_SYMBOLS.length} indices · 14 exchanges`}
@@ -242,7 +242,7 @@ export default function EquitiesPage() {
 
         {/* Market picker */}
         <div className="flex items-center gap-3">
-          <label htmlFor="equities-market" className="text-[10px] font-mono text-text-muted uppercase tracking-wide">Market</label>
+          <label htmlFor="equities-market" className="text-xs font-mono text-text-muted uppercase tracking-wide">Market</label>
           <select
             id="equities-market"
             value={market}
@@ -255,12 +255,12 @@ export default function EquitiesPage() {
             ))}
           </select>
           {market && marketStocks && marketStocks.length > MARKET_QUOTE_CAP && (
-            <span className="text-[10px] text-text-muted font-mono">
+            <span className="text-xs text-text-muted font-mono">
               quotes streaming for first {MARKET_QUOTE_CAP} listings
             </span>
           )}
         </div>
-        {error && <div className="text-data-bear text-[11px] font-mono p-4">Error: {error}</div>}
+        {error && <div className="text-data-bear text-xs font-mono p-4">Error: {error}</div>}
 
         {/* Indices */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
@@ -279,8 +279,8 @@ export default function EquitiesPage() {
                 const q = quotes[sym]
                 return (
                   <div key={sym} className="p-2">
-                    <p className="text-[10px] text-text-muted">{q?.name ?? sym}</p>
-                    <p className="text-lg font-mono font-bold">{q?.price != null ? format(q.price) : '—'}</p>
+                    <p className="text-xs text-text-muted">{q?.name ?? sym}</p>
+                    <p className="text-lg font-bold">{q?.price != null ? format(q.price) : '—'}</p>
                     <p className={`text-xs font-mono ${(q?.change ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
                       {q?.change != null ? `${q.change >= 0 ? '+' : ''}${q.change.toFixed(2)}%` : '—'}
                     </p>

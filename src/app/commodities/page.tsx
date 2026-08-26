@@ -52,37 +52,37 @@ export default function CommoditiesPage() {
       <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="page-title">GLOBAL COMMODITIES</h1>
-          <span className="text-[10px] text-text-muted font-mono">{quotedItems.length}/{ALL_COMMODITIES.length} live</span>
+          <span className="text-xs text-text-muted font-mono">{quotedItems.length}/{ALL_COMMODITIES.length} live</span>
         </div>
-        {error && <div className="text-data-bear text-[11px] font-mono p-4">Error: {error}</div>}
+        {error && <div className="text-data-bear text-xs font-mono p-4">Error: {error}</div>}
 
         {/* Summary bar */}
         {!loading && quotedItems.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted">BIGGEST GAINER</p>
-              <p className="text-sm font-mono font-bold text-accent-green">{biggestGainer?.name}</p>
-              <p className="text-xs font-mono text-accent-green">
+              <p className="text-xs text-text-muted">BIGGEST GAINER</p>
+              <p className="text-sm font-bold text-accent-green">{biggestGainer?.name}</p>
+              <p className="text-xs text-accent-green">
                 +{quotes[biggestGainer?.symbol]?.changePct?.toFixed(2)}%
               </p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted">BIGGEST LOSER</p>
-              <p className="text-sm font-mono font-bold text-accent-red">{biggestLoser?.name}</p>
-              <p className="text-xs font-mono text-accent-red">
+              <p className="text-xs text-text-muted">BIGGEST LOSER</p>
+              <p className="text-sm font-bold text-accent-red">{biggestLoser?.name}</p>
+              <p className="text-xs text-accent-red">
                 {quotes[biggestLoser?.symbol]?.changePct?.toFixed(2)}%
               </p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted">GOLD</p>
-              <p className="text-sm font-mono font-bold">${quotes['GC=F']?.price?.toFixed(0) ?? '—'}</p>
+              <p className="text-xs text-text-muted">GOLD</p>
+              <p className="text-sm font-bold">${quotes['GC=F']?.price?.toFixed(0) ?? '—'}</p>
               <p className={`text-xs font-mono ${(quotes['GC=F']?.changePct ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
                 {quotes['GC=F']?.changePct != null ? `${quotes['GC=F'].changePct >= 0 ? '+' : ''}${quotes['GC=F'].changePct.toFixed(2)}%` : '—'}
               </p>
             </div>
             <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-[10px] text-text-muted">BRENT CRUDE</p>
-              <p className="text-sm font-mono font-bold">${quotes['BZ=F']?.price?.toFixed(2) ?? '—'}</p>
+              <p className="text-xs text-text-muted">BRENT CRUDE</p>
+              <p className="text-sm font-bold">${quotes['BZ=F']?.price?.toFixed(2) ?? '—'}</p>
               <p className={`text-xs font-mono ${(quotes['BZ=F']?.changePct ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
                 {quotes['BZ=F']?.changePct != null ? `${quotes['BZ=F'].changePct >= 0 ? '+' : ''}${quotes['BZ=F'].changePct.toFixed(2)}%` : '—'}
               </p>
@@ -102,25 +102,25 @@ export default function CommoditiesPage() {
                   const q = quotes[c.symbol]
                   if (!q) return (
                     <div key={c.symbol} className="p-3 border border-border-dim/30 rounded">
-                      <p className="text-[10px] text-text-muted">{c.name}</p>
-                      <p className="text-lg font-mono text-text-dim">—</p>
-                      <p className="text-[10px] text-text-muted">{c.symbol}</p>
+                      <p className="text-xs text-text-muted">{c.name}</p>
+                      <p className="text-lg text-text-dim">—</p>
+                      <p className="text-xs text-text-muted">{c.symbol}</p>
                     </div>
                   )
                   return (
                     <div key={c.symbol} className="p-3 border border-border-dim/30 rounded hover:bg-bg-elevated transition-colors">
                       <div className="flex items-center justify-between">
-                        <p className="text-[10px] text-text-muted">{c.name}</p>
-                        <span className="text-[10px] text-text-dim">{c.unit}</span>
+                        <p className="text-xs text-text-muted">{c.name}</p>
+                        <span className="text-xs text-text-dim">{c.unit}</span>
                       </div>
-                      <p className="text-xl font-mono font-bold text-text-primary">
+                      <p className="text-xl font-bold text-text-primary">
                         ${q.price?.toFixed(2) ?? '—'}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className={`text-xs font-mono ${(q.changePct ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
                           {q.changePct != null ? `${q.changePct >= 0 ? '+' : ''}${q.changePct.toFixed(2)}%` : '—'}
                         </span>
-                        <span className={`text-[10px] font-mono ${(q.change ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                        <span className={`text-xs font-mono ${(q.change ?? 0) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
                           ({q.change != null ? `${q.change >= 0 ? '+' : ''}${q.change.toFixed(2)}` : '—'})
                         </span>
                       </div>
@@ -133,7 +133,7 @@ export default function CommoditiesPage() {
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">SOURCE</h2>
+          <h2 className="text-xs text-accent-cyan mb-2">SOURCE</h2>
           <p className="text-xs text-text-dim">
             Yahoo Finance RE — Futures data for {ALL_COMMODITIES.length} commodity contracts.
             Covers precious metals, energy, industrial metals, agriculture, and livestock.

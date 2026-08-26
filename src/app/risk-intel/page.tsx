@@ -72,7 +72,7 @@ export default function RiskIntelPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">RISK INTELLIGENCE</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               DeFi credit stress, miner behavior, narrative rotation — all from public APIs
             </p>
           </div>
@@ -95,7 +95,7 @@ export default function RiskIntelPage() {
         {activeTab === 'credit' && (
           <Panel title="DeFi Credit Stress" subtitle={`${creditRisk.length} elevated-risk protocols`}>
             {creditRisk.length === 0 ? (
-              <div className="text-text-muted text-[11px] p-4 text-center">No elevated credit risk detected</div>
+              <div className="text-text-muted text-xs p-4 text-center">No elevated credit risk detected</div>
             ) : (
               <>
                 <TableControlsBar idPrefix="risk-intel" query={creditTc.query} onQueryChange={creditTc.setQuery} shown={creditTc.visible.length} total={creditTc.total} />
@@ -121,7 +121,7 @@ export default function RiskIntelPage() {
                           c.riskLevel === 'critical' ? 'text-data-bear' : c.riskLevel === 'high' ? 'text-accent-amber' : 'text-text-muted'
                         }`}>{c.avgApy.toFixed(2)}%</td>
                         <td className="py-2 px-2">
-                          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                          <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
                             c.riskLevel === 'critical' ? 'bg-data-bear/20 text-data-bear' :
                             c.riskLevel === 'high' ? 'bg-accent-amber/20 text-accent-amber' :
                             'bg-bg-raised text-text-muted'
@@ -148,20 +148,20 @@ export default function RiskIntelPage() {
           <Panel title="Bitcoin Miner Intelligence" subtitle="Hash rate + miner behavior signals">
             <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <p className="text-[10px] text-text-muted font-mono">HASH RATE</p>
-                <p className="text-lg font-mono font-bold">{minerFlow.hashRate ? `${minerFlow.hashRate.toFixed(1)} EH/s` : '—'}</p>
+                <p className="text-xs text-text-muted">HASH RATE</p>
+                <p className="text-lg font-bold">{minerFlow.hashRate ? `${minerFlow.hashRate.toFixed(1)} EH/s` : '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] text-text-muted font-mono">BLOCK HEIGHT</p>
-                <p className="text-lg font-mono font-bold">{minerFlow.blockHeight?.toLocaleString() ?? '—'}</p>
+                <p className="text-xs text-text-muted">BLOCK HEIGHT</p>
+                <p className="text-lg font-bold">{minerFlow.blockHeight?.toLocaleString() ?? '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] text-text-muted font-mono">DIFFICULTY</p>
-                <p className="text-lg font-mono font-bold">{minerFlow.difficulty ? `${(minerFlow.difficulty / 1e12).toFixed(1)}T` : '—'}</p>
+                <p className="text-xs text-text-muted">DIFFICULTY</p>
+                <p className="text-lg font-bold">{minerFlow.difficulty ? `${(minerFlow.difficulty / 1e12).toFixed(1)}T` : '—'}</p>
               </div>
               <div>
-                <p className="text-[10px] text-text-muted font-mono">SIGNAL</p>
-                <p className="text-sm font-mono font-bold">{minerFlow.signal}</p>
+                <p className="text-xs text-text-muted">SIGNAL</p>
+                <p className="text-sm font-bold">{minerFlow.signal}</p>
               </div>
             </div>
           </Panel>
@@ -174,14 +174,14 @@ export default function RiskIntelPage() {
             <div className="grid grid-cols-2 gap-4">
               <Panel title="Top Inflows" subtitle="Sectors with capital rotation in">
                 {topInflows.length === 0 ? (
-                  <div className="text-text-muted text-[11px] p-4 text-center">No inflow signals</div>
+                  <div className="text-text-muted text-xs p-4 text-center">No inflow signals</div>
                 ) : (
                   <div className="p-3 space-y-2">
                     {topInflows.map((s, i) => (
                       <div key={i} className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs font-mono font-bold text-data-bull">{s.sector}</p>
-                          <p className="text-[9px] text-text-dim">{s.topCoins.slice(0, 3).join(', ')}</p>
+                          <p className="text-xs font-bold text-data-bull">{s.sector}</p>
+                          <p className="text-xs text-text-dim">{s.topCoins.slice(0, 3).join(', ')}</p>
                         </div>
                         <span className="text-sm font-mono font-bold text-data-bull">+{s.change24h.toFixed(2)}%</span>
                       </div>
@@ -191,14 +191,14 @@ export default function RiskIntelPage() {
               </Panel>
               <Panel title="Top Outflows" subtitle="Sectors with capital rotation out">
                 {topOutflows.length === 0 ? (
-                  <div className="text-text-muted text-[11px] p-4 text-center">No outflow signals</div>
+                  <div className="text-text-muted text-xs p-4 text-center">No outflow signals</div>
                 ) : (
                   <div className="p-3 space-y-2">
                     {topOutflows.map((s, i) => (
                       <div key={i} className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs font-mono font-bold text-data-bear">{s.sector}</p>
-                          <p className="text-[9px] text-text-dim">{s.topCoins.slice(0, 3).join(', ')}</p>
+                          <p className="text-xs font-bold text-data-bear">{s.sector}</p>
+                          <p className="text-xs text-text-dim">{s.topCoins.slice(0, 3).join(', ')}</p>
                         </div>
                         <span className="text-sm font-mono font-bold text-data-bear">{s.change24h.toFixed(2)}%</span>
                       </div>
@@ -235,7 +235,7 @@ export default function RiskIntelPage() {
                           {s.change7d >= 0 ? '+' : ''}{s.change7d.toFixed(2)}%
                         </td>
                         <td className="py-2 px-2">
-                          <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                          <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
                             s.signal === 'inflow' ? 'bg-data-bull/20 text-data-bull' :
                             s.signal === 'outflow' ? 'bg-data-bear/20 text-data-bear' :
                             'bg-bg-raised text-text-muted'

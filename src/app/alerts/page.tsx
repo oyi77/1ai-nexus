@@ -64,17 +64,17 @@ function PriceThresholdForm({ config, onChange }: { config: Record<string, unkno
   return (
     <div className="grid grid-cols-3 gap-3">
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Symbol</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Symbol</label>
         <input type="text" value={String(config.symbol ?? '')} onChange={e => onChange({ ...config, symbol: e.target.value.toUpperCase() })}
           placeholder="AAPL, GC=F, ^GSPC" className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
       </div>
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Price Threshold</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Price Threshold</label>
         <input type="number" value={String(config.threshold ?? '')} onChange={e => onChange({ ...config, threshold: parseFloat(e.target.value) || 0 })}
           placeholder="150.00" className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
       </div>
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Direction</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Direction</label>
         <select value={String(config.direction ?? 'above')} onChange={e => onChange({ ...config, direction: e.target.value })}
           className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary">
           <option value="above">Above threshold</option>
@@ -90,19 +90,19 @@ function ForexRateForm({ config, onChange }: { config: Record<string, unknown>; 
   return (
     <div className="grid grid-cols-3 gap-3">
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Currency Pair</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Currency Pair</label>
         <select value={String(config.pair ?? 'USD/IDR')} onChange={e => onChange({ ...config, pair: e.target.value })}
           className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary">
           {pairs.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
       </div>
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Rate Threshold</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Rate Threshold</label>
         <input type="number" value={String(config.threshold ?? '')} onChange={e => onChange({ ...config, threshold: parseFloat(e.target.value) || 0 })}
           placeholder="16000" className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
       </div>
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Direction</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Direction</label>
         <select value={String(config.direction ?? 'above')} onChange={e => onChange({ ...config, direction: e.target.value })}
           className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary">
           <option value="above">Above threshold</option>
@@ -131,7 +131,7 @@ function MacroEventForm({ config, onChange }: { config: Record<string, unknown>;
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Economic Event</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Economic Event</label>
         <select value={String(config.event ?? events[0].event)} onChange={e => {
           const sel = events.find(ev => ev.event === e.target.value)
           onChange({ ...config, event: e.target.value, country: sel?.country ?? '' })
@@ -141,7 +141,7 @@ function MacroEventForm({ config, onChange }: { config: Record<string, unknown>;
         </select>
       </div>
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Country</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Country</label>
         <input type="text" value={String(config.country ?? '')} readOnly
           className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-muted" />
       </div>
@@ -153,12 +153,12 @@ function WalletMovedForm({ config, onChange }: { config: Record<string, unknown>
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Wallet Address (optional)</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Wallet Address (optional)</label>
         <input type="text" value={String(config.address ?? '')} onChange={e => onChange({ ...config, address: e.target.value })}
           placeholder="0x... (leave empty for any whale)" className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
       </div>
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Min Amount (USD)</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Min Amount (USD)</label>
         <input type="number" value={String(config.minAmountUsd ?? 1000000)} onChange={e => onChange({ ...config, minAmountUsd: parseFloat(e.target.value) || 0 })}
           placeholder="1000000" className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
       </div>
@@ -170,7 +170,7 @@ function SmartMoneyForm({ config, onChange }: { config: Record<string, unknown>;
   return (
     <div className="grid grid-cols-2 gap-3">
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Action</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Action</label>
         <select value={String(config.action ?? 'Accumulated')} onChange={e => onChange({ ...config, action: e.target.value })}
           className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary">
           <option value="Accumulated">Accumulated</option>
@@ -180,7 +180,7 @@ function SmartMoneyForm({ config, onChange }: { config: Record<string, unknown>;
         </select>
       </div>
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Min Score (0-100)</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Min Score (0-100)</label>
         <input type="number" value={String(config.minScore ?? 70)} onChange={e => onChange({ ...config, minScore: parseInt(e.target.value) || 0 })}
           placeholder="70" className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
       </div>
@@ -192,17 +192,17 @@ function PredictionThresholdForm({ config, onChange }: { config: Record<string, 
   return (
     <div className="grid grid-cols-3 gap-3">
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Market ID</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Market ID</label>
         <input type="text" value={String(config.marketId ?? '')} onChange={e => onChange({ ...config, marketId: e.target.value })}
           placeholder="Polymarket market ID" className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
       </div>
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Price Threshold</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Price Threshold</label>
         <input type="number" value={String(config.threshold ?? '')} onChange={e => onChange({ ...config, threshold: parseFloat(e.target.value) || 0 })}
           placeholder="0.70" step="0.01" className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary" />
       </div>
       <div>
-        <label className="text-[10px] text-text-muted font-mono block mb-1">Direction</label>
+        <label className="text-xs text-text-muted font-mono block mb-1">Direction</label>
         <select value={String(config.direction ?? 'above')} onChange={e => onChange({ ...config, direction: e.target.value })}
           className="w-full px-3 py-2 text-xs font-mono bg-bg-elevated border border-border-dim rounded text-text-primary">
           <option value="above">Above threshold</option>
@@ -353,7 +353,7 @@ export default function AlertsPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">ALERT CENTER</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               {enabledCount} active alert{enabledCount !== 1 ? 's' : ''} — Price, Forex, Macro, Whale, Smart Money
             </p>
           </div>
@@ -361,7 +361,7 @@ export default function AlertsPage() {
             <LiveDot status="live" label />
             {alerts.length > 0 && (
               <button onClick={evaluateAlerts}
-                className="px-3 py-1.5 text-xs font-mono bg-bg-elevated border border-border-dim text-text-primary rounded hover:border-border-active disabled:opacity-50"
+                className="px-3 py-1.5 text-xs bg-bg-elevated border border-border-dim text-text-primary rounded hover:border-border-active disabled:opacity-50"
                 disabled={evaluating}>
                 {evaluating ? 'Evaluating…' : 'Evaluate Now'}
               </button>
@@ -374,7 +374,7 @@ export default function AlertsPage() {
         </div>
 
         {error && (
-          <div className="bg-bg-panel border border-data-bear/40 rounded-lg p-3 text-[11px] font-mono text-data-bear">
+          <div className="bg-bg-panel border border-data-bear/40 rounded-lg p-3 text-xs font-mono text-data-bear">
             {error}
           </div>
         )}
@@ -387,8 +387,8 @@ export default function AlertsPage() {
               {PRESETS.map((preset, i) => (
                 <button key={i} onClick={() => loadPreset(preset)}
                   className="text-left p-2 border border-border-dim/50 rounded hover:border-teal-vivid/50 hover:bg-bg-elevated transition-colors">
-                  <p className="text-[11px] font-mono text-text-primary">{preset.name}</p>
-                  <p className="text-[9px] text-text-muted mt-0.5">{ALERT_TYPES[preset.type].label} via {CHANNEL_INFO[preset.channel].name}</p>
+                  <p className="text-xs text-text-primary">{preset.name}</p>
+                  <p className="text-xs text-text-muted mt-0.5">{ALERT_TYPES[preset.type].label} via {CHANNEL_INFO[preset.channel].name}</p>
                 </button>
               ))}
             </div>
@@ -398,11 +398,11 @@ export default function AlertsPage() {
         {/* Create Alert Form */}
         {showCreate && (
           <div className="bg-bg-panel border border-teal-vivid rounded-lg p-4 space-y-4">
-            <h3 className="text-xs font-mono text-accent-cyan">CREATE NEW ALERT</h3>
+            <h3 className="text-xs text-accent-cyan">CREATE NEW ALERT</h3>
 
             {/* Alert type selector */}
             <div>
-              <label className="text-[10px] text-text-muted font-mono block mb-2">Alert Type</label>
+              <label className="text-xs text-text-muted font-mono block mb-2">Alert Type</label>
               <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
                 {(Object.entries(ALERT_TYPES) as Array<[AlertType, typeof ALERT_TYPES[AlertType]]>).map(([key, meta]) => (
                   <button key={key} onClick={() => { setAlertType(key); setConfig({}) }}
@@ -410,7 +410,7 @@ export default function AlertsPage() {
                       alertType === key ? 'border-teal-vivid bg-teal-vivid/10' : 'border-border-dim/50 hover:border-border-active'
                     }`}>
                     <p className="text-sm">{meta.icon}</p>
-                    <p className="text-[10px] font-mono text-text-primary">{meta.label}</p>
+                    <p className="text-xs text-text-primary">{meta.label}</p>
                     <p className={`text-[8px] font-mono ${meta.category === 'tradfi' ? 'text-accent-cyan' : 'text-accent-amber'}`}>{meta.category.toUpperCase()}</p>
                   </button>
                 ))}
@@ -427,8 +427,8 @@ export default function AlertsPage() {
                   className={`p-2 rounded border transition-colors ${
                     channel === key ? 'border-teal-vivid bg-teal-vivid/10' : 'border-border-dim/50 hover:border-border-active'
                   }`}>
-                  <p className="text-[11px] font-mono text-text-primary">{info.name}</p>
-                  <p className="text-[9px] text-text-muted">{info.description}</p>
+                  <p className="text-xs text-text-primary">{info.name}</p>
+                  <p className="text-xs text-text-muted">{info.description}</p>
                 </button>
               ))}
             </div>
@@ -436,7 +436,7 @@ export default function AlertsPage() {
             {/* Actions */}
             <div className="flex gap-2">
               <button onClick={createAlert}
-                className="px-4 py-2 text-xs font-mono bg-teal-vivid text-bg-base rounded hover:bg-teal-vivid/80">
+                className="px-4 py-2 text-xs bg-teal-vivid text-bg-base rounded hover:bg-teal-vivid/80">
                 Create Alert
               </button>
               <button onClick={() => setShowCreate(false)}
@@ -452,7 +452,7 @@ export default function AlertsPage() {
           <div className="flex items-center gap-2">
             {(['all', 'tradfi', 'crypto'] as const).map(cat => (
               <button key={cat} onClick={() => setFilterCategory(cat)}
-                className={`px-3 py-1 text-[10px] font-mono rounded capitalize ${
+                className={`px-3 py-1 text-xs font-mono rounded capitalize ${
                   filterCategory === cat ? 'bg-teal-dim/30 text-teal-vivid' : 'text-text-muted hover:text-text-secondary'
                 }`}>
                 {cat} ({cat === 'all' ? alerts.length : alerts.filter(a => ALERT_TYPES[a.type].category === cat).length})
@@ -464,14 +464,14 @@ export default function AlertsPage() {
         {evalSummary && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-xs font-mono text-accent-cyan">LATEST EVALUATION</h3>
-              <span className="text-[10px] font-mono text-text-muted">
+              <h3 className="text-xs text-accent-cyan">LATEST EVALUATION</h3>
+              <span className="text-xs font-mono text-text-muted">
                 {evalSummary.triggered}/{evalSummary.evaluated} triggered
               </span>
             </div>
             <div className="space-y-1.5">
               {evalSummary.results.slice(0, 8).map((result) => (
-                <div key={result.id} className="text-[10px] font-mono border-b border-border-dim/30 pb-1">
+                <div key={result.id} className="text-xs font-mono border-b border-border-dim/30 pb-1">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <span className={result.triggered ? 'text-accent-green' : 'text-text-dim'}>
@@ -506,27 +506,27 @@ export default function AlertsPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm">{ALERT_TYPES[alert.type].icon}</span>
-                      <p className="text-sm font-mono text-text-primary">{alert.name}</p>
+                      <p className="text-sm text-text-primary">{alert.name}</p>
                       <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded ${
                         ALERT_TYPES[alert.type].category === 'tradfi' ? 'bg-accent-cyan/10 text-accent-cyan' : 'bg-accent-amber/10 text-accent-amber'
                       }`}>
                         {ALERT_TYPES[alert.type].category.toUpperCase()}
                       </span>
                     </div>
-                    <p className="text-[10px] text-text-muted font-mono mt-0.5">{alert.description}</p>
+                    <p className="text-xs text-text-muted mt-0.5">{alert.description}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{
+                  <span className="text-xs font-mono px-2 py-0.5 rounded" style={{
                     backgroundColor: CHANNEL_INFO[alert.channel].color + '20',
                     color: CHANNEL_INFO[alert.channel].color,
                   }}>
                     {CHANNEL_INFO[alert.channel].name}
                   </span>
                   {alert.lastTriggered && (
-                    <span className="text-[9px] text-text-muted font-mono">Last: {alert.lastTriggered}</span>
+                    <span className="text-xs text-text-muted font-mono">Last: {alert.lastTriggered}</span>
                   )}
-                  <button onClick={() => deleteAlert(alert.id)} className="text-[10px] font-mono text-data-bear hover:text-data-bear/80">
+                  <button onClick={() => deleteAlert(alert.id)} className="text-xs font-mono text-data-bear hover:text-data-bear/80">
                     Delete
                   </button>
                 </div>
@@ -537,15 +537,15 @@ export default function AlertsPage() {
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
-            <h2 className="text-xs font-mono text-accent-cyan">ALERT HISTORY</h2>
-            <span className="text-[10px] font-mono text-text-muted">{alertLog.length} recent events</span>
+            <h2 className="text-xs text-accent-cyan">ALERT HISTORY</h2>
+            <span className="text-xs font-mono text-text-muted">{alertLog.length} recent events</span>
           </div>
           {alertLog.length === 0 ? (
-            <div className="text-[10px] text-text-muted font-mono">No alert events recorded yet.</div>
+            <div className="text-xs text-text-muted font-mono">No alert events recorded yet.</div>
           ) : (
             <div className="space-y-1.5">
               {alertLog.slice().reverse().slice(0, 10).map((event) => (
-                <div key={`${event.alertId}-${event.triggeredAt}`} className="flex items-start justify-between gap-3 text-[10px] font-mono border-b border-border-dim/30 pb-1">
+                <div key={`${event.alertId}-${event.triggeredAt}`} className="flex items-start justify-between gap-3 text-xs font-mono border-b border-border-dim/30 pb-1">
                   <div>
                     <div className="text-text-primary">{event.alertName}</div>
                     <div className="text-text-muted">{event.message}</div>
@@ -560,19 +560,19 @@ export default function AlertsPage() {
         </div>
         {alerts.length === 0 && !showCreate && (
           <div className="text-center py-12">
-            <p className="text-text-muted text-sm font-mono">No alerts configured</p>
+            <p className="text-text-muted text-sm">No alerts configured</p>
             <p className="text-text-dim text-xs mt-1">Click &quot;+ New Alert&quot; or use a Quick Start preset above</p>
           </div>
         )}
 
         {/* Delivery channels info */}
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">DELIVERY CHANNELS</h2>
+          <h2 className="text-xs text-accent-cyan mb-2">DELIVERY CHANNELS</h2>
           <div className="grid grid-cols-4 gap-4">
             {Object.entries(CHANNEL_INFO).map(([key, info]) => (
               <div key={key}>
-                <p className="text-xs font-mono text-text-primary">{info.name}</p>
-                <p className="text-[9px] text-text-muted">{info.description}</p>
+                <p className="text-xs text-text-primary">{info.name}</p>
+                <p className="text-xs text-text-muted">{info.description}</p>
               </div>
             ))}
           </div>

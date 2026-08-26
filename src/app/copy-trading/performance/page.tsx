@@ -107,25 +107,25 @@ export default function CopyTradingPerformancePage() {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={r.avatar} alt="" width={18} height={18} className="rounded-full bg-bg-raised" />
       ) : (
-        <span className="w-[18px] h-[18px] rounded-full bg-bg-raised flex items-center justify-center text-[9px] font-mono text-text-muted">
+        <span className="w-[18px] h-[18px] rounded-full bg-bg-raised flex items-center justify-center text-xs font-mono text-text-muted">
           {(r.nick?.[0] ?? '?').toUpperCase()}
         </span>
       )}
       <div className="flex flex-col min-w-0">
-        <span className="text-[11px] font-mono font-bold text-text-primary truncate max-w-[130px]">{r.nick}</span>
-        <span className="text-[9px] font-mono text-text-muted">{r.id.slice(0, 14)}</span>
+        <span className="text-xs font-mono font-bold text-text-primary truncate max-w-[130px]">{r.nick}</span>
+        <span className="text-xs font-mono text-text-muted">{r.id.slice(0, 14)}</span>
       </div>
     </div>
   )
 
   const platformCell = (r: CopyTradingLeader) => (
-    <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded uppercase ${platformColors[r.platform] ?? 'bg-bg-raised text-text-muted'}`}>
+    <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded uppercase ${platformColors[r.platform] ?? 'bg-bg-raised text-text-muted'}`}>
       {r.platform}
     </span>
   )
 
   const rankCell = (_r: CopyTradingLeader, i: number | undefined) => (
-    <span className="text-[11px] font-mono text-text-muted">#{i === undefined ? '—' : i + 1}</span>
+    <span className="text-xs font-mono text-text-muted">#{i === undefined ? '—' : i + 1}</span>
   )
 
   const winRateColumns: Column<CopyTradingLeader>[] = [
@@ -133,16 +133,16 @@ export default function CopyTradingPerformancePage() {
     { key: 'trader', header: 'Leader', width: 220, render: leaderCell },
     { key: 'platform', header: 'Platform', width: 100, render: platformCell },
     { key: 'winRate', header: 'Win Rate', width: 90, align: 'right', render: r => (
-      <span className="text-[11px] font-mono tabular-nums text-text-primary">{fmtPct(r.winRate)}</span>
+      <span className="text-xs font-mono tabular-nums text-text-primary">{fmtPct(r.winRate)}</span>
     )},
     { key: 'profit', header: 'Total Profit', width: 110, align: 'right', render: r => (
       <PriceTag value={r.profit} size="sm" />
     )},
     { key: 'aum', header: 'AUM', width: 110, align: 'right', render: r => (
-      <span className="text-[11px] font-mono text-text-secondary tabular-nums">{r.aum > 0 ? fmtUsd(r.aum) : '—'}</span>
+      <span className="text-xs font-mono text-text-secondary tabular-nums">{r.aum > 0 ? fmtUsd(r.aum) : '—'}</span>
     )},
     { key: 'followers', header: 'Followers', width: 90, align: 'right', render: r => (
-      <span className="text-[11px] font-mono font-bold text-text-primary tabular-nums">{r.followers || '—'}</span>
+      <span className="text-xs font-mono font-bold text-text-primary tabular-nums">{r.followers || '—'}</span>
     )},
   ]
 
@@ -154,10 +154,10 @@ export default function CopyTradingPerformancePage() {
       <PriceTag value={r.profit} size="sm" />
     )},
     { key: 'profitRate', header: 'Profit Rate', width: 90, align: 'right', render: r => (
-      <span className="text-[11px] font-mono tabular-nums text-data-bull">{fmtPct(r.profitRate)}</span>
+      <span className="text-xs font-mono tabular-nums text-data-bull">{fmtPct(r.profitRate)}</span>
     )},
     { key: 'aum', header: 'AUM', width: 110, align: 'right', render: r => (
-      <span className="text-[11px] font-mono text-text-secondary tabular-nums">{r.aum > 0 ? fmtUsd(r.aum) : '—'}</span>
+      <span className="text-xs font-mono text-text-secondary tabular-nums">{r.aum > 0 ? fmtUsd(r.aum) : '—'}</span>
     )},
   ]
 
@@ -175,7 +175,7 @@ export default function CopyTradingPerformancePage() {
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">📈</span> Performance Intelligence
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               Copy-trading leader performance: top win rates and profit gainers. Gate.io + Hyperliquid + Binance + Bitget + OKX.
             </p>
           </div>
@@ -193,13 +193,13 @@ export default function CopyTradingPerformancePage() {
         {/* Controls */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-text-muted uppercase">Platform:</span>
+            <span className="text-xs font-mono text-text-muted uppercase">Platform:</span>
             <div className="flex bg-bg-raised p-1 rounded">
               {ENABLED_PLATFORMS.map(p => (
                 <button
                   key={p}
                   onClick={() => setPlatform(p)}
-                  className={`px-3 py-1 text-[10px] font-mono rounded uppercase transition-colors ${platform === p ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
+                  className={`px-3 py-1 text-xs font-mono rounded uppercase transition-colors ${platform === p ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
                 >
                   {p}
                 </button>
@@ -207,11 +207,11 @@ export default function CopyTradingPerformancePage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-text-muted uppercase">Cycle:</span>
+            <span className="text-xs font-mono text-text-muted uppercase">Cycle:</span>
             <select
               value={cycle}
               onChange={e => setCycle(e.target.value as (typeof CYCLES)[number])}
-              className="bg-bg-raised border border-bg-border rounded px-2 py-1 text-[11px] font-mono text-text-primary"
+              className="bg-bg-raised border border-bg-border rounded px-2 py-1 text-xs font-mono text-text-primary"
             >
               {CYCLES.map(c => (
                 <option key={c} value={c}>{c}</option>

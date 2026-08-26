@@ -223,7 +223,7 @@ export default function BandarmologyPage() {
           <div className="flex items-center gap-3">
             <LiveDot status={loading ? "stale" : "live"} label />
             {meta.tradeDate && (
-              <span className="text-[10px] text-text-muted font-mono">
+              <span className="text-xs text-text-muted font-mono">
                 session {meta.tradeDate} · {meta.count ?? "—"} stocks
                 {meta.capturedAt ? ` · captured ${new Date(meta.capturedAt).toLocaleTimeString("id-ID")}` : ""}
               </span>
@@ -235,7 +235,7 @@ export default function BandarmologyPage() {
         <div className="flex flex-wrap gap-2">
           {(TABS as ReadonlyArray<readonly [typeof tab, string]>).map(([t, label]) => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-3 py-1 text-[10px] font-mono uppercase rounded border transition-colors ${
+              className={`px-3 py-1 text-xs font-mono uppercase rounded border transition-colors ${
                 tab === t
                   ? "bg-teal-vivid text-bg-base border-teal-vivid font-bold"
                   : "bg-bg-panel border-border-dim text-text-muted hover:border-border-active"
@@ -249,10 +249,10 @@ export default function BandarmologyPage() {
               onChange={(e) => setSymbol(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && lookupSeries()}
               placeholder="e.g. BBRI"
-              className="bg-bg-raised border border-border-dim rounded px-2 py-1 text-[11px] font-mono w-28"
+              className="bg-bg-raised border border-border-dim rounded px-2 py-1 text-xs font-mono w-28"
             />
             <button onClick={lookupSeries}
-              className="px-3 py-1 text-[10px] font-mono rounded border border-border-dim text-text-muted hover:border-border-active">
+              className="px-3 py-1 text-xs rounded border border-border-dim text-text-muted hover:border-border-active">
               Series
             </button>
           </div>
@@ -260,11 +260,11 @@ export default function BandarmologyPage() {
 
         {seriesStatus && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4 space-y-3">
-            <p className="text-[11px] font-mono text-text-muted">{seriesStatus}</p>
+            <p className="text-xs text-text-muted">{seriesStatus}</p>
             {seriesData && seriesData.pts.length > 0 && (
               <>
                 <SeriesChart pts={seriesData.pts} />
-                <div className="flex justify-between text-[10px] text-text-muted font-mono">
+                <div className="flex justify-between text-xs text-text-muted font-mono">
                   <span>{seriesData.pts[0]?.date}</span>
                   <span className="hidden md:inline">bars = daily net foreign vol · line = cumulative</span>
                   <span>{seriesData.pts[seriesData.pts.length - 1]?.date}</span>
@@ -341,17 +341,17 @@ export default function BandarmologyPage() {
         {tab === "flow" && (
           <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
             <div className="flex justify-between items-baseline mb-3">
-              <h3 className="text-xs font-mono text-accent-cyan">MARKET-WIDE FOREIGN NET VALUE / SESSION</h3>
-              <span className="text-[10px] text-text-muted font-mono">
+              <h3 className="text-xs text-accent-cyan">MARKET-WIDE FOREIGN NET VALUE / SESSION</h3>
+              <span className="text-xs text-text-muted font-mono">
                 latest {flow.length > 0 ? `Rp${fmtIdrB(flow[flow.length - 1].netValueIdr)}B` : "—"}
               </span>
             </div>
             {flow.length === 0 ? (
-              <p className="text-text-muted text-xs font-mono">no sessions in history yet</p>
+              <p className="text-text-muted text-xs">no sessions in history yet</p>
             ) : (
               <>
                 <FlowChart sessions={flow} />
-                <div className="flex justify-between mt-2 text-[10px] text-text-muted font-mono">
+                <div className="flex justify-between mt-2 text-xs text-text-muted font-mono">
                   <span>{flow[0]?.date}</span>
                   <span>{flow.length} session{flow.length > 1 ? "s" : ""} (history builds nightly toward 90)</span>
                   <span>{flow[flow.length - 1]?.date}</span>
@@ -369,7 +369,7 @@ export default function BandarmologyPage() {
                 const pct = (Math.abs(r.netValueIdr) / maxAbsRot) * 50
                 const up = r.netValueIdr >= 0
                 return (
-                  <div key={r.sector} className="flex items-center text-[11px] font-mono gap-2">
+                  <div key={r.sector} className="flex items-center text-xs font-mono gap-2">
                     <span className="w-40 truncate text-text-dim" title={r.sector}>{r.sector}</span>
                     <div className="flex-1 flex items-center h-4 relative">
                       <div className="absolute inset-y-0 left-1/2 w-px bg-border-dim" />

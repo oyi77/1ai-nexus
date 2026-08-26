@@ -31,11 +31,11 @@ export default function KnowledgeGraphPage() {
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">🕸</span> Arkham Knowledge Graph
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">Interactive visualization of entity relationships and wallet nodes.</p>
+            <p className="text-[12px] text-text-muted mt-1">Interactive visualization of entity relationships and wallet nodes.</p>
           </div>
           <div className="flex items-center gap-2 bg-bg-panel px-3 py-1.5 border border-bg-border rounded">
             <LiveDot status={status} />
-            <span className="text-[10px] font-mono text-text-muted">
+            <span className="text-xs font-mono text-text-muted">
               {data ? `${data.nodes.length} Nodes / ${data.links.length} Links` : 'Loading Topology...'}
             </span>
           </div>

@@ -64,7 +64,7 @@ export function PwaInstallPrompt() {
             </div>
             <div className="min-w-0">
               <p className="text-[13px] font-medium text-text-primary">Install NEXUS</p>
-              <p className="text-[11px] text-text-muted mt-0.5">
+              <p className="text-xs text-text-muted mt-0.5">
                 Add to home screen for quick access
               </p>
             </div>
@@ -79,13 +79,13 @@ export function PwaInstallPrompt() {
         <div className="flex gap-2 mt-3">
           <button
             onClick={handleDismiss}
-            className="flex-1 px-3 py-1.5 text-[11px] font-medium text-text-muted bg-bg-raised rounded hover:bg-bg-border transition-colors"
+            className="flex-1 px-3 py-1.5 text-xs font-medium text-text-muted bg-bg-raised rounded hover:bg-bg-border transition-colors"
           >
             Later
           </button>
           <button
             onClick={handleInstall}
-            className="flex-1 px-3 py-1.5 text-[11px] font-medium text-bg-base bg-teal-vivid rounded hover:bg-teal-bright transition-colors"
+            className="flex-1 px-3 py-1.5 text-xs font-medium text-bg-base bg-teal-vivid rounded hover:bg-teal-bright transition-colors"
           >
             Install
           </button>

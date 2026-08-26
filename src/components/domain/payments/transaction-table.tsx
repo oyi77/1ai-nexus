@@ -61,15 +61,15 @@ export function TransactionTable({ payments, idPrefix = 'payment-history' }: Tra
   if (!payments || payments.length === 0) {
     return (
       <div className="bg-bg-panel border border-border-dim rounded-lg p-6">
-        <h2 className="text-lg font-bold font-mono text-accent-cyan mb-4">Payment History</h2>
-        <p className="text-text-muted font-mono text-sm">No payments found.</p>
+        <h2 className="text-lg font-bold text-accent-cyan mb-4">Payment History</h2>
+        <p className="text-text-muted text-sm">No payments found.</p>
       </div>
     )
   }
 
   return (
     <div className="bg-bg-panel border border-border-dim rounded-lg p-6 overflow-x-auto">
-      <h2 className="text-lg font-bold font-mono text-accent-cyan mb-4">Payment History</h2>
+      <h2 className="text-lg font-bold text-accent-cyan mb-4">Payment History</h2>
       <TableControlsBar idPrefix={idPrefix} query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
       <table className="w-full text-left font-mono text-sm">
         <thead>

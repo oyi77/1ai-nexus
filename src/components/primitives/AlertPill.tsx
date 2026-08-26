@@ -22,8 +22,8 @@ export function AlertPill({
 }: AlertPillProps) {
   const config = SEVERITY_CONFIG[severity]
   const sizeClass = {
-    xs: 'text-[10px] px-1 py-0',
-    sm: 'text-[11px] px-1.5 py-0.5',
+    xs: 'text-xs px-1 py-0',
+    sm: 'text-xs px-1.5 py-0.5',
     md: 'text-[12px] px-2 py-1',
   }[size]
 

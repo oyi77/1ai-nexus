@@ -21,11 +21,11 @@ export default function DeFiProtocolPage() {
   return (
     <TerminalShell>
       <div className="p-4 space-y-4">
-        <h1 className="text-sm font-mono font-bold text-accent-cyan">DeFi PROTOCOL</h1>
-        <p className="text-xs font-mono text-text-dim">{protocol}</p>
+        <h1 className="text-sm font-bold text-accent-cyan">DeFi PROTOCOL</h1>
+        <p className="text-xs text-text-dim">{protocol}</p>
         {loading ? <p className="text-text-dim text-xs">Loading from DeFiLlama...</p> : data ? (
           <div className="bg-bg-panel border border-border-dim rounded p-4 space-y-2">
-            <p className="text-lg font-mono text-text-primary">{String(data.name ?? protocol)}</p>
+            <p className="text-lg text-text-primary">{String(data.name ?? protocol)}</p>
             <p className="text-xs text-text-dim">Category: <span className="text-accent-cyan">{String(data.category ?? "—")}</span></p>
             <p className="text-xs text-text-dim">Chain: <span className="text-accent-cyan">{String(data.chain ?? "—")}</span></p>
           </div>

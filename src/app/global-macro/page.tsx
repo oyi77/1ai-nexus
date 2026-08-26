@@ -55,7 +55,7 @@ export default function GlobalMacroPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">GLOBAL MACRO DASHBOARD</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               {COUNTRIES.length} countries · {INDICATORS.length} indicators · World Bank data
             </p>
           </div>
@@ -66,7 +66,7 @@ export default function GlobalMacroPage() {
         <div className="flex flex-wrap gap-2">
           {INDICATORS.map(name => (
               <button key={name} onClick={() => tc.setSort(name, 'desc')}
-              className={`px-3 py-1 text-[10px] font-mono rounded border transition-colors ${
+              className={`px-3 py-1 text-xs font-mono rounded border transition-colors ${
                 selectedIndicator === name
                   ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
                   : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
@@ -89,7 +89,7 @@ export default function GlobalMacroPage() {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-text-muted border-b border-border-dim">
-                    <th className="text-left py-2 font-mono w-8">#</th>
+                    <th className="text-left py-2 w-8">#</th>
                     <SortableTh controls={tc} k="name" className="text-left py-2 font-mono">COUNTRY</SortableTh>
                     {INDICATORS.map(ind => (
                       <SortableTh key={ind} controls={tc} k={ind} className="text-right py-2 font-mono">{ind.toUpperCase()}</SortableTh>
@@ -126,7 +126,7 @@ export default function GlobalMacroPage() {
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <h2 className="text-xs font-mono text-accent-cyan mb-2">SOURCE</h2>
+          <h2 className="text-xs text-accent-cyan mb-2">SOURCE</h2>
           <p className="text-xs text-text-dim">
             World Bank Open Data (api.worldbank.org) — free, no API key.
             Covers {COUNTRIES.length} countries across {INDICATORS.length} macro indicators.

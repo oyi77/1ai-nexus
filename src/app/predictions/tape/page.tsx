@@ -42,11 +42,11 @@ export default function PredictionsTapePage() {
     <NexusLayout>
       <div className="h-full overflow-auto p-4 space-y-4">
         <div className="flex items-center justify-between">
-          <h1 className="text-sm font-mono font-bold text-accent-cyan flex items-center gap-2">
+          <h1 className="text-sm font-bold text-accent-cyan flex items-center gap-2">
             <Activity size={14} /> PREDICTION TAPE
           </h1>
           <div className="flex items-center gap-3">
-            <span className="text-[10px] text-text-muted">{markets.length} recent</span>
+            <span className="text-xs text-text-muted">{markets.length} recent</span>
             <button
               onClick={fetchMarkets}
               className="text-text-dim hover:text-accent-cyan transition-colors"
@@ -72,7 +72,7 @@ export default function PredictionsTapePage() {
                 {/* Timestamp column */}
                 <div className="flex-shrink-0 w-16 text-right">
                   {m.createdAt && (
-                    <span className="text-[10px] font-mono text-text-muted">
+                    <span className="text-xs font-mono text-text-muted">
                       {formatTime(m.createdAt)}
                     </span>
                   )}
@@ -85,29 +85,29 @@ export default function PredictionsTapePage() {
                   </p>
                   <div className="flex items-center gap-3 mt-1">
                     {m.yesPrice != null && (
-                      <span className="text-[10px] font-mono text-accent-cyan">
+                      <span className="text-xs font-mono text-accent-cyan">
                         YES {(m.yesPrice * 100).toFixed(0)}¢
                       </span>
                     )}
                     {m.noPrice != null && (
-                      <span className="text-[10px] font-mono text-text-dim">
+                      <span className="text-xs font-mono text-text-dim">
                         NO {(m.noPrice * 100).toFixed(0)}¢
                       </span>
                     )}
                     {m.volume24h != null && m.volume24h > 0 && (
-                      <span className="text-[10px] font-mono text-text-muted">
+                      <span className="text-xs font-mono text-text-muted">
                         ${formatNum(m.volume24h)} 24h
                       </span>
                     )}
                     {m.category && (
-                      <span className="text-[10px] text-text-muted">{m.category}</span>
+                      <span className="text-xs text-text-muted">{m.category}</span>
                     )}
                   </div>
                 </div>
 
                 {/* Status indicator */}
                 <div className="flex-shrink-0">
-                  <span className={`text-[10px] ${m.status === 'open' ? 'text-green-500' : 'text-text-dim'}`}>
+                  <span className={`text-xs ${m.status === 'open' ? 'text-green-500' : 'text-text-dim'}`}>
                     {m.status === 'open' ? '●' : '○'}
                   </span>
                 </div>
@@ -117,7 +117,7 @@ export default function PredictionsTapePage() {
         )}
 
         <div className="text-center pt-2">
-          <Link href="/predictions" className="text-[10px] text-text-dim hover:text-accent-cyan transition-colors">
+          <Link href="/predictions" className="text-xs text-text-dim hover:text-accent-cyan transition-colors">
             ← Back to all markets
           </Link>
         </div>

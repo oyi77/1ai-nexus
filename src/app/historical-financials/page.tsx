@@ -95,7 +95,7 @@ export default function HistoricalFinancialsPage() {
         <div className="flex items-end justify-between">
           <div>
             <h1 className="page-title">HISTORICAL FINANCIALS</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               SEC EDGAR XBRL data · {COMPANIES.length} companies · 20+ years of 10-K filings
             </p>
           </div>
@@ -103,7 +103,7 @@ export default function HistoricalFinancialsPage() {
         </div>
 
         {error && (
-          <div className="text-data-bear text-[11px] font-mono p-4 bg-bg-panel border border-border-dim rounded">
+          <div className="text-data-bear text-xs font-mono p-4 bg-bg-panel border border-border-dim rounded">
             Error: {error}
           </div>
         )}
@@ -112,7 +112,7 @@ export default function HistoricalFinancialsPage() {
         <div className="flex flex-wrap gap-2">
           {COMPANIES.map(c => (
             <button key={c.ticker} onClick={() => setSelected(c.ticker)}
-              className={`px-2 py-1 text-[10px] font-mono rounded border transition-colors ${
+              className={`px-2 py-1 text-xs font-mono rounded border transition-colors ${
                 selected === c.ticker ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold' : 'bg-bg-panel border-border-dim text-text-muted hover:border-border-active'
               }`}>
               {c.ticker}
@@ -172,7 +172,7 @@ export default function HistoricalFinancialsPage() {
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
-          <p className="text-[9px] text-text-dim font-mono">
+          <p className="text-xs text-text-dim">
             Source: SEC EDGAR XBRL (data.sec.gov) · Annual 10-K filings only · All values in USD · FCF = Operating Cash Flow - CapEx
           </p>
         </div>

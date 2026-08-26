@@ -118,7 +118,7 @@ export default function TradesPage() {
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-data-bull">📊</span> Live Trade Flow
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               {connected ? '🟢 WebSocket connected — realtime Binance trades' : '🔴 Connecting...'}
             </p>
           </div>
@@ -137,9 +137,9 @@ export default function TradesPage() {
         {/* Buy/Sell Bar */}
         <div className="bg-bg-panel border border-bg-border rounded p-3">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-mono text-data-bull font-bold">{buyPct.toFixed(1)}% BUY</span>
-            <span className="text-[11px] font-mono text-text-muted">Volume Ratio</span>
-            <span className="text-[11px] font-mono text-data-bear font-bold">{(100 - buyPct).toFixed(1)}% SELL</span>
+            <span className="text-xs font-mono text-data-bull font-bold">{buyPct.toFixed(1)}% BUY</span>
+            <span className="text-xs font-mono text-text-muted">Volume Ratio</span>
+            <span className="text-xs font-mono text-data-bear font-bold">{(100 - buyPct).toFixed(1)}% SELL</span>
           </div>
           <div className="h-3 bg-bg-raised rounded-full overflow-hidden flex">
             <div className="h-full bg-data-bull transition-all duration-500" style={{ width: `${buyPct}%` }} />
@@ -153,7 +153,7 @@ export default function TradesPage() {
             const p = prices.get(s.toUpperCase())
             return (
               <div key={s} className="bg-bg-panel border border-bg-border p-2 rounded text-center">
-                <div className="text-[10px] font-mono text-text-muted uppercase">{s}</div>
+                <div className="text-xs font-mono text-text-muted uppercase">{s}</div>
                 <div className="text-[13px] font-mono font-bold text-text-primary tabular-nums">
                   {p ? `$${p.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}
                 </div>
@@ -167,22 +167,22 @@ export default function TradesPage() {
           <div className="space-y-0 max-h-[500px] overflow-y-auto scrollbar-thin">
             {trades.slice(0, 50).map((t, i) => (
               <div key={`${t.timestamp}-${i}`} className="flex items-center gap-3 px-3 py-1 border-b border-bg-border/30 hover:bg-bg-raised transition-colors">
-                <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
                   t.side === 'buy' ? 'bg-data-bull/20 text-data-bull' : 'bg-data-bear/20 text-data-bear'
                 }`}>
                   {t.side.toUpperCase()}
                 </span>
-                <span className="text-[11px] font-mono font-bold text-teal-vivid w-12">{t.pair}</span>
-                <span className="text-[11px] font-mono text-text-primary tabular-nums flex-1">
+                <span className="text-xs font-mono font-bold text-teal-vivid w-12">{t.pair}</span>
+                <span className="text-xs font-mono text-text-primary tabular-nums flex-1">
                   ${t.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                 </span>
-                <span className="text-[10px] font-mono text-text-secondary tabular-nums w-16 text-right">
+                <span className="text-xs font-mono text-text-secondary tabular-nums w-16 text-right">
                   {t.size.toFixed(4)}
                 </span>
-                <span className="text-[11px] font-mono font-bold text-text-primary tabular-nums w-20 text-right">
+                <span className="text-xs font-mono font-bold text-text-primary tabular-nums w-20 text-right">
                   {fmtUsd(t.usdValue)}
                 </span>
-                <span className="text-[9px] font-mono text-text-muted w-16 text-right">
+                <span className="text-xs font-mono text-text-muted w-16 text-right">
                   {new Date(t.timestamp).toLocaleTimeString()}
                 </span>
               </div>
@@ -202,7 +202,7 @@ export default function TradesPage() {
 function KPI({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="bg-bg-panel border border-bg-border p-3 rounded">
-      <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
+      <div className="text-xs text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className={`text-[16px] font-head font-bold tabular-nums ${color ?? 'text-text-primary'}`}>{value}</div>
     </div>
   )

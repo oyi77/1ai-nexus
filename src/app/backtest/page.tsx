@@ -78,7 +78,7 @@ function ModuleSignalsTable({ signals, idPrefix }: { signals: BacktestSignal[]; 
                   {sig.priceChange ? `${sig.priceChange > 0 ? '+' : ''}${sig.priceChange.toFixed(2)}%` : '—'}
                 </td>
                 <td className="py-1 px-2">
-                  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${
+                  <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
                     sig.correct ? 'bg-data-bull/20 text-data-bull' : 'bg-data-bear/20 text-data-bear'
                   }`}>
                     {sig.correct ? 'HIT' : 'MISS'}
@@ -117,7 +117,7 @@ export default function BacktestPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">SIGNAL BACKTEST</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Historical signal accuracy — predicted vs actual BTC price movement
             </p>
           </div>
@@ -141,15 +141,15 @@ export default function BacktestPage() {
             {/* Overall summary */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-bg-panel border border-border-dim rounded-lg p-3 text-center">
-                <p className="text-[10px] text-text-muted font-mono">TOTAL SIGNALS</p>
-                <p className="text-2xl font-mono font-bold">{report.overall.totalSignals}</p>
+                <p className="text-xs text-text-muted">TOTAL SIGNALS</p>
+                <p className="text-2xl font-bold">{report.overall.totalSignals}</p>
               </div>
               <div className="bg-bg-panel border border-border-dim rounded-lg p-3 text-center">
-                <p className="text-[10px] text-text-muted font-mono">CORRECT</p>
-                <p className="text-2xl font-mono font-bold text-data-bull">{report.overall.totalCorrect}</p>
+                <p className="text-xs text-text-muted">CORRECT</p>
+                <p className="text-2xl font-bold text-data-bull">{report.overall.totalCorrect}</p>
               </div>
               <div className="bg-bg-panel border border-border-dim rounded-lg p-3 text-center">
-                <p className="text-[10px] text-text-muted font-mono">ACCURACY</p>
+                <p className="text-xs text-text-muted">ACCURACY</p>
                 <p className={`text-2xl font-mono font-bold ${
                   report.overall.accuracy > 60 ? 'text-data-bull' : report.overall.accuracy < 40 ? 'text-data-bear' : 'text-text-muted'
                 }`}>
@@ -164,7 +164,7 @@ export default function BacktestPage() {
                 <div className="p-4 space-y-3">
                   <div className="grid grid-cols-3 gap-4">
                     <div>
-                      <p className="text-[10px] text-text-muted font-mono">ACCURACY</p>
+                      <p className="text-xs text-text-muted">ACCURACY</p>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-2 bg-bg-raised rounded overflow-hidden">
                           <div
@@ -176,12 +176,12 @@ export default function BacktestPage() {
                       </div>
                     </div>
                     <div>
-                      <p className="text-[10px] text-text-muted font-mono">AVG CONFIDENCE</p>
-                      <p className="text-sm font-mono font-bold">{mod.avgConfidence.toFixed(0)}%</p>
+                      <p className="text-xs text-text-muted">AVG CONFIDENCE</p>
+                      <p className="text-sm font-bold">{mod.avgConfidence.toFixed(0)}%</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-text-muted font-mono">HIT RATE</p>
-                      <p className="text-sm font-mono font-bold">{mod.correctPredictions}/{mod.totalSignals}</p>
+                      <p className="text-xs text-text-muted">HIT RATE</p>
+                      <p className="text-sm font-bold">{mod.correctPredictions}/{mod.totalSignals}</p>
                     </div>
                   </div>
 
@@ -191,7 +191,7 @@ export default function BacktestPage() {
                   )}
 
                   {mod.signals.length === 0 && (
-                    <div className="text-text-muted text-[11px] text-center py-2">
+                    <div className="text-text-muted text-xs text-center py-2">
                       No historical signals with price outcomes yet — data accumulates over time
                     </div>
                   )}
@@ -199,7 +199,7 @@ export default function BacktestPage() {
               </Panel>
             ))}
 
-            <div className="text-[10px] text-text-dim text-center font-mono">
+            <div className="text-xs text-text-dim text-center font-mono">
               Period: {new Date(report.period.from).toLocaleDateString()} — {new Date(report.period.to).toLocaleDateString()} | 
               Signals compared against BTC price movement 24h after prediction
             </div>

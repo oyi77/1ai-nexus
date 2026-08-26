@@ -144,7 +144,7 @@ fetchData()
             <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
               <span className="text-teal-vivid">📊</span> Order Book Depth
             </h1>
-            <p className="text-[12px] text-text-muted font-mono mt-1">
+            <p className="text-[12px] text-text-muted mt-1">
               Real-time bid/ask depth from Binance • Updated {lastUpdate.toLocaleTimeString()}
             </p>
           </div>
@@ -154,7 +154,7 @@ fetchData()
                 <button
                   key={s}
                   onClick={() => { setSymbol(s); setData(null) }}
-                  className={`px-3 py-1 text-[10px] font-mono rounded uppercase transition-colors ${symbol === s ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
+                  className={`px-3 py-1 text-xs font-mono rounded uppercase transition-colors ${symbol === s ? 'bg-teal-vivid text-bg-base font-bold' : 'text-text-muted hover:text-text-primary'}`}
                 >
                   {s}
                 </button>
@@ -187,18 +187,18 @@ fetchData()
               <table className="w-full">
                 <thead className="sticky top-0 bg-bg-base">
                   <tr className="text-text-muted">
-                    <th className="text-[10px] font-mono px-3 py-1 text-left">Price</th>
-                    <th className="text-[10px] font-mono px-3 py-1 text-right">Qty</th>
-                    <th className="text-[10px] font-mono px-3 py-1 text-right">Total</th>
+                    <th className="text-xs px-3 py-1 text-left">Price</th>
+                    <th className="text-xs px-3 py-1 text-right">Qty</th>
+                    <th className="text-xs px-3 py-1 text-right">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(data?.bids ?? []).map((bid, i) => (
                     <tr key={i} className="relative hover:bg-bg-raised transition-colors">
                       <td className="absolute inset-0 bg-data-bull/10 pointer-events-none" style={{ width: `${(bid.total / maxTotal) * 100}%`, right: 0, left: 'auto' }} />
-                      <td className="relative text-[11px] font-mono px-3 py-0.5 text-data-bull tabular-nums">{bid.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                      <td className="relative text-[11px] font-mono px-3 py-0.5 text-right text-text-primary tabular-nums">{bid.quantity.toFixed(4)}</td>
-                      <td className="relative text-[11px] font-mono px-3 py-0.5 text-right text-text-secondary tabular-nums">{fmtUsd(bid.total)}</td>
+                      <td className="relative text-xs font-mono px-3 py-0.5 text-data-bull tabular-nums">{bid.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                      <td className="relative text-xs font-mono px-3 py-0.5 text-right text-text-primary tabular-nums">{bid.quantity.toFixed(4)}</td>
+                      <td className="relative text-xs font-mono px-3 py-0.5 text-right text-text-secondary tabular-nums">{fmtUsd(bid.total)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -212,18 +212,18 @@ fetchData()
               <table className="w-full">
                 <thead className="sticky top-0 bg-bg-base">
                   <tr className="text-text-muted">
-                    <th className="text-[10px] font-mono px-3 py-1 text-left">Price</th>
-                    <th className="text-[10px] font-mono px-3 py-1 text-right">Qty</th>
-                    <th className="text-[10px] font-mono px-3 py-1 text-right">Total</th>
+                    <th className="text-xs px-3 py-1 text-left">Price</th>
+                    <th className="text-xs px-3 py-1 text-right">Qty</th>
+                    <th className="text-xs px-3 py-1 text-right">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(data?.asks ?? []).map((ask, i) => (
                     <tr key={i} className="relative hover:bg-bg-raised transition-colors">
                       <td className="absolute inset-0 bg-data-bear/10 pointer-events-none" style={{ width: `${(ask.total / maxTotal) * 100}%`, right: 0, left: 'auto' }} />
-                      <td className="relative text-[11px] font-mono px-3 py-0.5 text-data-bear tabular-nums">{ask.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
-                      <td className="relative text-[11px] font-mono px-3 py-0.5 text-right text-text-primary tabular-nums">{ask.quantity.toFixed(4)}</td>
-                      <td className="relative text-[11px] font-mono px-3 py-0.5 text-right text-text-secondary tabular-nums">{fmtUsd(ask.total)}</td>
+                      <td className="relative text-xs font-mono px-3 py-0.5 text-data-bear tabular-nums">{ask.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                      <td className="relative text-xs font-mono px-3 py-0.5 text-right text-text-primary tabular-nums">{ask.quantity.toFixed(4)}</td>
+                      <td className="relative text-xs font-mono px-3 py-0.5 text-right text-text-secondary tabular-nums">{fmtUsd(ask.total)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -238,11 +238,11 @@ fetchData()
             <div className="p-4 space-y-4">
               <div className="grid grid-cols-3 gap-4">
                 <div className="bg-bg-raised p-3 rounded border border-bg-border">
-                  <div className="text-[10px] text-text-muted font-mono uppercase mb-1">Bid/Ask Ratio</div>
+                  <div className="text-xs text-text-muted font-mono uppercase mb-1">Bid/Ask Ratio</div>
                   <div className={`text-[18px] font-head font-bold tabular-nums ${data.bidDepth > data.askDepth ? 'text-data-bull' : 'text-data-bear'}`}>
                     {(data.bidDepth / Math.max(1, data.askDepth)).toFixed(2)}
                   </div>
-                  <div className="text-[10px] font-mono text-text-muted mt-1">
+                  <div className="text-xs font-mono text-text-muted mt-1">
                     {data.bidDepth > data.askDepth * 1.2 ? '🟢 More buyers than sellers' :
                      data.askDepth > data.bidDepth * 1.2 ? '🔴 More sellers than buyers' :
                      '⚪ Balanced market'}
@@ -250,11 +250,11 @@ fetchData()
                 </div>
 
                 <div className="bg-bg-raised p-3 rounded border border-bg-border">
-                  <div className="text-[10px] text-text-muted font-mono uppercase mb-1">Spread Quality</div>
+                  <div className="text-xs text-text-muted font-mono uppercase mb-1">Spread Quality</div>
                   <div className={`text-[18px] font-head font-bold tabular-nums ${data.spreadBps < 1 ? 'text-data-bull' : data.spreadBps < 5 ? 'text-accent-amber' : 'text-data-bear'}`}>
                     {data.spreadBps.toFixed(2)} bps
                   </div>
-                  <div className="text-[10px] font-mono text-text-muted mt-1">
+                  <div className="text-xs font-mono text-text-muted mt-1">
                     {data.spreadBps < 1 ? '🟢 Ultra-tight (high liquidity)' :
                      data.spreadBps < 5 ? '🟡 Normal spread' :
                      '🔴 Wide spread (low liquidity)'}
@@ -262,11 +262,11 @@ fetchData()
                 </div>
 
                 <div className="bg-bg-raised p-3 rounded border border-bg-border">
-                  <div className="text-[10px] text-text-muted font-mono uppercase mb-1">Total Liquidity</div>
+                  <div className="text-xs text-text-muted font-mono uppercase mb-1">Total Liquidity</div>
                   <div className="text-[18px] font-head font-bold tabular-nums text-text-primary">
                     {fmtUsd(data.bidDepth + data.askDepth)}
                   </div>
-                  <div className="text-[10px] font-mono text-text-muted mt-1">
+                  <div className="text-xs font-mono text-text-muted mt-1">
                     {data.bidDepth + data.askDepth > 1e6 ? '🟢 Deep liquidity' :
                      data.bidDepth + data.askDepth > 1e5 ? '🟡 Moderate liquidity' :
                      '🔴 Thin liquidity'}
@@ -278,7 +278,7 @@ fetchData()
               <div className="bg-bg-raised p-4 rounded border border-bg-border">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-[12px] font-mono font-bold text-teal-vivid">🧠 AI VERDICT</span>
-                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                  <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${
                     data.imbalance > 0.15 ? 'bg-data-bull/20 text-data-bull' :
                     data.imbalance < -0.15 ? 'bg-data-bear/20 text-data-bear' :
                     'bg-bg-raised text-text-muted'
@@ -286,7 +286,7 @@ fetchData()
                     {data.imbalance > 0.15 ? 'BULLISH' : data.imbalance < -0.15 ? 'BEARISH' : 'NEUTRAL'}
                   </span>
                 </div>
-                <div className="text-[11px] font-mono text-text-secondary leading-relaxed space-y-1">
+                <div className="text-xs font-mono text-text-secondary leading-relaxed space-y-1">
                   <p>
                     {symbol} order book shows {data.bidDepth > data.askDepth * 1.2 ? 'strong buying pressure' :
                     data.askDepth > data.bidDepth * 1.2 ? 'strong selling pressure' :
@@ -313,29 +313,29 @@ fetchData()
 
               {/* Depth Visualization */}
               <div className="bg-bg-raised p-3 rounded border border-bg-border">
-                <div className="text-[10px] font-mono text-text-muted uppercase mb-2">Depth Visualization</div>
+                <div className="text-xs font-mono text-text-muted uppercase mb-2">Depth Visualization</div>
                 <div className="space-y-0.5">
                   {data.asks.slice(0, 7).reverse().map((ask, i) => (
                     <div key={`ask-${i}`} className="flex items-center gap-1">
-                      <span className="text-[9px] font-mono text-text-muted w-20 text-right tabular-nums">${ask.price.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                      <span className="text-xs font-mono text-text-muted w-20 text-right tabular-nums">${ask.price.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                       <div className="flex-1 h-2 relative">
                         <div className="absolute right-0 top-0 h-full bg-data-bear/40 rounded-sm" style={{ width: `${(ask.total / (data.bidDepth + data.askDepth)) * 200}%` }} />
                       </div>
-                      <span className="text-[9px] font-mono text-data-bear w-16 text-right tabular-nums">{fmtUsd(ask.total)}</span>
+                      <span className="text-xs font-mono text-data-bear w-16 text-right tabular-nums">{fmtUsd(ask.total)}</span>
                     </div>
                   ))}
                   <div className="flex items-center gap-1 py-0.5">
-                    <span className="text-[9px] font-mono text-teal-vivid w-20 text-right font-bold tabular-nums">${data.midPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                    <span className="text-xs font-mono text-teal-vivid w-20 text-right font-bold tabular-nums">${data.midPrice.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                     <div className="flex-1 h-px bg-teal-vivid" />
-                    <span className="text-[9px] font-mono text-teal-vivid w-16 text-right">MID</span>
+                    <span className="text-xs font-mono text-teal-vivid w-16 text-right">MID</span>
                   </div>
                   {data.bids.slice(0, 7).map((bid, i) => (
                     <div key={`bid-${i}`} className="flex items-center gap-1">
-                      <span className="text-[9px] font-mono text-text-muted w-20 text-right tabular-nums">${bid.price.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                      <span className="text-xs font-mono text-text-muted w-20 text-right tabular-nums">${bid.price.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                       <div className="flex-1 h-2 relative">
                         <div className="absolute left-0 top-0 h-full bg-data-bull/40 rounded-sm" style={{ width: `${(bid.total / (data.bidDepth + data.askDepth)) * 200}%` }} />
                       </div>
-                      <span className="text-[9px] font-mono text-data-bull w-16 text-right tabular-nums">{fmtUsd(bid.total)}</span>
+                      <span className="text-xs font-mono text-data-bull w-16 text-right tabular-nums">{fmtUsd(bid.total)}</span>
                     </div>
                   ))}
                 </div>
@@ -351,7 +351,7 @@ fetchData()
 function KPI({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="bg-bg-panel border border-bg-border p-3 rounded">
-      <div className="text-[10px] text-text-muted font-mono uppercase mb-1">{label}</div>
+      <div className="text-xs text-text-muted font-mono uppercase mb-1">{label}</div>
       <div className={`text-[16px] font-head font-bold tabular-nums ${color ?? 'text-text-primary'}`}>{value}</div>
     </div>
   )

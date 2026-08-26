@@ -102,7 +102,7 @@ export function LiveFeedPanel() {
           <button
             key={t.key}
             onClick={() => setActiveTab(t.key)}
-            className={`px-2 py-0.5 rounded text-[10px] whitespace-nowrap transition-colors ${
+            className={`px-2 py-0.5 rounded text-xs whitespace-nowrap transition-colors ${
               activeTab === t.key
                 ? 'bg-border-active text-text-primary'
                 : 'text-text-dim hover:text-text-primary'
@@ -131,7 +131,7 @@ export function LiveFeedPanel() {
                 {item.message}
               </span>
               {item.source && (
-                <span className="text-text-muted shrink-0 text-[10px]">{item.source}</span>
+                <span className="text-text-muted shrink-0 text-xs">{item.source}</span>
               )}
             </div>
           ))

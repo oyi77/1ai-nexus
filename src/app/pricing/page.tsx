@@ -122,8 +122,8 @@ export default function PricingPage() {
     <NexusLayout>
       <div className="max-w-6xl mx-auto p-6 space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold font-mono text-text-primary">Pricing Plans</h1>
-          <p className="text-sm text-text-muted font-mono mt-2">
+          <h1 className="text-3xl font-bold text-text-primary">Pricing Plans</h1>
+          <p className="text-sm text-text-muted mt-2">
             Choose the plan that fits your trading needs
           </p>
         </div>
@@ -148,7 +148,7 @@ export default function PricingPage() {
                   <span className="text-xl">{method.icon}</span>
                   <span className="font-mono font-bold text-text-primary">{method.name}</span>
                 </div>
-                <p className="text-[10px] text-text-muted font-mono">{method.description}</p>
+                <p className="text-xs text-text-muted">{method.description}</p>
               </button>
             ))}
           </div>
@@ -186,22 +186,22 @@ export default function PricingPage() {
             >
               {tier.highlighted && (
                 <div className="text-center mb-4">
-                  <span className="px-3 py-1 bg-teal-vivid text-bg-base text-[10px] font-mono font-bold rounded-full">
+                  <span className="px-3 py-1 bg-teal-vivid text-bg-base text-xs font-mono font-bold rounded-full">
                     MOST POPULAR
                   </span>
                 </div>
               )}
 
               <div className="text-center mb-6">
-                <h2 className="text-xl font-bold font-mono text-text-primary">{tier.name}</h2>
+                <h2 className="text-xl font-bold text-text-primary">{tier.name}</h2>
                 <div className="mt-2">
                   <span className="text-3xl font-bold font-mono text-text-primary">{tier.price}</span>
                   <span className="text-sm text-text-muted font-mono">{tier.period}</span>
                 </div>
-                <p className="text-xs text-text-muted font-mono mt-1">
+                <p className="text-xs text-text-muted mt-1">
                   {selectedMethod === 'nowpayments' ? tier.price : tier.priceIdr}
                 </p>
-                <p className="text-xs text-text-muted font-mono mt-1">{tier.description}</p>
+                <p className="text-xs text-text-muted mt-1">{tier.description}</p>
               </div>
 
               <ul className="space-y-3 mb-6">

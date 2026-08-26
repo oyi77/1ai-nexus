@@ -51,7 +51,7 @@ export default function CompositeAlertsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">COMPOSITE SIGNALS</h1>
-            <p className="text-xs text-text-muted font-mono mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Cross-module compound signals — ETF + derivatives + sentiment + credit + miner + narrative
             </p>
           </div>
@@ -61,23 +61,23 @@ export default function CompositeAlertsPage() {
         {/* Summary strip */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-bg-panel border border-data-bull/30 rounded-lg p-3 text-center">
-            <p className="text-[10px] text-text-muted font-mono">BULLISH</p>
-            <p className="text-2xl font-mono font-bold text-data-bull">{bullish.length}</p>
+            <p className="text-xs text-text-muted">BULLISH</p>
+            <p className="text-2xl font-bold text-data-bull">{bullish.length}</p>
           </div>
           <div className="bg-bg-panel border border-border-dim rounded-lg p-3 text-center">
-            <p className="text-[10px] text-text-muted font-mono">NEUTRAL</p>
-            <p className="text-2xl font-mono font-bold text-text-muted">{neutral.length}</p>
+            <p className="text-xs text-text-muted">NEUTRAL</p>
+            <p className="text-2xl font-bold text-text-muted">{neutral.length}</p>
           </div>
           <div className="bg-bg-panel border border-data-bear/30 rounded-lg p-3 text-center">
-            <p className="text-[10px] text-text-muted font-mono">BEARISH</p>
-            <p className="text-2xl font-mono font-bold text-data-bear">{bearish.length}</p>
+            <p className="text-xs text-text-muted">BEARISH</p>
+            <p className="text-2xl font-bold text-data-bear">{bearish.length}</p>
           </div>
         </div>
 
         {/* Signal cards */}
         {signals.length === 0 ? (
           <Panel title="No Active Signals" subtitle="Composite evaluator found no compound signals">
-            <div className="text-text-muted text-[11px] p-4 text-center">
+            <div className="text-text-muted text-xs p-4 text-center">
               No cross-module confluence detected — neutral conditions
             </div>
           </Panel>

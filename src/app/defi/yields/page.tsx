@@ -46,13 +46,13 @@ export default function DeFiYieldsPage() {
       <div className="h-full overflow-auto">
         <div className="sticky top-0 bg-bg-deep z-10 px-4 py-3 border-b border-border-dim">
           <div className="flex items-center justify-between">
-            <h1 className="text-sm font-mono font-bold text-accent-cyan flex items-center gap-2">
+            <h1 className="text-sm font-bold text-accent-cyan flex items-center gap-2">
               <Percent size={14} /> DeFi YIELD FINDER
             </h1>
             <div className="flex gap-2">
               <button
                 onClick={() => setStableOnly(!stableOnly)}
-                className={`px-2 py-0.5 rounded text-[10px] border font-mono transition-colors ${
+                className={`px-2 py-0.5 rounded text-xs border font-mono transition-colors ${
                   stableOnly ? 'bg-accent-green/20 border-accent-green text-accent-green' : 'bg-bg-panel border-border-dim text-text-dim'
                 }`}
               >
@@ -70,8 +70,8 @@ export default function DeFiYieldsPage() {
             <TableControlsBar idPrefix="defi-yields" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-text-muted text-[10px] uppercase">
-                  <th className="text-left py-2 px-2 font-mono">#</th>
+                <tr className="text-text-muted text-xs uppercase">
+                  <th className="text-left py-2 px-2">#</th>
                   <SortableTh controls={tc} k="project" className="text-left py-2 px-2 font-mono">PROTOCOL</SortableTh>
                   <SortableTh controls={tc} k="chain" className="text-left py-2 px-2 font-mono">CHAIN</SortableTh>
                   <SortableTh controls={tc} k="symbol" className="text-left py-2 px-2 font-mono">SYMBOL</SortableTh>

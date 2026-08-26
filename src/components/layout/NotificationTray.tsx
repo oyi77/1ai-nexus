@@ -55,14 +55,14 @@ export function NotificationTray() {
       {isOpen && (
         <div className="absolute top-full right-0 mt-1 w-80 bg-bg-panel border border-bg-border rounded shadow-lg z-50 max-h-96 overflow-auto scrollbar-thin">
           <div className="flex items-center justify-between px-3 py-2 border-b border-bg-border">
-            <span className="text-[11px] font-mono font-medium text-text-primary">Notifications</span>
+            <span className="text-xs font-mono font-medium text-text-primary">Notifications</span>
             <button onClick={() => setIsOpen(false)} className="text-text-muted hover:text-text-secondary">
               <X size={12} />
             </button>
           </div>
 
           {notifications.length === 0 ? (
-            <div className="p-4 text-center text-text-muted text-[11px]">No recent signals</div>
+            <div className="p-4 text-center text-text-muted text-xs">No recent signals</div>
           ) : (
             notifications.map(n => (
               <a
@@ -74,12 +74,12 @@ export function NotificationTray() {
                 <div className="flex items-start gap-2">
                   <span className="text-[12px] mt-0.5">{typeIcons[n.type] || '•'}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[11px] text-text-primary line-clamp-2">{n.headline}</div>
+                    <div className="text-xs text-text-primary line-clamp-2">{n.headline}</div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className={`text-[9px] font-mono ${n.direction === 'bullish' ? 'text-data-bull' : n.direction === 'bearish' ? 'text-data-bear' : 'text-data-neutral'}`}>
+                      <span className={`text-xs font-mono ${n.direction === 'bullish' ? 'text-data-bull' : n.direction === 'bearish' ? 'text-data-bear' : 'text-data-neutral'}`}>
                         {n.direction?.toUpperCase()}
                       </span>
-                      <span className="text-[9px] font-mono text-text-muted">{new Date(n.timestamp).toLocaleTimeString()}</span>
+                      <span className="text-xs font-mono text-text-muted">{new Date(n.timestamp).toLocaleTimeString()}</span>
                     </div>
                   </div>
                 </div>
