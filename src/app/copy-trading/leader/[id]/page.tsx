@@ -569,7 +569,7 @@ function LeaderPerformanceInner() {
                 <StatCard label="Profit Sharing" value={profile && profile.feeRate > 0 ? fmtPct(profile.feeRate, 0) : '—'} />
               </div>
               <p className="text-xs text-text-muted">
-                Binance doesn't expose win rate, max drawdown, or follow profit in its lead-portfolio endpoints — those
+                Binance doesn&apos;t expose win rate, max drawdown, or follow profit in its lead-portfolio endpoints — those
                 metrics are omitted rather than shown as 0.
               </p>
             </>

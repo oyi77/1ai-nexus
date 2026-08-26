@@ -120,11 +120,19 @@ export async function getCached<T>(
 
     return { data, fromCache: false }
   } catch (error) {
-    // If fetch fails but we have stale memory data, return it
+    // If fetch fails: serve stale memory, then stale Redis, before throwing.
     const stale = memoryCache.get(key)
     if (stale) {
       return { data: stale.data as T, fromCache: true }
     }
+    try {
+      const raw = await redisGet(key)
+      if (raw) {
+        const data = JSON.parse(raw) as T
+        memoryCache.set(key, { data, expires: Date.now() + ttlMs })
+        return { data, fromCache: true }
+      }
+    } catch { /* redis stale unavailable too */ }
     throw error
   } finally {
     inflight.delete(key)

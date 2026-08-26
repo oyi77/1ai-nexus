@@ -105,6 +105,7 @@ export default function TokenDiscoverPage() {
               <tbody>
                 {tc.visible.map((t, i) => (
                   <tr
+                    key={t.symbol ?? i}
                     className="border-t border-border-dim/30 hover:bg-bg-elevated cursor-pointer transition-colors"
                   >
                     <td className="py-2 px-2 text-text-muted">{i + 1}</td>

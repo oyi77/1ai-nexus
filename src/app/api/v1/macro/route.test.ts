@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- mock-heavy test file */
 // Direct GET-handler unit test for /api/v1/macro.
 // No server, no port, no auth, no network: exercises route.ts logic in isolation.
 // `category` flows from the static FRED_SERIES map (route.ts:46 / catch at :55),
