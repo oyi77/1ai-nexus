@@ -30,11 +30,6 @@ function fmtUsd(n: number): string {
   if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`
   return `$${n.toFixed(2)}`
 }
-
-export function TrendingCoinsPageContent() {
-  return <TrendingCoinsPageInner />
-}
-
 export default function TrendingCoinsPage() {
   return <NexusLayout><TrendingCoinsPageInner /></NexusLayout>
 }

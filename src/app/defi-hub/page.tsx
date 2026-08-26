@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { DeFiPageContent } from '../defi/page'
-import { YieldsPageContent } from '../yields/page'
-import { SectorsPageContent } from '../sectors/page'
+import { YieldsPageContent } from '../yields/content'
+import { SectorsPageContent } from '../sectors/content'
 import { RevenuePageContent } from '../revenue/page'
 
 const TABS = [

@@ -2,8 +2,8 @@
 
 import { useState } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
-import { WhaleClusterPageContent } from '../whale-cluster/page'
-import { SmartMoneyPageContent } from '../smart-money/page'
+import { WhaleClusterPageContent } from '../whale-cluster/content'
+import { SmartMoneyPageContent } from '../smart-money/content'
 import { EntitiesPageContent } from '../entities/page'
 import { MempoolPageContent } from '../mempool/page'
 import { InsiderPageContent } from '../insider/page'
