@@ -90,6 +90,17 @@ interface BandarCache {
   /** Sector-level foreign-flow rollup, |net| desc — prebuilt per snapshot. */
   rotation: SectorRotationRow[]
   rotationTradeDate: string
+  /** Market-wide foreign flow per session — prebuilt once per snapshot. */
+  marketFlow: MarketFlowPoint[]
+}
+
+export interface MarketFlowPoint {
+  date: string
+  buyVol: number
+  sellVol: number
+  netVol: number
+  /** Σ(net volume × close) across stocks with activity that session. */
+  netValueIdr: number
 }
 
 export interface SectorRotationRow {
@@ -163,6 +174,20 @@ async function buildCache(): Promise<BandarCache> {
     .map(([sector, v]) => ({ sector, ...v }))
     .sort((a, b) => Math.abs(b.netValueIdr) - Math.abs(a.netValueIdr))
 
+  // Market-wide flow per session: Σ foreign volumes + net-value estimate.
+  // O(sessions × stocks) once per snapshot (~90 × 1k).
+  const marketFlow: MarketFlowPoint[] = history.sessions.map((s) => {
+    let buyVol = 0
+    let sellVol = 0
+    let netValueIdr = 0
+    for (const e of Object.values(s.stocks)) {
+      buyVol += e.fbuy
+      sellVol += e.fsell
+      netValueIdr += (e.fbuy - e.fsell) * e.close
+    }
+    return { date: s.date, buyVol, sellVol, netVol: buyVol - sellVol, netValueIdr }
+  })
+
   return {
     mtimes: '',
     latestParsed: { capturedAt: latest.capturedAt, tradeDate: latest.tradeDate, count: latest.count },
@@ -173,6 +198,7 @@ async function buildCache(): Promise<BandarCache> {
     brokerRowsByValueDesc: [...brokers.rows].sort((a, b) => b.value - a.value),
     rotation,
     rotationTradeDate: latest.tradeDate,
+    marketFlow,
   }
 }
 
@@ -258,15 +284,19 @@ export async function getForeignStreaks(minDays = 3, limit = 25): Promise<{
 /** Per-symbol daily foreign-net series (oldest→newest). */
 export async function getForeignSeries(symbol: string, days = 30): Promise<{
   symbol: string
-  series: Array<{ date: string; fbuy: number; fsell: number; net: number; close: number }>
+  series: Array<{ date: string; fbuy: number; fsell: number; net: number; cum: number; close: number }>
 } | null> {
   const c = await getCache()
   const code = symbol.replace('.JK', '').toUpperCase()
+  let cum = 0
   const series = c.history.sessions
     .slice(-days)
     .map((s) => {
       const e = s.stocks[code]
-      return e ? { date: s.date, fbuy: e.fbuy, fsell: e.fsell, net: e.fbuy - e.fsell, close: e.close } : null
+      if (!e) return null
+      const net = e.fbuy - e.fsell
+      cum += net
+      return { date: s.date, fbuy: e.fbuy, fsell: e.fsell, net, cum, close: e.close }
     })
     .filter((x): x is NonNullable<typeof x> => x !== null)
   if (series.length === 0) return null
@@ -283,6 +313,15 @@ export async function getBrokerBoard(limit = 25): Promise<{
     tradeDate: c.brokersTradeDate,
     rows: c.brokerRowsByValueDesc.slice(0, limit),
   }
+}
+
+/** Market-wide foreign-flow timeline (prebuilt once per snapshot). */
+export async function getMarketFlow(): Promise<{
+  tradeDate: string
+  sessions: MarketFlowPoint[]
+}> {
+  const c = await getCache()
+  return { tradeDate: c.latestParsed.tradeDate, sessions: c.marketFlow }
 }
 
 /** Sector-level foreign-flow rotation for the latest session (prebuilt). */

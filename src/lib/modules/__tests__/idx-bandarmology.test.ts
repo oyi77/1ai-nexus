@@ -4,6 +4,7 @@ import {
   getForeignLeaders,
   getForeignSeries,
   getForeignStreaks,
+  getMarketFlow,
   getSectorRotation,
 } from '@/lib/modules/market/provider/idx-bandarmology'
 import { applyIcSector } from '@/lib/modules/market/provider/idx-universe'
@@ -56,6 +57,28 @@ describe('idx-bandarmology provider', () => {
       // sign coherence: net direction matches dominant flow side
       if (s.netValueIdr > 0) expect(s.inflowStocks).toBeGreaterThan(0)
       if (s.netValueIdr < 0) expect(s.outflowStocks).toBeGreaterThan(0)
+    }
+  })
+
+  it('market flow timeline is date-ordered with coherent volumes', async () => {
+    const f = await getMarketFlow()
+    expect(f.sessions.length).toBeGreaterThan(0)
+    for (let i = 0; i < f.sessions.length; i++) {
+      const s = f.sessions[i]
+      expect(s.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(s.netVol).toBe(s.buyVol - s.sellVol)
+      expect(Number.isFinite(s.netValueIdr)).toBe(true)
+      if (i > 0) expect(f.sessions[i - 1].date < s.date).toBe(true)
+    }
+  })
+
+  it('series cumulative is the running sum of nets', async () => {
+    const known = await getForeignSeries('BBCA', 90)
+    if (!known) return // history may not include the code yet
+    let running = 0
+    for (const p of known.series) {
+      running += p.net
+      expect(p.cum).toBe(running)
     }
   })
 
