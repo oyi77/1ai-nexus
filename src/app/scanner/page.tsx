@@ -43,7 +43,7 @@ function DegenScannerPageInner() {
   const [pairs, setPairs] = useState<NewPair[]>([])
   const [network, setNetwork] = useState('solana')
   const [feedStatus, setFeedStatus] = useState<'live' | 'stale' | 'error'>('live')
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [wsConnected, setWsConnected] = useState(false)
   const socketsRef = useRef<Socket[]>([])
 
@@ -86,9 +86,10 @@ fetchData()
 
   // Real-time Socket.IO connections to /dexscreener + /memecoins namespaces
   useEffect(() => {
-    const WS_URL = process.env.NEXT_PUBLIC_WS_URL
-      ? process.env.NEXT_PUBLIC_WS_URL.replace('wss://', 'https://').replace('ws://', 'http://')
-      : 'https://tracker-ws.aitradepulse.com'
+    const WS_URL =
+      typeof window !== 'undefined' && window.location.hostname === 'localhost'
+        ? 'http://localhost:4401'
+        : 'https://tracker-ws.aitradepulse.com'
 
     const dexSocket = io(`${WS_URL}/dexscreener`, {
       transports: ['websocket', 'polling'],
@@ -273,7 +274,7 @@ fetchData()
             </div>
             <div className="flex items-center gap-2 bg-bg-panel px-3 py-1.5 border border-bg-border rounded">
               <LiveDot status={feedStatus} />
-              <span className="text-xs font-mono text-text-muted">Updated {lastUpdated.toLocaleTimeString()}</span>
+              <span className="text-xs font-mono text-text-muted">Updated {lastUpdated ? lastUpdated.toLocaleTimeString() : '—'}</span>
             </div>
           </div>
         </div>

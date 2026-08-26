@@ -28,7 +28,7 @@ async function checkService(name: string, url: string, category: ServiceStatus['
 
 export async function GET() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4400'
-  const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:4401'
+  const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'wss://tracker-ws.aitradepulse.com'
 
   const checks = await Promise.allSettled([
     // Core infrastructure
