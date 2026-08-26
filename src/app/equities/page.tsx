@@ -9,6 +9,11 @@ import { GLOBAL_STOCKS, INDEX_SYMBOLS, type UniverseStock } from "@/lib/config/u
 
 type EquityStock = { symbol: string; name: string; sector: string }
 type EquityQuote = { price: number; change: number; name: string }
+type MarketCatalogEntry = { id: string; name: string }
+
+/** Quote backfill budget per selected market — keeps Yahoo chunk load bounded. */
+const MARKET_QUOTE_CAP = 500
+const QUOTE_CHUNK = 100
 
 
 /**
@@ -78,15 +83,22 @@ export default function EquitiesPage() {
   const { format } = useUserPreferences()
   const [idxUniverse, setIdxUniverse] = useState<UniverseStock[] | null>(null)
 
+  // Market explorer: '' = default curated+IDX view; otherwise a live
+  // TradingView universe from /api/v1/equities/universe?market=<id>.
+  const [catalog, setCatalog] = useState<MarketCatalogEntry[]>([])
+  const [market, setMarket] = useState("")
+  const [marketStocks, setMarketStocks] = useState<EquityStock[] | null>(null)
+  const [marketLoading, setMarketLoading] = useState(false)
+
   // Displayed universe = curated global list, with the IDX section replaced
-  // by the live IDX universe once loaded (idx.co.id → snapshot → fallback).
+  // by the live IDX universe once loaded (idx.co.id → snapshot → fallback),
+  // or the selected global-market listing when one is active.
   const allStocks: EquityStock[] =
     idxUniverse && idxUniverse.length > 0
-      ? [
-          ...GLOBAL_STOCKS.filter((s) => s.sector !== 'IDX').map((s) => ({ symbol: s.symbol, name: s.name, sector: s.sector ?? 'Global' })),
-          ...idxUniverse.map((s) => ({ symbol: s.symbol, name: s.name || s.symbol.replace('.JK', ''), sector: 'IDX' })),
-        ]
+      ? [...GLOBAL_STOCKS.filter((s) => !s.symbol.endsWith(".JK")).map((s) => ({ symbol: s.symbol, name: s.name, sector: s.sector ?? 'Global' })), ...idxUniverse.map((s) => ({ symbol: s.symbol, name: s.name, sector: s.sector ?? 'IDX' }))]
       : GLOBAL_STOCKS.map((s) => ({ symbol: s.symbol, name: s.name, sector: s.sector ?? 'Global' }))
+  const displayed = market && marketStocks ? marketStocks : allStocks
+
   useEffect(() => {
     const allSymbols = GLOBAL_STOCKS.map(s => s.symbol).join(',')
     fetch(`/api/v1/equities?symbols=${allSymbols}`)
@@ -126,6 +138,65 @@ export default function EquitiesPage() {
       .catch(() => { /* curated fallback floor covers the UI */ })
   }, [])
 
+  // Selection resets live in the handler (sanctioned cascade point); the
+  // effect below only performs the network fetch for a non-empty market.
+  const selectMarket = (id: string) => {
+    setMarket(id)
+    if (!id) {
+      setMarketStocks(null)
+      setMarketLoading(false)
+      return
+    }
+    setMarketStocks(null)
+    setMarketLoading(true)
+  }
+  // Market catalog for the picker (?markets=1 — no listing payload).
+  useEffect(() => {
+    fetch('/api/v1/equities/universe?markets=1')
+      .then((r) => r.json())
+      .then((d) => setCatalog(d.data?.markets ?? []))
+      .catch(() => { /* picker simply stays empty */ })
+  }, [])
+
+  // Selected market: load its universe, then backfill quotes progressively
+  // (chunks of 100 up to MARKET_QUOTE_CAP — rows appear as quotes arrive;
+  // the full listing remains searchable once its chunk lands).
+  useEffect(() => {
+    if (!market) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/v1/equities/universe?market=${encodeURIComponent(market)}`)
+        const d = await res.json()
+        if (cancelled) return
+        const rows = (d.data?.stocks ?? []) as Array<{ symbol: string; name: string; exchange: string }>
+        const mapped: EquityStock[] = rows.map((s) => ({ symbol: s.symbol, name: s.name, sector: s.exchange || 'LISTED' }))
+        setMarketStocks(mapped)
+        setMarketLoading(false)
+        const targets = mapped.slice(0, MARKET_QUOTE_CAP)
+        for (let i = 0; i < targets.length; i += QUOTE_CHUNK) {
+          const slice = targets.slice(i, i + QUOTE_CHUNK).map((s) => s.symbol)
+          try {
+            const qr = await fetch(`/api/v1/equities?symbols=${slice.join(',')}`)
+            const qd = await qr.json()
+            if (cancelled) return
+            const map: Record<string, EquityQuote> = {}
+            for (const q of qd.data?.stocks ?? []) {
+              map[q.symbol] = { price: q.price, change: q.changePercent, name: q.name ?? q.symbol }
+            }
+            setQuotes((prev) => ({ ...prev, ...map }))
+          } catch { /* leave those rows without quotes */ }
+        }
+      } catch {
+        if (!cancelled) {
+          setMarketLoading(false)
+          setError(`Failed to load ${market} universe`)
+        }
+      }
+    })()
+    return () => { cancelled = true }
+  }, [market])
+
   // Backfill quotes for IDX symbols that only exist in the live universe.
   useEffect(() => {
     if (!idxUniverse) return
@@ -153,15 +224,41 @@ export default function EquitiesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [idxUniverse])
 
-  // Group stocks by sector for display
-  const sectors = [...new Set(allStocks.map((s) => s.sector))]
+  // Group stocks by sector (or exchange prefix when a market is selected)
+  const sectors = [...new Set(displayed.map((s) => s.sector))]
+  const marketName = catalog.find((c) => c.id === market)?.name
 
   return (
     <NexusLayout>
       <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4">
           <h1 className="text-xl font-bold font-mono text-accent-cyan">GLOBAL EQUITIES</h1>
-          <span className="text-[10px] text-text-muted font-mono">{allStocks.length} stocks · {INDEX_SYMBOLS.length} indices · 14 exchanges</span>
+          <span className="text-[10px] text-text-muted font-mono">
+            {market && marketStocks
+              ? `${marketStocks.length} listings · ${marketName ?? market}`
+              : `${allStocks.length} stocks · ${INDEX_SYMBOLS.length} indices · 14 exchanges`}
+          </span>
+        </div>
+
+        {/* Market picker */}
+        <div className="flex items-center gap-3">
+          <label htmlFor="equities-market" className="text-[10px] font-mono text-text-muted uppercase tracking-wide">Market</label>
+          <select
+            id="equities-market"
+            value={market}
+            onChange={(e) => selectMarket(e.target.value)}
+            className="bg-bg-raised border border-border-dim rounded px-2 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:border-accent-cyan"
+          >
+            <option value="">Indonesia + Global Majors</option>
+            {catalog.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          {market && marketStocks && marketStocks.length > MARKET_QUOTE_CAP && (
+            <span className="text-[10px] text-text-muted font-mono">
+              quotes streaming for first {MARKET_QUOTE_CAP} listings
+            </span>
+          )}
         </div>
         {error && <div className="text-data-bear text-[11px] font-mono p-4">Error: {error}</div>}
 
@@ -194,8 +291,8 @@ export default function EquitiesPage() {
           </div>
         </div>
 
-        {/* All Stocks by Sector */}
-        {loading ? (
+        {/* All Stocks by Sector (or by exchange within a market) */}
+        {loading || marketLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <div key={i} className="bg-bg-panel border border-border-dim rounded-lg p-4 animate-pulse space-y-3">
@@ -219,7 +316,7 @@ export default function EquitiesPage() {
           </div>
         ) : (
           sectors.map(sector => {
-            const stocks = allStocks.filter(s => s.sector === sector).filter(s => quotes[s.symbol])
+            const stocks = displayed.filter(s => s.sector === sector).filter(s => quotes[s.symbol])
             if (stocks.length === 0) return null
             return (
               <div key={sector} className="bg-bg-panel border border-border-dim rounded-lg p-4">
