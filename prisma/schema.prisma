@@ -339,6 +339,10 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   
+  // Gamification fields
+  xp    Int @default(0)
+  level Int @default(1)
+
   subscriptions Subscription[]
   
   @@index([email])
@@ -873,4 +877,24 @@ model Payment {
   @@index([subscriptionId])
   @@index([status])
   @@index([externalId])
+}
+
+model UserBadge {
+  id        String   @id @default(cuid())
+  userId    String
+  badgeId   String
+  awardedAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model UserEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String
+  xpDelta   Int
+  refId     String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, action, refId])
 }
