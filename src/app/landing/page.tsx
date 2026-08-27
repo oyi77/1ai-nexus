@@ -1,6 +1,7 @@
 "use client"
 
 import Link from 'next/link'
+import { useEffect, useRef } from 'react'
 import {
   ArrowRight, BarChart3, Check, Globe2, Layers, Radio, Users, Zap,
 } from 'lucide-react'
@@ -65,6 +66,10 @@ function Mark() {
 }
 
 export default function LandingPage() {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.muted = true
+  }, [])
   return (
     <div className="min-h-screen bg-bg-base text-text-primary">
       {/* ── Nav ── */}
@@ -73,6 +78,7 @@ export default function LandingPage() {
           <Link href="/" className="text-lg"><Mark /></Link>
           <nav className="hidden md:flex items-center gap-7 text-sm text-text-secondary">
             <a href="#features" className="hover:text-text-primary transition-colors">Features</a>
+            <a href="#walkthrough" className="hover:text-text-primary transition-colors">Walkthrough</a>
             <a href="#coverage" className="hover:text-text-primary transition-colors">Coverage</a>
             <a href="#compare" className="hover:text-text-primary transition-colors">Compare</a>
             <Link href="/pricing" className="hover:text-text-primary transition-colors">Pricing</Link>
@@ -219,6 +225,27 @@ export default function LandingPage() {
               <p className="text-sm text-text-secondary leading-relaxed">{f.body}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ── Walkthrough ── */}
+      <section id="walkthrough" className="max-w-6xl mx-auto px-6 py-20">
+        <p className="eyebrow mb-2">Walkthrough</p>
+        <h2 className="text-3xl font-bold tracking-tight mb-3">See NEXUS in 60 seconds.</h2>
+        <p className="text-text-secondary mb-8 max-w-2xl">
+          A quick tour of the terminal — IDX bandarmology, global universes, on-chain intel, and AI signals, all from one keyboard-driven workspace.
+        </p>
+        <div className="card overflow-hidden bg-bg-base">
+          <video
+            ref={videoRef}
+            className="w-full aspect-video object-cover"
+            src="/videos/nexus-walkthrough.mp4"
+            poster="/videos/nexus-walkthrough-poster.jpg"
+            autoPlay
+            muted
+            loop
+            playsInline
+          />
         </div>
       </section>
 
