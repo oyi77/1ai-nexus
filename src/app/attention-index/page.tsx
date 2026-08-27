@@ -131,24 +131,24 @@ export default function AttentionIndexPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="bg-bg-elevated rounded-lg p-4 border border-border-dim/30 text-center">
                   <p className="text-xs text-text-muted">ATTENTION INDEX</p>
-                  <p className="text-3xl font-bold mt-1">{data.composite.attentionIndex}</p>
+                  <p className="text-2xl font-bold mt-1">{data.composite.attentionIndex}</p>
                   <span className={`inline-block mt-2 text-xs font-mono px-2 py-0.5 rounded ${signalColor(data.composite.signal)}`}>
                     {data.composite.signal.toUpperCase()}
                   </span>
                 </div>
                 <div className="bg-bg-elevated rounded-lg p-4 border border-border-dim/30 text-center">
                   <p className="text-xs text-text-muted">GITHUB SCORE</p>
-                  <p className="text-3xl font-bold mt-1 text-accent-green">{data.composite.githubScore}</p>
+                  <p className="text-2xl font-bold mt-1 text-accent-green">{data.composite.githubScore}</p>
                   <p className="text-xs text-text-dim mt-1">{fmtNum(data.github.totals.totalWeeklyCommits)} commits/wk</p>
                 </div>
                 <div className="bg-bg-elevated rounded-lg p-4 border border-border-dim/30 text-center">
                   <p className="text-xs text-text-muted">SEARCH SCORE</p>
-                  <p className="text-3xl font-bold mt-1 text-accent-amber">{data.composite.searchScore}</p>
+                  <p className="text-2xl font-bold mt-1 text-accent-amber">{data.composite.searchScore}</p>
                   <p className="text-xs text-text-dim mt-1">Trending proxy</p>
                 </div>
                 <div className="bg-bg-elevated rounded-lg p-4 border border-border-dim/30 text-center">
                   <p className="text-xs text-text-muted">TOTAL STARS</p>
-                  <p className="text-3xl font-bold mt-1">{fmtNum(data.github.totals.totalStars)}</p>
+                  <p className="text-2xl font-bold mt-1">{fmtNum(data.github.totals.totalStars)}</p>
                   <p className="text-xs text-text-dim mt-1">{data.github.repos.length} repos tracked</p>
                 </div>
               </div>

@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { type CellAccessor, filterRows, sortRows } from '@/lib/table-controls'
+import { Explain } from '@/components/primitives/Explain'
 
 export interface Column<T> {
   key: string
@@ -9,6 +10,7 @@ export interface Column<T> {
   width?: number | string
   align?: 'left' | 'center' | 'right'
   sortable?: boolean
+  explain?: string
   render?: (row: T, index: number) => React.ReactNode
   accessor?: (row: T) => string | number
 }
@@ -142,7 +144,7 @@ export function DataTable<T extends Record<string, unknown>>({
             <tr role="row" className="bg-bg-raised border-b border-bg-border">
               {columns.map(col => (
                 <th key={col.key} role="columnheader" aria-sort={sortKey === col.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined} className={`px-2 py-1.5 text-xs font-mono font-medium text-text-muted uppercase tracking-wider ${alignClass(col.align)} ${sortable && col.sortable !== false ? 'cursor-pointer hover:text-text-secondary select-none focus-visible:outline focus-visible:outline-teal-vivid' : ''}`} style={{ width: col.width }} onClick={() => sortable && col.sortable !== false && handleSort(col.key)} tabIndex={sortable && col.sortable !== false ? 0 : undefined} onKeyDown={e => { if (sortable && col.sortable !== false && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); handleSort(col.key) } }}>
-                  <span className="inline-flex items-center gap-1">{col.header}{sortKey === col.key && <span className="text-teal-vivid">{sortDir === 'asc' ? '↑' : '↓'}</span>}</span>
+                  <span className="inline-flex items-center gap-1">{col.header}{col.explain && <Explain text={col.explain} />}{sortKey === col.key && <span className="text-teal-vivid">{sortDir === 'asc' ? '↑' : '↓'}</span>}</span>
                 </th>
               ))}
             </tr>

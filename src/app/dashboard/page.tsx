@@ -238,7 +238,7 @@ fetchData()
               columns={newsColumns as unknown as Column<Record<string, unknown>>[]}
               data={news as unknown as Record<string, unknown>[]}
               rowHeight={28}
-              emptyState={<div className="text-text-muted text-xs p-4">Aggregating global news...</div>}
+              emptyState={<div className="text-text-muted text-xs p-4">No live news yet — we refresh every 15s. Connect a news source in Settings to start tracking.</div>}
             />
           </Panel>
 
@@ -247,7 +247,7 @@ fetchData()
               columns={dexColumns as unknown as Column<Record<string, unknown>>[]}
               data={dex as unknown as Record<string, unknown>[]}
               rowHeight={28}
-              emptyState={<div className="text-text-muted text-xs p-4">Scanning liquidity pools...</div>}
+              emptyState={<div className="text-text-muted text-xs p-4">No trending pairs yet — refreshing every 15s. Add a DEX feed to populate this panel.</div>}
             />
           </Panel>
         </div>
@@ -259,7 +259,7 @@ fetchData()
               columns={activityColumns as unknown as Column<Record<string, unknown>>[]}
               data={activity as unknown as Record<string, unknown>[]}
               rowHeight={28}
-              emptyState={<div className="text-text-muted text-xs p-4">Waiting for smart money signals...</div>}
+              emptyState={<div className="text-text-muted text-xs p-4">No smart-money signals yet — waiting for the next scan. Data appears automatically.</div>}
             />
           </Panel>
 
@@ -268,7 +268,7 @@ fetchData()
               columns={whaleColumns as unknown as Column<Record<string, unknown>>[]}
               data={whaleMoves as unknown as Record<string, unknown>[]}
               rowHeight={28}
-              emptyState={<div className="text-text-muted text-xs p-4">Monitoring mempool for whale TXs...</div>}
+              emptyState={<div className="text-text-muted text-xs p-4">No whale moves yet — monitoring the mempool. Large flows show up here as they happen.</div>}
             />
           </Panel>
         </div>

@@ -1,15 +1,17 @@
 import { cn, formatPercent } from "@/lib/utils";
 import { type ReactNode } from "react";
+import { Explain } from "@/components/primitives/Explain";
 
 interface StatCardProps {
-  label: string;
-  value: string | number;
-  change?: number;
-  icon?: ReactNode;
-  className?: string;
+  label: string
+  value: string | number
+  change?: number
+  icon?: ReactNode
+  explain?: string
+  className?: string
 }
 
-export function StatCard({ label, value, change, icon, className }: StatCardProps) {
+export function StatCard({ label, value, change, icon, explain, className }: StatCardProps) {
   return (
     <div
       className={cn(
@@ -21,6 +23,7 @@ export function StatCard({ label, value, change, icon, className }: StatCardProp
         <span className="text-xs font-medium uppercase tracking-wider text-text-muted">
           {label}
         </span>
+        {explain && <Explain text={explain} />}
         {icon && <span className="text-text-muted">{icon}</span>}
       </div>
       <div className="mt-2 flex items-baseline gap-2">

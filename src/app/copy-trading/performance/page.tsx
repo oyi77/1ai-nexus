@@ -162,9 +162,9 @@ export default function CopyTradingPerformancePage() {
   ]
 
   const emptyState = status === 'error' ? (
-    <div className="text-text-muted text-[12px] p-8 text-center">API access requires a key — data unavailable</div>
+    <div className="text-text-muted text-[12px] p-8 text-center">No leader data yet. Add your exchange API key in Settings — this view fills with live rankings.</div>
   ) : (
-    <div className="text-text-muted text-[12px] p-8 text-center">No leaders yet. Fetching from Gate.io + Hyperliquid + Binance + Bitget + OKX...</div>
+    <div className="text-text-muted text-[12px] p-8 text-center">No leaders yet — pulling live rankings from Gate.io, Hyperliquid, Binance, Bitget & OKX. This refreshes automatically; check back in a moment.</div>
   )
 
   return (

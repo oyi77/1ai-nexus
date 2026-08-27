@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { TierBadge } from '@/components/primitives/TierBadge'
 
 interface ComponentScore {
   score: number
@@ -119,7 +120,7 @@ export default function IntelligenceScorePage() {
               <ScoreGauge score={data.overall} label="OVERALL" size={160} />
             </div>
             <div className="text-center">
-              <p className="text-6xl font-bold" style={{ color: gradeColor }}>{data.grade}</p>
+              <TierBadge label={data.grade} color={gradeColor} className="text-6xl px-4 py-2" />
               <p className="text-sm mt-1" style={{ color: regimeColor }}>
                 {data.regime.toUpperCase()} REGIME
               </p>

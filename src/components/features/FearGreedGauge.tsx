@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
+import { Explain } from '@/components/primitives/Explain'
 
 interface FearGreedData {
   composite: { score: number; label: string; previousScore: number; change: number }
@@ -32,7 +33,10 @@ export function FearGreedGauge({ data }: { data: FearGreedData }) {
 
   return (
     <div className="flex flex-col items-center p-4 bg-bg-panel border border-bg-border rounded">
-      <h3 className="text-xs text-text-muted uppercase mb-2">Fear & Greed Index</h3>
+      <div className="flex items-center gap-2 mb-2">
+        <h3 className="text-xs text-text-muted uppercase">Fear &amp; Greed Index</h3>
+        <Explain text="The Fear & Greed Index measures market sentiment from 0 (extreme fear) to 100 (extreme greed). Lower = investors panicking (possible buy opportunity); higher = euphoria (possible topping)." />
+      </div>
       
       {/* Gauge */}
       <div className="relative w-48 h-24 mb-2">
