@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { TerminalShell } from "@/components/layout/TerminalShell"
+import { NexusLayout } from "@/components/layout/NexusLayout"
 import { useParams } from "next/navigation"
 
 export default function DeFiProtocolPage() {
@@ -19,18 +19,18 @@ export default function DeFiProtocolPage() {
   }, [protocol])
 
   return (
-    <TerminalShell>
+    <NexusLayout>
       <div className="p-4 space-y-4">
-        <h1 className="text-sm font-bold text-accent-cyan">DeFi PROTOCOL</h1>
-        <p className="text-xs text-text-dim">{protocol}</p>
-        {loading ? <p className="text-text-dim text-xs">Loading from DeFiLlama...</p> : data ? (
-          <div className="bg-bg-panel border border-border-dim rounded p-4 space-y-2">
+        <h1 className="text-sm font-bold text-teal-vivid">DeFi PROTOCOL</h1>
+        <p className="text-xs text-text-muted">{protocol}</p>
+        {loading ? <p className="text-text-muted text-xs">Loading from DeFiLlama...</p> : data ? (
+          <div className="bg-bg-panel border border-bg-border rounded p-4 space-y-2">
             <p className="text-lg text-text-primary">{String(data.name ?? protocol)}</p>
-            <p className="text-xs text-text-dim">Category: <span className="text-accent-cyan">{String(data.category ?? "—")}</span></p>
-            <p className="text-xs text-text-dim">Chain: <span className="text-accent-cyan">{String(data.chain ?? "—")}</span></p>
+            <p className="text-xs text-text-muted">Category: <span className="text-teal-vivid">{String(data.category ?? "—")}</span></p>
+            <p className="text-xs text-text-muted">Chain: <span className="text-teal-vivid">{String(data.chain ?? "—")}</span></p>
           </div>
-        ) : <p className="text-text-dim text-xs">Protocol not found on DeFiLlama</p>}
+        ) : <p className="text-text-muted text-xs">Protocol not found on DeFiLlama</p>}
       </div>
-    </TerminalShell>
+    </NexusLayout>
   )
 }

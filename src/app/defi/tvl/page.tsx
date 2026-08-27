@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { TerminalShell } from "@/components/layout/TerminalShell"
+import { NexusLayout } from "@/components/layout/NexusLayout"
 import { Layers } from "lucide-react"
 import { useTableControls, TableControlsBar, SortableTh } from "@/components/shell/TableControls"
 
@@ -41,15 +41,15 @@ export default function DeFiTvlPage() {
   const tc = useTableControls(protocols)
 
   return (
-    <TerminalShell>
+    <NexusLayout>
       <div className="h-full overflow-auto">
-        <div className="sticky top-0 bg-bg-deep z-10 px-4 py-3 border-b border-border-dim">
+        <div className="sticky top-0 bg-bg-panel z-10 px-4 py-3 border-b border-bg-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h1 className="text-sm font-bold text-accent-cyan flex items-center gap-2">
+              <h1 className="text-sm font-bold text-teal-vivid flex items-center gap-2">
                 <Layers size={14} /> DeFi TVL DASHBOARD
               </h1>
-              <span className="text-xs text-text-dim">Total: <span className="text-accent-green font-mono">${formatTvl(totalTvl)}</span></span>
+              <span className="text-xs text-text-muted">Total: <span className="text-data-bull font-mono">${formatTvl(totalTvl)}</span></span>
             </div>
             <div className="flex gap-1">
               {['', 'Ethereum', 'Solana', 'BSC', 'Arbitrum', 'Base'].map(c => (
@@ -57,7 +57,7 @@ export default function DeFiTvlPage() {
                   key={c}
                   onClick={() => setChain(c)}
                   className={`px-2 py-0.5 rounded text-xs border font-mono transition-colors ${
-                    chain === c ? 'bg-border-active border-border-active text-text-primary' : 'bg-bg-panel border-border-dim text-text-dim'
+                    chain === c ? 'bg-teal-dim/40 border-teal-dim text-text-primary' : 'bg-bg-panel border-bg-border text-text-muted'
                   }`}
                 >
                   {c || 'ALL'}
@@ -69,7 +69,7 @@ export default function DeFiTvlPage() {
 
         <div className="px-4 py-2">
           {loading ? (
-            <div className="text-center py-20 text-text-dim text-xs">Loading DeFi data from DeFiLlama...</div>
+            <div className="text-center py-20 text-text-muted text-xs">Loading DeFi data from DeFiLlama...</div>
           ) : (
           <>
             <TableControlsBar idPrefix="defi-tvl" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
@@ -87,16 +87,16 @@ export default function DeFiTvlPage() {
               </thead>
               <tbody>
                 {tc.visible.map((p, i) => (
-                  <tr key={p.name + i} className="border-t border-border-dim/30 hover:bg-bg-elevated cursor-pointer">
+                  <tr key={p.name + i} className="border-t border-bg-border/30 hover:bg-bg-elevated cursor-pointer">
                     <td className="py-2 px-2 text-text-muted">{i + 1}</td>
                     <td className="py-2 px-2 font-mono text-text-primary">{p.name}</td>
-                    <td className="py-2 px-2 text-accent-cyan">{p.chain}</td>
-                    <td className="py-2 px-2 text-text-dim">{p.category}</td>
-                    <td className="py-2 px-2 text-right font-mono text-accent-green">${formatTvl(Number(p.tvl))}</td>
-                    <td className={`py-2 px-2 text-right font-mono ${Number(p.change_1d) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                    <td className="py-2 px-2 text-teal-vivid">{p.chain}</td>
+                    <td className="py-2 px-2 text-text-muted">{p.category}</td>
+                    <td className="py-2 px-2 text-right font-mono text-data-bull">${formatTvl(Number(p.tvl))}</td>
+                    <td className={`py-2 px-2 text-right font-mono ${Number(p.change_1d) >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                       {formatChange(p.change_1d)}
                     </td>
-                    <td className={`py-2 px-2 text-right font-mono ${Number(p.change_7d) >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                    <td className={`py-2 px-2 text-right font-mono ${Number(p.change_7d) >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                       {formatChange(p.change_7d)}
                     </td>
                   </tr>
@@ -107,7 +107,7 @@ export default function DeFiTvlPage() {
           )}
         </div>
       </div>
-    </TerminalShell>
+    </NexusLayout>
   )
 }
 

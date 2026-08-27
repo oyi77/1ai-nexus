@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { TerminalShell } from "@/components/layout/TerminalShell"
+import { NexusLayout } from "@/components/layout/NexusLayout"
 import { Percent } from "lucide-react"
 import { useTableControls, TableControlsBar, SortableTh } from "@/components/shell/TableControls"
 
@@ -42,18 +42,18 @@ export default function DeFiYieldsPage() {
   const tc = useTableControls(pools)
 
   return (
-    <TerminalShell>
+    <NexusLayout>
       <div className="h-full overflow-auto">
-        <div className="sticky top-0 bg-bg-deep z-10 px-4 py-3 border-b border-border-dim">
+        <div className="sticky top-0 bg-bg-panel z-10 px-4 py-3 border-b border-bg-border">
           <div className="flex items-center justify-between">
-            <h1 className="text-sm font-bold text-accent-cyan flex items-center gap-2">
+            <h1 className="text-sm font-bold text-teal-vivid flex items-center gap-2">
               <Percent size={14} /> DeFi YIELD FINDER
             </h1>
             <div className="flex gap-2">
               <button
                 onClick={() => setStableOnly(!stableOnly)}
                 className={`px-2 py-0.5 rounded text-xs border font-mono transition-colors ${
-                  stableOnly ? 'bg-accent-green/20 border-accent-green text-accent-green' : 'bg-bg-panel border-border-dim text-text-dim'
+                  stableOnly ? 'bg-data-bull/20 border-data-bull text-data-bull' : 'bg-bg-panel border-bg-border text-text-muted'
                 }`}
               >
                 STABLECOIN ONLY
@@ -64,7 +64,7 @@ export default function DeFiYieldsPage() {
 
         <div className="px-4 py-2">
           {loading ? (
-            <div className="text-center py-20 text-text-dim text-xs">Loading yield data from DeFiLlama...</div>
+            <div className="text-center py-20 text-text-muted text-xs">Loading yield data from DeFiLlama...</div>
           ) : (
           <>
             <TableControlsBar idPrefix="defi-yields" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
@@ -83,15 +83,15 @@ export default function DeFiYieldsPage() {
               </thead>
               <tbody>
                 {tc.visible.map((p, i) => (
-                  <tr key={p.pool + i} className="border-t border-border-dim/30 hover:bg-bg-elevated cursor-pointer">
+                  <tr key={p.pool + i} className="border-t border-bg-border/30 hover:bg-bg-elevated cursor-pointer">
                     <td className="py-2 px-2 text-text-muted">{i + 1}</td>
                     <td className="py-2 px-2 font-mono text-text-primary">{p.project}</td>
-                    <td className="py-2 px-2 text-accent-cyan">{p.chain}</td>
-                    <td className="py-2 px-2 text-text-dim">{p.symbol}</td>
+                    <td className="py-2 px-2 text-teal-vivid">{p.chain}</td>
+                    <td className="py-2 px-2 text-text-muted">{p.symbol}</td>
                     <td className="py-2 px-2 text-right font-mono">${formatTvl(Number(p.tvlUsd))}</td>
-                    <td className="py-2 px-2 text-right font-mono text-accent-green font-bold">{Number(p.apy).toFixed(2)}%</td>
-                    <td className="py-2 px-2 text-right font-mono text-text-dim">{formatPct(p.apyBase)}</td>
-                    <td className="py-2 px-2 text-right font-mono text-text-dim">{formatPct(p.apyReward)}</td>
+                    <td className="py-2 px-2 text-right font-mono text-data-bull font-bold">{Number(p.apy).toFixed(2)}%</td>
+                    <td className="py-2 px-2 text-right font-mono text-text-muted">{formatPct(p.apyBase)}</td>
+                    <td className="py-2 px-2 text-right font-mono text-text-muted">{formatPct(p.apyReward)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -100,7 +100,7 @@ export default function DeFiYieldsPage() {
           )}
         </div>
       </div>
-    </TerminalShell>
+    </NexusLayout>
   )
 }
 

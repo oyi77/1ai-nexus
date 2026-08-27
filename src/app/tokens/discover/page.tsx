@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { TerminalShell } from "@/components/layout/TerminalShell"
+import { NexusLayout } from "@/components/layout/NexusLayout"
 import { useTableControls, TableControlsBar, SortableTh } from "@/components/shell/TableControls"
 import { TrendingUp, TrendingDown, AlertTriangle, Droplets, Clock } from "lucide-react"
 
@@ -46,13 +46,13 @@ export default function TokenDiscoverPage() {
   useEffect(() => { const invoke = () => fetchTokens(); invoke() }, [fetchTokens])
 
   return (
-    <TerminalShell>
+    <NexusLayout>
       <div className="h-full overflow-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-bg-deep z-10 px-4 py-3 border-b border-border-dim">
+        <div className="sticky top-0 bg-bg-panel z-10 px-4 py-3 border-b border-bg-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <h1 className="text-sm font-bold text-accent-cyan">TOKEN DISCOVERY</h1>
+              <h1 className="text-sm font-bold text-teal-vivid">TOKEN DISCOVERY</h1>
               <span className="text-xs text-text-muted">{tokens.length} tokens</span>
             </div>
             <div className="flex gap-1">
@@ -67,8 +67,8 @@ export default function TokenDiscoverPage() {
                   onClick={() => setSort(s.key)}
                   className={`px-2 py-0.5 rounded text-xs border font-mono transition-colors ${
                     sort === s.key
-                      ? 'bg-border-active border-border-active text-text-primary'
-                      : 'bg-bg-panel border-border-dim text-text-dim hover:border-border-active'
+                      ? 'bg-teal-dim/40 border-teal-dim text-text-primary'
+                      : 'bg-bg-panel border-bg-border text-text-muted hover:border-teal-dim'
                   }`}
                 >
                   {s.label}
@@ -81,9 +81,9 @@ export default function TokenDiscoverPage() {
         {/* Token Table */}
         <div className="px-4 py-2">
           {loading ? (
-            <div className="text-center py-20 text-text-dim text-xs">Scanning chains for tokens...</div>
+            <div className="text-center py-20 text-text-muted text-xs">Scanning chains for tokens...</div>
           ) : tokens.length === 0 ? (
-            <div className="text-center py-20 text-text-dim text-xs">No tokens found</div>
+            <div className="text-center py-20 text-text-muted text-xs">No tokens found</div>
           ) : (
             <>
             <TableControlsBar idPrefix="tokens-discover" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
@@ -106,7 +106,7 @@ export default function TokenDiscoverPage() {
                 {tc.visible.map((t, i) => (
                   <tr
                     key={t.symbol ?? i}
-                    className="border-t border-border-dim/30 hover:bg-bg-elevated cursor-pointer transition-colors"
+                    className="border-t border-bg-border/30 hover:bg-bg-elevated cursor-pointer transition-colors"
                   >
                     <td className="py-2 px-2 text-text-muted">{i + 1}</td>
                     <td className="py-2 px-2">
@@ -130,7 +130,7 @@ export default function TokenDiscoverPage() {
                        t.priceUsd < 1 ? (t.priceUsd ?? 0).toFixed(4) :
                        `$${t.priceUsd.toLocaleString('en-US', { maximumFractionDigits: 2 })}`}
                     </td>
-                    <td className={`py-2 px-2 text-right font-mono ${t.change24h >= 0 ? 'text-accent-green' : 'text-accent-red'}`}>
+                    <td className={`py-2 px-2 text-right font-mono ${t.change24h >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
                       <span className="flex items-center justify-end gap-0.5">
                         {t.change24h >= 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
                         {t.change24h >= 0 ? '+' : ''}{(t.change24h ?? 0).toFixed(1)}%
@@ -139,12 +139,12 @@ export default function TokenDiscoverPage() {
                     <td className="py-2 px-2 text-right font-mono">${formatNum(t.volume24h)}</td>
                     <td className="py-2 px-2 text-right font-mono">
                       <span className="flex items-center justify-end gap-1">
-                        <Droplets size={10} className="text-accent-cyan" />
+                        <Droplets size={10} className="text-teal-vivid" />
                         ${formatNum(t.liquidity)}
                       </span>
                     </td>
                     <td className="py-2 px-2 text-center">
-                      <span className="flex items-center justify-center gap-1 text-text-dim">
+                      <span className="flex items-center justify-center gap-1 text-text-muted">
                         <Clock size={10} />
                         {t.age}
                       </span>
@@ -155,7 +155,7 @@ export default function TokenDiscoverPage() {
                     <td className="py-2 px-2">
                       <div className="flex flex-wrap gap-1">
                         {t.badges.map((b, j) => (
-                          <span key={j} className="text-xs px-1 py-0.5 rounded bg-bg-elevated text-text-dim">
+                          <span key={j} className="text-xs px-1 py-0.5 rounded bg-bg-elevated text-text-muted">
                             {b}
                           </span>
                         ))}
@@ -165,7 +165,7 @@ export default function TokenDiscoverPage() {
                 ))}
                 {tc.visible.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="py-6 text-center text-text-dim text-xs">No tokens match the current filter.</td>
+                    <td colSpan={10} className="py-6 text-center text-text-muted text-xs">No tokens match the current filter.</td>
                   </tr>
                 )}
               </tbody>
@@ -174,14 +174,14 @@ export default function TokenDiscoverPage() {
           )}
         </div>
       </div>
-    </TerminalShell>
+    </NexusLayout>
   )
 }
 
 function RugScoreBadge({ score }: { score: number }) {
   if (score >= 70) {
     return (
-      <span className="inline-flex items-center gap-0.5 text-xs font-mono text-accent-red">
+      <span className="inline-flex items-center gap-0.5 text-xs font-mono text-data-bear">
         <AlertTriangle size={10} />
         {score}
       </span>
@@ -189,14 +189,14 @@ function RugScoreBadge({ score }: { score: number }) {
   }
   if (score >= 40) {
     return (
-      <span className="inline-flex items-center gap-0.5 text-xs font-mono text-accent-amber">
+      <span className="inline-flex items-center gap-0.5 text-xs font-mono text-data-warn">
         <AlertTriangle size={10} />
         {score}
       </span>
     )
   }
   return (
-    <span className="text-xs font-mono text-accent-green">{score}</span>
+    <span className="text-xs font-mono text-data-bull">{score}</span>
   )
 }
 
