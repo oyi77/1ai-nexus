@@ -28,7 +28,6 @@
 //      enabled:true, delete this doc block.
 // ─────────────────────────────────────────────────────────────
 
-import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../../types'
 import { TTL } from '../../types'
 import type { MemeAlphaToken, MemeRiskAudit } from '../types'
 
@@ -50,47 +49,4 @@ async function auditMobyToken(): Promise<MemeRiskAudit | null> {
   throw new MobyNotImplemented()
 }
 
-const mobyMemeModule: DataModule = {
-  id: MODULE_ID,
-  name: 'Moby Meme Alpha (pending RE)',
-  category: 'defi',
-  sourceType: 'pending',
-  provenance: {
-    describesItself: 'Moby smart-money meme screener — PENDING APK reverse-engineering. Endpoints unknown.',
-    upstreamProduct: 'Moby (moby.win)',
-    discoveredVia: 'computed',
-    fragility: 'unknown',
-    lastVerified: '2026-08-28',
-    toleratesAbsence: true,
-  },
-
-  // Disabled until APK RE supplies real endpoints.
-  isEnabled: () => false,
-
-  async healthCheck(): Promise<ModuleHealth> {
-    return {
-      status: 'degraded',
-      lastChecked: new Date(),
-      failureCount: 1,
-      notes: 'Moby meme module disabled: pending APK reverse-engineering',
-    }
-  },
-
-  async fetch<T>(_params: FetchParams): Promise<ModuleResult<T>> {
-    // Never pretends to succeed — surfaces the blocker to the caller.
-    throw new MobyNotImplemented()
-  },
-
-  async fallbackFn<T>(_params: FetchParams): Promise<ModuleResult<T>> {
-    return {
-      data: [] as unknown as T,
-      source: 'moby-meme (pending)',
-      cached: true,
-      timestamp: Date.now(),
-      ttl: MOBY_TTL,
-    }
-  },
-}
-
-export default mobyMemeModule
 export { discoverMobyTokens, auditMobyToken }

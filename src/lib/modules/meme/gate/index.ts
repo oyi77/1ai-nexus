@@ -13,7 +13,6 @@
 // ─────────────────────────────────────────────────────────────
 
 import crypto from 'node:crypto'
-import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../../types'
 import { TTL } from '../../types'
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
 
@@ -198,64 +197,3 @@ export async function auditGateToken(chainId: string, address: string): Promise<
   }
 }
 
-// ── Module ─────────────────────────────────────────────────────
-
-const gateMemeModule: DataModule = {
-  id: MODULE_ID,
-  name: 'Gate.io DEX Meme Alpha',
-  category: 'defi',
-  sourceType: 'public-api',
-  provenance: {
-    describesItself:
-      'New-token discovery + honeypot audit from Gate.io Web3 DEX (range_by_created_at + risk_infos).',
-    upstreamProduct: 'Gate.io Web3 OpenAPI',
-    discoveredVia: 'docs',
-    fragility: 'moderate',
-    lastVerified: '2026-08-28',
-    toleratesAbsence: true,
-  },
-
-  isEnabled: () => true,
-
-  async healthCheck(): Promise<ModuleHealth> {
-    try {
-      await gateDex<{ code?: unknown }>('base.token.range_by_created_at', {
-        start: new Date(Date.now() - 3600_000).toISOString(),
-        end: new Date().toISOString(),
-        chain_id: 56,
-        limit: 1,
-      })
-      return { status: 'active', lastChecked: new Date(), lastSuccess: new Date(), failureCount: 0 }
-    } catch (err) {
-      return {
-        status: 'degraded',
-        lastChecked: new Date(),
-        failureCount: 1,
-        notes: err instanceof Error ? err.message : 'gate meme endpoint unreachable',
-      }
-    }
-  },
-
-  async fetch<T>(_params: FetchParams): Promise<ModuleResult<T>> {
-    const tokens = await discoverGateTokens()
-    return {
-      data: tokens as unknown as T,
-      source: MODULE_ID,
-      cached: false,
-      timestamp: Date.now(),
-      ttl: GATE_TTL,
-    }
-  },
-
-  async fallbackFn<T>(_params: FetchParams): Promise<ModuleResult<T>> {
-    return {
-      data: [] as unknown as T,
-      source: 'gate-meme (fallback)',
-      cached: true,
-      timestamp: Date.now(),
-      ttl: GATE_TTL,
-    }
-  },
-}
-
-export default gateMemeModule

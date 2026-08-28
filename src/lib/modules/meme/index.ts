@@ -24,6 +24,7 @@
 import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '@/lib/modules/types'
 import { discoverBitgetTokens, auditBitgetToken } from './bitget'
 import { discoverGateTokens, auditGateToken } from './gate'
+import { discoverBotXTokens, auditBotXToken } from './botx'
 import { discoverMobyTokens } from './moby'
 import { MEME_PLATFORMS, type MemePlatform, type MemeRiskAudit } from './types'
 
@@ -166,6 +167,12 @@ const gateDiscovery = makeDiscoveryModule('gate-meme', 'Gate.io DEX Meme Alpha',
 const mobyDiscovery = makeDiscoveryModule('moby-meme', 'Moby Meme Alpha (pending RE)', () =>
   discoverMobyTokens(),
 )
+const botxDiscovery = makeDiscoveryModule('botx-meme', 'BotX Meme Alpha', () =>
+  discoverBotXTokens(),
+)
+const botxAudit = makeAuditModule('botx-meme-risk', 'BotX Meme Risk Audit', (c, k) =>
+  auditBotXToken(c, k),
+)
 
 const registry: Record<MemePlatform, MemePlatformEntry> = {
   bitget: {
@@ -181,6 +188,14 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     displayName: 'Gate.io DEX',
     discoveryModule: gateDiscovery,
     auditModule: gateAudit,
+    ttlMs: MEME_TTL,
+    enabled: true,
+  },
+  botx: {
+    platform: 'botx',
+    displayName: 'BotX',
+    discoveryModule: botxDiscovery,
+    auditModule: botxAudit,
     ttlMs: MEME_TTL,
     enabled: true,
   },

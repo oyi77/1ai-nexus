@@ -10,7 +10,6 @@
 // fallbackFn: none (route-level per-source error isolation handles gaps)
 // ─────────────────────────────────────────────────────────────
 
-import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '../../types'
 import { TTL } from '../../types'
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
 
@@ -200,59 +199,3 @@ export async function discoverBitgetTokens(limitPerChain = 25): Promise<MemeAlph
   return out
 }
 
-// ── Module ─────────────────────────────────────────────────────
-
-const bitgetMemeModule: DataModule = {
-  id: MODULE_ID,
-  name: 'Bitget Wallet Meme Alpha',
-  category: 'defi',
-  sourceType: 'public-api',
-  provenance: {
-    describesItself:
-      'New-token discovery + honeypot audit from Bitget Wallet token markets (topRank hotpicks + per-token security base info).',
-    upstreamProduct: 'Bitget Wallet Token Markets',
-    discoveredVia: 'docs',
-    fragility: 'moderate',
-    lastVerified: '2026-08-28',
-    toleratesAbsence: true,
-  },
-
-  isEnabled: () => true,
-
-  async healthCheck(): Promise<ModuleHealth> {
-    try {
-      await bitgetPost<{ code?: unknown }>('/topRank/detail', { name: 'hotpicks', chain: 'BSC', limit: 1 })
-      return { status: 'active', lastChecked: new Date(), lastSuccess: new Date(), failureCount: 0 }
-    } catch (err) {
-      return {
-        status: 'degraded',
-        lastChecked: new Date(),
-        failureCount: 1,
-        notes: err instanceof Error ? err.message : 'bitget meme endpoint unreachable',
-      }
-    }
-  },
-
-  async fetch<T>(_params: FetchParams): Promise<ModuleResult<T>> {
-    const tokens = await discoverBitgetTokens()
-    return {
-      data: tokens as unknown as T,
-      source: MODULE_ID,
-      cached: false,
-      timestamp: Date.now(),
-      ttl: BITGET_TTL,
-    }
-  },
-
-  async fallbackFn<T>(_params: FetchParams): Promise<ModuleResult<T>> {
-    return {
-      data: [] as unknown as T,
-      source: 'bitget-meme (fallback)',
-      cached: true,
-      timestamp: Date.now(),
-      ttl: BITGET_TTL,
-    }
-  },
-}
-
-export default bitgetMemeModule
