@@ -6,9 +6,9 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Coins, Building2, Zap, Bell,
   ChevronLeft, ChevronRight, ChevronDown, Globe,
-  TrendingUp, BarChart3, Activity, Shield, Radio, Eye,
-  Menu, X, Target, DollarSign, Package, Calendar,
-  Cloud, GitCompare, PieChart, Users, ArrowUpDown,
+  TrendingUp, BarChart3, Activity, Shield, Radio, Eye, Flame,
+  Menu, X, Target, DollarSign, Package,
+  Cloud, GitCompare, PieChart, Users,
   Newspaper, Gauge, Code,
 } from 'lucide-react'
 import { LiveDot } from '../primitives/LiveDot'
@@ -108,6 +108,15 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Leaderboard', href: '/copy-trading', icon: Users, description: 'Top copy-trading leaders.' },
       { label: 'Performance', href: '/copy-trading/performance', icon: Users, description: 'Copy-trading performance view.' },
+    ],
+  },
+  {
+    title: 'Meme',
+    items: [
+      { label: 'Meme Alpha', href: '/meme', icon: Flame, description: 'Meme-token discovery & risk audit.' },
+      { label: 'Leaderboard', href: '/meme/leaderboard', icon: Flame, description: 'Ranked meme-token discovery feed.' },
+      { label: 'Risk Audit', href: '/meme/risk', icon: Shield, description: 'Honeypot / rug-pull risk audit.' },
+      { label: 'Launch Alpha', href: '/meme/launch-alpha', icon: Flame, description: 'Recently launched meme tokens.' },
     ],
   },
   {

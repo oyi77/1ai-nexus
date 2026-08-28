@@ -2,35 +2,40 @@
 // Module: Bitget Wallet — Meme Alpha (new-token discovery + honeypot audit)
 // sourceType: public-api
 // upstreamProduct: Bitget Wallet Token Markets / token security audit
-// endpoint: https://www.bitget.com/bgw-pro/market/v3/  (POST, action in body)
+// endpoint: https://bopenapi.bgwapi.io/bgw-pro/market/v3  (POST, HMAC-SHA256 signed)
 // discoveredVia: docs
 // lastVerified: 2026-08-28
-// Official docs: Bitget Wallet Markets API. No API key required for the
-// public market endpoints (rate-limited; space requests out).
+// Auth: REQUIRED. Market endpoints require x-api-key + x-api-timestamp +
+//   x-api-signature (HMAC-SHA256 over sorted JSON content, base64 encoded).
+//   No public/unauthenticated access exists. Apply at https://portal-webbitget.com.
+//   Set BITGET_WALLET_API_KEY + BITGET_WALLET_SECRET_KEY env to enable.
+//   Without credentials the module throws — route error-isolates it.
 // fallbackFn: none (route-level per-source error isolation handles gaps)
 // ─────────────────────────────────────────────────────────────
 
-import { TTL } from '../../types'
+import crypto from 'node:crypto'
+
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
 
-const MODULE_ID = 'bitget-meme'
-const BITGET_TTL = TTL.TOKEN_DATA * 3 // 60s × 3 = 180s
 
-const BITGET_BASE = 'https://www.bitget.com/bgw-pro/market/v3'
+const BITGET_BASE = 'https://bopenapi.bgwapi.io/bgw-pro/market/v3'
 
 // Chain ids Bitget Wallet uses for meme tokens (BSC / ETH / Base / Solana).
-// Discovery endpoints accept a `chain` filter; we query the busiest chains.
 const DISCOVERY_CHAINS = ['BSC', 'ETH', 'BASE', 'SOL']
 
-const BITGET_HEADERS = {
-  'User-Agent':
-    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-  Accept: 'application/json, text/plain, */*',
-  'Content-Type': 'application/json',
-  'x-site-info': '0',
-  'x-locale': 'en_US',
-  Referer: 'https://web3.bitget.com/',
-} as const
+const API_KEY = process.env.BITGET_WALLET_API_KEY ?? ''
+const API_SECRET = process.env.BITGET_WALLET_SECRET_KEY ?? ''
+
+function bitgetKey(): string {
+  if (!API_KEY) throw new Error('BITGET_WALLET_API_KEY not set')
+  if (!API_SECRET) throw new Error('BITGET_WALLET_SECRET_KEY not set')
+  return API_KEY
+}
+
+function bitgetSecret(): string {
+  if (!API_SECRET) throw new Error('BITGET_WALLET_SECRET_KEY not set')
+  return API_SECRET
+}
 
 // ── Raw payload shapes (Bitget Wallet Markets API) ──────────────
 
@@ -70,6 +75,44 @@ interface BitgetTopRankEnvelope {
   msg?: string
 }
 
+// ── Signing ────────────────────────────────────────────────────
+// Verified against official Bitget Wallet auth docs (web3.bitget.com/en/docs/authentication):
+//   content = sorted JSON { apiPath, body, x-api-key, x-api-timestamp, <query params> }
+//   signature = base64(HMAC-SHA256(secret, content))
+
+function signRequest(path: string, bodyStr: string, queryParams: Record<string, string> = {}): {
+  headers: Record<string, string>
+} {
+  const ts = String(Date.now())
+  const content: Record<string, string> = {
+    apiPath: path,
+    body: bodyStr,
+    'x-api-key': bitgetKey(),
+    'x-api-timestamp': ts,
+    ...queryParams,
+  }
+  // Sort keys alphabetically (matches Go SDK json.Marshal behavior)
+  const sorted: Record<string, string> = {}
+  for (const key of Object.keys(content).sort()) {
+    sorted[key] = content[key]
+  }
+  const contentStr = JSON.stringify(sorted)
+  const signature = crypto
+    .createHmac('sha256', bitgetSecret())
+    .update(contentStr, 'utf8')
+    .digest('base64')
+  return {
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'x-api-key': bitgetKey(),
+      'x-api-timestamp': ts,
+      'x-api-signature': signature,
+      'x-locale': 'en_US',
+    },
+  }
+}
+
 // ── Normalizers ────────────────────────────────────────────────
 
 function toNum(v: unknown, fallback = 0): number {
@@ -84,11 +127,19 @@ function bailOnError(code: unknown, msg?: string): void {
   }
 }
 
-async function bitgetPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
-  const res = await fetch(`${BITGET_BASE}${path}`, {
+async function bitgetPost<T>(
+  path: string,
+  body: Record<string, unknown>,
+  queryParams: Record<string, string> = {},
+): Promise<T> {
+  const bodyStr = JSON.stringify(body)
+  const { headers } = signRequest(path, bodyStr, queryParams)
+  const qs = new URLSearchParams(queryParams).toString()
+  const url = `${BITGET_BASE}${path}${qs ? `?${qs}` : ''}`
+  const res = await fetch(url, {
     method: 'POST',
-    headers: BITGET_HEADERS,
-    body: JSON.stringify(body),
+    headers,
+    body: bodyStr,
     signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error(`Bitget ${res.status}: ${path}`)
@@ -198,4 +249,3 @@ export async function discoverBitgetTokens(limitPerChain = 25): Promise<MemeAlph
   }
   return out
 }
-

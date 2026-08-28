@@ -78,7 +78,7 @@ function makeDiscoveryModule(
     async fetch<T>(_params: FetchParams): Promise<ModuleResult<T>> {
       const tokens = await discover()
       return {
-        data: tokens as unknown as T,
+        data: { tokens, total: tokens.length } as unknown as T,
         source: id,
         cached: false,
         timestamp: Date.now(),

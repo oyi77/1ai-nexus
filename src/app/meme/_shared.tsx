@@ -1,5 +1,5 @@
 import type { Column } from "@/components/shell/DataTable";
-import type { MemeAlphaToken } from "@/lib/modules/meme/types";
+import type { MemeAlphaToken, MemeRiskAudit } from "@/lib/modules/meme/types";
 import { PriceTag } from "@/components/primitives/PriceTag";
 
 export const MEME_PLATFORMS = ["all", "bitget", "gate", "botx"] as const;
@@ -157,4 +157,24 @@ export const memeColumns: Column<MemeAlphaToken>[] = [
       </span>
     ),
   },
+];
+
+export const riskColumns: Column<MemeRiskAudit>[] = [
+  { key: "symbol", header: "Token", width: 160, accessor: (r) => r.symbol, render: (r) => (
+    <span className="font-medium text-text">{r.symbol}</span>
+  ) },
+  { key: "platform", header: "Platform", width: 90, accessor: (r) => r.platform },
+  { key: "chain", header: "Chain", width: 80, accessor: (r) => r.chain },
+  { key: "riskLabel", header: "Risk", width: 90, accessor: (r) => r.riskLabel, render: (r) => (
+    <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${riskClass(r.riskLevel)}`}>{r.riskLabel.toUpperCase()}</span>
+  ) },
+  { key: "top10HolderPercent", header: "Top10 %", width: 90, align: "right", accessor: (r) => r.top10HolderPercent, render: (r) => `${r.top10HolderPercent?.toFixed(1) ?? "—"}%` },
+  { key: "lpLockedPercent", header: "LP Locked %", width: 110, align: "right", accessor: (r) => r.lpLockedPercent, render: (r) => `${r.lpLockedPercent?.toFixed(1) ?? "—"}%` },
+  { key: "buyTax", header: "Buy Tax %", width: 90, align: "right", accessor: (r) => r.buyTax, render: (r) => `${r.buyTax?.toFixed(2) ?? "—"}%` },
+  { key: "sellTax", header: "Sell Tax %", width: 90, align: "right", accessor: (r) => r.sellTax, render: (r) => `${r.sellTax?.toFixed(2) ?? "—"}%` },
+  { key: "flags", header: "Flags", width: 120, render: (r) => (
+    <span className="text-text-muted text-xs">
+      {[r.canFreeze && "Freeze", r.canMint && "Mint"].filter(Boolean).join(" · ") || "—"}
+    </span>
+  ) },
 ];
