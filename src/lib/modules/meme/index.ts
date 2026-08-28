@@ -22,10 +22,10 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '@/lib/modules/types'
-import { discoverBitgetTokens } from './bitget'
-import { discoverGateTokens } from './gate'
+import { discoverBitgetTokens, auditBitgetToken } from './bitget'
+import { discoverGateTokens, auditGateToken } from './gate'
 import { discoverMobyTokens } from './moby'
-import { MEME_PLATFORMS, type MemePlatform } from './types'
+import { MEME_PLATFORMS, type MemePlatform, type MemeRiskAudit } from './types'
 
 const MEME_TTL = 180_000 // 3m — mirrors the bitget/gate discovery cadence
 
@@ -96,6 +96,67 @@ function makeDiscoveryModule(
   }
 }
 
+function makeAuditModule(
+  id: string,
+  name: string,
+  audit: (chain: string, contract: string) => Promise<MemeRiskAudit | null>,
+): DataModule {
+  return {
+    id,
+    name,
+    category: 'defi',
+    sourceType: 'public-api',
+    provenance: {
+      describesItself: `${name} — meme token honeypot/rug risk audit.`,
+      upstreamProduct: name,
+      discoveredVia: 'docs',
+      fragility: 'moderate',
+      lastVerified: '2026-08-28',
+      toleratesAbsence: true,
+    },
+    isEnabled: () => true,
+    async healthCheck(): Promise<ModuleHealth> {
+      if (typeof audit !== 'function') {
+        return {
+          status: 'degraded',
+          lastChecked: new Date(),
+          failureCount: 1,
+          notes: `${id} audit fn is not callable`,
+        }
+      }
+      return { status: 'active', lastChecked: new Date(), lastSuccess: new Date(), failureCount: 0 }
+    },
+    async fetch<T>(params: FetchParams): Promise<ModuleResult<T>> {
+      const chain = (params.chain as string) ?? ''
+      const contract = (params.contract as string) ?? ''
+      const result = await audit(chain, contract)
+      return {
+        data: (result ? [result] : []) as unknown as T,
+        source: id,
+        cached: false,
+        timestamp: Date.now(),
+        ttl: MEME_TTL,
+      }
+    },
+    async fallbackFn<T>(_params: FetchParams): Promise<ModuleResult<T>> {
+      return {
+        data: [] as unknown as T,
+        source: `${id} (fallback)`,
+        cached: true,
+        timestamp: Date.now(),
+        ttl: MEME_TTL,
+      }
+    },
+  }
+}
+
+const bitgetAudit = makeAuditModule('bitget-meme-risk', 'Bitget Wallet Meme Risk Audit', (c, k) =>
+  auditBitgetToken(c, k),
+)
+const gateAudit = makeAuditModule('gate-meme-risk', 'Gate.io DEX Meme Risk Audit', (c, k) =>
+  auditGateToken(c, k),
+)
+
 const bitgetDiscovery = makeDiscoveryModule('bitget-meme', 'Bitget Wallet Meme Alpha', () =>
   discoverBitgetTokens(),
 )
@@ -111,6 +172,7 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     platform: 'bitget',
     displayName: 'Bitget Wallet',
     discoveryModule: bitgetDiscovery,
+    auditModule: bitgetAudit,
     ttlMs: MEME_TTL,
     enabled: true,
   },
@@ -118,6 +180,7 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     platform: 'gate',
     displayName: 'Gate.io DEX',
     discoveryModule: gateDiscovery,
+    auditModule: gateAudit,
     ttlMs: MEME_TTL,
     enabled: true,
   },
