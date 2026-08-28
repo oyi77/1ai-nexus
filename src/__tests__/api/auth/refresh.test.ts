@@ -32,6 +32,8 @@ describe('POST /api/v1/auth/refresh', () => {
    planStartedAt: null,
    planExpiresAt: null,
    stripeCustomerId: null,
+   level: 1,
+   xp: 0,
    apiUsageCount: 0,
    lastApiUsageReset: new Date(),
    createdAt: new Date(),

@@ -25,7 +25,7 @@ import type { DataModule, FetchParams, ModuleResult, ModuleHealth } from '@/lib/
 import { discoverBitgetTokens, auditBitgetToken } from './bitget'
 import { discoverGateTokens, auditGateToken } from './gate'
 import { discoverBotXTokens, auditBotXToken } from './botx'
-import { discoverMobyTokens } from './moby'
+import { discoverDexScreenerTokens } from './dexscreener'
 import { MEME_PLATFORMS, type MemePlatform, type MemeRiskAudit } from './types'
 
 const MEME_TTL = 180_000 // 3m — mirrors the bitget/gate discovery cadence
@@ -164,14 +164,11 @@ const bitgetDiscovery = makeDiscoveryModule('bitget-meme', 'Bitget Wallet Meme A
 const gateDiscovery = makeDiscoveryModule('gate-meme', 'Gate.io DEX Meme Alpha', () =>
   discoverGateTokens(),
 )
-const mobyDiscovery = makeDiscoveryModule('moby-meme', 'Moby Meme Alpha (pending RE)', () =>
-  discoverMobyTokens(),
-)
 const botxDiscovery = makeDiscoveryModule('botx-meme', 'BotX Meme Alpha', () =>
   discoverBotXTokens(),
 )
-const botxAudit = makeAuditModule('botx-meme-risk', 'BotX Meme Risk Audit', (c, k) =>
-  auditBotXToken(c, k),
+const dexscreenerDiscovery = makeDiscoveryModule('dexscreener-meme', 'DEX Screener Meme Alpha', () =>
+  discoverDexScreenerTokens(),
 )
 
 const registry: Record<MemePlatform, MemePlatformEntry> = {
@@ -195,20 +192,25 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     platform: 'botx',
     displayName: 'BotX',
     discoveryModule: botxDiscovery,
-    auditModule: botxAudit,
+    auditModule: makeAuditModule('botx-meme-risk', 'BotX Meme Risk Audit', (c, k) =>
+      auditBotXToken(c, k),
+    ),
     ttlMs: MEME_TTL,
     enabled: true,
   },
-  // Moby module present but DISABLED: its discovery throws
-  // (MobyNotImplemented) until the APK reverse-engineering lands. The
-  // route only fetches enabled platforms, so it never reaches the
-  // throwing stub. Registered so pages/APIs can enumerate it.
   moby: {
     platform: 'moby',
     displayName: 'Moby (pending RE)',
-    discoveryModule: mobyDiscovery,
+    discoveryModule: makeDiscoveryModule('moby-meme', 'Moby Meme Alpha (pending RE)', () => Promise.resolve([])),
     ttlMs: MEME_TTL,
     enabled: false,
+  },
+  dexscreener: {
+    platform: 'dexscreener',
+    displayName: 'DEX Screener',
+    discoveryModule: dexscreenerDiscovery,
+    ttlMs: MEME_TTL,
+    enabled: true,
   },
 }
 
@@ -237,7 +239,7 @@ export function getEnabledPlatforms(): MemePlatform[] {
 }
 
 /**
- * Normalize the `platform` query param. Accepts all|bitget|gate|moby
+ * Normalize the `platform` query param. Accepts all|bitget|gate|moby|dexscreener
  * (case-insensitive). Non-matching values fall back to 'all'.
  */
 export function normalizeMemePlatformParam(param: string | null): MemePlatform | 'all' {

@@ -58,7 +58,7 @@ describe('Middleware JWT Integration', () => {
       })
 
       // Verify token can be decoded
-      const decoded = mockJwt.verify(token, JWT_SECRET) as { userId: string; email: string; role: string; plan: string }
+      const decoded = mockJwt.verify(token) as { userId: string; email: string; role: string; plan: string }
       expect(decoded.userId).toBe(userId)
       expect(decoded.email).toBe(email)
       expect(decoded.role).toBe(role)
@@ -69,7 +69,7 @@ describe('Middleware JWT Integration', () => {
       const invalidToken = 'invalid.token.here'
       
       expect(() => {
-        mockJwt.verify(invalidToken, JWT_SECRET)
+        mockJwt.verify(invalidToken)
       }).toThrow()
     })
 
@@ -81,7 +81,7 @@ describe('Middleware JWT Integration', () => {
       )
 
       expect(() => {
-        mockJwt.verify(token, JWT_SECRET)
+        mockJwt.verify(token)
       }).toThrow('jwt expired')
     })
   })
