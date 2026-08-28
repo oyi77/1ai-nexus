@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
-import { MacroCommandCenterContent } from '../macro/page'
-import { NewsFeedContent } from '../news-feed/page'
-import { CalendarPageContent } from '../calendar/page'
-import { CorrelationsPageContent } from '../correlations/page'
-import { IndonesiaMacroContent } from '../indonesia-macro/page'
+import { MacroCommandCenterContent } from '../macro/content'
+import { NewsFeedContent } from '../news-feed/content'
+import { CalendarPageContent } from '../calendar/content'
+import { CorrelationsPageContent } from '../correlations/content'
+import { IndonesiaMacroContent } from '../indonesia-macro/content'
 
 const TABS = [
   { key: 'macro', label: '🏛 Macro', content: MacroCommandCenterContent },

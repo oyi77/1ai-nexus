@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
-import { AlphaEnginePageContent } from '../alpha-engine/page'
-import { PredictionMarketsPageContent } from '../prediction-markets/page'
-import { PredictionsPageContent } from '../predictions/page'
+import { AlphaEnginePageContent } from '../alpha-engine/content'
+import { PredictionMarketsPageContent } from '../prediction-markets/content'
+import { PredictionsPageContent } from '../predictions/content'
 
 const TABS = [
   { key: 'alpha', label: '🧠 Alpha Engine', content: AlphaEnginePageContent },

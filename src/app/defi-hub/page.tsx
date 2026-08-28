@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
-import { DeFiPageContent } from '../defi/page'
+import { DeFiPageContent } from '../defi/content'
 import { YieldsPageContent } from '../yields/content'
 import { SectorsPageContent } from '../sectors/content'
-import { RevenuePageContent } from '../revenue/page'
+import { RevenuePageContent } from '../revenue/content'
 
 const TABS = [
   { key: 'defi', label: '🏦 DeFi Overview', content: DeFiPageContent },

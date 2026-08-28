@@ -4,9 +4,9 @@ import { useState } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { WhaleClusterPageContent } from '../whale-cluster/content'
 import { SmartMoneyPageContent } from '../smart-money/content'
-import { EntitiesPageContent } from '../entities/page'
-import { MempoolPageContent } from '../mempool/page'
-import { InsiderPageContent } from '../insider/page'
+import { EntitiesPageContent } from '../entities/content'
+import { MempoolPageContent } from '../mempool/content'
+import { InsiderPageContent } from '../insider/content'
 
 const TABS = [
   { key: 'whale', label: '🐋 Whale Alerts', content: WhaleClusterPageContent },
