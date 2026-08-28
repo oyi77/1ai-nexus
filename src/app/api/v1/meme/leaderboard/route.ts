@@ -18,6 +18,7 @@ import {
   normalizeMemePlatformParam,
   type MemePlatform,
 } from '@/lib/modules/meme'
+import { sortByMetrics } from '@/lib/modules/meme/ranking'
 import type { MemeAlphaToken, MemeDiscoveryResponse } from '@/lib/modules/meme/types'
 
 type PlatformStatus = { ok: boolean; error?: string }
@@ -39,15 +40,6 @@ async function fetchPlatform(platform: MemePlatform, limit: number): Promise<Pla
   }
 }
 
-function sortByMetrics(tokens: MemeAlphaToken[]): MemeAlphaToken[] {
-  // Rank by a composite of volume + momentum (desc). Mirrors the shared
-  // MemeAlphaToken shape: volume24h, change24h, marketCap, liquidity.
-  return [...tokens].sort((a, b) => {
-    const score = (t: MemeAlphaToken) =>
-      (t.volume24h ?? 0) / 1e6 + (t.marketCap ?? 0) / 1e9 + (t.change24h ?? 0)
-    return score(b) - score(a)
-  })
-}
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
