@@ -281,4 +281,42 @@ describe('User Model Tests', () => {
       expect(enterpriseUser.role).toBe(UserRole.enterprise);
     });
   });
+
+
+describe('Gamification Model', () => {
+  it('should create user with default xp=0 and level=1', async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: 'test-user-gamify@example.com',
+        passwordHash: 'test-hash',
+      },
+    });
+
+    expect(user.xp).toBe(0);
+    expect(user.level).toBe(1);
+  });
+
+  it('should enforce unique (userId, action, refId) on UserEvent', async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: 'test-user-event@example.com',
+        passwordHash: 'test-hash',
+      },
+    });
+
+    const base = { userId: user.id, action: 'DAILY_STREAK', refId: '2026-08-27' };
+
+    const first = await prisma.userEvent.create({
+      data: { ...base, xpDelta: 15 },
+    });
+
+    await expect(
+      prisma.userEvent.create({ data: { ...base, xpDelta: 15 } })
+    ).rejects.toThrow();
+
+    const rows = await prisma.userEvent.findMany({ where: { userId: user.id, action: base.action, refId: base.refId } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe(first.id);
+  });
+});
 });

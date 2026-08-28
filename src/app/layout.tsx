@@ -2,6 +2,11 @@ import type { Metadata, Viewport } from "next";
 import { Inter, IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 import { CsrfProvider } from "@/components/CsrfProvider"
+import { cookies } from "next/headers";
+import { verifyToken } from "@/lib/jwt";
+import { prisma } from "@/lib/db";
+import { UserProvider, type CurrentUser } from "@/lib/user-context";
+import { computeTier } from "@/lib/gamification-tier";
 import "./globals.css";
 
 const inter = Inter({
@@ -54,11 +59,30 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  let userData: CurrentUser | null = null;
+  const token = (await cookies()).get("nexus-session")?.value;
+  if (token) {
+    const session = await verifyToken(token);
+    if (session?.userId) {
+      const u = await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: { xp: true, level: true, plan: true },
+      });
+      if (u) {
+        userData = {
+          xp: u.xp,
+          level: u.level,
+          plan: u.plan ? String(u.plan) : null,
+          tier: computeTier(u.xp).tier,
+        };
+      }
+    }
+  }
   return (
     <html
       className={`${inter.variable} ${ibmPlexMono.variable} ${spaceGrotesk.variable} dark h-full antialiased`}
@@ -72,7 +96,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-bg-base text-text-primary font-sans">
         <CsrfProvider>
           <ErrorBoundary>
-            {children}
+            <UserProvider user={userData}>{children}</UserProvider>
           </ErrorBoundary>
         </CsrfProvider>
         <script
