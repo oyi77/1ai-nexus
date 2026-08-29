@@ -12,7 +12,7 @@ const CARDS: MemeCard[] = [
   {
     title: "Launch Alpha",
     href: "/meme/launch-alpha",
-    desc: "Recently launched meme tokens across Bitget Wallet and Gate.io DEX, sorted by listing time.",
+    desc: "Recently launched meme tokens across Bitget Wallet, Gate.io DEX, BotX, and DEX Screener, sorted by listing time.",
   },
   {
     title: "Leaderboard",
@@ -24,7 +24,7 @@ const CARDS: MemeCard[] = [
     href: "/meme/risk",
     desc: "Run a honeypot / rug-pull risk audit on any token contract: taxes, top-10 hold, LP lock, freeze/mint flags.",
   },
-];
+]
 
 export function MemeIndexPageContent() {
   return (

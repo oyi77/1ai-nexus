@@ -2,7 +2,7 @@ import type { Column } from "@/components/shell/DataTable";
 import type { MemeAlphaToken, MemeRiskAudit } from "@/lib/modules/meme/types";
 import { PriceTag } from "@/components/primitives/PriceTag";
 
-export const MEME_PLATFORMS = ["all", "bitget", "gate", "botx"] as const;
+export const MEME_PLATFORMS = ["all", "bitget", "gate", "botx", "dexscreener", "moby"] as const;
 export type MemePlatformFilter = (typeof MEME_PLATFORMS)[number];
 
 export function fmtUsd(n: number): string {
