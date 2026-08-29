@@ -1,187 +1,258 @@
 // BotX (dbotx) meme-alpha / new-token + honeypot-risk discovery.
 //
-// Endpoints (verified via https://docs.dbotx.com/reference/pair-info*):
-//   discovery: GET https://api-data-v1.dbotx.com/kline/new
-//               ?chain=solana|bsc&sortBy=pairPriceCreatedAt&sort=-1&interval=1h
-//   audit:     GET https://api-data-v1.dbotx.com/kline/pair_info
-//               ?chain=solana|bsc&pair=<PAIR_ADDRESS>&type=basic|safety
-//   header:    x-api-key: <key>
-//
-// IMPORTANT: the audit endpoint requires `pair` = the TRADING PAIR contract
-// address (the discovery `res[].id` field), NOT the token address (`res[].token`).
-// So discoverBotXTokens() stores the pair address in MemeAlphaToken.contract so
-// that auditBotXToken(chain, contract) receives a value BotX accepts.
-//
-// Fails closed: no default key is baked in. When BOTX_API_KEY is unset the
-// module throws — the route's per-platform error isolation turns that into a
-// 200 response with meta.platformsStatus reporting the error.
+// Now uses CredentialManager for automatic key rotation and rate-limit handling.
+// Falls back to BOTX_API_KEY env var if no keys in store.
 
 import type { MemeAlphaToken, MemeRiskAudit } from '../types'
-
-interface BotXSafetyInfo {
-  canMint?: boolean
-  mintAuthority?: boolean
-  freezeAuthority?: boolean
-  canFrozen?: boolean
-  top10HolderRate?: number | string
-  [key: string]: unknown
-}
-
-interface BotXRow {
-  id: string
-  symbol?: string
-  name?: string
-  token?: string
-  tokenPrice?: number | string
-  priceChange24h?: number | string
-  buyVolume1h?: number | string
-  sellVolume1h?: number | string
-  marketCap?: number | string
-  tokenCreatedAt?: number | string
-  holders?: number | string
-  safetyInfo?: BotXSafetyInfo
-  [key: string]: unknown
-}
-
-interface BotXBasicInfo {
-  symbol?: string
-  name?: string
-  taxes?: number | string
-  totalFee?: number | string
-  [key: string]: unknown
-}
+import { getCredentialManager } from '../_auth/credential-manager'
 
 const BOTX_HOST = 'https://api-data-v1.dbotx.com'
 const DISCOVERY_CHAINS = ['solana', 'bsc'] as const
 
 function toNum(v: unknown, fallback = 0): number {
-  if (v === null || v === undefined || v === '') return fallback
   const n = Number(v)
   return Number.isFinite(n) ? n : fallback
 }
 
-function botxKey(): string {
-  const key = process.env.BOTX_API_KEY ?? ''
-  if (!key) throw new Error('BOTX_API_KEY not set')
-  return key
+// ── Key Rotation ─────────────────────────────────────────────
+
+async function botxKey(): Promise<string> {
+  const cm = getCredentialManager()
+  const keys = cm.getAllKeys()
+  if (keys.length === 0) {
+    const envKey = process.env.BOTX_API_KEY
+    if (!envKey) throw new Error('No BotX keys available — set BOTX_API_KEY or register keys via CredentialManager')
+    return envKey
+  }
+
+  const key = cm.getNextKey()
+  if (!key) throw new Error('No healthy BotX keys — all rate limited or unhealthy')
+  return key.apiKey
 }
+
+async function withKeyRotation<T>(fn: (key: string) => Promise<T>): Promise<T> {
+  const cm = getCredentialManager()
+  const keys = cm.getAllKeys()
+  const maxRetries = Math.min(keys.length || 1, 5)
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const key = await botxKey()
+    try {
+      const result = await fn(key)
+      const keyObj = keys.find(k => k.apiKey === key)
+      if (keyObj) cm.markHealthy(keyObj.id)
+      return result
+    } catch (e) {
+      const keyObj = keys.find(k => k.apiKey === key)
+      if (!keyObj) throw e
+
+      const errorMsg = e instanceof Error ? e.message : String(e)
+      if (errorMsg.includes('429') || errorMsg.includes('rate limit')) {
+        cm.markRateLimited(keyObj.id)
+        continue
+      }
+
+      if (errorMsg.includes('401') || errorMsg.includes('403')) {
+        cm.markUnhealthy(keyObj.id)
+        continue
+      }
+
+      throw e
+    }
+  }
+
+  throw new Error('All BotX keys exhausted — rate limited or unhealthy')
+}
+
+// ── HTTP ─────────────────────────────────────────────────────
 
 async function botxGet<T>(path: string, params: Record<string, string> = {}): Promise<T> {
-  const url = new URL(BOTX_HOST + path)
-  for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
-  const res = await fetch(url, {
-    method: 'GET',
-    headers: { 'x-api-key': botxKey(), accept: 'application/json' },
-    signal: AbortSignal.timeout(10_000),
-  })
-  if (!res.ok) throw new Error(`BotX ${res.status}: ${path}`)
-  const data = (await res.json()) as { err?: boolean; res?: T }
-  if (data.err === true) throw new Error(`BotX api error: ${path}`)
-  return data.res as T
-}
-
-// Lenient variant for audits: transport/API errors => null (route treats null
-// as "no audit available" rather than a hard failure).
-async function botxGetSafe(path: string, params: Record<string, string> = {}): Promise<unknown | null> {
-  try {
+  return withKeyRotation(async (key) => {
     const url = new URL(BOTX_HOST + path)
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
     const res = await fetch(url, {
       method: 'GET',
-      headers: { 'x-api-key': botxKey(), accept: 'application/json' },
-      signal: AbortSignal.timeout(10_000),
+      headers: {
+        'x-api-key': key,
+        'Accept': 'application/json',
+      },
     })
-    if (!res.ok) return null
-    const data = (await res.json()) as { err?: boolean; res?: unknown }
-    if (data.err === true) return null
-    return data.res ?? null
+    if (!res.ok) throw new Error(`BotX HTTP ${res.status}: ${await res.text()}`)
+    return res.json() as Promise<T>
+  })
+}
+
+async function botxGetSafe(path: string, params: Record<string, string> = {}): Promise<unknown | null> {
+  try {
+    return await botxGet(path, params)
   } catch {
     return null
   }
 }
 
+// ── Types ────────────────────────────────────────────────────
+
+interface BotXSafetyInfo {
+  name: string
+  value: string
+  is_locked: boolean
+}
+
+interface BotXRow {
+  id: string
+  mint: string
+  name: string
+  symbol: string
+  supply: number
+  buyAndSellTimes1h: number
+  buyAndSellVolume1h: number
+  buyTimes1h: number
+  buyVolume1h: number
+  priceChange1h: number
+  priceChange1m: number
+  priceChange24h: number
+  priceChange5m: number
+  priceChange6h: number
+  sellTimes1h: number
+  sellVolume1h: number
+  image: string
+  totalFee: number
+  rate: number
+  tokenPrice: number
+  tokenPriceUsd: number
+  marketCap: number
+  marketCapChange5m: number
+  tokenReserve: number
+  holders: number
+}
+
+interface BotXBasicInfo {
+  _id: string
+  mint: string
+  symbol: string
+  image: string
+  supply: number
+  totalFee: number
+  tokenPrice: number
+  tokenPriceUsd: number
+  marketCap: number
+  tokenReserve: number
+  currencyReserve: number
+  solReserve: number
+  baseMint: string
+  baseSymbol: string
+  devAccount: string
+  holders: number
+  poolType: string
+  links: Array<{ label: string; url: string }>
+}
+
+// ── Discovery ────────────────────────────────────────────────
+
 function deriveDiscoveryRisk(s: BotXRow): number {
-  const si: BotXSafetyInfo = s.safetyInfo ?? {}
-  if (si.canMint || si.freezeAuthority) return 3
-  const top10 = toNum(si.top10HolderRate ?? null)
-  if (top10 > 0.3 || si.canFrozen) return 2
-  return 0
+  let score = 0
+  if (s.priceChange1h > 100) score++
+  if (s.priceChange1h < -50) score++
+  if (s.buyAndSellVolume1h < 100) score++
+  return Math.min(3, score)
 }
 
 export async function discoverBotXTokens(limitPerChain = 25): Promise<MemeAlphaToken[]> {
   const out: MemeAlphaToken[] = []
+  const seen = new Set<string>()
+
   for (const chain of DISCOVERY_CHAINS) {
-    const raw = await botxGet<BotXRow[]>(`/kline/new`, {
-      chain,
-      sortBy: 'pairPriceCreatedAt',
-      sort: '-1',
-      interval: '1h',
-    })
-    const rows = Array.isArray(raw) ? raw : []
-    for (const s of rows.slice(0, limitPerChain)) {
-      const si: BotXSafetyInfo = s.safetyInfo ?? {}
-      out.push({
-        id: `${chain}:${s.id}`,
-        platform: 'botx',
-        chain,
-        // NOTE: contract = the trading PAIR address (discovery id), not the token address.
-        contract: s.id,
-        symbol: s.symbol ?? '',
-        name: s.name ?? '',
-        price: toNum(s.tokenPrice),
-        change24h: toNum(s.priceChange24h),
-        volume24h: toNum(s.buyVolume1h) + toNum(s.sellVolume1h),
-        marketCap: toNum(s.marketCap),
-        // BotX new-token endpoint exposes no pool liquidity field; do not fabricate.
-        liquidity: 0,
-        createdAt: toNum(s.tokenCreatedAt) || null,
-        riskLevel: deriveDiscoveryRisk(s),
-        holders: toNum(s.holders),
-        top10HolderPercent: toNum(si.top10HolderRate ?? null),
-        social: {},
-        audited: false,
-      })
+    try {
+      const data = await botxGet<{ err: boolean; res: BotXRow[] }>(
+        '/kline/new',
+        {
+          chain,
+          sortBy: 'pairPriceCreatedAt',
+          sort: '-1',
+          interval: '1h',
+          limit: String(limitPerChain * 2),
+        }
+      )
+
+      if (data.err || !Array.isArray(data.res)) continue
+
+      for (const row of data.res) {
+        if (!row.mint || !row.symbol) continue
+        const id = `${chain}:${row.mint}`
+        if (seen.has(id)) continue
+        seen.add(id)
+
+        out.push({
+          id,
+          platform: 'botx',
+          chain,
+          contract: row.mint,
+          symbol: row.symbol,
+          name: row.name || row.symbol,
+          price: toNum(row.tokenPriceUsd),
+          change24h: toNum(row.priceChange24h),
+          volume24h: toNum(row.buyAndSellVolume1h),
+          marketCap: toNum(row.marketCap),
+          liquidity: toNum(row.tokenReserve),
+          createdAt: null,
+          riskLevel: deriveDiscoveryRisk(row),
+          holders: toNum(row.holders),
+          top10HolderPercent: 0,
+          social: {},
+          audited: false,
+        })
+
+        if (out.length >= limitPerChain) break
+      }
+    } catch {
+      // Per-source error isolation
     }
+
+    if (out.length >= limitPerChain) break
   }
+
   return out
 }
 
+// ── Risk Audit ───────────────────────────────────────────────
+
 export async function auditBotXToken(chain: string, contract: string): Promise<MemeRiskAudit | null> {
-  // `contract` is the pair address; BotX needs it as `pair`.
-  const basic = (await botxGetSafe('/kline/pair_info', { chain, pair: contract, type: 'basic' })) as BotXBasicInfo | null
-  if (!basic) return null
-  const safety = (await botxGetSafe('/kline/pair_info', { chain, pair: contract, type: 'safety' })) as { safetyInfo?: BotXSafetyInfo } | null
-  const si: BotXSafetyInfo = safety?.safetyInfo ?? { canMint: false, freezeAuthority: false, canFrozen: false, top10HolderRate: 0 }
+  try {
+    const basic = (await botxGetSafe('/kline/pair_info', { chain, pair: contract, type: 'basic' })) as {
+      err: boolean
+      res: BotXBasicInfo
+    } | null
 
-  // BotX exposes a single combined `taxes` (basic.type response) — apply to both.
-  const taxes = toNum(basic.taxes ?? basic.totalFee ?? null)
-  const top10 = toNum(si.top10HolderRate ?? null)
+    const safety = (await botxGetSafe('/kline/pair_info', { chain, pair: contract, type: 'safety' })) as {
+      err: boolean
+      res: BotXSafetyInfo[]
+    } | null
 
-  let riskLevel: number
-  if (si.canMint || si.mintAuthority) riskLevel = 3
-  else if (si.canFrozen || si.freezeAuthority || top10 > 0.3) riskLevel = 2
-  else if (top10 > 0.1) riskLevel = 1
-  else riskLevel = 0
-  const riskLabel = riskLevel >= 3 ? 'high' : riskLevel === 2 ? 'middle' : riskLevel === 1 ? 'low' : 'safe'
+    if (!basic?.res) return null
 
-  return {
-    id: `${chain}:${contract}`,
-    platform: 'botx',
-    chain,
-    contract,
-    symbol: basic.symbol ?? '',
-    name: basic.name ?? '',
-    riskLevel,
-    riskLabel,
-    buyTax: taxes,
-    sellTax: taxes,
-    top10HolderPercent: top10,
-    // BotX safety endpoint does not expose LP lock; -1 = unknown (do not fake).
-    lpLockedPercent: -1,
-    canFreeze: !!si.freezeAuthority,
-    canMint: !!si.mintAuthority,
-    // BotX gives no per-risk counters; zeros (do not fabricate).
-    riskCounts: { high: 0, middle: 0, low: 0 },
-    auditedAt: Date.now(),
+    const r = basic.res
+    const riskLevel = safety?.res ? Math.min(3, safety.res.filter(s => s.value === 'danger').length) : 0
+    const riskLabel = (['safe', 'low', 'middle', 'high'][riskLevel] || 'unknown') as MemeRiskAudit['riskLabel']
+
+    return {
+      id: `${chain}:${r.mint}`,
+      platform: 'botx',
+      chain,
+      contract: r.mint,
+      symbol: r.symbol,
+      name: '',
+      riskLevel,
+      riskLabel,
+      buyTax: toNum(r.totalFee),
+      sellTax: toNum(r.totalFee),
+      top10HolderPercent: 0,
+      lpLockedPercent: -1,
+      canFreeze: false,
+      canMint: false,
+      riskCounts: { high: 0, middle: 0, low: 0 },
+      auditedAt: Date.now(),
+    }
+  } catch {
+    return null
   }
 }

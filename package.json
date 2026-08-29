@@ -18,12 +18,15 @@
     "pm2:stop": "pm2 stop nexus-web nexus-ws nexus-indexer",
     "pm2:restart": "pm2 restart nexus-web nexus-ws nexus-indexer",
     "pm2:logs": "pm2 logs nexus-web nexus-ws nexus-indexer",
-    "start:ws": "cd ws-server && npx tsx server.ts",
-    "verify-re": "npx tsx src/scripts/verify-re-modules.ts",
+    "botx:register": "tsx src/scripts/botx-register.ts",
+    "botx:auto-rotate": "tsx src/scripts/botx-auto-rotate.ts",
+    "botx:health": "tsx src/scripts/botx-register.ts health",
     "harvest:crossex": "tsx src/scripts/crossex-harvest.ts",
     "harvest:idx-universe": "tsx src/scripts/idx-universe-harvest.ts",
     "harvest:idx-saham": "tsx src/scripts/idx-saham-harvest.ts",
-    "harvest:idx-fundamentals": "tsx src/scripts/idx-fundamentals-harvest.ts"
+    "harvest:idx-fundamentals": "tsx src/scripts/idx-fundamentals-harvest.ts",
+    "start:ws": "cd ws-server && npx tsx server.ts",
+    "verify-re": "npx tsx src/scripts/verify-re-modules.ts"
   },
   "dependencies": {
     "@1ai/payment": "file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",
@@ -78,7 +81,7 @@
     "@types/d3-drag": "^3.0.7",
     "@types/d3-force": "^3.0.10",
     "@types/d3-selection": "^3.0.11",
-    "@types/node": "^20",
+    "@types/node": "^22.20.1",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
