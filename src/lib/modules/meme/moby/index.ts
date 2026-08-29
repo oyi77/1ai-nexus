@@ -1,31 +1,39 @@
 // ─────────────────────────────────────────────────────────────
-// Module: Moby (moby.win) — Meme Alpha  [ PENDING APK REVERSE-ENGINEERING ]
+// Module: Moby (moby.win) — Meme Alpha  [ PENDING API KEY ]
 // sourceType: pending
 // upstreamProduct: Moby — smart-money meme screener (mobile-first, $MOBY)
-// status: DISABLED in meme registry until APK RE lands.
+// status: DISABLED — endpoints extracted from APK but API requires
+//   runtime X-API-KEY provisioned via Privy auth (not in APK).
 //
-// WHY PENDING (no fabricated endpoints):
-//   - Moby exposes no public REST SDK. The handoff directive is to
-//     "RE the apk". In this environment `apktool`/`jadx` are NOT
-//     installed and no Moby APK is present, so the real API base /
-//     new-token endpoint / honeypot endpoint / auth header are UNKNOWN.
-//   - Per engineering rules we do NOT invent endpoints. This module
-//     is a documented placeholder that enumerates exactly what the
-//     RE pass must extract, and it fails closed (throws) so it can
-//     never return fake data.
+// APK RE FINDINGS (v1.1.17, extracted /tmp/moby-re/base/):
+//   Base URL:  https://mobile-api.mobyscreener.com
+//   Auth:      X-API-KEY header (runtime-provisioned via Privy)
+//   Endpoints (from JS bundle /mobile/api_v1/):
+//     - /tokens/screener/leaderboard/?network=
+//     - /tokens/screener/groups/?network=
+//     - /tokens/screener/launchpads/?network=
+//     - /tokens/token/details?token_address=
+//     - /tokens/token/chart?token_address=
+//     - /tokens/token/holders/list?token_address=
+//     - /tokens/whalewatch/follows
+//     - /tokens/dca/global?
+//     - /tokens/signalsFeed
+//     - /tokens/clips/list?network=
+//     - /price-alerts/list, /price-alerts/create
+//     - /trigger-orders/list, /trigger-orders/create
+//     - /watchlist/list, /watchlist/add, /watchlist/remove
+//     - /wallet/transactions/list, /wallet/positions/list
+//     - /users/pnl-leaderboard/list?window=
+//     - /swap/v3/execute, /swap/v3/get-quote
+//     - /rewards/transactions, /rewards/claim-code
 //
-// RE PLAN (to enable this module):
-//   1. Obtain moby.win APK (apkcombo/apkpure or `adb pull` from device).
-//   2. `apt-get install -y apktool jadx` (or download static binaries).
-//   3. `apktool d moby.apk` → inspect AndroidManifest for exported
-//      network endpoints; `jadx -e moby.apk` → grep strings/Java for
-//      the API base, new-token listing route, risk/honeypot route,
-//      and any signature/auth header.
-//   4. Mirror src/lib/modules/meme/gate|bitget to implement:
-//        - discoverMobyTokens() → MemeAlphaToken[]
-//        - auditMobyToken(chain, address) → MemeRiskAudit | null
-//   5. Flip `isEnabled` to true, register in MEME_REGISTRY as
-//      enabled:true, delete this doc block.
+// UNBLOCK PATH:
+//   1. Obtain runtime API key via Moby app login (MITM proxy on device)
+//      OR find community-leaked key (Telegram/Discord/GitHub).
+//   2. Set MOBY_API_KEY env var.
+//   3. Implement discoverMobyTokens() / auditMobyToken() using the
+//      endpoints above (mirror gate/bitget patterns).
+//   4. Flip enabled:true in meme registry, delete this doc block.
 // ─────────────────────────────────────────────────────────────
 
 import { TTL } from '../../types'
@@ -36,7 +44,7 @@ const MOBY_TTL = TTL.TOKEN_DATA * 6
 
 class MobyNotImplemented extends Error {
   constructor() {
-    super('Moby meme module pending APK reverse-engineering — endpoints not yet extracted')
+    super('Moby meme module pending API key — endpoints extracted from APK but X-API-KEY required')
     this.name = 'MobyNotImplemented'
   }
 }
