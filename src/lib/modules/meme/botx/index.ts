@@ -92,12 +92,6 @@ async function botxGetSafe(path: string, params: Record<string, string> = {}): P
 
 // ── Types ────────────────────────────────────────────────────
 
-interface BotXSafetyInfo {
-  name: string
-  value: string
-  is_locked: boolean
-}
-
 interface BotXRow {
   id: string
   mint: string
@@ -123,7 +117,15 @@ interface BotXRow {
   marketCap: number
   marketCapChange5m: number
   tokenReserve: number
+  currencyReserve: number
+  solReserve: number
+  baseMint: string
+  baseSymbol: string
+  devAccount: string
   holders: number
+  poolType: string
+  devHoldPercent: number
+  links: Array<{ label: string; url: string }>
 }
 
 interface BotXBasicInfo {
@@ -144,6 +146,7 @@ interface BotXBasicInfo {
   devAccount: string
   holders: number
   poolType: string
+  devHoldPercent: number
   links: Array<{ label: string; url: string }>
 }
 
@@ -186,7 +189,7 @@ export async function discoverBotXTokens(limitPerChain = 25): Promise<MemeAlphaT
           id,
           platform: 'botx',
           chain,
-          contract: row.mint,
+          contract: row.id,  // Use pair address for audit (BotX requires pair, not mint)
           symbol: row.symbol,
           name: row.name || row.symbol,
           price: toNum(row.tokenPriceUsd),
@@ -225,13 +228,29 @@ export async function auditBotXToken(chain: string, contract: string): Promise<M
 
     const safety = (await botxGetSafe('/kline/pair_info', { chain, pair: contract, type: 'safety' })) as {
       err: boolean
-      res: BotXSafetyInfo[]
+      res: {
+        safetyInfo: {
+          canFrozen: boolean
+          freezeAuthority: boolean
+          canMint: boolean
+          mintAuthority: boolean
+          devPosition: string
+        }
+      }
     } | null
 
     if (!basic?.res) return null
 
     const r = basic.res
-    const riskLevel = safety?.res ? Math.min(3, safety.res.filter(s => s.value === 'danger').length) : 0
+    const si = safety?.res?.safetyInfo
+    
+    // Calculate risk level from safety info
+    let riskLevel = 0
+    if (si?.freezeAuthority) riskLevel++
+    if (si?.mintAuthority) riskLevel++
+    if (si?.devPosition === 'increased') riskLevel++
+    riskLevel = Math.min(3, riskLevel)
+    
     const riskLabel = (['safe', 'low', 'middle', 'high'][riskLevel] || 'unknown') as MemeRiskAudit['riskLabel']
 
     return {
@@ -245,10 +264,10 @@ export async function auditBotXToken(chain: string, contract: string): Promise<M
       riskLabel,
       buyTax: toNum(r.totalFee),
       sellTax: toNum(r.totalFee),
-      top10HolderPercent: 0,
+      top10HolderPercent: toNum(r.devHoldPercent),
       lpLockedPercent: -1,
-      canFreeze: false,
-      canMint: false,
+      canFreeze: si?.canFrozen ?? false,
+      canMint: si?.canMint ?? false,
       riskCounts: { high: 0, middle: 0, low: 0 },
       auditedAt: Date.now(),
     }
