@@ -20,6 +20,19 @@ export function scoreOf(t: MemeAlphaToken): number {
   return (t.volume24h ?? 0) / 1e6 + (t.marketCap ?? 0) / 1e9 + (t.change24h ?? 0)
 }
 
+/**
+ * Dedup tokens by chain:contract (platform-scoped id). Keeps the first
+ * occurrence (highest-ranked since input is pre-sorted by score).
+ */
+function dedup(tokens: MemeAlphaToken[]): MemeAlphaToken[] {
+  const seen = new Set<string>()
+  return tokens.filter((t) => {
+    if (seen.has(t.id)) return false
+    seen.add(t.id)
+    return true
+  })
+}
+
 export function sortByMetrics(tokens: MemeAlphaToken[]): MemeAlphaToken[] {
-  return [...tokens].sort((a, b) => scoreOf(b) - scoreOf(a))
+  return dedup([...tokens].sort((a, b) => scoreOf(b) - scoreOf(a)))
 }
