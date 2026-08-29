@@ -59,15 +59,22 @@ async function createMailTmAccount(domain: string): Promise<MailTmAccount & { pa
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ address, password }),
   })
-  if (!res.ok) throw new Error(`mail.tm create: HTTP ${res.status}`)
+  // 201 = created, 400 = already exists (try login), 429 = rate limited
+  if (res.status !== 201 && res.status !== 400) {
+    throw new Error(`mail.tm create: HTTP ${res.status}`)
+  }
 
   const loginRes = await fetch(`${MAIL_TM_BASE}/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ address, password }),
   })
-  if (!loginRes.ok) throw new Error(`mail.tm login: HTTP ${res.status}`)
+  // 200 = success, 201 = also accepted
+  if (loginRes.status !== 200 && loginRes.status !== 201) {
+    throw new Error(`mail.tm login: HTTP ${loginRes.status}`)
+  }
   const { token } = await loginRes.json()
+  if (!token) throw new Error(`mail.tm login: no token`)
 
   return { address, token, password }
 }
@@ -329,9 +336,12 @@ export class BotXRegistrationWorker {
       try {
         const key = await this.registerNewKey()
         results.push(key)
-        await new Promise((r) => setTimeout(r, 1500))
+        // Longer delay to avoid rate limits
+        await new Promise((r) => setTimeout(r, 3000))
       } catch (e) {
         console.error(`Registration ${i + 1}/${count} failed:`, e)
+        // Wait longer on failure (rate limit backoff)
+        await new Promise((r) => setTimeout(r, 10000))
       }
     }
     return results
