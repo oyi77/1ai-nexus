@@ -12,6 +12,7 @@ export type MemePlatform = 'bitget' | 'gate' | 'moby' | 'botx' | 'dexscreener'
 export const MEME_PLATFORMS: MemePlatform[] = [
   'bitget',
   'gate',
+  'botx',
   // Moby module is pending APK RE — registered so pages/APIs can
   // enumerate it, but disabled in the meme registry until it lands.
   'moby',
