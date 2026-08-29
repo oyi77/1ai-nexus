@@ -31,8 +31,8 @@ export const viewport: Viewport = {
   maximumScale: 1,
   themeColor: "#080b0f",
 }
-
 export const metadata: Metadata = {
+  metadataBase: new URL('https://tracker.aitradepulse.com'),
   title: "◆ NEXUS — Market Intelligence Terminal",
   description:
     "IDX bandarmology, fundamentals, 14 global markets, on-chain intel and AI signals — 38,902 instruments across 20 exchanges, served from memory in milliseconds. Free.",

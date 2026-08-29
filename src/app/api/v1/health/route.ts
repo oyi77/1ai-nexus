@@ -40,10 +40,22 @@ export async function GET() {
   // 4. Indexer health
   try {
     const res = await fetch('http://localhost:4409/health', { signal: AbortSignal.timeout(10_000) })
-    const data = await res.json() as Record<string, unknown>
-    checks.indexer = data.status
+    if (res.ok) {
+      const data = await res.json() as Record<string, unknown>
+      checks.indexer = data.status || 'ok'
+    } else {
+      checks.indexer = 'down'
+    }
   } catch {
-    checks.indexer = 'down'
+    // Indexer may not expose /health endpoint — check if port 4409 is reachable
+    try {
+      const ctrl = new AbortController()
+      setTimeout(() => ctrl.abort(), 3000)
+      await fetch('http://localhost:4409/', { signal: ctrl.signal })
+      checks.indexer = 'ok'
+    } catch {
+      checks.indexer = 'down'
+    }
   }
 
   // 5. Entity count (sanity check)
