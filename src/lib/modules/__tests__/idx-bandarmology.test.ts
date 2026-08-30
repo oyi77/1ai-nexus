@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { existsSync } from 'fs'
+import { join } from 'path'
 import {
   getBrokerBoard,
   getForeignLeaders,
@@ -10,10 +12,12 @@ import {
 import { applyIcSector } from '@/lib/modules/market/provider/idx-universe'
 import { fetchTopCryptoSymbols } from '@/lib/modules/market/provider/binance-top'
 
-// These run against the COMMITTED snapshots in data/idx/, so they
-// are deterministic within a given commit state.
+// These run against the harvested runtime snapshots in data/idx/
+// (written by npm run harvest:idx-*). Skipped when the snapshots
+// have not been harvested yet (e.g. fresh clone without cron).
+const HAS_IDX_SNAPSHOTS = existsSync(join(process.cwd(), 'data', 'idx', 'saham-latest.json'))
 
-describe('idx-bandarmology provider', () => {
+describe.skipIf(!HAS_IDX_SNAPSHOTS)('idx-bandarmology provider', () => {
   it('leaders are ranked by estimated net value and include meta', async () => {
     const l = await getForeignLeaders(10)
     expect(l.meta.tradeDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
