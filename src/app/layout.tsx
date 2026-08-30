@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, IBM_Plex_Mono, Space_Grotesk } from "next/font/google";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary"
 import { CsrfProvider } from "@/components/CsrfProvider"
 import { cookies } from "next/headers";
@@ -8,22 +7,6 @@ import { prisma } from "@/lib/db";
 import { UserProvider, type CurrentUser } from "@/lib/user-context";
 import { computeTier } from "@/lib/gamification-tier";
 import "./globals.css";
-
-const inter = Inter({
-  variable: "--font-sans",
-  subsets: ["latin"],
-});
-
-const ibmPlexMono = IBM_Plex_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
-});
-
-const spaceGrotesk = Space_Grotesk({
-  variable: "--font-head",
-  subsets: ["latin"],
-});
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -84,9 +67,7 @@ export default async function RootLayout({
     }
   }
   return (
-    <html
-      className={`${inter.variable} ${ibmPlexMono.variable} ${spaceGrotesk.variable} dark h-full antialiased`}
-    >
+    <html lang="en" className="dark h-full antialiased">
       <head>
         <link rel="icon" href="/icon-512.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
