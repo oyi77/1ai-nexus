@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { describe, it, expect } from 'vitest'
-import { sortByMetrics, scoreOf } from '../ranking'
+import { sortByMetrics, scoreOf, explainScore } from '../ranking'
 import { computeTier } from '@/lib/gamification-tier'
 import type { MemeAlphaToken } from '../types'
 
@@ -92,6 +92,29 @@ describe('sortByMetrics', () => {
     const snapshot = input.map((t) => t.id)
     sortByMetrics(input)
     expect(input.map((t) => t.id)).toEqual(snapshot)
+  })
+})
+describe('explainScore — decomposable composite with reason codes', () => {
+  it('splits score into volume/mcap/momentum reasons summing to scoreOf', () => {
+    const t = makeToken('mix', { volume24h: 2_000_000, marketCap: 3_000_000_000, change24h: 5 })
+    const { score, reasons } = explainScore(t)
+    expect(score).toBe(scoreOf(t)) // 2 + 3 + 5
+    expect(reasons.reduce((sum, r) => sum + r.points, 0)).toBeCloseTo(score)
+    const codes = reasons.map((r) => r.code)
+    expect(codes).toContain('VOLUME_ACTIVITY')
+    expect(codes).toContain('MARKET_CAP')
+    expect(codes).toContain('MOMENTUM')
+  })
+
+  it('emits NO_DATA reason when all metrics are zero', () => {
+    const { score, reasons } = explainScore(makeToken('empty'))
+    expect(score).toBe(0)
+    expect(reasons).toEqual([{ points: 0, code: 'NO_DATA', label: expect.any(String) }])
+  })
+
+  it('uses MOMENTUM_REVERSAL code for negative momentum', () => {
+    const { reasons } = explainScore(makeToken('down', { change24h: -3 }))
+    expect(reasons.map((r) => r.code)).toContain('MOMENTUM_REVERSAL')
   })
 })
 

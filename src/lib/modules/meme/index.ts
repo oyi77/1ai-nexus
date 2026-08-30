@@ -27,6 +27,9 @@ import { discoverGateTokens, auditGateToken } from './gate'
 import { discoverBotXTokens, auditBotXToken } from './botx'
 import { discoverDexScreenerTokens } from './dexscreener'
 import { MEME_PLATFORMS, type MemePlatform, type MemeRiskAudit } from './types'
+import { discoverBirdeyeTokens, auditBirdeyeToken } from './birdeye'
+import { auditRugcheckToken } from './rugcheck'
+import { discoverGeckoTerminalTokens } from './geckoterminal'
 
 const MEME_TTL = 180_000 // 3m — mirrors the bitget/gate discovery cadence
 
@@ -170,6 +173,24 @@ const botxDiscovery = makeDiscoveryModule('botx-meme', 'BotX Meme Alpha', () =>
 const dexscreenerDiscovery = makeDiscoveryModule('dexscreener-meme', 'DEX Screener Meme Alpha', () =>
   discoverDexScreenerTokens(),
 )
+const birdeyeAudit = makeAuditModule('birdeye-meme-risk', 'Birdeye Forge Meme Risk Audit', (c, k) =>
+  auditBirdeyeToken(c, k),
+)
+const rugcheckAudit = makeAuditModule('rugcheck-meme-risk', 'RugCheck Meme Risk Audit', (c, k) =>
+  auditRugcheckToken(c, k),
+)
+
+const birdeyeDiscovery = makeDiscoveryModule('birdeye-meme', 'Birdeye Forge Meme Alpha', () =>
+  discoverBirdeyeTokens(),
+)
+const geckoterminalDiscovery = makeDiscoveryModule('geckoterminal-meme', 'GeckoTerminal Meme Alpha', () =>
+  discoverGeckoTerminalTokens(),
+)
+
+// Blocked server-side (browser-session / Cloudflare) — disabled stubs so
+// pages/APIs can enumerate them without a live module.
+const blockedDiscovery = (name: string) =>
+  makeDiscoveryModule(name, `${name} (blocked server-side)`, () => Promise.resolve([]))
 
 const registry: Record<MemePlatform, MemePlatformEntry> = {
   bitget: {
@@ -211,6 +232,51 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     discoveryModule: dexscreenerDiscovery,
     ttlMs: MEME_TTL,
     enabled: true,
+  },
+  // Zero-key sources (research-verified 2026-08-30):
+  birdeye: {
+    platform: 'birdeye',
+    displayName: 'Birdeye Forge',
+    discoveryModule: birdeyeDiscovery,
+    auditModule: birdeyeAudit,
+    ttlMs: MEME_TTL,
+    enabled: true,
+  },
+  rugcheck: {
+    platform: 'rugcheck',
+    displayName: 'RugCheck',
+    auditModule: rugcheckAudit,
+    ttlMs: MEME_TTL,
+    enabled: true,
+  },
+  geckoterminal: {
+    platform: 'geckoterminal',
+    displayName: 'GeckoTerminal',
+    discoveryModule: geckoterminalDiscovery,
+    ttlMs: MEME_TTL,
+    enabled: true,
+  },
+  // Blocked server-side (browser-session / Cloudflare) — disabled stubs:
+  gmgn: {
+    platform: 'gmgn',
+    displayName: 'GMGN (blocked server-side)',
+    discoveryModule: blockedDiscovery('gmgn-meme'),
+    ttlMs: MEME_TTL,
+    enabled: false,
+  },
+  fomo: {
+    platform: 'fomo',
+    displayName: 'Fomo Family (blocked server-side)',
+    discoveryModule: blockedDiscovery('fomo-meme'),
+    ttlMs: MEME_TTL,
+    enabled: false,
+  },
+  photon: {
+    platform: 'photon',
+    displayName: 'Photon (blocked server-side)',
+    discoveryModule: blockedDiscovery('photon-meme'),
+    ttlMs: MEME_TTL,
+    enabled: false,
   },
 }
 

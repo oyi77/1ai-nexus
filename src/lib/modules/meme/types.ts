@@ -7,7 +7,7 @@
 //   2. Honeypot / rug audit  (risk scoring before you ape in)
 // ─────────────────────────────────────────────────────────────
 
-export type MemePlatform = 'bitget' | 'gate' | 'moby' | 'botx' | 'dexscreener'
+export type MemePlatform = 'bitget' | 'gate' | 'moby' | 'botx' | 'dexscreener' | 'birdeye' | 'rugcheck' | 'geckoterminal' | 'gmgn' | 'fomo' | 'photon'
 
 export const MEME_PLATFORMS: MemePlatform[] = [
   'bitget',
@@ -17,6 +17,19 @@ export const MEME_PLATFORMS: MemePlatform[] = [
   // enumerate it, but disabled in the meme registry until it lands.
   'moby',
   'dexscreener',
+  // Zero-key sources (research-verified 2026-08-30):
+  //   birdeye  — forge API (discovery + security audit)
+  //   rugcheck — security report (audit only)
+  //   geckoterminal — trending/new pools discovery
+  // Blocked server-side (browser-session / Cloudflare) — registered as
+  // disabled stub entries so pages/APIs can enumerate them:
+  //   gmgn, fomo, photon
+  'birdeye',
+  'rugcheck',
+  'geckoterminal',
+  'gmgn',
+  'fomo',
+  'photon',
 ]
 
 /** Normalized new-token discovery row — shared across platforms. */
