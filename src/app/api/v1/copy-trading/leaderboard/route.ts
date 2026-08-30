@@ -88,10 +88,33 @@ export async function GET(req: Request) {
       return resp
     }
 
-    // 'all' — fetch each enabled platform independently so one failure never 502s the request
-    const results = await Promise.all(enabledPlatforms.map((p) => fetchPlatform(p, cycle, orderBy, pageSize)))
-    const leaders = sortLeaders(results.flatMap((r) => r.leaders), orderBy)
-    const platforms: PlatformStatus[] = results.map((r) => r.status)
+    // 'all' — fetch each enabled platform independently with caching + global timeout
+    const allCacheKey = `copy-trading:leaderboard:all:${cycle}:${orderBy}:${pageSize}`
+    const allTtl = 180_000 // 3 min — matches Cache-Control below
+
+    const { data: allData, fromCache: allFromCache } = await getCached(
+      allCacheKey,
+      allTtl,
+      async () => {
+        // Global timeout for the entire "all" fetch: 15s max
+        const ctrl = new AbortController()
+        const timeoutId = setTimeout(() => ctrl.abort(), 15_000)
+
+        try {
+          const results = await Promise.all(
+            enabledPlatforms.map((p) => fetchPlatform(p, cycle, orderBy, pageSize)),
+          )
+          clearTimeout(timeoutId)
+          return results
+        } catch (e) {
+          clearTimeout(timeoutId)
+          throw e
+        }
+      },
+    )
+
+    const leaders = sortLeaders(allData.flatMap((r) => r.leaders), orderBy)
+    const platforms: PlatformStatus[] = allData.map((r) => r.status)
     const total = platforms.reduce((sum, p) => sum + (p.total ?? 0), 0)
 
     const resp = NextResponse.json({
@@ -99,10 +122,38 @@ export async function GET(req: Request) {
       error: null,
     })
     resp.headers.set('Cache-Control', 'public, max-age=180')
+    resp.headers.set('X-Cache', allFromCache ? 'HIT' : 'MISS')
+    if (allFromCache) {
+      resp.headers.set('X-Cache-Stale', 'true')
+    }
     return resp
   } catch (error) {
     // All platforms failed (module caches + fallbacks exhausted) — still a 200 with explicit statuses
     const message = error instanceof Error ? error.message : String(error)
+
+    // Try to serve stale cache as last resort
+    const allCacheKey = `copy-trading:leaderboard:all:${cycle}:${orderBy}:${pageSize}`
+    try {
+      const { getRedisClient } = await import('@/lib/redis')
+      const redis = getRedisClient()
+      const stale = await redis.get(allCacheKey)
+      if (stale) {
+        const parsed = JSON.parse(stale) as { data: PlatformResult[] }
+        const leaders = sortLeaders(parsed.data.flatMap((r) => r.leaders), orderBy)
+        const platforms: PlatformStatus[] = parsed.data.map((r) => r.status)
+        const total = platforms.reduce((sum, p) => sum + (p.total ?? 0), 0)
+        const resp = NextResponse.json({
+          data: { leaders, meta: { platforms, total, updatedAt: new Date().toISOString() } },
+          error: 'All platforms unreachable — serving stale data',
+        })
+        resp.headers.set('Cache-Control', 'public, max-age=60')
+        resp.headers.set('X-Cache', 'STALE')
+        return resp
+      }
+    } catch {
+      // Redis unavailable, fall through
+    }
+
     return NextResponse.json({
       data: { leaders: [], meta: { platforms: [], total: 0, updatedAt: new Date().toISOString() } },
       error: message,
