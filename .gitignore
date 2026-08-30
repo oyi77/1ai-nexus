@@ -37,8 +37,12 @@ yarn-error.log*
 
 # scratch research artifacts (large scraped dumps — must not be scanned by tailwind or committed)
 /local/
-/research-copy-trading.ts
 /home/
+
+# Playwright / QA run artifacts (regenerated on demand)
+/test-results/
+/okx-leader-verification.png
+/signals-content.webp
 
 # OMC state
 .omc/

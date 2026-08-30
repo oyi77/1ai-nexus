@@ -20,7 +20,7 @@
 // the timed region (same values, same order) so the metric
 // measures data-operation throughput, not RNG overhead.
 //
-// Run via ./autoresearch.sh
+// Run via ./scripts/autoresearch.sh
 // ─────────────────────────────────────────────────────────────
 
 import { existsSync, readFileSync, readdirSync } from 'fs'
