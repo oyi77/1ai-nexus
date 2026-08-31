@@ -49,6 +49,7 @@ import { extractJwtSession, checkSubscriptionRateLimit } from '@/lib/jwt-middlew
   '/api/v1/copy-trading/performance',
   '/api/v1/copy-trading/leader',
   '/api/v1/news',
+  '/api/v1/feed',
   '/api/v1/webhooks/payment',
 ]);
 
