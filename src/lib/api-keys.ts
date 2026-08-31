@@ -137,15 +137,18 @@ export async function listUserKeys(userId: string): Promise<Omit<ApiKey, 'key'>[
 // Revoke a key
 export function revokeApiKey(key: string): boolean {
   const apiKey = keys.get(key)
-  if (!apiKey) return false
-  apiKey.isActive = false
-  // Persist revocation so the key stays revoked after restart.
+  if (apiKey) {
+    apiKey.isActive = false
+  }
+  // Persist revocation by key hash so it survives a restart — the in-memory
+  // Map may be empty after a fresh process (or the key never loaded), so we
+  // must still update the DB row here.
   const id = createHash('sha256').update(key).digest('hex').substring(0, 16)
   void prisma.userApiKey.update({
     where: { id },
     data: { isActive: false },
   }).catch(() => {
-    // DB write failure — in-memory revocation still applies this process
+    // DB write failure — in-memory revocation (if present) still applies
   })
   return true
 }
