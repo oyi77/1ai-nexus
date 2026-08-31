@@ -57,7 +57,12 @@ describe('POST /api/v1/webhooks/payment', () => {
     })
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: 'user-1' },
-      data: { role: 'pro' },
+      data: expect.objectContaining({
+        role: 'pro',
+        plan: 'pro',
+        planStartedAt: expect.any(Date),
+        planExpiresAt: expect.any(Date),
+      }),
     })
     expect(prisma.payment.create).toHaveBeenCalledWith({
       data: expect.objectContaining({

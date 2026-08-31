@@ -66,7 +66,12 @@ export async function POST(request: Request) {
     }
 
     // Parse payload
-    const payload = JSON.parse(rawBody) as WebhookPayload
+    let payload: WebhookPayload
+    try {
+      payload = JSON.parse(rawBody) as WebhookPayload
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+    }
 
     // Extract metadata
     const metadata = payload.metadata || {}
@@ -75,53 +80,63 @@ export async function POST(request: Request) {
 
     // Only process successful payments
     if (payload.status === 'paid' && userId && plan) {
-      // Upsert subscription
-      const startDate = new Date()
-      const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+      try {
+        // Upsert subscription
+        const startDate = new Date()
+        const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
 
-      const subscription = await prisma.subscription.upsert({
-        where: { userId },
-        update: {
-          plan: plan as 'free' | 'pro' | 'enterprise',
-          status: 'active' as 'active' | 'canceled' | 'expired' | 'trial',
-          startDate,
-          endDate,
-          canceledAt: null,
-        },
-        create: {
+        const subscription = await prisma.subscription.upsert({
+          where: { userId },
+          update: {
+            plan: plan as 'free' | 'pro' | 'enterprise',
+            status: 'active' as 'active' | 'canceled' | 'expired' | 'trial',
+            startDate,
+            endDate,
+            canceledAt: null,
+          },
+          create: {
+            userId,
+            plan: plan as 'free' | 'pro' | 'enterprise',
+            status: 'active' as 'active' | 'canceled' | 'expired' | 'trial',
+            startDate,
+            endDate,
+          },
+        })
+
+        // Update user role + plan fields so the account page reflects the
+        // paid tier (plan, planStartedAt, planExpiresAt all come from here).
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            role: plan as 'free' | 'pro' | 'enterprise',
+            plan: plan as 'free' | 'pro' | 'enterprise',
+            planStartedAt: startDate,
+            planExpiresAt: endDate,
+          },
+        })
+
+        // Create Payment record
+        await prisma.payment.create({
+          data: {
+            subscriptionId: subscription.id,
+            amount: payload.amount,
+            currency: payload.currency,
+            status: 'completed',
+            provider: payload.gateway,
+            externalId: payload.order_id,
+            metadata: payload.metadata as unknown as Prisma.InputJsonValue,
+          },
+        })
+
+        console.log('Subscription activated:', {
           userId,
-          plan: plan as 'free' | 'pro' | 'enterprise',
-          status: 'active' as 'active' | 'canceled' | 'expired' | 'trial',
-          startDate,
-          endDate,
-        },
-      })
-
-      // Update user role
-      await prisma.user.update({
-        where: { id: userId },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        data: { role: plan as any },
-      })
-
-      // Create Payment record
-      await prisma.payment.create({
-        data: {
+          plan,
           subscriptionId: subscription.id,
-          amount: payload.amount,
-          currency: payload.currency,
-          status: 'completed',
-          provider: payload.gateway,
-          externalId: payload.order_id,
-          metadata: payload.metadata as unknown as Prisma.InputJsonValue,
-        },
-      })
-
-      console.log('Subscription activated:', {
-        userId,
-        plan,
-        subscriptionId: subscription.id,
-      })
+        })
+      } catch (err) {
+        console.error('[PAYMENT] DB write failed for PAID webhook — retry needed:', err)
+        return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+      }
     } else if (payload.status === 'failed' || payload.status === 'expired') {
       // Create failed Payment record if we have enough info
       if (userId) {

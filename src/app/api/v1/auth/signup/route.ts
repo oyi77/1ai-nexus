@@ -66,6 +66,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // If SMTP is not configured, auto-verify (dev convenience only —
+    // production must verify via /api/v1/auth/verify to prevent spam accounts).
+    const smtpConfigured = Boolean(process.env.MAIL_HOST && process.env.MAIL_USER && process.env.MAIL_PASS)
+    if (!smtpConfigured && process.env.NODE_ENV !== 'production') {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified: new Date() },
+      });
+    }
+
     // Generate JWT tokens
     const accessToken = await signToken({
       userId: user.id,

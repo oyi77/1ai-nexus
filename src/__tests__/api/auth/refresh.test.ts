@@ -27,6 +27,7 @@ describe('POST /api/v1/auth/refresh', () => {
    id: 'test-user-id',
    email: 'test@example.com',
    passwordHash: 'hash',
+   emailVerified: null,
    role: 'free' as const,
    plan: 'free' as const,
    planStartedAt: null,

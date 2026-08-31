@@ -326,6 +326,9 @@ model User {
   id           String   @id @default(cuid())
   email        String   @unique
   passwordHash String?
+
+  /** Null until the user verifies their email address. */
+  emailVerified DateTime?
   role         UserRole @default(free)
   
   // Subscription fields
