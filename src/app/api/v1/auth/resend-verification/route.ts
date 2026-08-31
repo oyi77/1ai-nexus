@@ -51,32 +51,29 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-    // Don't reveal whether account exists
-    if (!user) {
-      return NextResponse.json({ message: 'If the account exists, a verification email has been sent.' });
-    }
-
-    if (user.emailVerified) {
-      return NextResponse.json({ message: 'Email already verified', verified: true });
-    }
-
-    const verifyToken = await signPurposeToken(
-      { userId: user.id, email: user.email, role: user.role, plan: user.plan },
-      'email-verify',
-      '1d'
-    );
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:4400';
-    const verifyUrl = `${base}/api/v1/auth/verify?token=${encodeURIComponent(verifyToken)}`;
-
-    const sent = await sendVerificationEmail(user.email, verifyUrl);
-
+    // Same generic response for every case (missing, already verified, unverified)
+    // so callers cannot enumerate accounts or learn verification status.
     const responseBody: Record<string, string | boolean> = {
-      message: 'If the account exists, a verification email has been sent.',
+      message: 'If the account exists and is not yet verified, a verification email has been sent.',
     };
-    // Dev convenience only — never expose the verification link in production.
-    if (!sent && process.env.NODE_ENV !== 'production') {
-      responseBody.devLink = verifyUrl;
-      responseBody.note = 'Development mode: SMTP not configured, verification link shown for testing.';
+
+    // Only issue + deliver a link when the account exists and is unverified.
+    if (user && !user.emailVerified) {
+      const verifyToken = await signPurposeToken(
+        { userId: user.id, email: user.email, role: user.role, plan: user.plan },
+        'email-verify',
+        '1d'
+      );
+      const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:4400';
+      const verifyUrl = `${base}/api/v1/auth/verify?token=${encodeURIComponent(verifyToken)}`;
+
+      const sent = await sendVerificationEmail(user.email, verifyUrl);
+
+      // Dev convenience only — never expose the verification link in production.
+      if (!sent && process.env.NODE_ENV !== 'production') {
+        responseBody.devLink = verifyUrl;
+        responseBody.note = 'Development mode: SMTP not configured, verification link shown for testing.';
+      }
     }
 
     return NextResponse.json(responseBody, { status: 200 });

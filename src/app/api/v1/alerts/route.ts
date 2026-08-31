@@ -1,8 +1,11 @@
 import { type NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
-import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
+import { apiSuccess, apiError } from "@/lib/api/response";
+import { verifyToken } from "@/lib/jwt";
 import { AlertCondition } from "@/lib/alerts/schemas";
 import { createAlert, getAlerts, toggleAlert, deleteAlert, type Alert as EngineAlert } from "@/lib/modules/derived/alert-engine";
+
+export const runtime = "nodejs";
 
 interface AlertPageShape {
   id: string;
@@ -48,13 +51,38 @@ function engineToPage(alert: EngineAlert): AlertPageShape {
   };
 }
 
+/**
+ * Resolve the authenticated user id from the Bearer token or the
+ * nexus-session cookie (same pattern as /api/v1/account/me).
+ * Returns null when unauthenticated.
+ */
+async function requireUser(request: NextRequest): Promise<string | null> {
+  let token: string | undefined;
+  const authHeader = request.headers.get("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    token = authHeader.slice(7);
+  } else {
+    token = request.cookies.get("nexus-session")?.value;
+  }
+  if (!token) return null;
+
+  const payload = await verifyToken(token);
+  if (!payload?.userId) return null;
+  return payload.userId;
+}
+
 export async function GET(request: NextRequest) {
   try {
+    const userId = await requireUser(request);
+    if (!userId) return apiError("Authentication required", 401);
+
     const { searchParams } = request.nextUrl;
     const active = searchParams.get("active");
-    const alerts = (await getAlerts()).map(engineToPage);
+    const alerts = (await getAlerts())
+      .filter((a) => a.userId === userId)
+      .map(engineToPage);
     const filtered = active === null ? alerts : alerts.filter((a) => a.enabled === (active === "true"));
-    return cacheHeaders(apiSuccess(filtered), 10);
+    return apiSuccess(filtered);
   } catch (error) {
     console.error("GET /api/v1/alerts error:", error);
     return apiError("Internal server error", 500);
@@ -63,6 +91,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const userId = await requireUser(request);
+    if (!userId) return apiError("Authentication required", 401);
+
     const body = await request.json();
     const { type, name, config, channel, webhookUrl, webhookSecret } = body as {
       type?: string;
@@ -83,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     const created = await createAlert({
       id: "",
-      userId: "default",
+      userId,
       triggerType: type,
       conditions: { config, channel: channel ?? "telegram" } as Prisma.InputJsonValue,
       name: name ?? type,
@@ -104,9 +135,15 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
+    const userId = await requireUser(request);
+    if (!userId) return apiError("Authentication required", 401);
+
     const body = await request.json();
     const { id } = body as { id?: string };
     if (!id) return apiError("Missing required field: id", 400);
+
+    const owned = (await getAlerts()).some((a) => a.id === id && a.userId === userId);
+    if (!owned) return apiError("Alert not found", 404);
 
     const updated = await toggleAlert(id);
     if (!updated) return apiError("Alert not found", 404);
@@ -120,8 +157,14 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    const userId = await requireUser(request);
+    if (!userId) return apiError("Authentication required", 401);
+
     const id = request.nextUrl.searchParams.get("id");
     if (!id) return apiError("Missing required param: id", 400);
+
+    const owned = (await getAlerts()).some((a) => a.id === id && a.userId === userId);
+    if (!owned) return apiError("Alert not found", 404);
 
     const deleted = await deleteAlert(id);
     if (!deleted) return apiError("Alert not found", 404);

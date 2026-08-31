@@ -2,25 +2,25 @@ export const dynamic = "force-dynamic";
 
 import { type NextRequest } from "next/server";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
+import { validateApiKey } from "@/lib/api/auth";
 import { getUsage } from "@/lib/usage-tracking";
 
 export async function GET(request: NextRequest) {
   try {
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return cacheHeaders(apiError("Missing API key", 401), 10);
+    if (!validateApiKey(request)) {
+      return cacheHeaders(apiError("Invalid or missing API key", 401), 10);
     }
 
-    const key = authHeader.slice(7);
+    const key = request.headers.get("authorization")!.slice(7);
     const usage = getUsage(key);
 
     if (!usage) {
-    return cacheHeaders(apiSuccess({
-      totalCalls: 0,
-      lastCalledAt: null,
-      endpoints: {},
-      message: "No usage recorded yet for this API key",
-    }), 10);
+      return cacheHeaders(apiSuccess({
+        totalCalls: 0,
+        lastCalledAt: null,
+        endpoints: {},
+        message: "No usage recorded yet for this API key",
+      }), 10);
     }
 
     return cacheHeaders(apiSuccess({

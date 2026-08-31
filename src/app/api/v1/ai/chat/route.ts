@@ -3,7 +3,9 @@
 // Supports agent selection: whale, macro, rug, narrative, portfolio
 // ─────────────────────────────────────────────────────────────
 
-import { NextResponse } from 'next/server'
+import { type NextRequest } from 'next/server'
+import { apiJson, apiError } from '@/lib/api/response'
+import { verifyToken } from '@/lib/jwt'
 import { z } from 'zod/v4'
 import { getAgent, AGENTS } from '@/lib/modules/ai-signals/agents'
 
@@ -19,22 +21,34 @@ Respond like a senior cross-asset analyst: data-first, concise, no fluff.
 Use terminal-style brevity. Reference exact numbers. Flag uncertainty.`
 
 export async function GET() {
-  return NextResponse.json({
+  return apiJson({
     agents: AGENTS.map(a => ({ id: a.id, name: a.name, description: a.description, icon: a.icon })),
   })
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  let token: string | undefined
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7)
+  } else {
+    token = request.cookies.get('nexus-session')?.value
+  }
+  if (!token) return apiError('Authentication required', 401)
+
+  const payload = await verifyToken(token)
+  if (!payload?.userId) return apiError('Invalid or expired token', 401)
+
   try {
     const parsed = ChatRequest.safeParse(await request.json())
     if (!parsed.success) {
-      return NextResponse.json({ error: 'message required' }, { status: 400 })
+      return apiError('message required', 400)
     }
     const { message, agent: agentId } = parsed.data
 
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
-      return NextResponse.json({
+      return apiJson({
         response: 'AI Assistant is not configured. Add your Anthropic API key in Settings → Modules.',
       })
     }
@@ -62,7 +76,7 @@ export async function POST(request: Request) {
     if (!res.ok) {
       const err = await res.text()
       console.error('Anthropic API error:', res.status, err)
-      return NextResponse.json({
+      return apiJson({
         response: `AI service error (${res.status}). Check your API key in Settings.`,
       })
     }
@@ -70,10 +84,10 @@ export async function POST(request: Request) {
     const data: unknown = await res.json()
     const response = extractResponse(data)
 
-    return NextResponse.json({ response, agent: agentId ?? 'general' })
+    return apiJson({ response, agent: agentId ?? 'general' })
   } catch (err) {
     console.error('AI chat error:', err)
-    return NextResponse.json({ response: 'AI service temporarily unavailable.' })
+    return apiJson({ response: 'AI service temporarily unavailable.' })
   }
 }
 

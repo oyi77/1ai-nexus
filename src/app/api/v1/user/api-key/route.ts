@@ -4,40 +4,80 @@
 // POST /api/v1/user/api-key — Save/update API key
 // ─────────────────────────────────────────────────────────────
 
-import { NextResponse } from 'next/server'
+import { type NextRequest } from 'next/server'
 import { z } from 'zod/v4'
+import { apiJson, apiError } from '@/lib/api/response'
+import { verifyToken } from '@/lib/jwt'
+import { prisma } from '@/lib/db'
+import { createHash } from 'crypto'
 
 const ApiKeyRequest = z.object({ service: z.string().min(1), apiKey: z.string().min(1) })
 
-export async function GET(request: Request) {
+async function authenticate(request: NextRequest) {
+  let token: string | undefined
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7)
+  } else {
+    token = request.cookies.get('nexus-session')?.value
+  }
+  if (!token) return null
+  const payload = await verifyToken(token)
+  return payload?.userId ?? null
+}
+
+export async function GET(request: NextRequest) {
+  const userId = await authenticate(request)
+  if (!userId) return apiError('Authentication required', 401)
+
   const { searchParams } = new URL(request.url)
   const service = searchParams.get('service') ?? 'anthropic'
 
-  // For now, check if the key exists in environment or DB
-  // In production, this would check the UserApiKey table per-user
-  const envKey = process.env.ANTHROPIC_API_KEY
-  const hasKey = !!envKey && envKey.length > 0
+  try {
+    const row = await prisma.userApiKey.findFirst({
+      where: { userId, service },
+      select: { isActive: true },
+    })
 
-  return NextResponse.json({ service, hasKey })
+    return apiJson({ service, hasKey: !!row && row.isActive })
+  } catch (err) {
+    console.error('api-key fetch error:', err)
+    return apiError('Failed to check API key', 500)
+  }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const userId = await authenticate(request)
+  if (!userId) return apiError('Authentication required', 401)
+
   try {
     const parsed = ApiKeyRequest.safeParse(await request.json())
     if (!parsed.success) {
-      return NextResponse.json({ error: 'service and apiKey required' }, { status: 400 })
+      return apiError('service and apiKey required', 400)
     }
     const { service, apiKey } = parsed.data
 
+    // Hash the key before storing — raw keys are never persisted.
+    const keyHash = createHash('sha256').update(apiKey).digest('hex')
 
-    // In production: encrypt and store in UserApiKey table
-    // For now: store in environment variable (runtime only)
-    if (service === 'anthropic') {
-      process.env.ANTHROPIC_API_KEY = apiKey
-    }
+    await prisma.userApiKey.upsert({
+      where: { userId_service: { userId, service } },
+      create: {
+        userId,
+        service,
+        apiKey: keyHash,
+        isActive: true,
+        tier: 'free',
+      },
+      update: {
+        apiKey: keyHash,
+        isActive: true,
+      },
+    })
 
-    return NextResponse.json({ service, saved: true })
-  } catch {
-    return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
+    return apiJson({ service, saved: true })
+  } catch (err) {
+    console.error('api-key save error:', err)
+    return apiError('Failed to save API key', 500)
   }
 }

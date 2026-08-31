@@ -329,8 +329,10 @@ model User {
 
   /** Null until the user verifies their email address. */
   emailVerified DateTime?
+  /** Set once a password-reset token has been consumed; makes reset links single-use. */
+  passwordResetUsedAt DateTime?
   role         UserRole @default(free)
-  
+
   // Subscription fields
   plan              SubscriptionPlan   @default(free)
   planStartedAt     DateTime?
@@ -338,16 +340,16 @@ model User {
   stripeCustomerId  String?           @unique
   apiUsageCount     Int               @default(0)
   lastApiUsageReset DateTime          @default(now())
-  
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
-  
+
   // Gamification fields
   xp    Int @default(0)
   level Int @default(1)
 
   subscriptions Subscription[]
-  
+
   @@index([email])
   @@index([plan])
 }

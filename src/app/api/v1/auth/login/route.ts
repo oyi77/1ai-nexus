@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { verifyPassword } from '@/lib/password';
 import { signToken, createSessionCookie } from '@/lib/jwt';
+import { checkRateLimit } from '@/lib/api/rate-limit';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -13,6 +14,19 @@ const loginSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 5 login attempts per minute per IP.
+    const forwarded = request.headers.get('x-forwarded-for');
+    const ip = forwarded
+      ? forwarded.split(',')[0].trim()
+      : (request.headers.get('x-real-ip') ?? 'unknown');
+    const { allowed } = await checkRateLimit(`auth:login:${ip}`, 5, 60000);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Rate limit exceeded, please try again later.' },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const parsed = loginSchema.safeParse(body);
 
@@ -25,15 +39,16 @@ export async function POST(request: NextRequest) {
 
     const { email, password } = parsed.data;
 
-    // Find user by email
+    // Find user by email (normalized to lowercase, matching signup)
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: { email: email.toLowerCase() },
       select: {
         id: true,
         email: true,
         passwordHash: true,
         role: true,
         plan: true,
+        emailVerified: true,
       },
     });
 
@@ -57,6 +72,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
+      );
+    }
+
+    // Require verified email before login when SMTP is configured
+    // (production verification flow); dev auto-verifies on signup.
+    if (!user.emailVerified && process.env.MAIL_HOST) {
+      return NextResponse.json(
+        { error: 'Please verify your email before logging in' },
+        { status: 403 }
       );
     }
 

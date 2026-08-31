@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
     const { email } = parsed.data;
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     // Always return 200 (even when the user does not exist) to avoid
     // account enumeration.
     if (!user) {

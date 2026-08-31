@@ -11,6 +11,11 @@ vi.mock('@/lib/jwt', () => ({
   createSessionCookie: vi.fn((token: string) => `nexus-session=${token}; HttpOnly; Secure; Path=/`),
 }));
 
+// Mock Redis-backed rate limiting (no Redis in test env — would fail closed to 429)
+vi.mock('@/lib/api/rate-limit', () => ({
+  checkRateLimit: vi.fn(async () => ({ allowed: true, remaining: 5 })),
+}));
+
 describe('POST /api/v1/auth/login', () => {
   const testEmail = 'test-login-user@example.com';
   let testUser: User;
