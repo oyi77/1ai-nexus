@@ -58,12 +58,16 @@ describe('POST /api/v1/webhooks/payment', () => {
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: 'user-1' },
       data: expect.objectContaining({
-        role: 'pro',
         plan: 'pro',
         planStartedAt: expect.any(Date),
         planExpiresAt: expect.any(Date),
       }),
     })
+    // role is authorization (admin etc.) — a payment must never clobber it
+    const updateCall = vi.mocked(prisma.user.update).mock.calls[0][0] as {
+      data: Record<string, unknown>
+    }
+    expect(updateCall.data).not.toHaveProperty('role')
     expect(prisma.payment.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         subscriptionId: 'sub-1',

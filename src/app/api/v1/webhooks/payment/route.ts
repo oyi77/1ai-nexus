@@ -103,12 +103,12 @@ export async function POST(request: Request) {
           },
         })
 
-        // Update user role + plan fields so the account page reflects the
-        // paid tier (plan, planStartedAt, planExpiresAt all come from here).
+        // Update subscription tier fields so the account page reflects the
+        // paid plan. We deliberately do NOT touch user.role — role is
+        // authorization (admin etc.) and must not be clobbered by a payment.
         await prisma.user.update({
           where: { id: userId },
           data: {
-            role: plan as 'free' | 'pro' | 'enterprise',
             plan: plan as 'free' | 'pro' | 'enterprise',
             planStartedAt: startDate,
             planExpiresAt: endDate,
