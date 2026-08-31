@@ -8,6 +8,10 @@ import { LiveDot } from "@/components/primitives/LiveDot";
 import { riskColumns } from "../_shared";
 import type { MemeRiskAudit } from "@/lib/modules/meme/types";
 
+// Platforms with an audit module (leaderboard-only sources are excluded).
+const RISK_PLATFORMS = ["all", "bitget", "gate", "botx", "birdeye", "rugcheck"] as const;
+type RiskPlatform = (typeof RISK_PLATFORMS)[number];
+
 type Meta = {
   platform: string;
   platforms: { platform: string; ok: boolean; error?: string }[];
@@ -20,18 +24,24 @@ export function MemeRiskPageContent() {
   const params = useSearchParams();
   const chainParam = params.get("chain") ?? "";
   const contractParam = params.get("contract") ?? "";
+  const platformParam = (params.get("platform") ?? "all").toLowerCase();
 
   const [chain, setChain] = useState(chainParam);
   const [contract, setContract] = useState(contractParam);
+  const [platform, setPlatform] = useState<RiskPlatform>(
+    (RISK_PLATFORMS as readonly string[]).includes(platformParam)
+      ? (platformParam as RiskPlatform)
+      : "all",
+  );
   const [audits, setAudits] = useState<MemeRiskAudit[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [status, setStatus] = useState<"live" | "stale" | "error">("stale");
 
-  const runAudit = useCallback((c: string, k: string) => {
+  const runAudit = useCallback((c: string, k: string, p: RiskPlatform) => {
     if (!c.trim()) return;
     setStatus("stale");
     fetch(
-      `/api/v1/meme/risk?chain=${encodeURIComponent(k)}&contract=${encodeURIComponent(c)}`,
+      `/api/v1/meme/risk?platform=${p}&chain=${encodeURIComponent(k)}&contract=${encodeURIComponent(c)}`,
     )
       .then((r) => r.json())
       .then((d: { data: MemeRiskAudit[]; meta: Meta }) => {
@@ -44,14 +54,14 @@ export function MemeRiskPageContent() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (contractParam.trim()) runAudit(contractParam, chainParam);
+    if (contractParam.trim()) runAudit(contractParam, chainParam, platform);
     else setStatus("stale");
-  }, [contractParam, chainParam, runAudit]);
+  }, [contractParam, chainParam, platform, runAudit]);
 
   const onSubmit: React.FormEventHandler<HTMLFormElement> = (e) => {
     e.preventDefault();
     router.push(
-      `/meme/risk?chain=${encodeURIComponent(chain)}&contract=${encodeURIComponent(contract)}`,
+      `/meme/risk?platform=${platform}&chain=${encodeURIComponent(chain)}&contract=${encodeURIComponent(contract)}`,
     );
   };
 
@@ -66,7 +76,7 @@ export function MemeRiskPageContent() {
         title="Meme Risk Audit"
         subtitle="Honeypot / rug-pull risk audit per token contract"
         liveStatus={contractParam ? status : undefined}
-        onRefresh={() => contractParam && runAudit(contractParam, chainParam)}
+        onRefresh={() => contractParam && runAudit(contractParam, chainParam, platform)}
       >
         <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-xs text-text-muted">
@@ -86,6 +96,18 @@ export function MemeRiskPageContent() {
               placeholder="0x…"
               className="w-80 bg-bg-base border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:border-teal-vivid"
             />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-text-muted">
+            Source
+            <select
+              value={platform}
+              onChange={(e) => setPlatform(e.target.value as RiskPlatform)}
+              className="bg-bg-base border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-text-primary focus:outline-none focus:border-teal-vivid"
+            >
+              {RISK_PLATFORMS.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
           </label>
           <button
             type="submit"

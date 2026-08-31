@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Panel } from "@/components/shell/Panel";
 import { DataTable, type Column } from "@/components/shell/DataTable";
@@ -18,23 +18,32 @@ type Meta = {
   platformsStatus: Record<string, { ok: boolean; error?: string }>;
 };
 
+type Explanation = {
+  score: number;
+  reasons: { points: number; code: string; label: string }[];
+  flowSignal?: { code: string; label: string } | null;
+};
+
 export function MemeLeaderboardPageContent() {
   const router = useRouter();
   const [platform, setPlatform] = useState<MemePlatformFilter>("all");
   const [tokens, setTokens] = useState<MemeAlphaToken[]>([]);
+  const [explanations, setExplanations] = useState<Record<string, Explanation> | null>(null);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [status, setStatus] = useState<"live" | "stale" | "error">("stale");
 
   const fetchData = useCallback(async () => {
     setStatus("stale");
     try {
-      const res = await fetch(`/api/v1/meme/leaderboard?platform=${platform}`);
+      const res = await fetch(`/api/v1/meme/leaderboard?platform=${platform}&explain=1`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const d = (await res.json()) as {
         tokens: MemeAlphaToken[];
         meta: Meta;
+        explanations?: Record<string, Explanation> | null;
       };
       setTokens(d.tokens);
+      setExplanations(d.explanations ?? null);
       setMeta(d.meta);
       setStatus("live");
     } catch {
@@ -47,8 +56,38 @@ export function MemeLeaderboardPageContent() {
     fetchData();
   }, [fetchData]);
 
-  const platformError =
-    meta?.platformsStatus?.[platform]?.error ?? null;
+  const platformError = meta?.platformsStatus?.[platform]?.error ?? null;
+
+  // Append a "Why" column that renders the score decomposition for each token.
+  const columns = useMemo(() => {
+    if (!explanations) return memeColumns as unknown as Column<Record<string, unknown>>[];
+    const why: Column<Record<string, unknown>> = {
+      key: "why",
+      header: "Why",
+      width: 200,
+      render: (row) => {
+        const id = String((row as unknown as MemeAlphaToken).id ?? "");
+        const ex = explanations[id];
+        if (!ex) return <span className="text-xs font-mono text-text-muted">—</span>;
+        return (
+          <div className="flex flex-col gap-0.5">
+            {ex.reasons.slice(0, 3).map((r) => (
+              <span key={r.code} className="text-[10px] font-mono text-text-secondary">
+                <span className="text-teal-vivid">{r.code}</span>{" "}
+                <span className="text-text-muted">{r.points >= 0 ? "+" : ""}{r.points.toFixed(2)}</span>
+              </span>
+            ))}
+            {ex.flowSignal && (
+              <span className="text-[10px] font-mono text-data-bull">
+                ⤴ {ex.flowSignal.label}
+              </span>
+            )}
+          </div>
+        );
+      },
+    };
+    return [...(memeColumns as unknown as Column<Record<string, unknown>>[]), why];
+  }, [explanations]);
 
   return (
     <div className="space-y-4">
@@ -86,10 +125,13 @@ export function MemeLeaderboardPageContent() {
             ? "Failed to load"
             : `${tokens.length} tokens`}
         </span>
+        {explanations && (
+          <span className="text-text-muted">· explain on</span>
+        )}
       </div>
 
       <DataTable
-        columns={memeColumns as unknown as Column<Record<string, unknown>>[]}
+        columns={columns}
         data={tokens as unknown as Record<string, unknown>[]}
         sortable
         filterable

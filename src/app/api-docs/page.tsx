@@ -96,6 +96,26 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     response: '{ data: [{ coin: "bitcoin", score: 95, price: 59502 }] }',
   },
 
+  // ─── Meme Alpha ─────────────────────────────────────────
+  {
+    method: 'GET',
+    path: '/api/v1/meme/leaderboard',
+    description: 'Multi-platform memecoin discovery leaderboard (11 sources)',
+    category: 'Meme',
+    params: 'platform=all|bitget|gate|botx|dexscreener|birdeye|geckoterminal&limit=50&explain=1',
+    example: 'curl "https://tracker.aitradepulse.com/api/v1/meme/leaderboard?platform=all&limit=10&explain=1"',
+    response: '{ data: { tokens: [{ symbol: "nub", price: 0.01, ... }], meta: { total: 209, ... }, explanations: { "solana:addr": { score: 1.4, reasons: [{ code: "VOLUME_ACTIVITY", points: 0.7 }] } } } }',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/meme/risk',
+    description: 'Honeypot / rug-pull risk audit per token contract',
+    category: 'Meme',
+    params: 'platform=all|bitget|gate|botx|birdeye|rugcheck&chain=solana&contract=0x...',
+    example: 'curl "https://tracker.aitradepulse.com/api/v1/meme/risk?platform=all&chain=solana&contract=So11111111111111111111111111111111111111112"',
+    response: '{ data: [{ riskLevel: 3, riskLabel: "high", riskCounts: { high: 37, middle: 6, low: 18 }, top10HolderPercent: 0.19 }] }',
+  },
+
   // ─── Macro & Economics ──────────────────────────────────
   {
     method: 'GET',

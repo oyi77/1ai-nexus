@@ -161,14 +161,22 @@ export const memeColumns: Column<MemeAlphaToken>[] = [
     ),
   },
   {
-    key: "audited",
-    header: "Audited",
-    width: 80,
-    render: (r) => (
-      <span className="text-xs font-mono">
-        {r.audited ? "✓" : "—"}
-      </span>
-    ),
+    key: "flow",
+    header: "Flow",
+    width: 90,
+    align: "right",
+    render: (r) => {
+      const buys = Number(r.buyCount24h ?? 0);
+      const sells = Number(r.sellCount24h ?? 0);
+      if (buys <= 0 && sells <= 0) return <span className="text-xs font-mono text-text-muted">—</span>;
+      const ratio = buys / Math.max(1, sells);
+      const color = ratio > 1.2 ? "text-data-bull" : ratio < 0.8 ? "text-data-bear" : "text-text-secondary";
+      return (
+        <span className={`text-xs font-mono tabular-nums ${color}`}>
+          {ratio >= 1 ? `B ${ratio.toFixed(1)}:1` : `S ${(1 / ratio).toFixed(1)}:1`}
+        </span>
+      );
+    },
   },
 ];
 
