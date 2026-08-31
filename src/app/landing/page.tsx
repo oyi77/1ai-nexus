@@ -7,51 +7,51 @@ import {
 } from 'lucide-react'
 
 const STATS = [
-  { value: '38,902', label: 'Instruments indexed' },
-  { value: '20', label: 'Exchanges' },
+  { value: '50+', label: 'Proprietary signals' },
+  { value: '15+', label: 'Data sources' },
   { value: '15', label: 'Markets' },
-  { value: '58+', label: 'Data modules' },
-  { value: '~3M', label: 'Queries/sec served' },
+  { value: 'AI', label: 'Powered signals' },
+  { value: '~3M', label: 'Intelligence queries/sec' },
 ]
 
 const FEATURES = [
   {
     icon: Layers,
-    title: 'Bandarmology — IDX depth nobody else has',
-    body: 'Foreign flow per stock, sector rotation, broker board, accumulation streaks — the Indonesian market decoded daily from exchange summaries.',
+    title: 'Bandarmology Signals — IDX depth nobody else has',
+    body: 'Foreign flow signals, sector rotation, broker board, accumulation streaks — exclusive Indonesian market intelligence decoded daily from proprietary sources.',
   },
   {
     icon: Globe2,
-    title: '14 global markets, one screen',
-    body: 'US, Japan, UK, Germany, Hong Kong, India, Canada, Korea, Taiwan, Australia, Singapore, Brazil, Switzerland, Netherlands — unified symbols, one search.',
+    title: 'Market Intelligence — 14 markets, one screen',
+    body: 'US, Japan, UK, Germany, Hong Kong, India, Canada, Korea, Taiwan, Australia, Singapore, Brazil, Switzerland, Netherlands — unified symbols, one search, cross-chain intelligence.',
   },
   {
     icon: BarChart3,
-    title: 'Fundamentals that load instantly',
-    body: 'PER, PBV, ROE, DER, EPS and market cap for the entire IDX universe — harvested nightly, served from memory in single-digit milliseconds.',
+    title: 'Fundamental Intelligence — IDX fundamentals from proprietary feeds',
+    body: 'PER, PBV, ROE, DER, EPS and market cap for the entire IDX universe — hard-to-find fundamental data, served from memory in milliseconds.',
   },
   {
     icon: Zap,
-    title: 'AI signals with real risk levels',
-    body: 'Entry, TP1–TP3 and stop-loss computed from live volatility — cross-correlated across trade flow, whale alerts, funding and sentiment.',
+    title: 'AI Trade Thesis — entry, TP and stop from live volatility',
+    body: 'AI-generated trade thesis with entry, TP1–TP3 and stop-loss from live volatility — cross-correlated across trade flow, whale alerts, funding and sentiment.',
   },
   {
     icon: Radio,
-    title: 'On-chain intelligence',
-    body: 'Whale alerts, DEX flows, stablecoin shifts, token unlocks and dev activity — the crypto layer wired into the same terminal.',
+    title: 'On-Chain Intel — whale alerts, DEX flows, stablecoin shifts',
+    body: 'Whale alerts, DEX flows, stablecoin shifts, token unlocks and dev activity — cross-chain intelligence wired into the same terminal.',
   },
   {
     icon: Users,
-    title: 'Copy-trading leaderboard',
+    title: 'Copy-trading Intel — ranked leaders, live performance',
     body: 'Gate.io and Hyperliquid leaders ranked, with per-trader performance drill-downs — see what the best are actually doing.',
   },
 ]
 
 const COMPARISON = [
-  { name: 'NEXUS', price: 'Free', idx: true, global: true, onchain: true, bandar: true, api: true, highlight: true },
-  { name: 'Bloomberg Terminal', price: '~$24k/yr', idx: true, global: true, onchain: false, bandar: false, api: true, highlight: false },
-  { name: 'Hyperdash', price: 'Paid tiers', idx: false, global: false, onchain: true, bandar: false, api: false, highlight: false },
-  { name: 'Stockbit', price: 'Freemium', idx: true, global: false, onchain: false, bandar: true, api: false, highlight: false },
+  { name: 'NEXUS', price: 'Free', idx: true, global: true, onchain: true, bandar: true, api: true, intel: true, highlight: true },
+  { name: 'Bloomberg Terminal', price: '~$24k/yr', idx: true, global: true, onchain: false, bandar: false, api: true, intel: false, highlight: false },
+  { name: 'Hyperdash', price: 'Paid tiers', idx: false, global: false, onchain: true, bandar: false, api: false, intel: false, highlight: false },
+  { name: 'Stockbit', price: 'Freemium', idx: true, global: false, onchain: false, bandar: true, api: false, intel: false, highlight: false },
 ]
 
 const MARKETS = [
@@ -142,7 +142,7 @@ export default function LandingPage() {
         <div className="relative max-w-6xl mx-auto px-6 pt-20 pb-16 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-bg-border bg-bg-panel text-xs text-text-secondary mb-7">
             <span className="w-1.5 h-1.5 rounded-full bg-teal-vivid animate-live-dot" />
-            Live — 38,902 instruments across 20 exchanges
+            Live — 50+ proprietary signals, 15+ data sources
           </div>
           <h1 className="text-[2.75rem] md:text-6xl font-bold tracking-tight leading-[1.05] mb-6">
             Market intelligence,
@@ -150,8 +150,8 @@ export default function LandingPage() {
             <span className="text-teal-vivid">Bloomberg-grade.</span> Zero cost.
           </h1>
           <p className="text-lg text-text-secondary max-w-2xl mx-auto mb-9 leading-relaxed">
-            IDX bandarmology, fundamentals, 14 global markets, on-chain intel and AI signals —
-            one terminal, every dataset served from memory in milliseconds.
+            IDX bandarmology signals, fundamentals, 14 global markets, on-chain intel and AI trade thesis —
+            one terminal, every intelligence layer served from memory in milliseconds.
           </p>
           <div className="flex items-center justify-center gap-3 mb-14">
             <Link
@@ -179,7 +179,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-12 text-xs">
               {/* mini sidebar */}
               <div className="col-span-3 md:col-span-2 border-r border-bg-border p-3 space-y-2 text-text-muted hidden sm:block">
-                {['Dashboard', 'Equities', 'Bandarmology', 'AI Signals', 'On-Chain', 'Copy Trading'].map((s, i) => (
+                {['Dashboard', 'Equities', 'Bandarmology', 'AI Thesis', 'On-Chain', 'Copy Trading'].map((s, i) => (
                   <div key={s} className={`px-2 py-1 rounded-md ${i === 2 ? 'bg-teal-dim/40 text-teal-vivid font-semibold' : ''}`}>{s}</div>
                 ))}
               </div>
@@ -271,7 +271,7 @@ export default function LandingPage() {
         <p className="eyebrow mb-2">Walkthrough</p>
         <h2 className="text-3xl font-bold tracking-tight mb-3">See NEXUS in 60 seconds.</h2>
         <p className="text-text-secondary mb-8 max-w-2xl">
-          A quick tour of the terminal — IDX bandarmology, global universes, on-chain intel, and AI signals, all from one keyboard-driven workspace.
+          A quick tour of the terminal — IDX bandarmology signals, global universes, on-chain intel, and AI trade thesis, all from one keyboard-driven workspace.
         </p>
         <div className="card overflow-hidden bg-bg-base">
           <video
@@ -319,6 +319,7 @@ export default function LandingPage() {
                 <th className="px-4 py-3.5 font-medium text-center">IDX depth</th>
                 <th className="px-4 py-3.5 font-medium text-center">Global</th>
                 <th className="px-4 py-3.5 font-medium text-center">On-chain</th>
+                <th className="px-4 py-3.5 font-medium text-center">Proprietary Intel</th>
                 <th className="px-4 py-3.5 font-medium text-center">API</th>
               </tr>
             </thead>
@@ -332,7 +333,7 @@ export default function LandingPage() {
                     )}
                   </td>
                   <td className={`px-5 py-3.5 text-right tabular-nums ${r.highlight ? 'text-teal-vivid font-semibold' : 'text-text-secondary'}`}>{r.price}</td>
-                  {[r.bandar, r.global, r.onchain, r.api].map((v, i) => (
+                  {[r.bandar, r.global, r.onchain, r.intel, r.api].map((v, i) => (
                     <td key={i} className="px-4 py-3.5 text-center">
                       {v ? <Check size={16} className="inline text-teal-vivid" /> : <span className="text-text-muted">—</span>}
                     </td>
@@ -356,7 +357,7 @@ export default function LandingPage() {
         <div className="relative max-w-3xl mx-auto px-6 py-24 text-center">
           <h2 className="text-4xl font-bold tracking-tight mb-4">Stop paying for less data.</h2>
           <p className="text-text-secondary text-lg mb-8">
-            Open the terminal — no signup, no API keys, no credit card. Everything above is live right now.
+            Open the terminal — no signup, no credit card. Everything above is live right now.
           </p>
           <Link
             href="/dashboard"
@@ -417,7 +418,7 @@ export default function LandingPage() {
           <div>
             <div className="text-lg mb-2"><Mark /></div>
             <p className="text-text-muted text-xs leading-relaxed">
-              Market intelligence terminal — IDX bandarmology, global universes, on-chain intel and AI signals.
+              Market intelligence terminal — IDX bandarmology signals, global universes, on-chain intel and AI trade thesis.
             </p>
           </div>
           <div>
@@ -440,7 +441,7 @@ export default function LandingPage() {
           <div>
             <p className="eyebrow mb-3">Data</p>
             <ul className="space-y-2 text-text-secondary text-xs">
-              <li>TradingView · idx.co.id · Stockbit RE</li>
+              <li>TradingView · idx.co.id · Stockbit</li>
               <li>Binance · Gate.io · Hyperliquid</li>
               <li>Yahoo Finance · FRED · World Bank</li>
             </ul>
@@ -449,7 +450,7 @@ export default function LandingPage() {
         <div className="border-t border-bg-border/60">
           <div className="max-w-6xl mx-auto px-6 py-4 text-xs text-text-muted flex flex-col md:flex-row justify-between gap-2">
             <span>© 2026 NEXUS — BerkahKarya. Data for research; not financial advice.</span>
-            <span>Datasets refresh nightly · served from memory</span>
+            <span>Data refresh nightly · served from memory</span>
           </div>
         </div>
       </footer>

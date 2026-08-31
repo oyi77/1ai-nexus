@@ -63,7 +63,7 @@ export function TickerStrip() {
   const fgLabel = fgValue == null ? '—' : fgValue >= 55 ? 'Greed' : fgValue >= 45 ? 'Neutral' : 'Fear'
 
   return (
-    <div className="bg-bg-panel border-b border-border-dim px-4 py-1.5 flex items-center gap-4 text-xs font-mono overflow-hidden">
+    <div className="bg-bg-panel border-b border-border-dim px-4 py-1.5 flex items-center gap-4 text-xs font-mono overflow-hidden flex-wrap sm:flex-nowrap">
       <span className="flex items-center gap-1.5 shrink-0">
         <span className="w-2 h-2 rounded-full bg-accent-green animate-live-dot" />
         <span className="text-accent-green font-semibold">LIVE</span>
@@ -77,7 +77,7 @@ export function TickerStrip() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 shrink-0 text-text-dim">
+      <div className="flex items-center justify-center sm:justify-end gap-3 shrink-0 text-text-dim w-full sm:w-auto">
         <span className="flex items-center gap-1">
           FEAR/GREED: <span className={fgColor}>{fgValue ?? '—'} {fgLabel}</span>
         </span>

@@ -97,6 +97,21 @@
   animation-play-state: paused;
 }
 
+/* Mobile: user-scrollable ticker — pause auto-marquee, let fingers scroll */
+@media (max-width: 640px) {
+  .ticker-strip {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .ticker-strip::-webkit-scrollbar {
+    display: none;
+  }
+  .ticker-content {
+    animation: none;
+  }
+}
+
 /* ── Base ────────────────────────────────────────────────── */
 * {
   box-sizing: border-box;

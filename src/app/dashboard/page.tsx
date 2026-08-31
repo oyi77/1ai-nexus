@@ -58,6 +58,31 @@ interface ActivityEvent {
   [key: string]: unknown
 }
 
+interface AlphaSignalCard {
+  id: string
+  type: string
+  asset: string
+  strength: number
+  confidence: number
+  headline: string
+  explanation: string
+  source: string
+  timestamp: string
+}
+
+interface ThesisCard {
+  symbol: string
+  thesis: 'BULLISH' | 'BEARISH' | 'NEUTRAL'
+  confidence: number
+  totalSignals: number
+}
+
+interface TrendingCard {
+  id: string
+  title: string
+  source: string
+}
+
 function fmtUsd(n: number): string {
   if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`
   if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`
@@ -155,6 +180,59 @@ fetchData()
     return () => clearInterval(interval)
   }, [fetchData])
 
+  const [alphaSignals, setAlphaSignals] = useState<AlphaSignalCard[]>([])
+  const [thesis, setThesis] = useState<ThesisCard | null>(null)
+  const [trending, setTrending] = useState<TrendingCard[]>([])
+  const [intelStatus, setIntelStatus] = useState<'live' | 'stale' | 'error'>('live')
+
+  const fetchIntel = useCallback(async () => {
+    const [alphaRes, thesisRes, feedRes] = await Promise.allSettled([
+      fetch('/api/v1/alpha-feed?limit=5').then(r => r.json()),
+      fetch('/api/v1/token/thesis?symbol=BTC').then(r => r.json()),
+      fetch('/api/v1/feed?limit=3').then(r => r.json()),
+    ])
+
+    if (alphaRes.status === 'fulfilled' && Array.isArray(alphaRes.value?.data)) {
+      setAlphaSignals((alphaRes.value.data as Record<string, unknown>[]).slice(0, 5).map(s => ({
+        id: String(s.id ?? ''),
+        type: String(s.type ?? 'signal'),
+        asset: String(s.asset ?? ''),
+        strength: Number(s.strength ?? 0),
+        confidence: Number(s.confidence ?? 0),
+        headline: String(s.headline ?? ''),
+        explanation: String(s.explanation ?? ''),
+        source: String(s.source ?? ''),
+        timestamp: s.timestamp ? new Date(String(s.timestamp)).toLocaleTimeString() : '',
+      })))
+    }
+
+    if (thesisRes.status === 'fulfilled' && thesisRes.value?.thesis) {
+      const t = thesisRes.value as Record<string, unknown>
+      const dir = t.thesis === 'BULLISH' || t.thesis === 'BEARISH' ? t.thesis : 'NEUTRAL'
+      setThesis({
+        symbol: String(t.symbol ?? 'BTC'),
+        thesis: dir as 'BULLISH' | 'BEARISH' | 'NEUTRAL',
+        confidence: Number(t.confidence ?? 0),
+        totalSignals: Number(t.totalSignals ?? 0),
+      })
+    }
+
+    if (feedRes.status === 'fulfilled' && Array.isArray(feedRes.value?.top)) {
+      setTrending((feedRes.value.top as Record<string, unknown>[]).slice(0, 3).map(i => ({
+        id: String(i.id ?? ''),
+        title: String(i.t ?? ''),
+        source: String(i.s ?? ''),
+      })))
+    }
+
+    setIntelStatus('live')
+  }, [])
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+fetchIntel()
+  }, [fetchIntel])
+
   const newsColumns: Column<NewsItem>[] = [
     { key: 'title', header: 'Headline (Bloomberg / Macro)', width: 300, render: r => (
       <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-xs text-text-primary hover:text-teal-vivid truncate block">
@@ -206,6 +284,76 @@ fetchData()
   return (
     <NexusLayout>
       <div className="p-3 space-y-3">
+        {/* Today&apos;s Intelligence — derived signals as the product */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <h2 className="text-[13px] font-head font-bold text-text-primary uppercase tracking-wide">Today&apos;s Intelligence</h2>
+            <LiveDot status={intelStatus} label />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Panel title="Alpha Signals" subtitle="Top derived signals right now" liveStatus={intelStatus}>
+              <div className="max-h-[220px] overflow-y-auto space-y-2 pr-1">
+                {alphaSignals.length === 0 ? (
+                  <div className="text-text-muted text-xs p-4">No alpha signals available right now — signals appear as new data is derived.</div>
+                ) : alphaSignals.map(s => (
+                  <div key={s.id} className="border border-bg-border bg-bg-panel p-2 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-xs font-medium text-text-primary leading-snug">{s.headline}</span>
+                      <span className="text-[10px] font-mono text-text-muted shrink-0 whitespace-nowrap">{s.timestamp}</span>
+                    </div>
+                    <p className="text-[11px] text-text-secondary leading-snug line-clamp-2">{s.explanation}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono uppercase text-teal-vivid truncate">{s.source}</span>
+                      <span className="text-[10px] font-mono text-text-muted shrink-0">{(s.confidence * 100).toFixed(0)}% conf</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+
+            <Panel title="BTC Trade Thesis" subtitle="Aggregated from all alpha sources" liveStatus={intelStatus}>
+              {thesis ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-mono font-bold px-2 py-1 border ${thesis.thesis === 'BULLISH' ? 'text-data-bull bg-data-bull/20 border-data-bull/30' : thesis.thesis === 'BEARISH' ? 'text-data-bear bg-data-bear/20 border-data-bear/30' : 'text-text-secondary bg-bg-raised border-bg-border'}`}>
+                      {thesis.thesis}
+                    </span>
+                    <span className="text-xs text-text-muted font-mono">{thesis.totalSignals} signal{thesis.totalSignals === 1 ? '' : 's'}</span>
+                  </div>
+                  <div className="text-[11px] text-text-secondary leading-snug">
+                    {thesis.thesis === 'BULLISH'
+                      ? 'Weighted alpha signals lean bullish — positive conviction across derived sources.'
+                      : thesis.thesis === 'BEARISH'
+                        ? 'Weighted alpha signals lean bearish — caution flagged across derived sources.'
+                        : 'Signals are balanced — no dominant directional edge right now.'}
+                  </div>
+                  <div className="text-[11px] font-mono text-text-muted">
+                    Confidence {(thesis.confidence * 100).toFixed(0)}% · BTC
+                  </div>
+                </div>
+              ) : (
+                <div className="text-text-muted text-xs p-4">No trade thesis available for BTC right now.</div>
+              )}
+            </Panel>
+
+            <Panel title="Trending Now" subtitle="Hottest items across all feeds" liveStatus={intelStatus}>
+              <div className="space-y-2">
+                {trending.length === 0 ? (
+                  <div className="text-text-muted text-xs p-4">No trending items right now — refreshing automatically.</div>
+                ) : trending.map((t, i) => (
+                  <div key={t.id || i} className="flex items-start gap-2 border border-bg-border bg-bg-panel p-2">
+                    <span className="text-xs font-mono font-bold text-teal-vivid shrink-0">#{i + 1}</span>
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="text-xs text-text-primary leading-snug line-clamp-2">{t.title}</div>
+                      {t.source && <div className="text-[10px] font-mono uppercase text-text-muted truncate">{t.source}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Panel>
+          </div>
+        </div>
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-[20px] font-head font-bold text-text-primary">Command Center</h1>

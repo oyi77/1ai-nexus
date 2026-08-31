@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { NexusLayout } from "@/components/layout/NexusLayout"
 import { LoaderCircle, Check } from "lucide-react"
 
@@ -26,6 +26,8 @@ const STRENGTH_COLORS = ["bg-bg-border", "bg-data-bear", "bg-data-warn", "bg-tea
 
 export default function SignupPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get("redirect") || "/pricing"
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -54,7 +56,7 @@ export default function SignupPage() {
       // The signup route sets HTTP-only nexus-session / nexus-refresh cookies
       // via Set-Cookie — the browser stores them automatically for this origin.
       if (res.status === 201) {
-        router.push("/account")
+        router.push(redirectTo)
         router.refresh() // let the server layout re-read the session cookie
         return
       }

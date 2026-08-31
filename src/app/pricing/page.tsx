@@ -107,7 +107,7 @@ export default function PricingPage() {
 
       if (res.status === 401 || (data.error && String(data.error).includes('Authentication required'))) {
         // eslint-disable-next-line react-hooks/immutability
-        window.location.href = '/login?redirect=/pricing'
+        window.location.href = '/signup?redirect=/pricing'
         return
       }
 
