@@ -530,6 +530,8 @@ model UserApiKey {
   userId    String
   service   String
   apiKey    String   @db.Text
+  isActive  Boolean  @default(true)
+  tier      String   @default("free")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

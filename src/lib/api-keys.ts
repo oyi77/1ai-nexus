@@ -59,6 +59,8 @@ export async function generateApiKey(params: {
         userId: params.userId,
         service: params.name,
         apiKey: createHash('sha256').update(key).digest('hex'),
+        isActive: true,
+        tier: params.tier,
         createdAt: new Date(),
       },
     }).catch(() => {
@@ -77,16 +79,19 @@ export async function validateApiKey(key: string): Promise<ApiKey | null> {
     const hash = createHash('sha256').update(key).digest('hex')
     const row = await prisma.userApiKey.findUnique({ where: { id: hash.slice(0, 16) } }).catch(() => null)
     if (!row) return null
+    const tier = (['free', 'pro', 'enterprise'] as const).includes(row.tier as 'free' | 'pro' | 'enterprise')
+      ? (row.tier as 'free' | 'pro' | 'enterprise')
+      : 'free'
     apiKey = {
       id: row.id,
       key,
       name: row.service,
-      tier: 'free' as const,
+      tier,
       createdAt: row.createdAt.toISOString(),
       lastUsedAt: null,
       requestCount: 0,
-      rateLimit: rateLimits.free,
-      isActive: true,
+      rateLimit: rateLimits[tier],
+      isActive: row.isActive,
     }
     keys.set(key, apiKey)
   }
@@ -112,16 +117,21 @@ export async function listUserKeys(userId: string): Promise<Omit<ApiKey, 'key'>[
     where: { userId },
     orderBy: { createdAt: 'desc' },
   })
-  return dbKeys.map((k) => ({
-    id: k.id,
-    name: k.service,
-    tier: 'free' as const,
-    createdAt: k.createdAt.toISOString(),
-    lastUsedAt: null,
-    requestCount: 0,
-    rateLimit: 100,
-    isActive: true,
-  }))
+  return dbKeys.map((k) => {
+    const tier = (['free', 'pro', 'enterprise'] as const).includes(k.tier as 'free' | 'pro' | 'enterprise')
+      ? (k.tier as 'free' | 'pro' | 'enterprise')
+      : 'free'
+    return {
+      id: k.id,
+      name: k.service,
+      tier,
+      createdAt: k.createdAt.toISOString(),
+      lastUsedAt: null,
+      requestCount: 0,
+      rateLimit: rateLimits[tier],
+      isActive: k.isActive,
+    }
+  })
 }
 
 // Revoke a key
@@ -129,6 +139,14 @@ export function revokeApiKey(key: string): boolean {
   const apiKey = keys.get(key)
   if (!apiKey) return false
   apiKey.isActive = false
+  // Persist revocation so the key stays revoked after restart.
+  const id = createHash('sha256').update(key).digest('hex').substring(0, 16)
+  void prisma.userApiKey.update({
+    where: { id },
+    data: { isActive: false },
+  }).catch(() => {
+    // DB write failure — in-memory revocation still applies this process
+  })
   return true
 }
 
