@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: nexus
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
       POSTGRES_DB: nexus
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -12,10 +12,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    secrets:
+      - db_password
 
   redis:
     image: redis:7-alpine
-    command: redis-server --requirepass ${REDIS_PASSWORD:-nexus-redis-pass}
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-nexus-redis-pass} --requirepass_file /run/secrets/redis_password
     volumes:
       - redis_data:/data
     healthcheck:
@@ -23,11 +25,13 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    secrets:
+      - redis_password
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.9
     environment:
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-nexus-ch-pass}
+      CLICKHOUSE_PASSWORD_FILE: /run/secrets/clickhouse_password
     volumes:
       - clickhouse_data:/var/lib/clickhouse
       - ./db/clickhouse-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -36,6 +40,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    secrets:
+      - clickhouse_password
 
   db-init:
     build:
@@ -44,9 +50,12 @@ services:
     command: ["sh", "-c", "npx prisma db push --skip-generate && npm run db:seed"]
     environment:
       - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus
+      - DB_PASSWORD_FILE=/run/secrets/db_password
     depends_on:
       postgres:
         condition: service_healthy
+    secrets:
+      - db_password
 
   web:
     build:
@@ -58,11 +67,16 @@ services:
       - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus
       - REDIS_URL=redis://:${REDIS_PASSWORD:-nexus-redis-pass}@redis:6379
       - USE_BATCH_INDEXER=1
+      - DB_PASSWORD_FILE=/run/secrets/db_password
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
     depends_on:
       db-init:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+    secrets:
+      - db_password
+      - redis_password
 
   ws:
     build:
@@ -73,9 +87,12 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-nexus-redis-pass}@redis:6379
       - WS_PORT=4401
       - NEXUS_API_KEYS=${NEXUS_API_KEYS:-}
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
     depends_on:
       redis:
         condition: service_healthy
+    secrets:
+      - redis_password
 
   indexer:
     build:
@@ -85,10 +102,12 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-nexus-redis-pass}@redis:6379
       - CLICKHOUSE_URL=http://clickhouse:8123
       - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD:-nexus-ch-pass}
+      - CLICKHOUSE_PASSWORD_FILE=/run/secrets/clickhouse_password
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - HEALTH_PORT=4409
       - USE_BATCH_INDEXER=1
+      - DB_PASSWORD_FILE=/run/secrets/db_password
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
     depends_on:
       db-init:
         condition: service_completed_successfully
@@ -97,6 +116,10 @@ services:
       clickhouse:
         condition: service_healthy
     restart: unless-stopped
+    secrets:
+      - db_password
+      - redis_password
+      - clickhouse_password
 
   mcp-server:
     build:
@@ -120,14 +143,29 @@ services:
     environment:
       - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus
       - REDIS_URL=redis://:${REDIS_PASSWORD:-nexus-redis-pass}@redis:6379
+      - DB_PASSWORD_FILE=/run/secrets/db_password
+      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     restart: unless-stopped
+    secrets:
+      - db_password
+      - redis_password
 
 volumes:
   postgres_data:
+  redis_data:
+  clickhouse_data:
+
+secrets:
+  db_password:
+    file: ./secrets/db_password.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  clickhouse_password:
+    file: ./secrets/clickhouse_password.txt
   redis_data:
   clickhouse_data:

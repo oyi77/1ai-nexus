@@ -34,6 +34,12 @@ yarn-error.log*
 .env
 .env.local
 .env.production
+# Docker secrets
+secrets/
+
+# scratch research artifacts (large scraped dumps — must not be scanned by tailwind or committed)
+/local/
+/home/
 
 # scratch research artifacts (large scraped dumps — must not be scanned by tailwind or committed)
 /local/

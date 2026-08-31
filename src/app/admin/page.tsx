@@ -11,6 +11,13 @@ interface AdminStats {
   plans?: Record<string, number>
 }
 
+interface AnalyticsData {
+  dau: number
+  mau: number
+  total: number
+  topPages: Array<{ path: string; count: number }>
+}
+
 interface ApiKeyInfo {
   id: string
   name: string
@@ -38,6 +45,8 @@ export default function AdminPage() {
 
   const [keys, setKeys] = useState<ApiKeyInfo[] | null>(null)
   const [keysError, setKeysError] = useState(false)
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
+  const [analyticsError, setAnalyticsError] = useState(false)
 
   const fetchAll = useCallback(async () => {
     setStatus('loading')
@@ -88,6 +97,21 @@ export default function AdminPage() {
       } catch {
         setKeys(null)
         setKeysError(true)
+      }
+
+      // Fetch analytics (DAU/MAU)
+      try {
+        const analyticsRes = await fetch('/api/v1/analytics')
+        if (analyticsRes.ok) {
+          const analyticsJson = (await analyticsRes.json()) as { data: AnalyticsData }
+          setAnalytics(analyticsJson.data ?? null)
+        } else {
+          setAnalytics(null)
+          setAnalyticsError(true)
+        }
+      } catch {
+        setAnalytics(null)
+        setAnalyticsError(true)
       }
     } catch {
       setStatus('error')
@@ -268,6 +292,43 @@ export default function AdminPage() {
             </p>
           )}
         </Panel>
+
+        {/* Analytics */}
+        {analytics && (
+          <Panel
+            title="Analytics"
+            subtitle="Pageview traffic"
+            liveStatus={analyticsError ? 'error' : 'live'}
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4">
+              <div className="flex flex-col gap-1 p-4 bg-bg-raised rounded">
+                <span className="text-xs text-text-muted font-mono uppercase tracking-wider">DAU</span>
+                <span className="text-2xl font-bold text-text-primary font-mono">{analytics.dau}</span>
+              </div>
+              <div className="flex flex-col gap-1 p-4 bg-bg-raised rounded">
+                <span className="text-xs text-text-muted font-mono uppercase tracking-wider">MAU</span>
+                <span className="text-2xl font-bold text-text-primary font-mono">{analytics.mau}</span>
+              </div>
+              <div className="flex flex-col gap-1 p-4 bg-bg-raised rounded">
+                <span className="text-xs text-text-muted font-mono uppercase tracking-wider">Total Views</span>
+                <span className="text-2xl font-bold text-text-primary font-mono">{analytics.total}</span>
+              </div>
+            </div>
+            {analytics.topPages && analytics.topPages.length > 0 && (
+              <div className="px-4 pb-4">
+                <p className="text-xs text-text-muted font-mono uppercase tracking-wider mb-2">Top Pages</p>
+                <div className="space-y-1">
+                  {analytics.topPages.slice(0, 5).map((p) => (
+                    <div key={p.path} className="flex items-center justify-between text-xs font-mono">
+                      <span className="text-text-secondary truncate">{p.path}</span>
+                      <span className="text-text-muted ml-2">{p.count} views</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </Panel>
+        )}
       </div>
     </NexusLayout>
   )

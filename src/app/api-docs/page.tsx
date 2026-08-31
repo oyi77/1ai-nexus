@@ -323,6 +323,60 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     response: '{ data: { symbol: "BBCA", per: 13.62, pbv: 2.81, roe: 21.82, der: 0.20, eps: 471.83, marketCap: 788960300000000, dividendYield: 5.56 } }',
   },
 
+  // ─── Growth & Social ──────────────────────────────────
+  {
+    method: 'GET',
+    path: '/api/v1/analytics',
+    description: 'Pageview analytics — DAU, MAU, total views, top pages',
+    category: 'System',
+    example: 'curl https://tracker.aitradepulse.com/api/v1/analytics',
+    response: '{ data: { dau: 12, mau: 300, total: 5000, topPages: [{ path: "/", count: 200 }] } }',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/token/thesis',
+    description: 'Per-token trade thesis from aggregated alpha signals',
+    category: 'Market Data',
+    params: 'symbol=BTC',
+    example: 'curl "https://tracker.aitradepulse.com/api/v1/token/thesis?symbol=BTC"',
+    response: '{ data: { symbol: "BTC", thesis: "BULLISH", weightedScore: 42, confidence: 0.8, counts: { bullish: 3, bearish: 1, neutral: 2 }, totalSignals: 6 } }',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/follows',
+    description: 'List followed traders/wallets (auth required)',
+    category: 'Social',
+    example: 'curl https://tracker.aitradepulse.com/api/v1/follows',
+    response: '{ data: { follows: [{ type: "entity", id: "abc", label: "Binance" }] } }',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/follows',
+    description: 'Follow a trader/wallet (auth required)',
+    category: 'Social',
+    params: '{ type: "entity|wallet", id: "..." }',
+    example: 'curl -X POST https://tracker.aitradepulse.com/api/v1/follows -H "Content-Type: application/json" -d \'{"type":"entity","id":"abc"}\'',
+    response: '{ data: { following: true } }',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/follows/feed',
+    description: 'Recent activity from followed traders (auth required)',
+    category: 'Social',
+    params: 'limit=20',
+    example: 'curl "https://tracker.aitradepulse.com/api/v1/follows/feed?limit=20"',
+    response: '{ data: { items: [{ wallet: "0x...", type: "transfer", amountUsd: 1000, timestamp: "..." }] } }',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/leads',
+    description: 'Join waitlist — capture email for early access',
+    category: 'System',
+    params: '{ email: "user@example.com", source: "landing" }',
+    example: 'curl -X POST https://tracker.aitradepulse.com/api/v1/leads -H "Content-Type: application/json" -d \'{"email":"user@example.com"}\'',
+    response: '{ data: { success: true } }',
+  },
+
   // ─── API Keys ──────────────────────────────────────────
   {
     method: 'GET',
