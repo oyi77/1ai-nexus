@@ -1,9 +1,10 @@
 // ─── API Key Authentication System ────────────────────────
 // Manages API keys for external service access.
-// Keys are stored in Redis with metadata.
+// Keys are stored in Prisma (UserApiKey table) for durability.
 // ─────────────────────────────────────────────────────────
 
 import { randomBytes, createHash } from 'crypto'
+import { prisma } from '@/lib/db'
 
 export interface ApiKey {
   id: string
@@ -17,22 +18,23 @@ export interface ApiKey {
   isActive: boolean
 }
 
-// In-memory store (replace with Redis/DB in production)
+// In-memory cache of validated keys (hydrated from DB on first use).
 const keys = new Map<string, ApiKey>()
 
-// Generate a new API key
-export function generateApiKey(params: {
+const rateLimits: Record<string, number> = {
+  free: 100,
+  pro: 1000,
+  enterprise: 10000,
+}
+
+// Generate a new API key and persist to DB
+export async function generateApiKey(params: {
   name: string
   tier: 'free' | 'pro' | 'enterprise'
-}): ApiKey {
+  userId?: string
+}): Promise<ApiKey> {
   const key = `nexus_${randomBytes(24).toString('hex')}`
   const id = createHash('sha256').update(key).digest('hex').substring(0, 16)
-
-  const rateLimits: Record<string, number> = {
-    free: 100,
-    pro: 1000,
-    enterprise: 10000,
-  }
 
   const apiKey: ApiKey = {
     id,
@@ -46,14 +48,49 @@ export function generateApiKey(params: {
     isActive: true,
   }
 
+  // Register in-memory first so validateApiKey sees it immediately.
   keys.set(key, apiKey)
+
+  // Persist to DB (hash only — the raw key is never stored).
+  if (params.userId) {
+    await prisma.userApiKey.create({
+      data: {
+        id,
+        userId: params.userId,
+        service: params.name,
+        apiKey: createHash('sha256').update(key).digest('hex'),
+        createdAt: new Date(),
+      },
+    }).catch(() => {
+      // DB write failure — in-memory copy still works for this process
+    })
+  }
+
   return apiKey
 }
 
-// Validate an API key
-export function validateApiKey(key: string): ApiKey | null {
-  const apiKey = keys.get(key)
-  if (!apiKey || !apiKey.isActive) return null
+// Validate an API key (checks in-memory cache; hydrate from DB on miss).
+export async function validateApiKey(key: string): Promise<ApiKey | null> {
+  let apiKey = keys.get(key)
+  if (!apiKey) {
+    // Hydrate from DB: match against stored hash so pre-restart keys work.
+    const hash = createHash('sha256').update(key).digest('hex')
+    const row = await prisma.userApiKey.findUnique({ where: { id: hash.slice(0, 16) } }).catch(() => null)
+    if (!row) return null
+    apiKey = {
+      id: row.id,
+      key,
+      name: row.service,
+      tier: 'free' as const,
+      createdAt: row.createdAt.toISOString(),
+      lastUsedAt: null,
+      requestCount: 0,
+      rateLimit: rateLimits.free,
+      isActive: true,
+    }
+    keys.set(key, apiKey)
+  }
+  if (!apiKey.isActive) return null
 
   apiKey.lastUsedAt = new Date().toISOString()
   apiKey.requestCount++
@@ -69,9 +106,22 @@ export function getKeyInfo(key: string): Omit<ApiKey, 'key'> | null {
   return info
 }
 
-// List all keys (admin)
-export function listApiKeys(): Omit<ApiKey, 'key'>[] {
-  return Array.from(keys.values()).map(({ key: _, ...info }) => info)
+// List all user's keys (scoped to userId)
+export async function listUserKeys(userId: string): Promise<Omit<ApiKey, 'key'>[]> {
+  const dbKeys = await prisma.userApiKey.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+  })
+  return dbKeys.map((k) => ({
+    id: k.id,
+    name: k.service,
+    tier: 'free' as const,
+    createdAt: k.createdAt.toISOString(),
+    lastUsedAt: null,
+    requestCount: 0,
+    rateLimit: 100,
+    isActive: true,
+  }))
 }
 
 // Revoke a key

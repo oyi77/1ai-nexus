@@ -67,22 +67,11 @@ describe('POST /api/v1/checkout', () => {
       gateway: 'midtrans',
       customerEmail: 'test@example.com',
       returnUrl: 'http://localhost:4400/account/payments',
-      cancelUrl: 'http://localhost:4400/checkout',
+      cancelUrl: 'http://localhost:4400/pricing',
     })
   })
 
-  it('should create checkout session for guest enterprise user', async () => {
-    // Mock payment service response
-    mockPaymentService.createSubscriptionPayment.mockResolvedValue({
-      orderId: 'order-456',
-      status: 'pending',
-      amount: 19900,
-      currency: 'USD',
-      gateway: 'midtrans',
-      paymentUrl: 'https://gateway.example.com/pay/456',
-      metadata: { plan: 'enterprise', email: 'guest@example.com' },
-    })
-
+  it('should reject guest checkout (authentication required)', async () => {
     // Create request without JWT (guest checkout)
     const request = new Request('http://localhost:3000/api/v1/checkout', {
       method: 'POST',
@@ -98,25 +87,9 @@ describe('POST /api/v1/checkout', () => {
     const response = await POST(request)
     const data = await response.json()
 
-    expect(response.status).toBe(200)
-    expect(data).toEqual({
-      success: true,
-      orderId: 'order-456',
-      paymentUrl: 'https://gateway.example.com/pay/456',
-      amount: 19900,
-      currency: 'USD',
-    })
-
-    expect(mockPaymentService.createSubscriptionPayment).toHaveBeenCalledWith({
-      userId: 'guest',
-      plan: 'enterprise',
-      amount: 19900,
-      currency: 'USD',
-      gateway: 'midtrans',
-      customerEmail: 'guest@example.com',
-      returnUrl: 'http://localhost:4400/account/payments',
-      cancelUrl: 'http://localhost:4400/checkout',
-    })
+    expect(response.status).toBe(401)
+    expect(data.error).toBe('Authentication required. Sign in to purchase a subscription.')
+    expect(mockPaymentService.createSubscriptionPayment).not.toHaveBeenCalled()
   })
 
   it('should reject invalid plan', async () => {
@@ -165,8 +138,8 @@ describe('POST /api/v1/checkout', () => {
     const response = await POST(request)
     const data = await response.json()
 
-    expect(response.status).toBe(400)
-    expect(data.error).toBe('Email required for guest checkout')
+    expect(response.status).toBe(401)
+    expect(data.error).toBe('Authentication required. Sign in to purchase a subscription.')
     expect(mockPaymentService.createSubscriptionPayment).not.toHaveBeenCalled()
   })
 

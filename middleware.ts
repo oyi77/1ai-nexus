@@ -130,7 +130,7 @@ function checkRateLimit(key: string, maxRequests = 100, windowMs = 60_000): { al
   }
 
   // Always public routes
-  if (ALWAYS_PUBLIC.has(pathname) || pathname.startsWith("/api/auth/")) {
+  if (ALWAYS_PUBLIC.has(pathname) || pathname.startsWith("/api/auth/") || pathname.startsWith("/api/v1/auth/")) {
     return addCorsHeaders(NextResponse.next(), request);
   }
   // Premium / protected routes — require a valid JWT session (browser) or API key (external)

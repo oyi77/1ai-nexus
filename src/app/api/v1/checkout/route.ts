@@ -2,20 +2,15 @@ export const runtime = 'nodejs';
 
 // ─────────────────────────────────────────────────────────────
 // POST /api/v1/checkout — Create payment via 1ai-payment service
-// Creates payment order for subscription plans
+// Creates payment order for subscription plans.
+// Requires an authenticated user (subscription activation needs userId).
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
 import { getPaymentService } from '@/lib/payment-service'
 import { verifyToken, extractTokenFromCookies } from '@/lib/jwt'
+import { PLAN_PRICING, isPaidPlan } from '@/lib/pricing'
 import type { UserRole } from '@prisma/client'
-
-// Plan pricing configuration
-const PLAN_PRICING: Record<string, { amount: number; currency: string }> = {
-  free: { amount: 0, currency: 'USD' },
-  pro: { amount: 4900, currency: 'USD' }, // $49.00
-  enterprise: { amount: 19900, currency: 'USD' }, // $199.00
-}
 
 interface CheckoutRequest {
   plan: string
@@ -38,21 +33,21 @@ export async function POST(request: Request) {
         { status: 400 }
       )
     }
-    if (!PLAN_PRICING[plan]) {
+    if (!(plan in PLAN_PRICING)) {
       return NextResponse.json(
         { success: false, error: 'Invalid plan. Must be pro or enterprise' },
         { status: 400 }
       )
     }
     // Free plan doesn't need payment
-    if (plan === 'free') {
+    if (!isPaidPlan(plan)) {
       return NextResponse.json(
         { success: false, error: 'Free plan does not require payment' },
         { status: 400 }
       )
     }
 
-    // Extract user from JWT (optional - allow unauthenticated checkout)
+    // Require authenticated user (subscription activation needs userId)
     let userId: string | undefined
     let userEmail: string | undefined
     const authHeader = request.headers.get('authorization')
@@ -67,28 +62,21 @@ export async function POST(request: Request) {
           userEmail = payload.email || undefined
         }
       } catch {
-        // Continue without userId - allow guest checkout
+        // Token invalid — fall through to 401
       }
     }
-    // Guest checkout requires email
-    if (!userId && !email && !customerEmail) {
+    if (!userId) {
       return NextResponse.json(
-        { success: false, error: 'Email required for guest checkout' },
-        { status: 400 }
+        { success: false, error: 'Authentication required. Sign in to purchase a subscription.' },
+        { status: 401 }
       )
     }
 
     // Get customer email (from request body or JWT)
-    const finalEmail = email || customerEmail || userEmail
+    const finalEmail = email || customerEmail || userEmail || ''
 
-    // Get pricing for selected plan
+    // Get pricing for selected plan (single source of truth)
     const pricing = PLAN_PRICING[plan]
-    if (!pricing) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid plan' },
-        { status: 400 }
-      )
-    }
 
     // Determine gateway, defaults to midtrans
     const selectedGateway = gateway || 'midtrans'
@@ -96,17 +84,17 @@ export async function POST(request: Request) {
     // Determine return/cancel URLs from request headers or env
     const origin = request.headers.get('origin') || request.headers.get('referer') || process.env.NEXT_PUBLIC_APP_URL || ''
     const returnDestination = returnUrl || `${origin}/account/payments`
-    const cancelDestination = cancelUrl || `${origin}/checkout`
+    const cancelDestination = cancelUrl || `${origin}/pricing`
 
     // Create payment order
     const paymentService = getPaymentService()
     const order = await paymentService.createSubscriptionPayment({
-      userId: userId || 'guest',
+      userId,
       plan: plan as UserRole,
       amount: pricing.amount,
       currency: pricing.currency,
       gateway: selectedGateway,
-      customerEmail: finalEmail || '',
+      customerEmail: finalEmail,
       returnUrl: returnDestination,
       cancelUrl: cancelDestination,
     })

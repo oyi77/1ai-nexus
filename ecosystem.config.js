@@ -10,6 +10,7 @@ module.exports = {
         REDIS_URL: 'redis://localhost:6379',
         NODE_ENV: 'production',
         PORT: '4400',
+        NEXUS_API_KEYS: process.env.NEXUS_API_KEYS || '',
       },
       exec_mode: 'fork',
       instances: 1,

@@ -73,6 +73,40 @@ export async function generateRefreshToken(payload: Omit<JwtPayload, 'iat' | 'ex
 }
 
 /**
+ * Sign a short-lived, purpose-scoped token (e.g. password reset).
+ * The `purpose` claim prevents a token minted for one flow (session,
+ * reset) from being replayed in another.
+ */
+export async function signPurposeToken(
+  payload: Omit<JwtPayload, 'iat' | 'exp'>,
+  purpose: string,
+  expiresIn = '30m'
+): Promise<string> {
+  const jwt = new SignJWT({ ...(payload as Record<string, unknown>), purpose })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(expiresIn);
+  return jwt.sign(secretKey);
+}
+
+/**
+ * Verify a purpose-scoped token and reject it when the `purpose` claim
+ * does not match, or when it is expired/invalid.
+ */
+export async function verifyPurposeToken(
+  token: string,
+  purpose: string
+): Promise<JwtPayload | null> {
+  try {
+    const { payload } = await jwtVerify(token, secretKey);
+    if (payload.purpose !== purpose) return null;
+    return payload as JwtPayload;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Create HTTP-only session cookie
  */
 export function createSessionCookie(token: string): string {

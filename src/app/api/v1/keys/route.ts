@@ -1,17 +1,39 @@
 import { type NextRequest } from 'next/server'
 import { apiJson } from '@/lib/api/response'
-import { generateApiKey, listApiKeys, revokeApiKey, TIER_CONFIG } from '@/lib/api-keys'
+import { generateApiKey, listUserKeys, revokeApiKey, TIER_CONFIG } from '@/lib/api-keys'
+import { verifyToken } from '@/lib/jwt'
 
 export const dynamic = 'force-dynamic'
 
-// GET /api/v1/keys — List all API keys (admin)
-export async function GET() {
-  const allKeys = listApiKeys()
-  return apiJson({ keys: allKeys, tiers: TIER_CONFIG })
+/** Extract user from JWT (Authorization header or nexus-session cookie). */
+async function getUser(request: NextRequest): Promise<{ userId: string } | null> {
+  let token: string | undefined
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ')) {
+    token = authHeader.slice(7)
+  } else {
+    token = request.cookies.get('nexus-session')?.value
+  }
+  if (!token) return null
+  const payload = await verifyToken(token)
+  if (!payload || !payload.userId) return null
+  return { userId: payload.userId }
 }
 
-// POST /api/v1/keys — Create new API key
+// GET /api/v1/keys — List current user's API keys
+export async function GET(request: NextRequest) {
+  const user = await getUser(request)
+  if (!user) return apiJson(null, { error: 'Authentication required', status: 401 })
+
+  const keys = await listUserKeys(user.userId)
+  return apiJson({ keys, tiers: TIER_CONFIG })
+}
+
+// POST /api/v1/keys — Create a new API key for the current user
 export async function POST(request: NextRequest) {
+  const user = await getUser(request)
+  if (!user) return apiJson(null, { error: 'Authentication required', status: 401 })
+
   try {
     const body = await request.json() as { name?: string; tier?: string }
 
@@ -24,7 +46,7 @@ export async function POST(request: NextRequest) {
       return apiJson(null, { error: 'Invalid tier: must be free, pro, or enterprise', status: 400 })
     }
 
-    const apiKey = generateApiKey({ name: body.name, tier })
+    const apiKey = await generateApiKey({ name: body.name, tier, userId: user.userId })
 
     return apiJson({
       key: apiKey.key,
@@ -40,8 +62,11 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// DELETE /api/v1/keys — Revoke API key
+// DELETE /api/v1/keys — Revoke an API key (scoped to current user)
 export async function DELETE(request: NextRequest) {
+  const user = await getUser(request)
+  if (!user) return apiJson(null, { error: 'Authentication required', status: 401 })
+
   try {
     const { searchParams } = new URL(request.url)
     const key = searchParams.get('key')

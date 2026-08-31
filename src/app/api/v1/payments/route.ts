@@ -5,6 +5,7 @@
 
 import { apiJson, apiError } from '@/lib/api/response'
 import { createPayment, getAvailableMethods, type PaymentMethod } from '@/lib/payments'
+import { PLAN_PRICING } from '@/lib/pricing'
 
 export async function GET() {
   return apiJson({ methods: getAvailableMethods() })
@@ -25,15 +26,11 @@ export async function POST(request: Request) {
       return apiError('Email is required', 400)
     }
 
-    const prices: Record<string, number> = {
-      pro: 29,
-      enterprise: 99,
-    }
-
-    const amount = prices[tier]
-    if (!amount) {
+    const planPricing = PLAN_PRICING[tier]
+    if (!planPricing || planPricing.amount <= 0) {
       return apiError('Invalid tier', 400)
     }
+    const amount = planPricing.amount / 100 // cents → dollars for legacy gateway path
 
     const orderId = `NXS-${tier.toUpperCase()}-${Date.now()}`
 

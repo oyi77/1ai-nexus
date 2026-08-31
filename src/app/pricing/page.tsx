@@ -25,8 +25,8 @@ const tiers = [
   {
     id: 'pro',
     name: 'Pro',
-    price: '$29',
-    priceIdr: 'Rp449.500',
+    price: '$49',
+    priceIdr: 'Rp759.500',
     period: '/month',
     description: 'Full data access + signals',
     features: [
@@ -45,8 +45,8 @@ const tiers = [
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: '$99',
-    priceIdr: 'Rp1.534.500',
+    price: '$199',
+    priceIdr: 'Rp3.084.500',
     period: '/month',
     description: 'Unlimited access + WebSocket',
     features: [
