@@ -25,11 +25,12 @@ export function TradingViewChart({
   const containerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!containerRef.current) return
-    
+    const el = containerRef.current
+    if (!el) return
+
     // Clear previous chart
-    containerRef.current.innerHTML = ''
-    
+    el.innerHTML = ''
+
     const widgetContainer = document.createElement('div')
     widgetContainer.className = 'tradingview-widget-container'
     widgetContainer.style.height = `${height}px`
@@ -69,11 +70,11 @@ export function TradingViewChart({
     })
 
     widgetContainer.appendChild(script)
-    containerRef.current.appendChild(widgetContainer)
+    el.appendChild(widgetContainer)
 
     return () => {
-      if (containerRef.current) {
-        containerRef.current.innerHTML = ''
+      if (el) {
+        el.innerHTML = ''
       }
     }
   }, [symbol, interval, theme, height, studies])

@@ -9,10 +9,8 @@
 // fallbackFn: none (route-level per-source error isolation handles gaps)
 // ─────────────────────────────────────────────────────────────
 
-import { TTL } from '../../types'
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
 
-const DEXSCREENER_TTL = TTL.TOKEN_DATA * 3 // 60s × 3 = 180s
 const DEXSCREENER_BASE = 'https://api.dexscreener.com'
 
 interface DexScreenerPair {
@@ -95,7 +93,7 @@ export async function discoverDexScreenerTokens(limitPerChain = 25): Promise<Mem
         })
         if (out.length >= limitPerChain) break
       }
-    } catch (e) {
+    } catch {
       // Per-source error isolation
     }
     if (out.length >= limitPerChain) break

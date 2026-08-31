@@ -147,7 +147,6 @@ async function getDbDerivedConfidences(): Promise<SignalConfidence[]> {
 
     // 4. Prediction Market Signal — count active markets + trades
     const predTradeCount = await prisma.predictionTrade.count()
-    const predMarketCount = await prisma.predictionMarket.count()
     if (predTradeCount > 0) {
       const predConfidence = Math.min(85, 40 + Math.log10(Math.max(1, predTradeCount)) * 12)
       confidences.push({

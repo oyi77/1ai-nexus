@@ -14,9 +14,7 @@ const WELL_KNOWN_WALLETS: Record<string, Partial<Record<string, string>>> = {
   },
 }
 
-const ENTITY_TYPES = ["Exchange", "Whale", "Fund", "Protocol", "Government", "Unknown"] as const;
 const CHAINS = ["ethereum", "arbitrum", "base", "optimism", "solana", "bitcoin"] as const;
-const PM_CATEGORIES = ["Politics", "Crypto", "Sports", "Science", "Finance"] as const;
 
 const ENTITIES = [
   { name: "Binance", type: "Exchange", chains: ["ethereum", "bsc", "arbitrum", "base"], verified: true },
@@ -203,11 +201,8 @@ async function main() {
 
   // Create transactions
   console.log("Creating transactions...");
-  const decodedTypes = ["send", "receive", "swap", "bridge"];
   for (let i = 0; i < 1000; i++) {
     const wallet = createdWallets[i % createdWallets.length];
-    const token = createdTokens[i % createdTokens.length];
-    const otherWallet = createdWallets[(i + 1) % createdWallets.length];
     await prisma.transaction.create({
       data: {
         txHash: `0x${(i + 1).toString(16).padStart(64, "0")}`,

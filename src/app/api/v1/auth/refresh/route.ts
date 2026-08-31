@@ -1,7 +1,6 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
 import { verifyToken, signToken, generateRefreshToken, createRefreshCookie, extractRefreshToken } from '@/lib/jwt';
 import { prisma } from '@/lib/db';
 

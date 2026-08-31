@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { apiJson } from '@/lib/api/response'
 import { getCopyTradeSignals, generateCopyTradeSignals, getSignalStats } from '@/lib/modules/derived/copy-trade'
 
 export async function GET(request: Request) {

@@ -5,7 +5,6 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
-import { apiJson } from '@/lib/api/response'
 
 export const dynamic = 'force-dynamic'
 

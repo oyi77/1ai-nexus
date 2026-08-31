@@ -10,10 +10,8 @@
 // fallbackFn: none (route-level per-source error isolation handles gaps)
 // ─────────────────────────────────────────────────────────────
 
-import { TTL } from '../../types'
 import type { MemeRiskAudit } from '../types'
 
-const RUGCHECK_TTL = TTL.TOKEN_DATA * 3 // 60s × 3 = 180s
 const RUGCHECK_BASE = 'https://api.rugcheck.xyz/v1/tokens'
 
 function toNum(v: unknown, fallback = 0): number {

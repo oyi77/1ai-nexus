@@ -143,7 +143,7 @@ export default function DashboardPage() {
       }
 
       setFeedStatus('live')
-    } catch (e) {
+    } catch {
       setFeedStatus('error')
     }
   }, [])

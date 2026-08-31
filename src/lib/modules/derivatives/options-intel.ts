@@ -353,12 +353,6 @@ export async function fetchTermStructure(currency: 'BTC' | 'ETH' = 'BTC'): Promi
 
   const now = Date.now()
 
-  // Also fetch perpetual funding rate
-  const perpData = await deribitGet<{ result?: { current_funding: number } }>(
-    'get_funding_rate_value',
-    { instrument_name: `${currency}-PERPETUAL` }
-  )
-
   // Sort futures by expiration
   const sortedFutures = (futures ?? [])
     .filter(f => f.expiration_timestamp > now)

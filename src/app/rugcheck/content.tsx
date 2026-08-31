@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useCallback } from 'react'
-import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 
 interface RugCheckResult {

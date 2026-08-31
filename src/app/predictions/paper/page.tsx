@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { NexusLayout } from "@/components/layout/NexusLayout"
 import { Panel } from "@/components/shell/Panel"
-import { Target, TrendingUp, TrendingDown, X, Plus, Check, Trophy, BarChart3 } from "lucide-react"
+import { Target, TrendingUp, TrendingDown, X, Check } from "lucide-react"
 
 interface Market {
   id: string
@@ -63,8 +63,6 @@ const fmtUsd = (n: number): string => {
   if (abs >= 1e3) return `${n < 0 ? "-" : ""}$${(abs / 1e3).toFixed(1)}K`
   return `${n < 0 ? "-" : ""}$${abs.toFixed(2)}`
 }
-
-const fmtPct = (n: number): string => `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`
 
 const fmtPrice = (n: number): string => `${(n * 100).toFixed(1)}¢`
 

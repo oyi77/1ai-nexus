@@ -36,11 +36,7 @@
 //   4. Flip enabled:true in meme registry, delete this doc block.
 // ─────────────────────────────────────────────────────────────
 
-import { TTL } from '../../types'
 import type { MemeAlphaToken, MemeRiskAudit } from '../types'
-
-const MODULE_ID = 'moby-meme'
-const MOBY_TTL = TTL.TOKEN_DATA * 6
 
 class MobyNotImplemented extends Error {
   constructor() {

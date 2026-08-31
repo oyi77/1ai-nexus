@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo } from 'react'
-import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { DataTable, type Column } from '@/components/shell/DataTable'
 import { LiveDot } from '@/components/primitives/LiveDot'
@@ -42,7 +41,7 @@ export function CorrelationsPageContent() {
 
 function CorrelationsPageInner() {
   const { data, status, refresh } = useLiveFetch<CorrelationData[]>({ url: '/api/v1/correlations', interval: 60_000, initialData: [] })
-  const correlations = data || []
+  const correlations = useMemo(() => data || [], [data])
 
   const columns: Column<CorrelationData>[] = [
     { key: 'pair', header: 'Pair', width: 150, render: r => <span className="text-teal-vivid font-bold">{r.pair}</span> },

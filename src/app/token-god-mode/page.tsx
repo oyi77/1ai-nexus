@@ -3,10 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
-import { PriceTag } from '@/components/primitives/PriceTag'
-import { DeltaBadge } from '@/components/primitives/DeltaBadge'
 import { LiveDot } from '@/components/primitives/LiveDot'
-import { Search } from 'lucide-react'
 import { useTableControls, TableControlsBar, SortableTh } from '@/components/shell/TableControls'
 
 interface Holder {
@@ -79,7 +76,7 @@ export default function TokenGodModePage() {
   const [data, setData] = useState<TokenData | null>(null)
   const [status, setStatus] = useState<'idle' | 'loading' | 'live' | 'error'>('idle')
   const [trending, setTrending] = useState<TrendingToken[]>([])
-  const [trendingLoading, setTrendingLoading] = useState(true)
+  const [, setTrendingLoading] = useState(true)
   const poolsTc = useTableControls(data?.pools, undefined, { initialSortKey: 'liquidity', initialSortDir: 'desc' })
 
   // Popular tokens for quick analysis
@@ -137,7 +134,10 @@ export default function TokenGodModePage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchToken()
     }
-  }, [address, network])
+    // status is intentionally excluded from deps: including it would refetch
+    // on every status flip (loading→live→loading…), causing an infinite loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, network, fetchToken])
 
   return (
     <NexusLayout>

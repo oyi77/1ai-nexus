@@ -124,7 +124,7 @@ async function runFredLoop(config: IntegrationConfig, apiKey: string): Promise<v
 async function fetchFredData(config: IntegrationConfig, apiKey: string): Promise<void> {
   const results: Array<{ seriesId: string; value: number; date: string }> = [];
 
-  for (const [name, seriesId] of Object.entries(FRED_SERIES)) {
+  for (const [, seriesId] of Object.entries(FRED_SERIES)) {
     try {
       const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${apiKey}&file_type=json&limit=1&sort_order=desc`;
 
@@ -290,7 +290,7 @@ function computeRegime(indicators: Array<{ seriesId: string; value: number }>): 
   return { label, score: normalized };
 }
 
-function classifyZone(indicator: string, value: number, asset: string): string {
+function classifyZone(indicator: string, value: number, _asset: string): string {
   const zones: Record<string, { euphoria: number; bull: number; neutral: number; accumulation: number; capitulation: number }> = {
     mvrv: { euphoria: 3.5, bull: 2.0, neutral: 1.0, accumulation: 0.7, capitulation: 0 },
     nupl: { euphoria: 0.7, bull: 0.4, neutral: 0, accumulation: -0.3, capitulation: -1 },
@@ -344,7 +344,7 @@ export async function getCurrentRegime(): Promise<{
   return { regime: regime.label, score: regime.score, fredIndicators, cmIndicators };
 }
 
-export async function healthCheck(config: IntegrationConfig): Promise<{
+export async function healthCheck(_config: IntegrationConfig): Promise<{
   ok: boolean;
   fredAvailable: boolean;
   cmAvailable: boolean;

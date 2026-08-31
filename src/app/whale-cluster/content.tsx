@@ -8,7 +8,6 @@ import { LiveDot } from '@/components/primitives/LiveDot'
 import { AddressChip } from '@/components/primitives/AddressChip'
 import { DeltaBadge } from '@/components/primitives/DeltaBadge'
 import { EntityLabel } from '@/components/primitives/EntityLabel'
-import { Sparkline } from '@/components/primitives/Sparkline'
 import { useLiveFetch } from '@/lib/hooks/useLiveFetch'
 
 interface ClusterWallet {
@@ -100,7 +99,7 @@ function WhaleClusterPageInner() {
     interval: 300_000,
   })
 
-  const clusters = data?.clusters ?? []
+  const clusters = useMemo(() => data?.clusters ?? [], [data?.clusters])
   const summary = data?.summary
 
   const [filterType, setFilterType] = useState<string>('all')

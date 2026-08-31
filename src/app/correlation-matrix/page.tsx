@@ -50,7 +50,7 @@ export default function CorrelationPage() {
     initialData: [],
   })
 
-  const correlations = data || []
+  const correlations = useMemo(() => data || [], [data])
 
   // Build asset list and matrix from correlation data
   const { assets, matrix } = useMemo(() => {

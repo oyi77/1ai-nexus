@@ -126,15 +126,6 @@ function significance(r: number): CorrelationResult['significance'] {
   return 'none'
 }
 
-interface ChartResponse {
-  chart?: {
-    result?: Array<{
-      timestamp?: number[]
-      indicators?: { quote?: Array<{ close?: number[] }> }
-    }>
-  }
-}
-
 async function fetchYahooReturns(symbol: string, days = 30): Promise<number[]> {
   try {
     const registry = await import('@/lib/modules').then(m => m.registerAllModules())

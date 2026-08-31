@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { apiJson } from '@/lib/api/response'
 import { getMultiExchangeTickers, getCrossExchangeFundingRates, getBinanceTickers, getBybitTickers, getOkxTickers } from '@/lib/modules/market/multi-exchange'
 
 export async function GET(request: Request) {

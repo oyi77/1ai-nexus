@@ -10,10 +10,8 @@
 // fallbackFn: none (route-level per-source error isolation handles gaps)
 // ─────────────────────────────────────────────────────────────
 
-import { TTL } from '../../types'
 import type { MemeAlphaToken, MemeRiskAudit } from '../types'
 
-const GECKO_TTL = TTL.TOKEN_DATA * 3 // 60s × 3 = 180s
 const GECKO_BASE = 'https://api.geckoterminal.com/api/v2/networks/solana'
 
 function toNum(v: unknown, fallback = 0): number {

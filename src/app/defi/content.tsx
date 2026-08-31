@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { NexusLayout } from "@/components/layout/NexusLayout"
 import { Layers, TrendingUp, TrendingDown } from "lucide-react"
 import { useTableControls, TableControlsBar, SortableTh } from "@/components/shell/TableControls"
 

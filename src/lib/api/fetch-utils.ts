@@ -32,7 +32,7 @@ export async function fetchWithFallback<T>(
   try {
     const data = await primary.fetch()
     return { data, source: primary.name, success: true, latencyMs: Date.now() - start1 }
-  } catch (e) {
+  } catch {
     // Try fallback
     const start2 = Date.now()
     try {

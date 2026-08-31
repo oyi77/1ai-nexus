@@ -98,6 +98,7 @@ function TrendingCoinsPageInner() {
               >
                 <div className="flex items-center gap-3 mb-2">
                   <span className="text-[14px] font-mono font-bold text-text-muted">#{i + 1}</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element -- remote thumbnail, not local asset */}
                   {token.thumb && <img src={token.thumb} alt={token.name} className="w-6 h-6 rounded-full" />}
                   <div>
                     <span className="text-[13px] font-mono font-bold text-text-primary">{token.symbol}</span>

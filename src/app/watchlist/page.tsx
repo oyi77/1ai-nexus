@@ -7,7 +7,7 @@ import { PriceTag } from '@/components/primitives/PriceTag'
 import { DeltaBadge } from '@/components/primitives/DeltaBadge'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { useTableControls, TableControlsBar, SortableTh, type TableControlsColumn } from '@/components/shell/TableControls'
-import { X, TrendingUp, TrendingDown, Eye, EyeOff } from 'lucide-react'
+import { X, TrendingUp, TrendingDown, Eye } from 'lucide-react'
 
 type WatchItem = {
   id: string

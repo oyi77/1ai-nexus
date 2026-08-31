@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
     // Resolve each trade
     const results = await Promise.all(
       openTrades.map(trade => {
-        const direction = trade.direction === "YES" ? 1 : -1
         // Winner gets $1 per share, loser gets $0
         const pnl = trade.direction === resolvedOutcome
           ? Math.round((1.0 - trade.entryPrice) * trade.shares * 100) / 100

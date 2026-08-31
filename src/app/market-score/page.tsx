@@ -34,7 +34,7 @@ const TIER_LABELS: Record<string, { label: string; icon: string }> = {
 export default function MarketScorePage() {
   const [scores, setScores] = useState<MarketScore[]>([])
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
-  const [loading, setLoading] = useState(true)
+  const [, setLoading] = useState(true)
 
   const fetchScores = useCallback(async () => {
     try {

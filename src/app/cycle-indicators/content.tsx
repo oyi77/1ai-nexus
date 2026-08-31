@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo } from 'react'
-import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { useLiveFetch } from '@/lib/hooks/useLiveFetch'
@@ -246,7 +245,7 @@ export function CycleIndicatorsPageContent() {
 
 
 function CycleIndicatorsPageInner() {
-  const { data, status, refresh } = useLiveFetch<CycleIndicatorsResponse>({
+  const { data, status } = useLiveFetch<CycleIndicatorsResponse>({
     url: '/api/v1/cycle-indicators?action=current',
     interval: 300_000, // 5 min
   })

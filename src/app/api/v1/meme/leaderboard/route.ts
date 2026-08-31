@@ -18,7 +18,7 @@ import {
   normalizeMemePlatformParam,
   type MemePlatform,
 } from '@/lib/modules/meme'
-import { sortByMetrics, explainScore, type FlowSignal } from '@/lib/modules/meme/ranking'
+import { sortByMetrics, explainScore } from '@/lib/modules/meme/ranking'
 import type { MemeAlphaToken, MemeDiscoveryResponse } from '@/lib/modules/meme/types'
 
 type PlatformStatus = { ok: boolean; error?: string }
@@ -82,8 +82,6 @@ export async function GET(req: Request) {
     const enabledPlatforms = getEnabledPlatforms()
     const results = await Promise.all(enabledPlatforms.map((p) => fetchPlatform(p, limit)))
     const tokens = sortByMetrics(results.flatMap((r) => r.tokens))
-    const platformsStatus: Record<string, PlatformStatus> = {}
-    for (const r of results) platformsStatus[r.status.ok ? '' : ''] // placeholder, replaced below
     const statusMap: Record<string, PlatformStatus> = {}
     results.forEach((r, i) => {
       statusMap[enabledPlatforms[i]] = r.status

@@ -86,8 +86,6 @@ const MAIN_MENU = keyboard([
 ])
 
 const BACK_ROW: Button[] = [{ text: '🔙 Back', callback_data: 'menu:main' }]
-const BACK_MENU = keyboard([BACK_ROW])
-
 const MARKET_MENU = keyboard([
   [{ text: '🔥 Fear & Greed', callback_data: 'data:fear-greed' }, { text: '💲 Top Prices', callback_data: 'data:prices' }],
   [{ text: '📈 Sectors', callback_data: 'data:sectors' }, { text: '🌐 Macro', callback_data: 'data:macro' }],

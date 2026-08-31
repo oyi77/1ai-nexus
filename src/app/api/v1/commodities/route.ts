@@ -6,7 +6,7 @@
 export const dynamic = "force-dynamic";
 
 import { type NextRequest, NextResponse } from "next/server";
-import { apiSuccess, apiError } from "@/lib/api/response";
+import { apiError } from "@/lib/api/response";
 import { registerAllModules } from "@/lib/modules";
 import { getCached } from "@/lib/api/server-cache";
 import { saveBackup, getBackup } from "@/lib/api/backup";

@@ -43,8 +43,8 @@ export default function TokenDetailPage() {
   const params = useParams()
   const address = params?.address as string
   const [token, setToken] = useState<TokenInfo | null>(null)
-  const [candles, setCandles] = useState<OhlcvCandle[]>([])
-  const [indicators, setIndicators] = useState<Record<string, Array<{ time: number; value: number }>>>({})
+  const [, setCandles] = useState<OhlcvCandle[]>([])
+  const [, setIndicators] = useState<Record<string, Array<{ time: number; value: number }>>>({})
   const [interval, setIntervalStr] = useState('1h')
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
   
@@ -71,10 +71,6 @@ export default function TokenDetailPage() {
 
   useEffect(() => {
     if (!token) return
-    
-    // Map token symbol to Binance format for OHLCV
-    const symbol = token.symbol.replace('/', '').replace('SOL', 'SOLUSDT').replace('USDT', 'USDT')
-    const binanceSymbol = symbol.endsWith('USDT') ? symbol : `${symbol}USDT`
 
     fetch(`/api/v1/ohlcv?symbol=${encodeURIComponent(token.symbol.split('/')[0])}&interval=${interval}&limit=100&indicators=sma20,ema50,bb`)
       .then(r => r.json())

@@ -14,7 +14,6 @@ import type {
   GateioTrade,
 } from '@/lib/modules/derivatives/gateio/performance'
 import type {
-  BinancePerformanceData,
   BinanceLeaderProfile,
   BinanceEquityPoint,
   BinanceMarketConcentration,

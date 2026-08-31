@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react'
-import { formatCompact } from '@/lib/format'
 
 interface FeedItem {
   id: string

@@ -24,8 +24,6 @@ const mockJwt = {
 
 
 
-import { NextRequest } from 'next/server'
-
 // Mock the middleware module
 vi.mock('@/lib/jwt-middleware', () => ({
   extractJwtSession: vi.fn(),
@@ -50,12 +48,6 @@ describe('Middleware JWT Integration', () => {
         JWT_SECRET,
         { expiresIn: '7d' }
       )
-
-      const request = new NextRequest('https://tracker.aitradepulse.com/api/v1/signals/history', {
-        headers: {
-          cookie: `nexus-session=${token}`,
-        },
-      })
 
       // Verify token can be decoded
       const decoded = mockJwt.verify(token) as { userId: string; email: string; role: string; plan: string }

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { TierName, TierInfo, computeTier } from "./gamification-tier";
+import { TierName, computeTier } from "./gamification-tier";
 export type { TierName, TierInfo } from "./gamification-tier";
 export { computeTier } from "./gamification-tier";
 

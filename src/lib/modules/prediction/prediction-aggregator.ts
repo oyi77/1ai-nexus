@@ -59,12 +59,6 @@ interface PolymarketMarket {
   active?: boolean
 }
 
-interface PolymarketResponse {
-  data?: PolymarketMarket[]
-  markets?: PolymarketMarket[]
-  next_cursor?: string
-}
-
 async function fetchPolymarketMarkets(limit: number): Promise<{ markets: NormalizedMarket[]; latencyMs: number }> {
   const start = Date.now()
   const markets: NormalizedMarket[] = []

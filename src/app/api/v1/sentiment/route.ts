@@ -6,11 +6,6 @@ import * as lunarcrush from "@/lib/lunarcrush";
 
 const X_API_BEARER_TOKEN = process.env.X_API_BEARER_TOKEN ?? "";
 
-const TRACKED_ASSETS = [
-  "BTC", "ETH", "SOL", "ARB", "OP", "BASE", "MATIC", "AVAX", "DOT", "LINK",
-  "UNI", "AAVE", "MKR", "CRV", "LDO", "GMX", "GNS", "SNX", "YFI", "BAL",
-] as const;
-
 interface XTweet {
   id: string;
   text: string;
@@ -148,7 +143,6 @@ export async function GET(request: NextRequest) {
 
       case "lunarcrush": {
         const symbols = assets.split(",").map((s) => s.trim().toUpperCase());
-        const data = await lunarcrush.getCoinMetrics(symbols[0]); // LunarCrush client only does single coin
 
         const results = [];
         for (const sym of symbols.slice(0, 10)) {

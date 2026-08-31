@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { NowPaymentsProvider } from '@/lib/payments/nowpayments'
 import type { PaymentRequest } from '@/lib/payments/types'
+import { createHmac } from 'crypto'
 
 // Mock fetch globally
 global.fetch = vi.fn()
@@ -99,7 +100,6 @@ describe('NowPaymentsProvider (1ai-payment adapter)', () => {
       })
 
       // Create valid signature
-      const { createHmac } = require('crypto')
       const sig = createHmac('sha512', 'test-secret').update(body).digest('hex')
 
       const headers = { 'x-nowpayments-sig': sig }
@@ -142,7 +142,6 @@ describe('NowPaymentsProvider (1ai-payment adapter)', () => {
           price_currency: 'USD',
         })
 
-        const { createHmac } = require('crypto')
         const sig = createHmac('sha512', 'test-secret').update(body).digest('hex')
 
         const headers = { 'x-nowpayments-sig': sig }
@@ -165,7 +164,6 @@ describe('NowPaymentsProvider (1ai-payment adapter)', () => {
         // missing payment_status, price_amount, price_currency
       })
 
-      const { createHmac } = require('crypto')
       const sig = createHmac('sha512', 'test-secret').update(body).digest('hex')
 
       const headers = { 'x-nowpayments-sig': sig }

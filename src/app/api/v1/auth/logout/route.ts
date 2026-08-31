@@ -7,7 +7,7 @@ import { cookies } from 'next/headers';
  * POST /api/v1/auth/logout
  * Clear session cookie and log user out
  */
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   try {
     // Clear session cookie
     const cookieStore = await cookies();

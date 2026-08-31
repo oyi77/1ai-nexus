@@ -79,31 +79,6 @@ async function createMailTmAccount(domain: string): Promise<MailTmAccount & { pa
   return { address, token, password }
 }
 
-async function getMailTmMessages(token: string): Promise<Array<{ id: string; subject: string; body: string }>> {
-  const res = await fetch(`${MAIL_TM_BASE}/messages`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) return []
-  const data = await res.json()
-  const messages = (data['hydra:member'] ?? []) as Array<{ id: string; subject: string; text?: string; html?: string }>
-
-  const fullMessages = []
-  for (const msg of messages) {
-    const msgRes = await fetch(`${MAIL_TM_BASE}/messages/${msg.id}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (msgRes.ok) {
-      const full = await msgRes.json()
-      fullMessages.push({
-        id: msg.id,
-        subject: full.subject ?? msg.subject,
-        body: full.text ?? full.html ?? '',
-      })
-    }
-  }
-  return fullMessages
-}
-
 // ── BotX Registration ────────────────────────────────────────
 
 const BOTX_SIGNUP_URL = 'https://dbotx.com/api/auth/register'

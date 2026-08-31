@@ -13,6 +13,10 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     "node_modules/**",
+    // Gitignored scratch/research + promo-video build (not tracked source —
+    // keep eslint aligned with gitignore so CI lint == tracked surface).
+    "videos/**",
+    "local/**",
   ]),
   {
     rules: {

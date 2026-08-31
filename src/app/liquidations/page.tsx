@@ -135,10 +135,6 @@ fetchBinance()
 
   const totalLongLiq = heatmap.reduce((s, b) => s + b.longLiquidations, 0)
   const totalShortLiq = heatmap.reduce((s, b) => s + b.shortLiquidations, 0)
-  const totalLiq = totalLongLiq + totalShortLiq
-  const longDominance = totalLiq > 0 ? (totalLongLiq / totalLiq) * 100 : 50
-
-  const maxDensity = binanceData ? Math.max(...binanceData.heatmap.map(b => b.density), 0.01) : 1
 
   const posColumns: Column<PositionEntry>[] = [
     { key: 'symbol', header: 'Pair', width: 80, render: r => (
@@ -264,7 +260,6 @@ fetchBinance()
                       {[...heatmap].reverse().map((bin, i) => {
                         const longD = bin.longLiquidations
                         const shortD = bin.shortLiquidations
-                        const maxD = Math.max(longD, shortD, 1)
                         const intensity = Math.min(1, bin.density)
                         return (
                           <div key={i} className="rounded-sm transition-colors"

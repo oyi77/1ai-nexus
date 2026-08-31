@@ -16,7 +16,6 @@
 // Chain: solana only (forge API is Solana-specific).
 // ─────────────────────────────────────────────────────────────
 
-import { TTL } from '../../types'
 import type { MemeAlphaToken, MemeRiskAudit } from '../types'
 import { connect } from 'node:http2'
 

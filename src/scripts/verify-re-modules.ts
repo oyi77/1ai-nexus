@@ -9,7 +9,6 @@
  * Usage: npx tsx src/scripts/verify-re-modules.ts [--fix]
  */
 
-import { getRegistry } from '../lib/modules/registry'
 import { registerAllModules } from '../lib/modules'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -57,15 +56,6 @@ function colorStatus(status: string): string {
   }
 }
 
-function colorTime(iso: string): string {
-  const now = Date.now()
-  const then = new Date(iso).getTime()
-  const days = Math.floor((now - then) / 86_400_000)
-  if (days > 14) return `${RED}${days}d ago${RESET}`
-  if (days > 7)  return `${YELLOW}${days}d ago${RESET}`
-  return `${GREEN}${days}d ago${RESET}`
-}
-
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10)
 }
@@ -89,7 +79,6 @@ interface HealthResult {
 
 async function main() {
   const fix = process.argv.includes('--fix')
-  const args = process.argv.slice(2).filter(a => a !== '--fix')
 
   console.log(`\n  ${BOLD}${CYAN}RE Module Verification${RESET}${DIM}  —  ${new Date().toISOString()}${RESET}\n`)
 

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { NexusLayout } from "@/components/layout/NexusLayout"
 import { Target, TrendingUp, Users, BarChart3, ExternalLink, Filter } from "lucide-react"
 
 interface NormalizedMarket {

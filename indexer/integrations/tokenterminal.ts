@@ -188,7 +188,7 @@ async function syncLatestMetrics(config: IntegrationConfig, apiKey: string): Pro
   console.log(`[tokenterminal] published ${snapshots.length} fundamental metric snapshots`);
 }
 
-export async function healthCheck(config: IntegrationConfig): Promise<{
+export async function healthCheck(_config: IntegrationConfig): Promise<{
   ok: boolean;
   projectCount?: number;
   error?: string;

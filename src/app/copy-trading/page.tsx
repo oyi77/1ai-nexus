@@ -71,9 +71,6 @@ export default function CopyTradingPage() {
 
   const totalAum = leaders.reduce((s, l) => s + l.aum, 0)
   const totalFollowers = leaders.reduce((s, l) => s + l.followers, 0)
-  const avgWinRate = leaders.length
-    ? leaders.reduce((s, l) => s + l.winRate, 0) / leaders.length
-    : 0
   const platformStatus = meta?.platforms
     ? meta.platforms.filter(p => p.status === 'ok').length
     : 0

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { NexusLayout } from '@/components/layout/NexusLayout'
 import { LiveDot } from '@/components/primitives/LiveDot'
 
 interface NewsItem {

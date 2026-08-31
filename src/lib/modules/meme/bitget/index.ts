@@ -15,11 +15,8 @@
 
 import https from 'node:https'
 import crypto from 'node:crypto'
-import { TTL } from '../../types'
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
 
-const MODULE_ID = 'bitget-meme'
-const BITGET_TTL = TTL.TOKEN_DATA * 3 // 60s × 3 = 180s
 const BITGET_HOST = 'copenapi.bgwapi.io'
 
 // Chain ids Bitget Wallet uses for meme tokens (BSC / ETH / Base / Solana).

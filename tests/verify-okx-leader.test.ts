@@ -10,7 +10,6 @@ test('OKX leader detail page renders correctly', async ({ page }) => {
   await page.waitForLoadState('networkidle');
   
   // Get page content for verification
-  const content = await page.content();
   const textContent = await page.textContent('body');
   
   console.log('=== Page Title ===');

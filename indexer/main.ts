@@ -181,7 +181,7 @@ async function checkIntegrations(config: IntegrationConfig) {
   // FRED
   if (config.fred.apiKey) {
     try {
-      const fredHealth = await fetchWithRetry(
+      await fetchWithRetry(
         `https://api.stlouisfed.org/fred/series/observations?series_id=FEDFUNDS&api_key=${config.fred.apiKey}&file_type=json&limit=1`,
         { maxRetries: 1, timeoutMs: 10_000 }
       );
@@ -196,7 +196,7 @@ async function checkIntegrations(config: IntegrationConfig) {
   // CoinMetrics
   if (config.coinmetrics.apiKey) {
     try {
-      const cmHealth = await fetchWithRetry(
+      await fetchWithRetry(
         "https://api.coinmetrics.io/v4/timeseries/asset-metrics?assets=btc&metrics=PriceUSD&page_size=1",
         { headers: { Authorization: `Bearer ${config.coinmetrics.apiKey}` }, maxRetries: 1, timeoutMs: 10_000 }
       );

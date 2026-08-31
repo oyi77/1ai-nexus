@@ -12,7 +12,6 @@
 
 import { PrismaClient } from "@prisma/client";
 import * as fs from "fs";
-import * as path from "path";
 
 const prisma = new PrismaClient();
 
@@ -102,9 +101,6 @@ async function main() {
     (await prisma.entity.findMany({ select: { name: true } })).map(e => e.name)
   )
 
-  let totalEntities = 0
-  let totalWallets = 0
-
   // Phase 1: Fetch top holders for each major token
   console.log("\n─── Phase 1: Top Token Holders (Ethplorer) ───")
   for (const token of MAJOR_TOKENS) {
@@ -149,8 +145,6 @@ async function main() {
       newWallets++
     }
 
-    totalEntities += newEntities
-    totalWallets += newWallets
     if (newEntities > 0) {
       console.log(`  ${token.symbol}: +${newEntities} entities, +${newWallets} wallets`)
     }
@@ -185,7 +179,6 @@ async function main() {
       }
 
       let chainEntities = 0
-      let chainWallets = 0
 
       for (const [address, info] of Object.entries(labels)) {
         const name = info.name?.trim()
@@ -217,11 +210,8 @@ async function main() {
         existingEntityNames.add(name)
         existingAddresses.add(addr)
         chainEntities++
-        chainWallets++
       }
 
-      totalEntities += chainEntities
-      totalWallets += chainWallets
       console.log(`  ${chainDir.name}: +${chainEntities} entities`)
     }
   }

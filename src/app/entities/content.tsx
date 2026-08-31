@@ -1,14 +1,12 @@
 "use client"
 
 import { useState, useEffect, useCallback } from 'react'
-import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { DataTable, type Column } from '@/components/shell/DataTable'
 import { AddressChip } from '@/components/primitives/AddressChip'
 import { EntityLabel } from '@/components/primitives/EntityLabel'
 import { PriceTag } from '@/components/primitives/PriceTag'
 import { LiveDot } from '@/components/primitives/LiveDot'
-import { Sparkline } from '@/components/primitives/Sparkline'
 
 interface Entity {
   id: string

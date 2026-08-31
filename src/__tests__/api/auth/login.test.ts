@@ -7,7 +7,7 @@ import { UserRole, type User } from '@prisma/client';
 
 // Mock JWT functions
 vi.mock('@/lib/jwt', () => ({
-  signToken: vi.fn((payload: unknown) => 'mock-jwt-token'),
+  signToken: vi.fn((_payload: unknown) => 'mock-jwt-token'),
   createSessionCookie: vi.fn((token: string) => `nexus-session=${token}; HttpOnly; Secure; Path=/`),
 }));
 

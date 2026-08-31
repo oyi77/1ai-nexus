@@ -38,7 +38,7 @@ function normalizeOI(oi: number): number {
   return Math.min(100, (oi / 200_000) * 100)
 }
 
-function getDirection(oi: number): 'bullish' | 'bearish' | 'neutral' {
+function getDirection(_oi: number): 'bullish' | 'bearish' | 'neutral' {
   // High OI with high funding = crowded, risky
   // Rising OI + rising price = trend continuation
   // For now, return neutral (needs price context)

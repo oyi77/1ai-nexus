@@ -52,7 +52,7 @@ export default function OrderBookPage() {
     return () => { cancelled = true }
   }, [])
 
-  const [wsConnected, setWsConnected] = useState(false)
+  const [, setWsConnected] = useState(false)
   const socketRef = useRef<Socket | null>(null)
 
   // REST fallback for ticker data

@@ -91,7 +91,7 @@ export default function FundamentalsPage() {
           operatingCashflow: (q.operatingCashflow ?? null) as number | null,
         }))
         setData(items)
-        setDetail(items.find(i => i.symbol === selected) ?? null)
+        // setDetail is handled by the [selected, data] effect below.
         setLoading(false)
       })
       .catch(() => setLoading(false))

@@ -1,7 +1,6 @@
 "use client"
 
 import { useMemo } from 'react'
-import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { DataTable, type Column } from '@/components/shell/DataTable'
 import { LiveDot } from '@/components/primitives/LiveDot'

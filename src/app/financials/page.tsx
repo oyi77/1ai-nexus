@@ -61,7 +61,6 @@ export default function FinancialsPage() {
 
         const marketCap = q.marketCap ?? 0
         const shares = q.sharesOutstanding ?? 1
-        const price = q.regularMarketPrice ?? 0
 
         setData({
           symbol: q.symbol,

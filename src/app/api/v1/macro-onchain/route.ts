@@ -1,4 +1,3 @@
-import { fetchGraceful } from '@/lib/api/fetch-utils'
 // ─────────────────────────────────────────────────────────────
 // GET /api/v1/macro-onchain — BTC on-chain macro metrics
 // MVRV, SOPR, NVT derived from CoinGecko + Blockstream

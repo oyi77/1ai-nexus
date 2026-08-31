@@ -351,7 +351,7 @@ export async function getAggregatedSentiment(asset: string): Promise<{
   return { xScore, lunarScore, combined, label, confidence };
 }
 
-export async function healthCheck(config: IntegrationConfig): Promise<{
+export async function healthCheck(_config: IntegrationConfig): Promise<{
   ok: boolean;
   xAvailable: boolean;
   lunarAvailable: boolean;

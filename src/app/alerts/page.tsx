@@ -225,28 +225,6 @@ function AlertTypeForm({ type, config, onChange }: { type: AlertType; config: Re
   }
 }
 
-// ─── Description builder ──────────────────────────────────
-
-function describeAlert(alert: Alert): string {
-  const c = alert.config
-  switch (alert.type) {
-    case 'price_threshold':
-      return `${c.symbol} ${c.direction === 'above' ? '>' : '<'} ${c.threshold}`
-    case 'forex_rate':
-      return `${c.pair} ${c.direction === 'above' ? '>' : '<'} ${c.threshold}`
-    case 'macro_event':
-      return `${c.country} — ${c.event}`
-    case 'wallet_moved':
-      return `Any wallet moves >= $${Number(c.minAmountUsd).toLocaleString()}${c.address ? ` (${String(c.address).slice(0, 8)}...)` : ''}`
-    case 'smart_money_action':
-      return `Smart money ${c.action} (score >= ${c.minScore})`
-    case 'prediction_threshold':
-      return `Market ${String(c.marketId).slice(0, 12)}... ${c.direction === 'above' ? '>' : '<'} ${c.threshold}`
-    default:
-      return alert.name
-  }
-}
-
 // ─── Main page ────────────────────────────────────────────
 
 export default function AlertsPage() {
@@ -256,7 +234,7 @@ export default function AlertsPage() {
   const [config, setConfig] = useState<Record<string, unknown>>({})
   const [channel, setChannel] = useState<Channel>('telegram')
   const [filterCategory, setFilterCategory] = useState<'all' | 'tradfi' | 'crypto'>('all')
-  const [loading, setLoading] = useState(true)
+  const [, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [evaluating, setEvaluating] = useState(false)
   const [evalSummary, setEvalSummary] = useState<{ evaluated: number; triggered: number; results: Array<{ id: string; type: string; triggered: boolean; message: string; fired: boolean; deliveryStatus: string; deliveryError?: string }> } | null>(null)

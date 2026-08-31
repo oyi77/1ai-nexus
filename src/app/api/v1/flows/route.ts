@@ -1,6 +1,5 @@
 export const dynamic = "force-dynamic";
 
-import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 
 import { apiSuccess, apiError } from "@/lib/api/response";
