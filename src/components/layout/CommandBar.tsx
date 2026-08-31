@@ -21,7 +21,7 @@ export function CommandBar() {
   const inputRef = useRef<HTMLInputElement>(null)
   const router = useRouter()
 
-  // Global keyboard shortcut: / or Cmd+K to focus
+  // Global keyboard shortcut: / to focus
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === '/' && !e.metaKey && !e.ctrlKey && !(e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement)) {
@@ -29,11 +29,7 @@ export function CommandBar() {
         inputRef.current?.focus()
         setIsOpen(true)
       }
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-        e.preventDefault()
-        inputRef.current?.focus()
-        setIsOpen(true)
-      }
+
       if (e.key === 'Escape') {
         setInput('')
         setIsOpen(false)
@@ -102,7 +98,7 @@ export function CommandBar() {
             <X size={10} />
           </button>
         )}
-        <kbd className="text-[8px] text-text-muted bg-bg-base px-1 rounded shrink-0">⌘K</kbd>
+        <kbd className="text-[8px] text-text-muted bg-bg-base px-1 rounded shrink-0">/</kbd>
       </div>
 
       {/* Suggestions dropdown */}
