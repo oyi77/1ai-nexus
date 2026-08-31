@@ -25,7 +25,7 @@ All configuration is via environment variables. Copy `.env.example` to `.env` an
 | `NEXTAUTH_URL` | `http://localhost:4400` | Yes | Base URL for NextAuth callbacks. Set to `https://tracker.aitradepulse.com` in production. |
 | `NEXT_PUBLIC_APP_URL` | `http://localhost:4400` | No | Public-facing app URL used by the frontend. |
 | `NEXT_PUBLIC_WS_URL` | `ws://localhost:4401` | No | WebSocket server URL used by the frontend. |
-| `NEXUS_API_KEYS` | `nexus-dev-key` | Yes | Comma-separated API keys for v1 endpoint auth. |
+| `NEXUS_API_KEYS` | *(required — no default)* | Yes | Comma-separated API keys for v1 endpoint auth. |
 | `POSTGRES_PASSWORD` | `nexus` | Docker | PostgreSQL password (Docker Compose only). |
 
 ### Blockchain RPC Endpoints
@@ -257,7 +257,7 @@ Expected: `PONG`
 docker compose ps
 
 # Check web app responds
-curl -s -H "Authorization: Bearer nexus-dev-key" \
+curl -s -H "Authorization: Bearer $NEXUS_API_KEYS" \
   http://localhost:4400/api/v1/data-sources | jq '.data.summary'
 
 # Check indexer health
@@ -464,7 +464,7 @@ Common fixes:
 curl -s http://localhost:4401/health
 
 # Test Socket.IO connection
-npx socket.io-cli connect http://localhost:4401 --auth '{"token":"nexus-dev-key"}'
+npx socket.io-cli connect http://localhost:4401 --auth '{"token":"<NEXUS_API_KEYS>"}'
 
 # Check if WS port is exposed
 docker compose port ws 4401
@@ -511,7 +511,7 @@ docker compose up -d --build
 
 # 4. Verify
 curl -s http://localhost:4401/health
-curl -s -H "Authorization: Bearer nexus-dev-key" \
+curl -s -H "Authorization: Bearer $NEXUS_API_KEYS" \
   http://localhost:4400/api/v1/data-sources | jq '.data.summary'
 
 # 5. Return to latest when ready

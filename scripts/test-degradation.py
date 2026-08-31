@@ -23,7 +23,7 @@ def test_graceful_degradation():
         import requests
         res = requests.get(
             "http://localhost:4400/api/v1/market-score?symbol=BTC",
-            headers={"Authorization": "Bearer nexus-dev-key"},
+            headers={"Authorization": f"Bearer {os.environ.get('NEXUS_API_KEYS', '').split(',')[0]}"},
             timeout=30
         )
         data = res.json()
@@ -40,7 +40,7 @@ def test_graceful_degradation():
     try:
         res = requests.get(
             "http://localhost:4400/api/v1/market-score?symbol=FAKECOIN",
-            headers={"Authorization": "Bearer nexus-dev-key"},
+            headers={"Authorization": f"Bearer {os.environ.get('NEXUS_API_KEYS', '').split(',')[0]}"},
             timeout=30
         )
         data = res.json()
@@ -55,7 +55,7 @@ def test_graceful_degradation():
     try:
         res = requests.get(
             "http://localhost:4400/api/v1/market-score",
-            headers={"Authorization": "Bearer nexus-dev-key"},
+            headers={"Authorization": f"Bearer {os.environ.get('NEXUS_API_KEYS', '').split(',')[0]}"},
             timeout=30
         )
         data = res.json()

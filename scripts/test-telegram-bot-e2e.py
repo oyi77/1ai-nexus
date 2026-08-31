@@ -7,7 +7,13 @@ import asyncio, sys, os
 
 SESSION_PATH = os.path.expanduser("~/.openclaw/workspace/vilona_session")
 API_ID = 23913448
-API_HASH = "78d168f985edf365a5cd9679a917a0b2"
+# API credentials come from env (Telegram requires API_ID + API_HASH).
+# Set TELEGRAM_API_ID / TELEGRAM_API_HASH — never commit real values.
+API_ID = int(os.environ.get("TELEGRAM_API_ID", "23913448"))
+API_HASH = os.environ.get("TELEGRAM_API_HASH") or ""
+if not API_HASH:
+    print("Set TELEGRAM_API_HASH env var (Telegram app credentials) and retry.")
+    sys.exit(2)
 BOT_USERNAME = "vilona_nexus_bot"
 
 passed = 0
