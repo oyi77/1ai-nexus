@@ -26,6 +26,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: 'Alpha Feed', href: '/alpha', icon: Zap, description: 'Curated high-conviction opportunities.' },
       { label: 'Watchlist', href: '/watchlist', icon: Eye, description: 'Assets you track closely.' },
       { label: 'Alerts', href: '/alerts', icon: Bell, description: 'Price and on-chain alerts you set.' },
+      { label: 'Following', href: '/following', icon: Users, description: 'Track traders, entities and wallets you follow.' },
       { label: 'Intelligence Score', href: '/intelligence-score', icon: Gauge, description: 'A/B/C intelligence grade per asset.' },
     ],
   },

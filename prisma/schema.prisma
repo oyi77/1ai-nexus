@@ -354,6 +354,17 @@ model User {
   @@index([plan])
 }
 
+model Follow {
+  id         String   @id @default(cuid())
+  userId     String
+  targetType String   // 'entity' | 'wallet'
+  targetId   String   // entity.id or wallet.id
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, targetType, targetId])
+  @@index([userId])
+}
+
 model IndexerCheckpoint {
   id         String   @id @default(cuid())
   chain      String   @unique

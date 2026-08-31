@@ -68,6 +68,42 @@ interface HoldersResponse {
   timestamp: number
 }
 
+interface ThesisSignal {
+  id: string
+  type: string
+  asset: string
+  direction: 'bullish' | 'bearish' | 'neutral'
+  strength: number
+  confidence: number
+  headline: string
+  explanation: string
+  source: string
+  timestamp: string
+  route?: string
+}
+
+interface ThesisResponse {
+  symbol: string
+  thesis: 'BULLISH' | 'BEARISH' | 'NEUTRAL'
+  weightedScore: number
+  confidence: number
+  counts: { bullish: number; bearish: number; neutral: number }
+  totalSignals: number
+  topSignals: ThesisSignal[]
+}
+
+const THESIS_STYLE: Record<string, string> = {
+  BULLISH: 'bg-data-bull/20 text-data-bull',
+  BEARISH: 'bg-data-bear/20 text-data-bear',
+  NEUTRAL: 'bg-bg-raised text-text-muted',
+}
+
+const DIRECTION_STYLE: Record<string, string> = {
+  bullish: 'text-data-bull',
+  bearish: 'text-data-bear',
+  neutral: 'text-text-muted',
+}
+
 const TYPE_STYLE: Record<string, string> = {
   exchange: 'bg-accent-amber/20 text-accent-amber',
   fund: 'bg-purple-400/20 text-purple-400',
@@ -100,6 +136,7 @@ export default function TokenDetailPage() {
   const [interval, setIntervalStr] = useState('1h')
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
   const [holders, setHolders] = useState<HoldersResponse | null>(null)
+  const [thesis, setThesis] = useState<ThesisResponse | null>(null)
 
   useEffect(() => {
     if (!address) return
@@ -145,6 +182,16 @@ export default function TokenDetailPage() {
       .then(d => setHolders((d as { data: HoldersResponse }).data))
       .catch(() => {})
   }, [address])
+
+  const thesisSymbol = holders?.token?.symbol || token?.symbol?.split('/')[0] || null
+
+  useEffect(() => {
+    if (!thesisSymbol) return
+    fetch(`/api/v1/token/thesis?symbol=${encodeURIComponent(thesisSymbol)}`)
+      .then(r => r.json())
+      .then(d => setThesis((d as { data: ThesisResponse }).data))
+      .catch(() => {})
+  }, [thesisSymbol])
 
   return (
     <NexusLayout>
@@ -296,6 +343,59 @@ export default function TokenDetailPage() {
                       </span>
                     </div>
                   ))}
+                </div>
+              )}
+            </Panel>
+
+            {/* Trade Thesis */}
+            <Panel title="Trade Thesis" subtitle="Aggregated alpha signal thesis" liveStatus="live">
+              {!thesis ? (
+                <div className="text-text-muted text-[12px] p-8 text-center">
+                  Loading trade thesis…
+                </div>
+              ) : thesis.totalSignals === 0 ? (
+                <div className="text-text-muted text-[12px] p-8 text-center">
+                  No alpha signals for this token yet.
+                </div>
+              ) : (
+                <div className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[16px] font-head font-bold px-2.5 py-1 rounded ${THESIS_STYLE[thesis.thesis] ?? 'bg-bg-raised text-text-muted'}`}>
+                      {thesis.thesis}
+                    </span>
+                    <span className="text-xs font-mono text-text-muted">
+                      Confidence{' '}
+                      <span className="text-text-primary font-bold tabular-nums">{(thesis.confidence * 100).toFixed(0)}%</span>
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono text-text-muted">Weighted Score</span>
+                    <span className="text-[16px] font-mono font-bold text-text-primary tabular-nums">
+                      {thesis.weightedScore.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between border-t border-bg-border pt-2">
+                    <span className="text-[11px] font-mono font-bold text-data-bull">▲ Bullish {thesis.counts.bullish}</span>
+                    <span className="text-[11px] font-mono font-bold text-data-bear">▼ Bearish {thesis.counts.bearish}</span>
+                    <span className="text-[11px] font-mono text-text-muted">◆ Neutral {thesis.counts.neutral}</span>
+                  </div>
+                  <div className="space-y-2 border-t border-bg-border pt-2">
+                    {thesis.topSignals.map(s => (
+                      <div key={s.id} className="rounded border border-bg-border bg-bg-raised/40 p-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-[12px] font-medium text-text-primary leading-snug">{s.headline}</span>
+                          <span className={`text-[11px] shrink-0 ${DIRECTION_STYLE[s.direction] ?? 'text-text-muted'}`}>
+                            {s.direction === 'bullish' ? '▲' : s.direction === 'bearish' ? '▼' : '◆'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-text-muted mt-1 leading-snug">{s.explanation}</p>
+                        <div className="flex items-center justify-between mt-1.5">
+                          <span className="text-[10px] font-mono uppercase text-teal-vivid">{s.source}</span>
+                          <span className="text-[10px] font-mono text-text-muted">STR {s.strength}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </Panel>

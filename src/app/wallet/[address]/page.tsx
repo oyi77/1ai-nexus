@@ -9,6 +9,7 @@ import { DataTable, type Column } from '@/components/shell/DataTable'
 import { PriceTag } from '@/components/primitives/PriceTag'
 import { AddressChip } from '@/components/primitives/AddressChip'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { FollowButton } from '@/components/primitives/FollowButton'
 
 interface EntityInfo {
   id: string
@@ -229,7 +230,10 @@ export default function WalletDetailPage() {
               )}
             </div>
           </div>
-          <LiveDot status={status} label />
+          <div className="flex items-center gap-2">
+            <FollowButton type="wallet" id={address} />
+            <LiveDot status={status} label />
+          </div>
         </div>
 
         {/* Wallet Stats */}

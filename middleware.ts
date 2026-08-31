@@ -46,6 +46,7 @@ import { extractJwtSession, checkSubscriptionRateLimit } from '@/lib/jwt-middlew
   '/api/v1/revenue',
   '/api/v1/token/god-mode',
   '/api/v1/token/holders',
+  '/api/v1/token/thesis',
   '/api/v1/mempool',
   '/api/v1/copy-trading/leaderboard',
   '/api/v1/copy-trading/performance',

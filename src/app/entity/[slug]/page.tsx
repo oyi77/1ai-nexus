@@ -7,6 +7,7 @@ import { Panel } from '@/components/shell/Panel'
 import { PriceTag } from '@/components/primitives/PriceTag'
 import { AddressChip } from '@/components/primitives/AddressChip'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { FollowButton } from '@/components/primitives/FollowButton'
 
 interface EntityDetail {
   id: string
@@ -144,7 +145,10 @@ export default function EntityDetailPage() {
               ) : 'Loading entity data...'}
             </p>
           </div>
-          <LiveDot status={status} label />
+          <div className="flex items-center gap-2">
+            {entity && <FollowButton type="entity" id={entity.id} />}
+            <LiveDot status={status} label />
+          </div>
         </div>
 
         {entity ? (
