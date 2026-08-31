@@ -34,6 +34,7 @@ interface GeckoPoolAttrs {
   price_change_percentage?: Record<string, string>
   volume_usd?: string
   reserve_in_usd?: string
+  transactions?: Record<string, { buys?: number; sells?: number; buyers?: number; sellers?: number }>
 }
 
 interface GeckoPool {
@@ -80,6 +81,7 @@ function poolToToken(pool: GeckoPool): MemeAlphaToken | null {
   const nameParts = (attrs.name ?? '').split('/').map((s) => s.trim())
   const symbol = nameParts[0] ?? ''
   const changePct = toNum(attrs.price_change_percentage?.h24)
+  const h24 = attrs.transactions?.h24
 
   return {
     id: `solana:${contract}`,
@@ -99,6 +101,8 @@ function poolToToken(pool: GeckoPool): MemeAlphaToken | null {
     top10HolderPercent: 0,
     social: {},
     audited: false,
+    buyCount24h: toNum(h24?.buys),
+    sellCount24h: toNum(h24?.sells),
   }
 }
 

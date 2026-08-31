@@ -63,6 +63,9 @@ export interface MemeAlphaToken {
   social: { twitter?: string; telegram?: string; site?: string }
   /** True when the discovery row also carries a fresh honeypot audit. */
   audited: boolean
+  /** Optional buy/sell transaction counts (24h — from GeckoTerminal etc.). */
+  buyCount24h?: number
+  sellCount24h?: number
 }
 
 export interface MemeDiscoveryResponse {
@@ -74,6 +77,11 @@ export interface MemeDiscoveryResponse {
     /** Per-source status for error isolation (mirrors copy-trading). */
     platformsStatus: Record<string, { ok: boolean; error?: string }>
   }
+  /** Present when requested via `?explain=1` — per-token score decomposition. */
+  explanations?: Record<
+    string,
+    { score: number; reasons: { points: number; code: string; label: string }[]; flowSignal?: unknown }
+  >
 }
 
 /** Normalized honeypot / rug audit row. */

@@ -27,6 +27,7 @@ const POOL = {
     price_change_percentage: { h24: '15.5', h1: '2.1', m5: '0.3' },
     volume_usd: '125000',
     reserve_in_usd: '30000',
+    transactions: { h24: { buys: 120, sells: 40, buyers: 90, sellers: 35 } },
   },
   relationships: {
     base_token: { data: { id: 'solana_TestMint11111111111111111111111111111111111111', type: 'token' } },
@@ -50,6 +51,8 @@ describe('discoverGeckoTerminalTokens', () => {
     expect(t.marketCap).toBe(450000)
     expect(t.liquidity).toBe(30000)
     expect(t.createdAt).toBe(new Date('2026-08-30T10:00:00Z').getTime())
+    expect(t.buyCount24h).toBe(120)
+    expect(t.sellCount24h).toBe(40)
   })
 
   it('returns empty array on upstream failure', async () => {

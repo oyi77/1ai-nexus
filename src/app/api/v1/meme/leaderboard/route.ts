@@ -18,7 +18,7 @@ import {
   normalizeMemePlatformParam,
   type MemePlatform,
 } from '@/lib/modules/meme'
-import { sortByMetrics } from '@/lib/modules/meme/ranking'
+import { sortByMetrics, explainScore, type FlowSignal } from '@/lib/modules/meme/ranking'
 import type { MemeAlphaToken, MemeDiscoveryResponse } from '@/lib/modules/meme/types'
 
 type PlatformStatus = { ok: boolean; error?: string }
@@ -45,8 +45,12 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const platformParam = (searchParams.get('platform') ?? 'all').toLowerCase()
   const limit = Math.min(Math.max(Number(searchParams.get('limit') ?? 50) || 50, 1), 200)
+  const explain = searchParams.get('explain') === '1'
 
   const platform: MemePlatform | 'all' = normalizeMemePlatformParam(platformParam)
+  // ?explain=1 → attach per-token score decomposition (reasons + flow signal).
+  const explainOf = (tokens: MemeAlphaToken[]) =>
+    explain ? Object.fromEntries(tokens.map((t) => [t.id, explainScore(t)])) : undefined
 
   try {
     if (platform !== 'all') {
@@ -67,6 +71,7 @@ export async function GET(req: Request) {
           platformsStatus: { [platform]: data.status },
         },
       }
+      if (explain) body.explanations = explainOf(tokens)
       const resp = NextResponse.json(body)
       resp.headers.set('Cache-Control', `public, max-age=${Math.floor(ttl / 1000)}`)
       resp.headers.set('X-Cache', fromCache ? 'HIT' : 'MISS')
@@ -92,6 +97,7 @@ export async function GET(req: Request) {
         platformsStatus: statusMap,
       },
     }
+    if (explain) body.explanations = explainOf(tokens)
     const resp = NextResponse.json(body)
     resp.headers.set('Cache-Control', 'public, max-age=180')
     return resp

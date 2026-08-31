@@ -12,7 +12,7 @@ async function main() {
   console.log('== GeckoTerminal discovery ==')
   const gt = await discoverGeckoTerminalTokens(3)
   console.log(`tokens: ${gt.length}`)
-  if (gt[0]) console.log('  first:', gt[0].symbol, '| price:', gt[0].price, '| vol24h:', gt[0].volume24h)
+  if (gt[0]) console.log('  first:', gt[0].symbol, '| price:', gt[0].price, '| vol24h:', gt[0].volume24h, '| buys:', gt[0].buyCount24h, '| sells:', gt[0].sellCount24h)
 
   const target = bt[0]?.contract
   if (target) {
@@ -25,10 +25,16 @@ async function main() {
     console.log(' ', ra ? `risk=${ra.riskLevel} ${ra.riskLabel} counts=${JSON.stringify(ra.riskCounts)} top10=${ra.top10HolderPercent} freeze=${ra.canFreeze} mint=${ra.canMint}` : 'null')
   }
 
-  console.log('== explainScore ==')
+  console.log('== explainScore (Birdeye token) ==')
   if (bt[0]) {
     const ex = explainScore(bt[0])
     console.log(' ', 'score:', ex.score.toFixed(3), 'reasons:', ex.reasons.map(r => `${r.code}:${r.points.toFixed(3)}`).join(' '))
+  }
+
+  console.log('== explainScore (GeckoTerminal token — flowSignal) ==')
+  if (gt[0]) {
+    const ex = explainScore(gt[0])
+    console.log(' ', 'score:', ex.score.toFixed(3), 'flow:', ex.flowSignal ? `${ex.flowSignal.code} ${ex.flowSignal.label}` : 'none')
   }
 }
 main().catch(e => { console.error('SMOKE FAIL:', e.message); process.exit(1) })

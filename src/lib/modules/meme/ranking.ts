@@ -30,13 +30,29 @@ export interface ScoreReason {
   label: string
 }
 
+/** Buy/sell flow signal derived from per-window transaction counts. */
+export interface FlowSignal {
+  /** Buy-to-sell ratio (buys / max(1, sells)). */
+  ratio: number
+  /** `accumulation` when buys dominate, `distribution` when sells do. */
+  direction: 'accumulation' | 'distribution' | 'neutral'
+  code: 'BUY_PRESSURE' | 'SELL_PRESSURE' | 'BALANCED'
+  label: string
+}
+
 /**
  * Explainable composite score — same total as `scoreOf`, plus the
  * per-component breakdown (volume / market-cap / momentum) with reason
  * codes. Uses the same formula so `scoreOf` stays the single source of
  * truth; `explainScore` only decomposes it.
+ * When buy/sell counts are available on the token, a `flowSignal` is
+ * returned alongside the decomposition (not part of the composite score).
  */
-export function explainScore(t: MemeAlphaToken): { score: number; reasons: ScoreReason[] } {
+export function explainScore(t: MemeAlphaToken): {
+  score: number
+  reasons: ScoreReason[]
+  flowSignal?: FlowSignal
+} {
   const volume = (t.volume24h ?? 0) / 1e6
   const marketCap = (t.marketCap ?? 0) / 1e9
   const momentum = t.change24h ?? 0
@@ -47,7 +63,23 @@ export function explainScore(t: MemeAlphaToken): { score: number; reasons: Score
   if (momentum > 0) reasons.push({ points: momentum, code: 'MOMENTUM', label: `24h momentum +${Math.round(momentum * 100)}%` })
   if (momentum < 0) reasons.push({ points: momentum, code: 'MOMENTUM_REVERSAL', label: `24h momentum ${Math.round(momentum * 100)}%` })
   if (reasons.length === 0) reasons.push({ points: 0, code: 'NO_DATA', label: 'No volume / market cap / momentum data' })
-  return { score, reasons }
+
+  // Flow signal from buy/sell counts.
+  let flowSignal: FlowSignal | undefined
+  const buys = t.buyCount24h ?? 0
+  const sells = t.sellCount24h ?? 0
+  if (buys > 0 || sells > 0) {
+    const ratio = buys / Math.max(1, sells)
+    if (ratio > 1.2) {
+      flowSignal = { ratio, direction: 'accumulation', code: 'BUY_PRESSURE', label: `Buy pressure ${ratio.toFixed(1)}:1` }
+    } else if (ratio < 0.8) {
+      flowSignal = { ratio, direction: 'distribution', code: 'SELL_PRESSURE', label: `Sell pressure ${(1 / ratio).toFixed(1)}:1` }
+    } else {
+      flowSignal = { ratio, direction: 'neutral', code: 'BALANCED', label: 'Balanced flow' }
+    }
+  }
+
+  return { score, reasons, flowSignal }
 }
 
 /**

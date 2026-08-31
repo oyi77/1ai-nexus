@@ -116,6 +116,20 @@ describe('explainScore — decomposable composite with reason codes', () => {
     const { reasons } = explainScore(makeToken('down', { change24h: -3 }))
     expect(reasons.map((r) => r.code)).toContain('MOMENTUM_REVERSAL')
   })
+
+  it('emits BUY_PRESSURE flow signal from buy/sell counts', () => {
+    const t: MemeAlphaToken = { ...makeToken('flow'), buyCount24h: 120, sellCount24h: 40 }
+    const { flowSignal } = explainScore(t)
+    expect(flowSignal).toBeDefined()
+    expect(flowSignal!.direction).toBe('accumulation')
+    expect(flowSignal!.code).toBe('BUY_PRESSURE')
+    expect(flowSignal!.ratio).toBeCloseTo(3)
+  })
+
+  it('omits flow signal when no buy/sell counts present', () => {
+    const { flowSignal } = explainScore(makeToken('plain'))
+    expect(flowSignal).toBeUndefined()
+  })
 })
 
 describe('computeTier', () => {
