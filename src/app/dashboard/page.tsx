@@ -2,6 +2,7 @@
 import { LiveTerminalFeed } from '@/components/features/LiveTerminalFeed'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { DataTable, type Column } from '@/components/shell/DataTable'
@@ -287,7 +288,7 @@ fetchIntel()
         {/* Today&apos;s Intelligence — derived signals as the product */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-[13px] font-head font-bold text-text-primary uppercase tracking-wide">Today&apos;s Intelligence</h2>
+            <Link href="/intelligence"><h2 className="text-[13px] font-head font-bold text-text-primary uppercase tracking-wide hover:text-teal-vivid transition-colors">Today&apos;s Intelligence →</h2></Link>
             <LiveDot status={intelStatus} label />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
