@@ -83,12 +83,12 @@ describe('scoreCrypto', () => {
     expect(scoreCrypto([])).toBe(50)
   })
 
-  it('full-strength bullish whale signal: 50 + (1×1×1×0.35)×100 = 85', () => {
-    expect(scoreCrypto([sig({})])).toBe(85)
+  it('full-strength bullish whale signal: 50 + (1×1×1×0.3)×100 = 80', () => {
+    expect(scoreCrypto([sig({})])).toBe(80)
   })
 
-  it('full-strength bearish whale signal: 50 - 35 = 15', () => {
-    expect(scoreCrypto([sig({ direction: 'bearish' })])).toBe(15)
+  it('full-strength bearish whale signal: 50 - 30 = 20', () => {
+    expect(scoreCrypto([sig({ direction: 'bearish' })])).toBe(20)
   })
 
   it('neutral direction contributes zero', () => {
@@ -96,8 +96,8 @@ describe('scoreCrypto', () => {
   })
 
   it('scales with strength and confidence', () => {
-    // 50 + (1 × 0.5 × 0.5 × 0.35) × 100 = 58.75
-    expect(scoreCrypto([sig({ strength: 50, confidence: 0.5 })])).toBe(58.75)
+    // 50 + (1 × 0.5 × 0.5 × 0.3) × 100 = 57.5
+    expect(scoreCrypto([sig({ strength: 50, confidence: 0.5 })])).toBe(57.5)
   })
 
   it('applies type weights (news 0.1 vs whale 0.35)', () => {
@@ -112,10 +112,10 @@ describe('scoreCrypto', () => {
 
   it('aggregates multiple signals additively', () => {
     const signals = [
-      sig({ direction: 'bullish', strength: 100, confidence: 1, type: 'whale' }), // +35
+      sig({ direction: 'bullish', strength: 100, confidence: 1, type: 'whale' }), // +30
       sig({ direction: 'bullish', strength: 100, confidence: 1, type: 'news' }), // +10
     ]
-    expect(scoreCrypto(signals)).toBe(95)
+    expect(scoreCrypto(signals)).toBe(90)
   })
 
   it('thesis adds ±10 weighted 0.3', () => {
@@ -174,13 +174,13 @@ describe('idxReasons', () => {
 describe('cryptoReasons', () => {
   it('returns top 3 by |weighted contribution|, skipping zero contributions', () => {
     const signals: AlphaSignalLike[] = [
-      { type: 'whale', direction: 'bullish', strength: 100, confidence: 1, headline: 'strong' }, // |0.35|
+      { type: 'whale', direction: 'bullish', strength: 100, confidence: 1, headline: 'strong' }, // |0.3|
       { type: 'news', direction: 'bullish', strength: 50, confidence: 0.5, headline: 'weak' }, // |0.025|
       { type: 'whale', direction: 'neutral', strength: 100, confidence: 1, headline: 'neutral-skip' }, // 0
     ]
     const reasons = cryptoReasons(signals, 3)
     expect(reasons).toEqual([
-      { text: 'strong', weight: 0.35 },
+      { text: 'strong', weight: 0.3 },
       { text: 'weak', weight: 0.025 },
     ])
   })
@@ -218,7 +218,7 @@ describe('item builders', () => {
     expect(item.price).toBe(78_752)
     expect(item.changePct).toBe(-0.5)
     expect(item.sources).toEqual(['alpha', 'whale', 'news', 'thesis'])
-    expect(item.conviction).toBe(98) // 50 + 45 + 3
+    expect(item.conviction).toBe(93) // 50 + 45 + 3
     expect(item.action).toBe('BUY')
     expect(item.direction).toBe('bull')
   })
