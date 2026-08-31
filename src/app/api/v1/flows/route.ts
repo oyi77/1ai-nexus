@@ -11,6 +11,8 @@ export async function GET(request: Request) {
     const limit = Math.min(200, Math.max(1, Number(searchParams.get("limit") ?? 100)));
 
     const where: Record<string, unknown> = {};
+    const address = searchParams.get("address");
+    if (address) where.wallet = { address: address.toLowerCase() };
     if (chain) where.chain = chain;
 
     const transactions = await prisma.transaction.findMany({

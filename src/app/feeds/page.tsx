@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
-import { Flame, TrendingUp, ExternalLink, RefreshCw, Zap, Activity } from 'lucide-react'
+import { Flame, ExternalLink, RefreshCw } from 'lucide-react'
 
 interface FeedItem {
   id: string
@@ -40,14 +40,6 @@ const CATEGORY_COLORS: Record<string, string> = {
   RESEARCH: 'text-amber-400',
   INDUSTRY: 'text-blue-400',
   TRENDING: 'text-purple-400',
-}
-
-const CATEGORY_ICONS: Record<string, React.ReactNode> = {
-  VIRAL: <Flame size={12} />,
-  MODELS: <Zap size={12} />,
-  RESEARCH: <Activity size={12} />,
-  INDUSTRY: <TrendingUp size={12} />,
-  TRENDING: <Zap size={12} />,
 }
 
 function feedItem(item: FeedItem, rank?: number) {
@@ -111,7 +103,12 @@ export default function FeedsPage() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { fetchFeeds(); const id = setInterval(fetchFeeds, 60_000); return () => clearInterval(id) }, [fetchFeeds])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchFeeds()
+    const id = setInterval(fetchFeeds, 60_000)
+    return () => clearInterval(id)
+  }, [fetchFeeds])
 
   const toggleGroup = (id: string) => {
     setExpanded(prev => {

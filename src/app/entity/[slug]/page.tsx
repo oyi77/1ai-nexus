@@ -18,11 +18,28 @@ interface EntityDetail {
   wallets: Array<{ id: string; address: string; chain: string }>
 }
 
+interface GraphNode {
+  id: string
+  group: number
+  label: string
+  tvl: number
+  type: string
+}
+
+interface GraphLink {
+  source: string
+  target: string
+  value: number
+}
+
 export default function EntityDetailPage() {
   const params = useParams()
   const slug = params?.slug as string
   const [entity, setEntity] = useState<EntityDetail | null>(null)
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
+  const [graphNodes, setGraphNodes] = useState<GraphNode[]>([])
+  const [graphLinks, setGraphLinks] = useState<GraphLink[]>([])
+  const [graphStatus, setGraphStatus] = useState<'live' | 'stale' | 'error'>('stale')
 
   useEffect(() => {
     if (!slug) return
@@ -53,6 +70,19 @@ export default function EntityDetailPage() {
       .catch(() => setStatus('error'))
   }, [slug])
 
+  useEffect(() => {
+    fetch('/api/v1/entities/graph')
+      .then(r => r.json())
+      .then(d => {
+        const nodes = d.data?.nodes ?? []
+        const links = d.data?.links ?? []
+        if (Array.isArray(nodes)) setGraphNodes(nodes as GraphNode[])
+        if (Array.isArray(links)) setGraphLinks(links as GraphLink[])
+        setGraphStatus('live')
+      })
+      .catch(() => setGraphStatus('error'))
+  }, [])
+
   const typeColors: Record<string, string> = {
     protocol: 'bg-teal-vivid/20 text-teal-vivid',
     exchange: 'bg-accent-amber/20 text-accent-amber',
@@ -61,6 +91,36 @@ export default function EntityDetailPage() {
     whale: 'bg-data-bull/20 text-data-bull',
     dao: 'bg-blue-400/20 text-blue-400',
   }
+
+  const relLabel = (value: number): string => {
+    if (value >= 5) return 'Co-invest'
+    if (value >= 3) return 'Bridge'
+    if (value >= 2) return 'Exchange'
+    return 'Wallet'
+  }
+
+  const related = entity && graphNodes.length > 0
+    ? (() => {
+        const ownIds = new Set([entity.id, ...entity.wallets.map(w => w.id)])
+        const nodeById = new Map<string, GraphNode>(graphNodes.map(n => [n.id, n]))
+        const seen = new Map<string, { node: GraphNode; rel: string; value: number }>()
+        for (const link of graphLinks) {
+          const touchesSelf = ownIds.has(link.source) || ownIds.has(link.target)
+          if (!touchesSelf) continue
+          const neighborId = ownIds.has(link.source) ? link.target : link.source
+          if (ownIds.has(neighborId)) continue
+          const node = nodeById.get(neighborId)
+          if (!node) continue
+          const prev = seen.get(neighborId)
+          if (!prev || link.value > prev.value) {
+            seen.set(neighborId, { node, rel: relLabel(link.value), value: link.value })
+          }
+        }
+        return [...seen.values()]
+          .sort((a, b) => b.node.tvl - a.node.tvl)
+          .map(({ node, rel }) => ({ node, rel }))
+      })()
+    : []
 
   return (
     <NexusLayout>
@@ -136,8 +196,8 @@ export default function EntityDetailPage() {
               </Panel>
             </div>
 
-            {/* Right: Wallets */}
-            <div className="col-span-7">
+            {/* Right: Wallets + Related Entities */}
+            <div className="col-span-7 space-y-4">
               <Panel title="Tracked Wallets" subtitle={`${entity.wallets.length} addresses`} liveStatus={status}>
                 <div className="space-y-1 p-2 max-h-[500px] overflow-y-auto">
                   {entity.wallets.map((w) => (
@@ -155,6 +215,33 @@ export default function EntityDetailPage() {
                   ))}
                   {entity.wallets.length === 0 && (
                     <div className="text-xs font-mono text-text-muted p-4 text-center">No wallets tracked yet</div>
+                  )}
+                </div>
+              </Panel>
+
+              <Panel title="Related Entities" subtitle={`${related.length} connections`} liveStatus={graphStatus}>
+                <div className="space-y-1 p-2 max-h-[420px] overflow-y-auto">
+                  {related.length > 0 ? related.map(({ node, rel }) => (
+                    <div key={node.id} className="flex items-center justify-between p-2 hover:bg-bg-raised rounded transition-colors">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded uppercase shrink-0 ${typeColors[node.type.toLowerCase()] ?? 'bg-bg-raised text-text-muted'}`}>
+                          {node.type}
+                        </span>
+                        {node.type === 'entity' ? (
+                          <a href={`/entity/${node.id}`} className="text-[13px] font-mono text-text-primary truncate hover:text-teal-vivid transition-colors">
+                            {node.label}
+                          </a>
+                        ) : (
+                          <span className="text-[13px] font-mono text-text-secondary truncate">{node.label}</span>
+                        )}
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted shrink-0">{rel}</span>
+                      </div>
+                      <PriceTag value={node.tvl} size="sm" />
+                    </div>
+                  )) : (
+                    <div className="text-xs font-mono text-text-muted p-4 text-center">
+                      {graphStatus === 'stale' ? 'Loading graph data...' : graphStatus === 'error' ? 'Graph data unavailable' : 'No related entities found in the graph'}
+                    </div>
                   )}
                 </div>
               </Panel>

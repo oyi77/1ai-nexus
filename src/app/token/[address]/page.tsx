@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { PriceTag } from '@/components/primitives/PriceTag'
+import { AddressChip } from '@/components/primitives/AddressChip'
 import { DeltaBadge } from '@/components/primitives/DeltaBadge'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { TradingViewChart } from '@/components/features/TradingViewChart'
@@ -39,6 +40,57 @@ interface OhlcvResponse {
   indicators: Record<string, unknown>
 }
 
+interface KnownHolder {
+  address: string
+  chain: string
+  label: string
+  type: string
+  verified: boolean
+  tvl: number
+  isContract: boolean
+}
+
+interface HoldersResponse {
+  token: {
+    address: string
+    symbol: string
+    name: string
+    price: number
+    fdv: number
+    marketCap: number
+    totalSupply: number
+    volume24h: number
+    coingeckoId: string | null
+  }
+  knownHolders: KnownHolder[]
+  distribution: Record<string, number>
+  holderCount: number
+  timestamp: number
+}
+
+const TYPE_STYLE: Record<string, string> = {
+  exchange: 'bg-accent-amber/20 text-accent-amber',
+  fund: 'bg-purple-400/20 text-purple-400',
+  whale: 'bg-data-bull/20 text-data-bull',
+  protocol: 'bg-teal-vivid/20 text-teal-vivid',
+  bridge: 'bg-blue-400/20 text-blue-400',
+}
+
+const DISTRIBUTION_LABELS: Record<string, string> = {
+  exchange: 'Exchanges',
+  fund: 'Funds',
+  protocol: 'Protocols',
+  bridge: 'Bridges',
+  whale: 'Whales',
+}
+
+function formatUsd(v: number): string {
+  if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`
+  if (v >= 1e6) return `$${(v / 1e6).toFixed(2)}M`
+  if (v >= 1e3) return `$${(v / 1e3).toFixed(1)}K`
+  return `$${v.toFixed(2)}`
+}
+
 export default function TokenDetailPage() {
   const params = useParams()
   const address = params?.address as string
@@ -47,7 +99,8 @@ export default function TokenDetailPage() {
   const [, setIndicators] = useState<Record<string, Array<{ time: number; value: number }>>>({})
   const [interval, setIntervalStr] = useState('1h')
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
-  
+  const [holders, setHolders] = useState<HoldersResponse | null>(null)
+
   useEffect(() => {
     if (!address) return
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -84,6 +137,14 @@ export default function TokenDetailPage() {
       })
       .catch(() => {})
   }, [token, interval])
+
+  useEffect(() => {
+    if (!address) return
+    fetch(`/api/v1/token/holders?address=${encodeURIComponent(address)}&network=eth`)
+      .then(r => r.json())
+      .then(d => setHolders((d as { data: HoldersResponse }).data))
+      .catch(() => {})
+  }, [address])
 
   return (
     <NexusLayout>
@@ -192,6 +253,84 @@ export default function TokenDetailPage() {
                 <Row label="6h Volume" value={`$${(parseFloat(token.volumeUsd?.h6 ?? '0') / 1e6).toFixed(2)}M`} />
                 <Row label="1h Change" value={`${parseFloat(token.priceChangePercentage?.h1 ?? '0').toFixed(2)}%`} />
                 <Row label="6h Change" value={`${parseFloat(token.priceChangePercentage?.h6 ?? '0').toFixed(2)}%`} />
+              </div>
+            </Panel>
+          </div>
+        )}
+
+        {/* Top Holders */}
+        {holders && (
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <Panel title="Top Holders" subtitle={`${holders.holderCount} known wallets`} liveStatus="live">
+              {holders.knownHolders.length === 0 ? (
+                <div className="text-text-muted text-[12px] p-8 text-center">
+                  No known holders found for this token.
+                </div>
+              ) : (
+                <div className="divide-y divide-bg-border">
+                  <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-4 py-1.5 text-[11px] font-mono text-text-muted uppercase tracking-wide">
+                    <span>Address</span>
+                    <span>Chain</span>
+                    <span>Type</span>
+                    <span className="text-right">TVL</span>
+                  </div>
+                  {holders.knownHolders.map((h, i) => (
+                    <div
+                      key={h.address}
+                      className="grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center px-4 py-2 hover:bg-bg-raised/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[11px] font-mono text-text-muted w-4 shrink-0">{i + 1}</span>
+                        <AddressChip address={h.address} truncate={6} size="xs" />
+                        <span className="text-[12px] font-medium text-text-primary truncate">{h.label}</span>
+                        {h.verified && (
+                          <span className="text-teal-vivid text-[11px] shrink-0" title="Verified">✓</span>
+                        )}
+                      </div>
+                      <span className="text-[11px] font-mono text-text-muted uppercase">{h.chain}</span>
+                      <span className={`text-[11px] font-mono font-bold px-1.5 py-0.5 rounded ${TYPE_STYLE[h.type] ?? 'bg-bg-raised text-text-muted'}`}>
+                        {h.type.toUpperCase()}
+                      </span>
+                      <span className="text-[12px] font-mono font-bold text-text-primary tabular-nums text-right">
+                        {formatUsd(h.tvl)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+
+            {/* Holder Distribution */}
+            <Panel title="Holder Distribution" subtitle="By entity type" liveStatus="live">
+              <div className="p-4 space-y-3">
+                {Object.entries(DISTRIBUTION_LABELS).map(([key, label]) => {
+                  const count = (holders.distribution as Record<string, number>)[key] ?? 0
+                  const total = holders.holderCount
+                  const pct = total > 0 ? (count / total) * 100 : 0
+                  return (
+                    <div key={key}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-xs font-mono font-bold ${TYPE_STYLE[key]?.split(' ')[1] ?? 'text-text-muted'}`}>
+                          {label}
+                        </span>
+                        <span className="text-[13px] font-mono font-bold text-text-primary tabular-nums">
+                          {count} <span className="text-text-muted text-[11px] font-normal">({pct.toFixed(0)}%)</span>
+                        </span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-bg-raised overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${TYPE_STYLE[key]?.split(' ')[0]?.replace('/20', '/40') ?? 'bg-bg-elevated'}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })}
+                {(holders.holderCount === 0 || Object.values(holders.distribution as Record<string, number>).every(v => v === 0)) && (
+                  <div className="text-text-muted text-[12px] text-center py-4">
+                    No distribution data available.
+                  </div>
+                )}
               </div>
             </Panel>
           </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
+import Link from 'next/link'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { DataTable, type Column } from '@/components/shell/DataTable'
@@ -30,12 +31,22 @@ interface WalletTransaction {
   [key: string]: unknown
 }
 
+interface RelatedEntity {
+  wallet: string
+  label: string
+  entityId: string | null
+  type: string
+  totalUsd: number
+  count: number
+}
+
 interface WalletData {
   entity: EntityInfo | null
   transactions: WalletTransaction[]
   txCount: number
   totalVolume: number
   chains: string[]
+  relatedEntities: RelatedEntity[]
 }
 
 export default function WalletDetailPage() {
@@ -49,10 +60,25 @@ export default function WalletDetailPage() {
 
     const fetchData = async () => {
       try {
-        const [entityRes, txRes] = await Promise.allSettled([
+        const [entityRes, txRes, catRes] = await Promise.allSettled([
           fetch(`/api/v1/entities?search=${encodeURIComponent(address)}&pageSize=1`).then(r => r.json()),
           fetch(`/api/v1/flows?address=${encodeURIComponent(address)}&limit=20`).then(r => r.json()),
+          fetch('/api/v1/entities?pageSize=100&sort=totalUsdValue&order=desc').then(r => r.json()),
         ])
+
+        // Build name -> {id,type} map so related entities get a real type badge + deep link
+        const entityCatalog = new Map<string, { id: string; type: string }>()
+        if (catRes.status === 'fulfilled') {
+          const cats = catRes.value?.data?.items ?? catRes.value?.data ?? []
+          if (Array.isArray(cats)) {
+            for (const c of cats) {
+              if (c && c.name) entityCatalog.set(String(c.name).toLowerCase(), {
+                id: String(c.id ?? ''),
+                type: String(c.type ?? 'unknown'),
+              })
+            }
+          }
+        }
 
         let entity: EntityInfo | null = null
         if (entityRes.status === 'fulfilled') {
@@ -87,10 +113,33 @@ export default function WalletDetailPage() {
           }
         }
 
+        // Related entities: aggregate the flows payload by entity for the interactions panel
+        let relatedEntities: RelatedEntity[] = []
+        if (txRes.status === 'fulfilled') {
+          const flowsArr = txRes.value?.data?.items ?? txRes.value?.data?.flows ?? txRes.value?.data ?? []
+          if (Array.isArray(flowsArr)) {
+            relatedEntities = flowsArr.slice(0, 20).map((f: Record<string, unknown>) => {
+              const wallet = String(f.wallet ?? '')
+              const rawLabel = String(f.entity ?? f.label ?? 'Unknown')
+              const known = rawLabel !== 'Unknown' && !/^0x[0-9a-f]{6,}$/i.test(rawLabel)
+                ? entityCatalog.get(rawLabel.toLowerCase())
+                : undefined
+              return {
+                wallet,
+                label: known ? rawLabel : (wallet || rawLabel),
+                entityId: known?.id ?? null,
+                type: known?.type ?? (wallet ? 'wallet' : 'unknown'),
+                totalUsd: Number(f.totalUsd ?? 0),
+                count: Number(f.count ?? 1),
+              }
+            })
+          }
+        }
+
         const totalVolume = transactions.reduce((sum, t) => sum + t.amountUsd, 0)
         const chains = [...new Set(transactions.map(t => t.chain))]
 
-        setData({ entity, transactions, txCount: transactions.length, totalVolume, chains })
+        setData({ entity, transactions, txCount: transactions.length, totalVolume, chains, relatedEntities })
         setStatus('live')
       } catch {
         setStatus('error')
@@ -121,6 +170,39 @@ export default function WalletDetailPage() {
     )},
     { key: 'isMEV', header: 'MEV', width: 50, align: 'center', render: r => (
       r.isMEV ? <span className="text-accent-amber text-xs font-bold">⚠</span> : <span className="text-text-muted text-xs">—</span>
+    )},
+  ]
+
+  const entityColumns: Column<RelatedEntity>[] = [
+    { key: 'label', header: 'Entity', width: 200, render: r => (
+      r.entityId ? (
+        <Link href={`/entity/${encodeURIComponent(r.entityId)}`} className="text-text-primary font-mono text-xs hover:text-teal-vivid transition-colors">
+          {r.label}
+        </Link>
+      ) : r.wallet ? (
+        <Link href={`/wallet/${encodeURIComponent(r.wallet)}`} className="text-text-muted font-mono text-xs hover:text-teal-vivid transition-colors">
+          {r.label.length > 16 ? `${r.label.slice(0, 10)}…${r.label.slice(-4)}` : r.label}
+        </Link>
+      ) : (
+        <span className="text-text-muted font-mono text-xs">{r.label}</span>
+      )
+    )},
+    { key: 'type', header: 'Type', width: 90, render: r => (
+      <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
+        r.type === 'exchange' ? 'bg-accent-amber/20 text-accent-amber' :
+        r.type === 'fund' ? 'bg-purple-400/20 text-purple-400' :
+        r.type === 'whale' ? 'bg-data-bull/20 text-data-bull' :
+        r.type === 'protocol' ? 'bg-teal-vivid/20 text-teal-vivid' :
+        'bg-bg-raised text-text-secondary'
+      }`}>
+        {r.type.toUpperCase()}
+      </span>
+    )},
+    { key: 'totalUsd', header: 'Total USD', width: 110, align: 'right', render: r => (
+      <PriceTag value={r.totalUsd} size="sm" />
+    )},
+    { key: 'count', header: 'Trades', width: 70, align: 'right', render: r => (
+      <span className="text-text-primary font-mono text-xs tabular-nums">{r.count}</span>
     )},
   ]
 
@@ -165,6 +247,16 @@ export default function WalletDetailPage() {
             data={data?.transactions as unknown as Record<string, unknown>[] ?? []}
             rowHeight={32}
             emptyState={<div className="text-text-muted text-[12px] p-8 text-center">No transactions yet. Indexer is scanning live...</div>}
+          />
+        </Panel>
+
+        {/* Entity Interactions */}
+        <Panel title="Entity Interactions" subtitle={`${data?.relatedEntities?.length ?? 0} entities detected`} liveStatus={status}>
+          <DataTable
+            columns={entityColumns as unknown as Column<Record<string, unknown>>[]}
+            data={data?.relatedEntities as unknown as Record<string, unknown>[] ?? []}
+            rowHeight={32}
+            emptyState={<div className="text-text-muted text-[12px] p-8 text-center">No entity interactions detected yet. Indexer is scanning live...</div>}
           />
         </Panel>
 
