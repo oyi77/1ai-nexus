@@ -75,9 +75,14 @@ export async function DELETE(request: NextRequest) {
       return apiJson(null, { error: 'Missing required param: key', status: 400 })
     }
 
-    const revoked = revokeApiKey(key)
-    if (!revoked) {
+    // Scope to the current user — a key owned by another user is "not found"
+    // here, so we never revoke keys we don't own.
+    const result = await revokeApiKey(key, user.userId)
+    if (result === 'not_found') {
       return apiJson(null, { error: 'Key not found', status: 404 })
+    }
+    if (result === 'persist_failed') {
+      return apiJson(null, { error: 'Failed to persist revocation — key is still active', status: 500 })
     }
 
     return apiJson({ revoked: true, message: 'API key has been revoked.' })

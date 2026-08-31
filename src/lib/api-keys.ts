@@ -134,23 +134,30 @@ export async function listUserKeys(userId: string): Promise<Omit<ApiKey, 'key'>[
   })
 }
 
-// Revoke a key
-export function revokeApiKey(key: string): boolean {
-  const apiKey = keys.get(key)
-  if (apiKey) {
-    apiKey.isActive = false
-  }
-  // Persist revocation by key hash so it survives a restart — the in-memory
-  // Map may be empty after a fresh process (or the key never loaded), so we
-  // must still update the DB row here.
+export type RevokeResult = 'ok' | 'not_found' | 'persist_failed'
+
+// Revoke a key. Persists isActive=false to the DB row (by key hash) so the
+// revocation survives a restart — the in-memory Map may be empty after a fresh
+// process, so we must always update the DB. DB write happens first; in-memory
+// state only flips on success so we never report "revoked" while the durable
+// record still says active.
+export async function revokeApiKey(key: string, userId?: string): Promise<RevokeResult> {
   const id = createHash('sha256').update(key).digest('hex').substring(0, 16)
-  void prisma.userApiKey.update({
-    where: { id },
-    data: { isActive: false },
-  }).catch(() => {
-    // DB write failure — in-memory revocation (if present) still applies
-  })
-  return true
+  try {
+    // When userId is given, scope the update — a key owned by another user
+    // matches zero rows, so we never revoke keys we don't own.
+    const result = await prisma.userApiKey.updateMany({
+      where: userId ? { id, userId } : { id },
+      data: { isActive: false },
+    })
+    if (result.count === 0) return 'not_found'
+  } catch (err) {
+    console.error('[api-keys] revoke persistence failed', err)
+    return 'persist_failed'
+  }
+  const apiKey = keys.get(key)
+  if (apiKey) apiKey.isActive = false
+  return 'ok'
 }
 
 // Check rate limit
