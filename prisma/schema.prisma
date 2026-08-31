@@ -916,3 +916,24 @@ model UserEvent {
 
   @@unique([userId, action, refId])
 }
+
+
+model Lead {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String   @default("landing")
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}
+
+model Pageview {
+  id        String   @id @default(cuid())
+  path      String
+  referrer  String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([path])
+}

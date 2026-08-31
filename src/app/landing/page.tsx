@@ -1,7 +1,7 @@
 "use client"
 
 import Link from 'next/link'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ArrowRight, BarChart3, Check, Globe2, Layers, Radio, Users, Zap,
 } from 'lucide-react'
@@ -70,6 +70,44 @@ export default function LandingPage() {
   useEffect(() => {
     if (videoRef.current) videoRef.current.muted = true
   }, [])
+
+  const [waitlistEmail, setWaitlistEmail] = useState('')
+  const [waitlistLoading, setWaitlistLoading] = useState(false)
+  const [waitlistMessage, setWaitlistMessage] = useState<string | null>(null)
+  const [waitlistError, setWaitlistError] = useState<string | null>(null)
+
+  const handleWaitlist = async () => {
+    const trimmed = waitlistEmail.trim()
+    if (!trimmed) {
+      setWaitlistError('Please enter your email')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setWaitlistError('Please enter a valid email address')
+      return
+    }
+    setWaitlistLoading(true)
+    setWaitlistError(null)
+    setWaitlistMessage(null)
+    try {
+      const res = await fetch('/api/v1/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmed, source: 'landing' }),
+      })
+      const data = await res.json()
+      if (!res.ok || data.error) {
+        setWaitlistError(data.error ?? 'Something went wrong — please try again')
+        return
+      }
+      setWaitlistMessage("You're on the list!")
+      setWaitlistEmail('')
+    } catch {
+      setWaitlistError('Network error — please try again')
+    } finally {
+      setWaitlistLoading(false)
+    }
+  }
   return (
     <div className="min-h-screen bg-bg-base text-text-primary">
       {/* ── Nav ── */}
@@ -326,6 +364,50 @@ export default function LandingPage() {
           >
             Open Terminal <ArrowRight size={18} />
           </Link>
+        </div>
+      </section>
+
+      {/* ── Waitlist ── */}
+      <section className="relative overflow-hidden border-t border-bg-border">
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ background: 'radial-gradient(ellipse 55% 60% at 50% 0%, rgba(45,212,160,0.10), transparent 70%)' }}
+        />
+        <div className="relative max-w-3xl mx-auto px-6 py-20 text-center">
+          <p className="eyebrow mb-2">Early access</p>
+          <h2 className="text-3xl font-bold tracking-tight mb-3">Join the waitlist</h2>
+          <p className="text-text-secondary text-lg mb-8">
+            Be first in line for paid tiers, API keys and premium signals — get early access as they launch.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault()
+              void handleWaitlist()
+            }}
+            className="flex flex-col sm:flex-row gap-3 max-w-xl mx-auto"
+          >
+            <input
+              type="email"
+              value={waitlistEmail}
+              onChange={(e) => setWaitlistEmail(e.target.value)}
+              placeholder="you@email.com"
+              disabled={waitlistLoading}
+              className="flex-1 px-4 py-3 rounded-lg border border-bg-border bg-bg-panel text-text-primary placeholder:text-text-muted focus:outline-none focus:border-teal-vivid disabled:opacity-50"
+            />
+            <button
+              type="submit"
+              disabled={waitlistLoading}
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-teal-vivid text-bg-void font-semibold hover:bg-teal-vivid/85 transition-colors disabled:opacity-50"
+            >
+              {waitlistLoading ? 'Joining…' : 'Join Waitlist'}
+            </button>
+          </form>
+          {waitlistMessage && (
+            <p className="mt-4 text-teal-vivid text-sm font-medium">{waitlistMessage}</p>
+          )}
+          {waitlistError && (
+            <p className="mt-4 text-data-bear text-sm font-medium">{waitlistError}</p>
+          )}
         </div>
       </section>
 

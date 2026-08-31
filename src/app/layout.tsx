@@ -7,6 +7,8 @@ import { prisma } from "@/lib/db";
 import { UserProvider, type CurrentUser } from "@/lib/user-context";
 import { computeTier } from "@/lib/gamification-tier";
 import "./globals.css";
+import { PageviewBeacon } from '@/components/primitives/PageviewBeacon'
+
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -85,6 +87,7 @@ export default async function RootLayout({
             __html: `if('serviceWorker' in navigator){navigator.serviceWorker.register('/sw.js')}`,
           }}
         />
+        <PageviewBeacon />
       </body>
     </html>
   );

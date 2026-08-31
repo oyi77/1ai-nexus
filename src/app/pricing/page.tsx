@@ -105,6 +105,12 @@ export default function PricingPage() {
 
       const data = await res.json()
 
+      if (res.status === 401 || (data.error && String(data.error).includes('Authentication required'))) {
+        // eslint-disable-next-line react-hooks/immutability
+        window.location.href = '/login?redirect=/pricing'
+        return
+      }
+
       if (data.data?.paymentUrl) {
         // eslint-disable-next-line react-hooks/immutability
         window.location.href = data.data.paymentUrl

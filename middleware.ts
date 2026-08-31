@@ -54,6 +54,9 @@ import { extractJwtSession, checkSubscriptionRateLimit } from '@/lib/jwt-middlew
   '/api/v1/news',
   '/api/v1/feed',
   '/api/v1/webhooks/payment',
+  '/api/v1/leads',
+  '/api/v1/analytics',
+  '/api/v1/analytics/pageview',
 ]);
 
 // Routes that require JWT authentication (premium features)
