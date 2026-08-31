@@ -34,7 +34,6 @@ import { extractJwtSession, checkSubscriptionRateLimit } from '@/lib/jwt-middlew
    "/api/v1/dex/trades",
    "/api/v1/correlation",
    "/api/v1/volume-profile",
-  '/api/v1/modules/fetch',
   '/api/v1/derivatives',
   '/api/v1/market/prices',
   '/api/v1/entities/graph',

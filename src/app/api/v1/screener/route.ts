@@ -55,7 +55,10 @@ export async function GET(request: NextRequest) {
   try {
     const quoteRes = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:4400'}/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${symbols}`,
-      { signal: AbortSignal.timeout(30_000) }
+      {
+        signal: AbortSignal.timeout(30_000),
+        headers: { Authorization: `Bearer ${process.env.NEXUS_API_KEYS?.split(',')[0] ?? ''}` },
+      }
     )
     const quoteData = await quoteRes.json()
     const quoteMap: Record<string, Record<string, unknown>> = {}
