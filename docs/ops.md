@@ -426,13 +426,15 @@ docker compose logs web | grep AUTH
 
 **Symptom**: `{"data": null, "error": "Rate limit exceeded"}`.
 
-- **Middleware rate limit**: 200 req/min per API key (in-memory, resets on restart)
-- **Route rate limit**: 100 req/min per IP (Redis-backed sliding window)
+- **Middleware per-key rate limit**: 200 req/min per API key (in-memory, resets on restart)
+- **Auth endpoint rate limit**: 5 login attempts/min per IP (Redis-backed, fail-closed)
+- **Per-plan rate limit**: 100–10,000 req/hr per user session (in-memory, premium routes)
+- **Redis-backed route rate limit**: 100 req/min per IP (applied to ~9 routes: entities, tokens, predictions, smart-money, paper-trades)
 
 ```bash
-# Check remaining limit
+# Check remaining limit (Redis-backed routes only)
 curl -sI -H "Authorization: Bearer <key>" \
-  http://localhost:4400/api/v1/tokens | grep X-RateLimit
+  http://localhost:4400/api/v1/tokens | grep -i X-RateLimit
 
 # If stuck, restart web service to clear in-memory limits
 docker compose restart web
