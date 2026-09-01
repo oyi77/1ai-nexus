@@ -6,10 +6,12 @@ import { prisma } from '@/lib/db';
 import { hashPassword, validatePasswordStrength } from '@/lib/password';
 import { signToken, generateRefreshToken, createRefreshCookie, createSessionCookie } from '@/lib/jwt';
 import { checkRateLimit } from '@/lib/api/rate-limit';
+import { generateReferralCode } from '@/lib/referral';
 
 const signupSchema = z.object({
   email: z.string().email('Invalid email format'),
   password: z.string().min(1, 'Password is required'),
+  referralCode: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -58,13 +60,15 @@ export async function POST(request: NextRequest) {
     // Hash password
     const passwordHash = await hashPassword(password);
 
-    // Create user with default free plan
+    // Create user with default free plan + referral code
+    const referralCode = generateReferralCode()
     const user = await prisma.user.create({
       data: {
         email: email.toLowerCase(),
         passwordHash,
         role: 'free',
         plan: 'free',
+        referralCode,
       },
       select: {
         id: true,
@@ -72,8 +76,29 @@ export async function POST(request: NextRequest) {
         role: true,
         plan: true,
         createdAt: true,
+        referralCode: true,
       },
     });
+
+    // Process referral if code provided
+    if (parsed.data.referralCode) {
+      const referrer = await prisma.user.findUnique({
+        where: { referralCode: parsed.data.referralCode },
+      })
+      if (referrer && referrer.id !== user.id) {
+        await prisma.user.update({
+          where: { id: referrer.id },
+          data: {
+            referralsCount: { increment: 1 },
+            referralCredits: { increment: 1 },
+          },
+        })
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { referredById: referrer.id },
+        })
+      }
+    }
 
     // If SMTP is not configured, auto-verify (dev convenience only —
     // production must verify via /api/v1/auth/verify to prevent spam accounts).

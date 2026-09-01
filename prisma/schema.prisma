@@ -354,8 +354,18 @@ model User {
   subscriptions Subscription[]
   watchlist      Watchlist[]
 
+  // Referral program
+  referralCode   String?   @unique
+  referredById   String?
+  referredBy     User?     @relation("UserReferrals", fields: [referredById], references: [id])
+  referrals      User[]    @relation("UserReferrals")
+  referralsCount Int       @default(0)
+  referralCredits Int      @default(0) // months of Pro earned
+
   @@index([email])
   @@index([plan])
+  @@index([referralCode])
+  @@index([referredById])
 }
 
 model Follow {

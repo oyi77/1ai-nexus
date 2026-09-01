@@ -39,6 +39,9 @@ export async function GET(request: NextRequest) {
           apiUsageCount: true,
           lastApiUsageReset: true,
           createdAt: true,
+          referralCode: true,
+          referralsCount: true,
+          referralCredits: true,
         },
       }),
       prisma.subscription.findUnique({ where: { userId } }),
@@ -60,6 +63,9 @@ export async function GET(request: NextRequest) {
         planExpiresAt: user.planExpiresAt,
         apiUsageCount: user.apiUsageCount,
         createdAt: user.createdAt,
+        referralCode: user.referralCode,
+        referralsCount: user.referralsCount,
+        referralCredits: user.referralCredits,
       },
       subscription: subscription
         ? {

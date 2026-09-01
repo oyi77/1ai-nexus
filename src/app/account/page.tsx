@@ -46,6 +46,9 @@ interface AccountData {
     badges: Array<{ badgeId: string; awardedAt: string }>
     recent: Array<{ action: string; xpDelta: number; refId: string; createdAt: string }>
   } | null
+  referralCode: string | null
+  referralsCount: number
+  referralCredits: number
 }
 
 export default function AccountPage() {
@@ -200,6 +203,44 @@ export default function AccountPage() {
               ))}
             </div>
           )}
+        </Panel>
+
+        {/* Referral Program */}
+        <Panel title="Referral Program">
+          <div className="space-y-3">
+            <p className="text-sm text-text-muted">
+              Invite friends to Nexus. When they sign up with your code, you both get 1 month of Pro free.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={data?.referralCode || 'LOADING'}
+                className="flex-1 px-3 py-2 bg-bg-raised border border-border-dim rounded text-sm font-mono text-text-primary"
+              />
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(data?.referralCode || '')
+                }}
+                className="px-3 py-2 bg-bg-raised border border-border-dim rounded text-sm text-text-muted hover:text-text-primary"
+              >
+                Copy
+              </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-bg-raised rounded p-3">
+                <div className="text-xs text-text-muted">Referrals</div>
+                <div className="text-lg font-bold text-text-primary">{data?.referralsCount ?? 0}</div>
+              </div>
+              <div className="bg-bg-raised rounded p-3">
+                <div className="text-xs text-text-muted">Credits Earned</div>
+                <div className="text-lg font-bold text-teal-vivid">{data?.referralCredits ?? 0} months</div>
+              </div>
+            </div>
+            <p className="text-xs text-text-dim">
+              Max 5 months of Pro credits. Credits are applied automatically when your referral upgrades.
+            </p>
+          </div>
         </Panel>
 
         {/* Usage */}
