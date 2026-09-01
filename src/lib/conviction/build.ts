@@ -279,23 +279,53 @@ export async function buildConvictionResult(): Promise<ConvictionResult> {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Shared cache + in-flight dedup.
-// Conviction compute is heavy (~10s+). N connected SSE clients or a
-// burst of poll hits must NOT trigger N recomputes — they share ONE
-// recompute per CACHE_TTL_MS window. Module-level so every route in
-// this process reads the same cache.
+// Adaptive TTL: conviction compute is heavy (~10s+), but during
+// high volatility we want fresher data. TTL scales with VIX:
+//   VIX > 30 (crisis) → 15s
+//   VIX < 15 (calm)   → 60s
+//   else              → 25s
 // ─────────────────────────────────────────────────────────────
-const CACHE_TTL_MS = 25_000
+const BASE_TTL_MS = 25_000
+const HIGH_VOL_TTL_MS = 15_000
+const LOW_VOL_TTL_MS = 60_000
 let cachedResult: ConvictionResult | null = null
 let cachedAt = 0
 let inflight: Promise<ConvictionResult> | null = null
+let currentTtlMs = BASE_TTL_MS
 
 /** Cached result if fresh (< TTL), else null. */
 export function peekCachedConviction(): ConvictionResult | null {
-  if (cachedResult && Date.now() - cachedAt < CACHE_TTL_MS) return cachedResult
+  if (cachedResult && Date.now() - cachedAt < currentTtlMs) return cachedResult
   return null
 }
+async function fetchVixLevel(): Promise<number | null> {
+  try {
+    const res = await fetch(
+      'https://api.stlouisfed.org/fred/series/observations?series_id=VIXCLS&api_key=' +
+      (process.env.FRED_API_KEY ?? '') +
+      '&file_type=json&sort_order=desc&limit=1'
+    )
+    const data = await res.json()
+    const obs = data?.observations?.[0]
+    return obs?.value ? Number(obs.value) : null
+  } catch {
+    return null
+  }
+}
 
+/** Update TTL based on VIX. Called before each recompute. */
+async function updateAdaptiveTtl(): Promise<void> {
+  const vix = await fetchVixLevel()
+  if (vix === null) {
+    currentTtlMs = BASE_TTL_MS
+  } else if (vix > 30) {
+    currentTtlMs = HIGH_VOL_TTL_MS
+  } else if (vix < 15) {
+    currentTtlMs = LOW_VOL_TTL_MS
+  } else {
+    currentTtlMs = BASE_TTL_MS
+  }
+}
 /**
  * Returns a fresh-enough result WITHOUT recomputing if the cache is hot,
  * or shares the single in-flight recompute if one is already running.
@@ -306,6 +336,9 @@ export async function getCachedConvictionResult(): Promise<ConvictionResult> {
   const hot = peekCachedConviction()
   if (hot) return hot
   if (inflight) return inflight
+
+  // Update TTL based on volatility before recomputing
+  await updateAdaptiveTtl()
 
   const running = buildConvictionResult()
   inflight = running
@@ -323,4 +356,9 @@ export async function getCachedConvictionResult(): Promise<ConvictionResult> {
   } finally {
     inflight = null
   }
+}
+
+/** Current TTL in ms (for monitoring). */
+export function getConvictionTtl(): number {
+  return currentTtlMs
 }

@@ -69,21 +69,19 @@ export async function GET() {
     checks.dataIntegrity = 'unknown'
   }
 
-  // 6. Module health summary
-  const moduleHealth = getAllHealth()
-  const activeModules = moduleHealth.filter(h => h.status === 'active').length
-  const degradedModules = moduleHealth.filter(h => h.status === 'degraded').length
-  checks.modules = {
-    total: moduleHealth.length,
-    active: activeModules,
-    degraded: degradedModules,
-  }
-
   // 7. Conviction cache status
   const cached = peekCachedConviction()
   checks.conviction = {
     cached: cached !== null,
     markets: cached?.markets?.length ?? 0,
+  }
+
+  // 8. Conviction TTL (adaptive based on VIX)
+  try {
+    const { getConvictionTtl } = await import('@/lib/conviction/build')
+    checks.convictionTtl = getConvictionTtl()
+  } catch {
+    checks.convictionTtl = -1
   }
 
   // 8. Backtest pending count
