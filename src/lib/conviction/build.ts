@@ -250,3 +250,45 @@ export async function safeBuildConvictionResult(): Promise<ConvictionResult> {
     return emptyResult()
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// Shared cache + in-flight dedup.
+// Conviction compute is heavy (~10s+). N connected SSE clients or a
+// burst of poll hits must NOT trigger N recomputes — they share ONE
+// recompute per CACHE_TTL_MS window. Module-level so every route in
+// this process reads the same cache.
+// ─────────────────────────────────────────────────────────────
+const CACHE_TTL_MS = 25_000
+let cachedResult: ConvictionResult | null = null
+let cachedAt = 0
+let inflight: Promise<ConvictionResult> | null = null
+
+/** Cached result if fresh (< TTL), else null. */
+export function peekCachedConviction(): ConvictionResult | null {
+  if (cachedResult && Date.now() - cachedAt < CACHE_TTL_MS) return cachedResult
+  return null
+}
+
+/**
+ * Returns a fresh-enough result WITHOUT recomputing if the cache is hot,
+ * or shares the single in-flight recompute if one is already running.
+ * Guarantees at most one buildConvictionResult() per TTL window.
+ */
+export async function getCachedConvictionResult(): Promise<ConvictionResult> {
+  const hot = peekCachedConviction()
+  if (hot) return hot
+  if (inflight) return inflight
+
+  const running = buildConvictionResult()
+  inflight = running
+  try {
+    const result = await running
+    cachedResult = result
+    cachedAt = Date.now()
+    return result
+  } catch {
+    return emptyResult()
+  } finally {
+    inflight = null
+  }
+}

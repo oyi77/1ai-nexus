@@ -5,7 +5,7 @@
 // Public (ALWAYS_PUBLIC) — same trust model as the poll route.
 // ─────────────────────────────────────────────────────────────
 
-import { safeBuildConvictionResult } from '@/lib/conviction/build'
+import { getCachedConvictionResult } from '@/lib/conviction/build'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -20,7 +20,7 @@ export async function GET() {
       // Immediate first payload so the client renders fast.
       const push = async () => {
         try {
-          const result = await safeBuildConvictionResult()
+          const result = await getCachedConvictionResult()
           const frame = `data: ${JSON.stringify({ data: result, meta: null, error: null })}\n\n`
           controller.enqueue(encoder.encode(frame))
         } catch {

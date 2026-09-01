@@ -5,13 +5,13 @@
 // ─────────────────────────────────────────────────────────────
 
 import { apiJson } from '@/lib/api/response'
-import { safeBuildConvictionResult } from '@/lib/conviction/build'
+import { getCachedConvictionResult } from '@/lib/conviction/build'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const resp = apiJson(await safeBuildConvictionResult())
+  const resp = apiJson(await getCachedConvictionResult())
   resp.headers.set('Cache-Control', 'public, max-age=30')
   return resp
 }
