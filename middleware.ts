@@ -47,6 +47,7 @@ import { extractJwtSession, checkSubscriptionRateLimit } from '@/lib/jwt-middlew
   '/api/v1/saham/screener',
   '/api/v1/telegram/broadcast',
   '/api/v1/telegram/subscribe',
+  '/api/v1/telegram/personal-alerts',
   '/api/v1/telegram/alert',
 ]);
 

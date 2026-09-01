@@ -351,8 +351,8 @@ model User {
   // Telegram alert link (per-user)
   telegramChatId     String?
   telegramUsername   String?
-
   subscriptions Subscription[]
+  watchlist      Watchlist[]
 
   @@index([email])
   @@index([plan])
@@ -368,13 +368,13 @@ model Follow {
   @@unique([userId, targetType, targetId])
   @@index([userId])
 }
-
 model Watchlist {
   id        String   @id @default(cuid())
   userId    String
   symbol    String
   market    String   // IDX | CRYPTO
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, symbol, market])
   @@index([userId])
