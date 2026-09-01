@@ -1,0 +1,2 @@
+-- Rollback
+DROP TABLE "ConvictionSignal";

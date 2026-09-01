@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
-import { Panel } from '@/components/shell/Panel'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { Flame, RefreshCw } from 'lucide-react'
 
@@ -122,6 +121,12 @@ export default function IntelligencePage() {
   const [data, setData] = useState<ConvictionResult | null>(null)
   const [filter, setFilter] = useState<'All' | 'IDX' | 'CRYPTO'>('All')
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
+  const [accuracy, setAccuracy] = useState<{
+    total: number
+    evaluated: number
+    overallWinRate: number
+    buckets: Array<{ label: string; signals: number; evaluated: number; winRate: number }>
+  } | null>(null)
 
   const fetchConviction = useCallback(async () => {
     try {
@@ -133,6 +138,15 @@ export default function IntelligencePage() {
         setStatus('live')
       } else {
         setStatus('error')
+      }
+      // Track record — win-rate by bucket.
+      try {
+        const accRes = await fetch('/api/v1/conviction/accuracy')
+        const accJson = await accRes.json()
+        const ad = accJson?.data ?? accJson
+        if (ad?.buckets) setAccuracy(ad)
+      } catch {
+        setAccuracy(null)
       }
     } catch {
       setStatus('error')
@@ -189,6 +203,33 @@ export default function IntelligencePage() {
             </button>
           ))}
         </div>
+
+        {/* Track Record — the PROOF layer */}
+        {accuracy && (
+          <div className="bg-bg-panel border border-bg-border rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Track Record</h2>
+              <span className="text-xs font-mono text-teal-vivid">{accuracy.overallWinRate.toFixed(1)}% win rate</span>
+            </div>
+            <div className="grid grid-cols-5 gap-3">
+              {accuracy.buckets.map((b) => (
+                <div key={b.label} className="text-center">
+                  <p className="text-[10px] font-mono text-text-muted">CONV {b.label}</p>
+                  <p className={`text-lg font-bold font-mono ${b.winRate >= 65 ? 'text-data-bull' : b.winRate >= 45 ? 'text-amber-400' : 'text-data-bear'}`}>
+                    {b.evaluated > 0 ? `${b.winRate.toFixed(0)}%` : '—'}
+                  </p>
+                  <p className="text-[9px] text-text-muted">{b.signals} signals</p>
+                </div>
+              ))}
+              <div className="text-center">
+                <p className="text-[10px] font-mono text-text-muted">TOTAL</p>
+                <p className="text-lg font-bold font-mono text-text-primary">{accuracy.evaluated}</p>
+                <p className="text-[9px] text-text-muted">evaluated</p>
+              </div>
+            </div>
+            <p className="text-[10px] text-text-muted mt-3">Win-rate of past BUY/SELL conviction signals measured 24h after emission. The higher the conviction, the higher the hit-rate should be.</p>
+          </div>
+        )}
 
         {/* Cards */}
         {status === 'error' && (

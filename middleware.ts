@@ -42,6 +42,7 @@ import { extractJwtSession, checkSubscriptionRateLimit } from '@/lib/jwt-middlew
   '/api/v1/analytics',
   '/api/v1/analytics/pageview',
   '/api/v1/conviction',
+  '/api/v1/conviction/accuracy',
   '/api/v1/saham/screener',
   '/api/v1/telegram/broadcast',
 ]);

@@ -13,7 +13,6 @@ import { fetchOHLCV } from '@/lib/modules/market'
 import {
   actionFor,
   buildCryptoItem,
-  buildIdxItem,
   buildResult,
   directionFor,
   emptyResult,
@@ -25,6 +24,7 @@ import {
   whaleToSignal,
 } from '@/lib/conviction/engine'
 import type { ConvictionItem } from '@/lib/conviction/engine'
+import { recordConvictionSignal, evaluateTrackRecord } from '@/lib/conviction/track-record'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -244,6 +244,30 @@ export async function GET() {
 
     const resp = apiJson(buildResult(idxItems, cryptoItems))
     resp.headers.set('Cache-Control', 'public, max-age=30')
+
+    // ── Track record (PROOF layer) — persist this emission + evaluate matured.
+    // Fire-and-forget on BOTH — never block or break the response.
+    const persist = async () => {
+      for (const item of idxItems) {
+        if (item.action === 'WAIT') continue // only score deliberate BUY/SELL
+        await recordConvictionSignal({
+          symbol: item.symbol, market: 'IDX', conviction: item.conviction,
+          action: item.action, direction: item.direction, price: item.price > 0 ? item.price : undefined,
+          reasons: item.reasons,
+        })
+      }
+      for (const item of cryptoItems) {
+        if (item.action === 'WAIT') continue
+        await recordConvictionSignal({
+          symbol: item.symbol, market: 'CRYPTO', conviction: item.conviction,
+          action: item.action, direction: item.direction, price: item.price > 0 ? item.price : undefined,
+          reasons: item.reasons,
+        })
+      }
+      await evaluateTrackRecord().catch(() => {})
+    }
+    void persist()
+
     return resp
   } catch {
     // Graceful empty on any unexpected error.

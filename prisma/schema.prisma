@@ -937,3 +937,25 @@ model Pageview {
   @@index([createdAt])
   @@index([path])
 }
+
+model ConvictionSignal {
+  id          String   @id @default(cuid())
+  symbol      String
+  market      String   // IDX | CRYPTO
+  conviction  Int
+  action      String   // BUY | WAIT | SELL
+  direction   String   // bull | bear | neutral
+  price       Float?
+  reasons     Json?
+  emittedAt   DateTime @default(now())
+
+  // Outcome (filled later by the evaluator — price moves after emission)
+  outcome     String?  // win | loss | na
+  priceAfter  Float?   // price measured after HORIZON
+  pnlPercent  Float?   // (priceAfter - price)/price
+  evaluatedAt DateTime?
+
+  @@index([market, conviction])
+  @@index([emittedAt])
+  @@index([symbol, emittedAt(sort: Desc)])
+}
