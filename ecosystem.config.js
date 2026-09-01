@@ -1,3 +1,4 @@
+require('dotenv').config()
 module.exports = {
   apps: [
     {
@@ -12,6 +13,7 @@ module.exports = {
         PORT: '4400',
         NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || '',
         NEXUS_API_KEYS: process.env.NEXUS_API_KEYS || '',
+        TELEGRAM_CRON_SECRET: process.env.TELEGRAM_CRON_SECRET || '',
         NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4400',
       },
       exec_mode: 'fork',
