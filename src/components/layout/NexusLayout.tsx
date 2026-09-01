@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Menu, X, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
+import { Menu, X, ChevronLeft, ChevronRight, ChevronDown, LayoutDashboard, BarChart3, Activity, Users, User } from 'lucide-react'
 import { NAV_SECTIONS } from '@/lib/config/nav'
 import { LiveDot } from '../primitives/LiveDot'
 import { CommandBar } from './CommandBar'
@@ -15,6 +15,15 @@ import { GlobalSearch } from './GlobalSearch'
 interface NexusLayoutProps {
   children: React.ReactNode
 }
+
+// ── Mobile bottom-nav — top-5 destinations (visible < lg) ──
+const MOBILE_NAV = [
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Markets', href: '/screener', icon: BarChart3 },
+  { label: 'Intelligence', href: '/intelligence', icon: Activity },
+  { label: 'Following', href: '/following', icon: Users },
+  { label: 'Account', href: '/account', icon: User },
+]
 
 export function NexusLayout({ children }: NexusLayoutProps) {
   const [collapsed, setCollapsed] = useState(false)
@@ -172,12 +181,36 @@ export function NexusLayout({ children }: NexusLayoutProps) {
         </nav>
 
         {/* ── MainContent ── */}
-        <main className="flex-1 overflow-auto scrollbar-thin bg-bg-base">
+        <main className="flex-1 overflow-auto scrollbar-thin bg-bg-base has-mobile-bottom-nav">
           {children}
         </main>
       </div>
       <GlobalSearch />
       <PwaInstallPrompt />
+
+      {/* ── Mobile Bottom Nav (visible < lg) ── */}
+      <nav
+        aria-label="Mobile navigation"
+        className="mobile-bottom-nav lg:hidden fixed bottom-0 inset-x-0 z-40 border-t border-bg-border bg-bg-panel/95 backdrop-blur-md"
+      >
+        <div className="flex items-stretch h-16">
+          {MOBILE_NAV.map(item => {
+            const isActive = pathname === item.href || pathname.startsWith(item.href)
+            const Icon = item.icon
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors
+                  ${isActive ? 'text-teal-vivid' : 'text-text-muted hover:text-text-secondary'}`}
+              >
+                <Icon size={20} strokeWidth={isActive ? 2.25 : 2} className="shrink-0" />
+                <span className="leading-none">{item.label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      </nav>
     </div>
   )
 }

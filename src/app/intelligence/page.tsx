@@ -119,7 +119,9 @@ function ConvictionCard({ item }: { item: ConvictionItem }) {
 
 export default function IntelligencePage() {
   const [data, setData] = useState<ConvictionResult | null>(null)
-  const [filter, setFilter] = useState<'All' | 'IDX' | 'CRYPTO'>('All')
+  const [filter, setFilter] = useState<'All' | 'IDX' | 'CRYPTO' | 'Watchlist'>('All')
+  const [watchlist, setWatchlist] = useState<{ symbol: string; market: string }[]>([])
+  const [watchlistStatus, setWatchlistStatus] = useState<'authed' | 'guest' | 'error' | 'loading'>('loading')
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
   const [accuracy, setAccuracy] = useState<{
     total: number
@@ -153,17 +155,43 @@ export default function IntelligencePage() {
     }
   }, [])
 
+  const fetchWatchlist = useCallback(async () => {
+    try {
+      const res = await fetch('/api/v1/watchlist')
+      if (res.status === 401) {
+        setWatchlistStatus('guest')
+        return
+      }
+      const json = await res.json()
+      const wl = json?.data?.watchlist ?? []
+      setWatchlist(wl)
+      setWatchlistStatus('authed')
+    } catch {
+      setWatchlistStatus('error')
+    }
+  }, [])
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchConviction()
+    fetchWatchlist()
     const id = setInterval(fetchConviction, 60_000)
     return () => clearInterval(id)
-  }, [fetchConviction])
+  }, [fetchConviction, fetchWatchlist])
 
   const allItems = data ? data.markets.flatMap((m) => m.items) : []
-  const filtered = filter === 'All'
-    ? allItems
-    : (data?.markets.find((m) => m.id === filter)?.items ?? [])
+  const watchedKeys = new Set(watchlist.map((w) => `${w.market}:${w.symbol}`))
+  const filtered = (() => {
+    if (filter === 'All') return allItems
+    if (filter === 'Watchlist') {
+      return data
+        ? data.markets.flatMap((m) =>
+            m.items.filter((it) => watchedKeys.has(`${m.id}:${it.symbol}`))
+          )
+        : []
+    }
+    return data?.markets.find((m) => m.id === filter)?.items ?? []
+  })()
   const sorted = [...filtered].sort((a, b) => (b.conviction ?? 0) - (a.conviction ?? 0))
 
   return (
@@ -189,19 +217,27 @@ export default function IntelligencePage() {
 
         {/* Market filter */}
         <div className="flex flex-wrap gap-2">
-          {(['All', 'IDX', 'CRYPTO'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1 text-xs font-mono rounded border transition-colors ${
-                filter === f
-                  ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
-                  : 'bg-bg-panel border-bg-border text-text-muted hover:text-text-primary'
-              }`}
-            >
-              {f === 'IDX' ? 'Indonesia Equities' : f === 'CRYPTO' ? 'Crypto' : 'All'}
-            </button>
-          ))}
+          {(['All', 'IDX', 'CRYPTO', 'Watchlist'] as const).map((f) => {
+            if (f === 'Watchlist' && !(watchlistStatus === 'authed' && watchlist.length > 0)) {
+              return null
+            }
+            return (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3 py-1 text-xs font-mono rounded border transition-colors ${
+                  filter === f
+                    ? 'bg-teal-vivid text-bg-base border-teal-vivid font-bold'
+                    : 'bg-bg-panel border-bg-border text-text-muted hover:text-text-primary'
+                }`}
+              >
+                {f === 'IDX' ? 'Indonesia Equities' : f === 'CRYPTO' ? 'Crypto' : f === 'Watchlist' ? 'Your Watchlist' : 'All'}
+              </button>
+            )
+          })}
+          {watchlistStatus === 'guest' && (
+            <span className="text-[10px] text-text-muted self-center">Sign in to personalize</span>
+          )}
         </div>
 
         {/* Track Record — the PROOF layer */}

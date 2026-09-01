@@ -144,7 +144,7 @@ export default function LandingPage() {
             <span className="w-1.5 h-1.5 rounded-full bg-teal-vivid animate-live-dot" />
             Live — 50+ proprietary signals, 15+ data sources
           </div>
-          <h1 className="text-[2.75rem] md:text-6xl font-bold tracking-tight leading-[1.05] mb-6">
+          <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.05] mb-6">
             Market intelligence,
             <br />
             <span className="text-teal-vivid">Bloomberg-grade.</span> Zero cost.
@@ -153,16 +153,16 @@ export default function LandingPage() {
             IDX bandarmology signals, fundamentals, 14 global markets, on-chain intel and AI trade thesis —
             one terminal, every intelligence layer served from memory in milliseconds.
           </p>
-          <div className="flex items-center justify-center gap-3 mb-14">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 mb-14">
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-teal-vivid text-bg-void font-semibold hover:bg-teal-vivid/85 transition-colors"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-teal-vivid text-bg-void font-semibold hover:bg-teal-vivid/85 transition-colors"
             >
               Open Terminal <ArrowRight size={16} />
             </Link>
             <a
               href="#coverage"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-bg-border bg-bg-panel text-text-primary font-medium hover:border-border-active transition-colors"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg border border-bg-border bg-bg-panel text-text-primary font-medium hover:border-border-active transition-colors"
             >
               Explore coverage
             </a>
@@ -184,7 +184,7 @@ export default function LandingPage() {
                 ))}
               </div>
               {/* mini content */}
-              <div className="col-span-9 md:col-span-10 p-4 space-y-4">
+              <div className="col-span-12 sm:col-span-9 md:col-span-10 p-4 space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold">Bandarmology — IDX Foreign Flow</span>
                   <span className="text-text-muted text-xs">session 2026-08-24 · 843 stocks</span>
@@ -311,7 +311,8 @@ export default function LandingPage() {
         <p className="eyebrow mb-2">Compare</p>
         <h2 className="text-3xl font-bold tracking-tight mb-8">The invoice is the feature</h2>
         <div className="card overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto scrollbar-thin">
+            <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-bg-border text-text-muted">
                 <th className="text-left px-5 py-3.5 font-medium">Terminal</th>
@@ -342,6 +343,7 @@ export default function LandingPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
         <p className="text-xs text-text-muted mt-3">
           Competitor positioning as of Aug 2026 — Bloomberg Terminal list price, Hyperdash crypto-only scope, Stockbit IDX-focused freemium.

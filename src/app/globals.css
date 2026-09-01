@@ -191,3 +191,23 @@ h1, h2, h3, h4 {
 .bloomberg-grid > * {
   background: var(--color-bg-panel);
 }
+
+/* ── Mobile Bottom Nav ── touch targets + iOS safe area ───── */
+.mobile-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.mobile-bottom-nav a {
+  min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Offset scroll content so the fixed bottom nav never covers it */
+.has-mobile-bottom-nav {
+  padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 1024px) {
+  .has-mobile-bottom-nav {
+    padding-bottom: 0;
+  }
+}

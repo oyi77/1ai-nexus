@@ -607,6 +607,7 @@ interface TgMessage {
   text?: string
   chat: { id: number }
   message_id?: number
+  from?: { id: number; username?: string }
 }
 
 interface TgCallbackQuery {
@@ -619,11 +620,27 @@ async function handleMessage(msg: TgMessage): Promise<void> {
   const chatId = String(msg.chat.id)
   const text = (msg.text ?? '').trim().toLowerCase()
 
-  if (text === '/start') {
+  // /start and /sub both register the chat AND attempt to link it to an app user
+  // via a matching Telegram username (persisted by linkTelegram on the web side).
+  if (text === '/start' || text === '/sub') {
     registeredChats.add(chatId)
+    if (msg.from?.username) {
+      try {
+        const alert = await import('./alert-service')
+        await alert.linkTelegramByUsername(msg.from.username, chatId)
+      } catch {
+        // Non-fatal — linking is best-effort.
+      }
+    }
+    if (text === '/sub') {
+      const sub = await import('./signal-publisher')
+      sub.subscribeSignals(chatId)
+    }
     await callTelegram('sendMessage', {
       chat_id: chatId,
-      text: '🔔 *NEXUS Intelligence Terminal*\n\nWelcome! Tap a button to explore:',
+      text: text === '/sub'
+        ? '🔔 *Signal Subscription Active*\n\nYou\'ll now receive high-confidence signals automatically as they\'re generated.'
+        : '🔔 *NEXUS Intelligence Terminal*\n\nWelcome! Tap a button to explore:',
       parse_mode: 'Markdown',
       reply_markup: MAIN_MENU,
     })

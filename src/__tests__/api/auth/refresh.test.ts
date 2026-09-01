@@ -34,6 +34,8 @@ describe('POST /api/v1/auth/refresh', () => {
    planExpiresAt: null,
    stripeCustomerId: null,
    passwordResetUsedAt: null,
+   telegramUsername: null,
+   telegramChatId: null,
    level: 1,
    xp: 0,
    apiUsageCount: 0,

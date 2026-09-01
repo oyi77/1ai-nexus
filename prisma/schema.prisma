@@ -348,6 +348,10 @@ model User {
   xp    Int @default(0)
   level Int @default(1)
 
+  // Telegram alert link (per-user)
+  telegramChatId     String?
+  telegramUsername   String?
+
   subscriptions Subscription[]
 
   @@index([email])
@@ -362,6 +366,17 @@ model Follow {
   createdAt  DateTime @default(now())
 
   @@unique([userId, targetType, targetId])
+  @@index([userId])
+}
+
+model Watchlist {
+  id        String   @id @default(cuid())
+  userId    String
+  symbol    String
+  market    String   // IDX | CRYPTO
+  createdAt DateTime @default(now())
+
+  @@unique([userId, symbol, market])
   @@index([userId])
 }
 

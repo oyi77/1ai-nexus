@@ -67,6 +67,34 @@ describe('User Model Tests', () => {
     });
   });
 
+  describe('Telegram Link Fields', () => {
+    it('should store telegram chat link on user', async () => {
+      const user = await prisma.user.create({
+        data: {
+          email: 'test-user-telegram@example.com',
+          passwordHash: 'test-hash',
+          telegramChatId: '423456789',
+          telegramUsername: 'nexus_user',
+        },
+      });
+
+      expect(user.telegramChatId).toBe('423456789');
+      expect(user.telegramUsername).toBe('nexus_user');
+    });
+
+    it('should default telegram fields to null', async () => {
+      const user = await prisma.user.create({
+        data: {
+          email: 'test-user-telegram-null@example.com',
+          passwordHash: 'test-hash',
+        },
+      });
+
+      expect(user.telegramChatId).toBeNull();
+      expect(user.telegramUsername).toBeNull();
+    });
+  });
+
   describe('User-Subscription Relations', () => {
     it('should create user with subscription relation', async () => {
       const now = new Date();
