@@ -9,3 +9,6 @@ CREATE TABLE "Watchlist" (
 );
 CREATE UNIQUE INDEX "Watchlist_userId_symbol_market_key" ON "Watchlist"("userId", "symbol", "market");
 CREATE INDEX "Watchlist_userId_idx" ON "Watchlist"("userId");
+
+-- AddForeignKey
+ALTER TABLE "Watchlist" ADD CONSTRAINT "Watchlist_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;

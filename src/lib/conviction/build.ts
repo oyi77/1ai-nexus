@@ -242,15 +242,6 @@ export async function buildConvictionResult(): Promise<ConvictionResult> {
   return buildResult(idxItems, cryptoItems)
 }
 
-/** Safe wrapper — never throws; returns empty on any unexpected error. */
-export async function safeBuildConvictionResult(): Promise<ConvictionResult> {
-  try {
-    return await buildConvictionResult()
-  } catch {
-    return emptyResult()
-  }
-}
-
 // ─────────────────────────────────────────────────────────────
 // Shared cache + in-flight dedup.
 // Conviction compute is heavy (~10s+). N connected SSE clients or a
