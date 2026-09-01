@@ -9,14 +9,18 @@ import { apiJson } from '@/lib/api/response'
 import { getForeignLeaders } from '@/lib/modules/market/provider/idx-bandarmology'
 import { getScreenerSnapshot, type ScreenerRow } from '@/lib/modules/market/provider/idx-screener'
 import { fetchAlphaSignals, type AlphaSignal } from '@/lib/modules/derived/alpha-feed'
+import { fetchOHLCV } from '@/lib/modules/market'
 import {
+  actionFor,
   buildCryptoItem,
   buildIdxItem,
   buildResult,
+  directionFor,
   emptyResult,
   fundingToSignal,
   scoreCrypto,
   scoreIdxRow,
+  scoreTechnical,
   smartMoneyToSignal,
   whaleToSignal,
 } from '@/lib/conviction/engine'
@@ -212,14 +216,29 @@ export async function GET() {
         .sort((a, b) => b.sigs.length - a.sigs.length)
         .slice(0, 15)
 
-      const [thesisResults, priceMap] = await Promise.all([
+      const [thesisResults, priceMap, ohlcvResults] = await Promise.all([
         Promise.allSettled(ranked.map((r) => api<{ thesis: string }>(`/api/v1/token/thesis?symbol=${r.asset}`))),
         fetchBinancePrices(ranked.map((r) => `${r.asset}USDT`)),
+        Promise.allSettled(ranked.map((r) => fetchOHLCV({ symbol: `${r.asset}USDT`, interval: '1d', limit: 100 }))),
       ])
 
       ranked.forEach((r, i) => {
         const thesis = thesisResults[i].status === 'fulfilled' ? (thesisResults[i].value?.thesis ?? null) : null
-        cryptoItems.push(buildCryptoItem(r.asset, r.sigs, thesis, priceMap[`${r.asset}USDT`]))
+        const item = buildCryptoItem(r.asset, r.sigs, thesis, priceMap[`${r.asset}USDT`])
+        // Technical overlay — RSI/MACD conviction ADDS to fundamentals.
+        // Graceful: no/little candles → delta 0, item passes through unchanged.
+        const ohlcvRes = ohlcvResults[i]
+        const candles = ohlcvRes.status === 'fulfilled' ? (ohlcvRes.value?.candles ?? []) : []
+        const tech = scoreTechnical(candles)
+        if (tech.scoreDelta !== 0) {
+          item.conviction = Math.max(0, Math.min(100, item.conviction + tech.scoreDelta))
+          // Recompute action/direction — the delta may cross a boundary.
+          item.action = actionFor(item.conviction)
+          item.direction = directionFor(item.conviction)
+          item.reasons = [...item.reasons, ...tech.reasons]
+          if (!item.sources.includes('technical')) item.sources.push('technical')
+        }
+        cryptoItems.push(item)
       })
     }
 

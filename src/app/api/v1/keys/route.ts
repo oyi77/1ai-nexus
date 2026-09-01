@@ -3,6 +3,7 @@ import { apiJson } from '@/lib/api/response'
 import { generateApiKey, listUserKeys, revokeApiKey, TIER_CONFIG } from '@/lib/api-keys'
 import { verifyToken } from '@/lib/jwt'
 import { prisma } from '@/lib/db'
+import { awardXp } from '@/lib/gamification'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +58,11 @@ export async function POST(request: NextRequest) {
     // A paid user picks their key tier; a free user is always 'free'.
     const keyTier = tier !== 'free' && body.tier === 'enterprise' ? 'enterprise' : tier
     const apiKey = await generateApiKey({ name: body.name, tier: keyTier, userId: user.userId })
+
+    // Reward connecting a service key (idempotent per key).
+    void awardXp(user.userId, 'CONNECT_EXCHANGE', `key:${apiKey.id}`).catch((err) => {
+      console.error('CONNECT_EXCHANGE XP award error:', err)
+    })
 
     return apiJson({
       key: apiKey.key,

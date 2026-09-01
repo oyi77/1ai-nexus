@@ -36,6 +36,16 @@ interface AccountData {
     rateLimit: number
   } | null
   usage: { calls: number; limit: number }
+  gamification: {
+    xp: number
+    level: number
+    tier: string
+    nextTierXp: number | null
+    nextLevelXp: number
+    progress: number
+    badges: Array<{ badgeId: string; awardedAt: string }>
+    recent: Array<{ action: string; xpDelta: number; refId: string; createdAt: string }>
+  } | null
 }
 
 export default function AccountPage() {
@@ -89,6 +99,10 @@ export default function AccountPage() {
   const planLabel = user?.plan?.toUpperCase() ?? (data?.subscription?.plan.toUpperCase() ?? 'FREE')
   const planPrice = planInfo?.label ?? ''
   const usagePct = data ? Math.min(100, Math.round((data.usage.calls / Math.max(1, data.usage.limit)) * 100)) : 0
+  const gam = data?.gamification
+  const levelFloor = gam ? (gam.level - 1) * 250 : 0
+  const levelCeil = gam?.nextLevelXp ?? 0
+  const xpPct = gam && levelCeil > levelFloor ? Math.min(100, Math.round(((gam.xp - levelFloor) / (levelCeil - levelFloor)) * 100)) : 0
 
   return (
     <NexusLayout>
@@ -129,6 +143,43 @@ export default function AccountPage() {
               ))}
             </ul>
           )}
+        </Panel>
+
+        {/* Gamification */}
+        <Panel title="Gamification">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-text-primary">
+                Level {data?.gamification?.level ?? 1}
+              </span>
+              <span className="text-xs font-mono text-teal-vivid capitalize">
+                {data?.gamification?.tier ?? 'Bronze'}
+              </span>
+            </div>
+            <div className="h-2 bg-bg-raised rounded overflow-hidden">
+              <div
+                className="h-full bg-teal-vivid"
+                style={{ width: `${xpPct}%` }}
+              />
+            </div>
+            <div className="flex justify-between text-xs text-text-muted">
+              <span className="font-mono">{data?.gamification?.xp ?? 0} XP</span>
+              <span className="font-mono">
+                {data?.gamification?.nextLevelXp != null
+                  ? `${data.gamification.nextLevelXp} XP`
+                  : 'Max level'}
+              </span>
+            </div>
+            {(data?.gamification?.badges?.length ?? 0) > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {data!.gamification!.badges.map((b) => (
+                  <span key={b.badgeId} className="px-2 py-0.5 text-xs text-text-secondary bg-bg-raised rounded">
+                    {b.badgeId}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </Panel>
 
         {/* API Keys */}

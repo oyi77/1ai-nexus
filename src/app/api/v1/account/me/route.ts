@@ -9,6 +9,7 @@ import { verifyToken } from '@/lib/jwt'
 import { prisma } from '@/lib/db'
 import { listUserKeys } from '@/lib/api-keys'
 import { getPlanPricing } from '@/lib/pricing'
+import { getUserGamification } from '@/lib/gamification'
 
 export async function GET(request: NextRequest) {
   let token: string | undefined
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
   const userId = payload.userId
 
   try {
-    const [user, subscription, apiKeys] = await Promise.all([
+    const [user, subscription, apiKeys, gamification] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
       }),
       prisma.subscription.findUnique({ where: { userId } }),
       listUserKeys(userId),
+      getUserGamification(userId),
     ])
 
     if (!user) return apiError('User not found', 404)
@@ -79,6 +81,16 @@ export async function GET(request: NextRequest) {
       usage: {
         calls: user.apiUsageCount,
         limit: plan?.rateLimit ?? 100,
+      },
+      gamification: {
+        xp: gamification.xp,
+        level: gamification.level,
+        tier: gamification.tier,
+        nextTierXp: gamification.nextTierXp,
+        nextLevelXp: gamification.level * 250,
+        progress: gamification.progress,
+        badges: gamification.badges,
+        recent: gamification.recent,
       },
     })
   } catch (err) {

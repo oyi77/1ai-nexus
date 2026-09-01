@@ -4,6 +4,7 @@ import { apiSuccess, apiError } from "@/lib/api/response";
 import { verifyToken } from "@/lib/jwt";
 import { AlertCondition } from "@/lib/alerts/schemas";
 import { createAlert, getAlerts, toggleAlert, deleteAlert, type Alert as EngineAlert } from "@/lib/modules/derived/alert-engine";
+import { awardXp } from "@/lib/gamification";
 
 export const runtime = "nodejs";
 
@@ -124,6 +125,11 @@ export async function POST(request: NextRequest) {
       enabled: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
+    });
+
+    // Reward saving a watchlist alert (idempotent per alert).
+    void awardXp(userId, "SAVE_WATCHLIST", `alert:${created.id}`).catch((err) => {
+      console.error("SAVE_WATCHLIST XP award error:", err);
     });
 
     return apiSuccess(engineToPage(created));

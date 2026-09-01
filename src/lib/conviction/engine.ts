@@ -4,6 +4,8 @@
 // Every symbol gets ONE conviction score + action + reasons.
 // ─────────────────────────────────────────────────────────────
 
+import { MACD, RSI, type OHLCV } from '@/lib/indicators'
+
 // ── Types ──
 
 export type ConvictionAction = 'BUY' | 'WAIT' | 'SELL'
@@ -318,6 +320,65 @@ export function scoreCrypto(signals: AlphaSignalLike[], thesis?: string | null):
     conviction += delta * 0.3
   }
   return Math.max(0, Math.min(100, conviction))
+}
+
+// ── Technical Scoring ──
+
+/**
+ * Technical conviction delta from RSI + MACD.
+ * RSI(14): <30 oversold (bullish +), >70 overbought (bearish -), else neutral.
+ * MACD: macd line above signal line → bullish, below → bearish.
+ * Returns a clamped [-20, +20] score delta + reasons, so technical conviction
+ * ADDS TO the fundamental score without ever overruling it.
+ */
+export function scoreTechnical(
+  ohlcv: OHLCV[],
+): { scoreDelta: number; reasons: Array<{ text: string; weight: number }> } {
+  const reasons: Array<{ text: string; weight: number }> = []
+  if (!ohlcv || ohlcv.length === 0) return { scoreDelta: 0, reasons }
+
+  let delta = 0
+
+  // RSI(14) — last non-null value.
+  const rsiSeries = RSI(ohlcv, 14)
+  const rsi = lastIndicatorValue(rsiSeries)
+  if (rsi != null) {
+    if (rsi < 30) {
+      delta += 10
+      reasons.push({ text: `RSI ${rsi.toFixed(1)} — oversold, relief-bounce potential`, weight: 0.2 })
+    } else if (rsi > 70) {
+      delta -= 10
+      reasons.push({ text: `RSI ${rsi.toFixed(1)} — overbought, pullback risk`, weight: 0.2 })
+    }
+  }
+
+  // MACD — macd line vs signal line (last non-null pair).
+  const { macd, signal } = MACD(ohlcv)
+  const macdVal = lastIndicatorValue(macd)
+  const signalVal = lastIndicatorValue(signal)
+  if (macdVal != null && signalVal != null) {
+    if (macdVal > signalVal) {
+      delta += 8
+      reasons.push({ text: 'MACD above signal — bullish momentum', weight: 0.15 })
+    } else if (macdVal < signalVal) {
+      delta -= 8
+      reasons.push({ text: 'MACD below signal — bearish momentum', weight: 0.15 })
+    }
+  }
+
+  return {
+    scoreDelta: Math.max(-20, Math.min(20, delta)),
+    reasons,
+  }
+}
+
+/** Last non-null (and finite) `.value` from an indicator series, or undefined. */
+function lastIndicatorValue(points: Array<{ value: number }>): number | undefined {
+  for (let i = points.length - 1; i >= 0; i--) {
+    const v = points[i].value
+    if (v != null && Number.isFinite(v)) return v
+  }
+  return undefined
 }
 
 // ── Reason Builders ──

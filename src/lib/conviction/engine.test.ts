@@ -12,6 +12,7 @@ import {
   scoreCrypto,
   scoreIdx,
   scoreIdxRow,
+  scoreTechnical,
   sourceLabel,
 } from '@/lib/conviction/engine'
 import type { AlphaSignalLike, IdxLeaderLike } from '@/lib/conviction/engine'
@@ -304,3 +305,56 @@ describe('scoreIdxRow (z-score path)', () => {
     expect(directionFor(35)).toBe('bear')
   })
 })
+
+describe('scoreTechnical', () => {
+  /** Build an OHLCV series by compounding daily change percentages. */
+  function ohlcvSeries(
+    changePcts: number[],
+    start = 100,
+  ): Array<{ time: number; open: number; high: number; low: number; close: number; volume: number }> {
+    let price = start
+    return changePcts.map((c, i) => {
+      price = price * (1 + c / 100)
+      return { time: i, open: price, high: price * 1.005, low: price * 0.995, close: price, volume: 1000 }
+    })
+  }
+
+  it('returns zero delta and no reasons for empty candles', () => {
+    expect(scoreTechnical([])).toEqual({ scoreDelta: 0, reasons: [] })
+  })
+
+  it('oversold RSI → bullish +10 (MACD too short to contribute)', () => {
+    const res = scoreTechnical(ohlcvSeries(Array(20).fill(-1.5)))
+    expect(res.scoreDelta).toBe(10)
+    expect(res.reasons.some((r) => r.text.includes('oversold'))).toBe(true)
+  })
+
+  it('overbought RSI → bearish -10 (MACD too short to contribute)', () => {
+    const res = scoreTechnical(ohlcvSeries(Array(20).fill(1.5)))
+    expect(res.scoreDelta).toBe(-10)
+    expect(res.reasons.some((r) => r.text.includes('overbought'))).toBe(true)
+  })
+
+  it('MACD above signal → bullish +8 when RSI is neutral', () => {
+    const res = scoreTechnical(ohlcvSeries([...Array(40).fill(-0.8), ...Array(5).fill(3.0)]))
+    expect(res.scoreDelta).toBe(8)
+    expect(res.reasons.some((r) => r.text.includes('MACD above signal'))).toBe(true)
+  })
+
+  it('MACD below signal → bearish -8 when RSI is neutral', () => {
+    const res = scoreTechnical(ohlcvSeries([...Array(40).fill(0.8), ...Array(5).fill(-3.0)]))
+    expect(res.scoreDelta).toBe(-8)
+    expect(res.reasons.some((r) => r.text.includes('MACD below signal'))).toBe(true)
+  })
+
+  it('combines oversold RSI + bullish MACD and keeps the delta clamped', () => {
+    // Verified against the indicators module: RSI ~24.4 (<30) and MACD(-5.00) > signal(-5.75).
+    const res = scoreTechnical(ohlcvSeries([...Array(52).fill(-1.3), ...Array(3).fill(2.0)]))
+    expect(res.scoreDelta).toBe(18)
+    expect(res.scoreDelta).toBeGreaterThanOrEqual(-20)
+    expect(res.scoreDelta).toBeLessThanOrEqual(20)
+    expect(res.reasons.some((r) => r.text.includes('oversold'))).toBe(true)
+    expect(res.reasons.some((r) => r.text.includes('MACD above signal'))).toBe(true)
+  })
+})
+
