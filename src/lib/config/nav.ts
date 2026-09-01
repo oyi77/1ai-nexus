@@ -29,6 +29,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: 'Following', href: '/following', icon: Users, description: 'Track traders, entities and wallets you follow.' },
       { label: 'Intelligence Score', href: '/intelligence-score', icon: Gauge, description: 'A/B/C intelligence grade per asset.' },
       { label: 'Market Intelligence', href: '/intelligence', icon: Activity, description: 'Cross-asset conviction signals — every symbol scored BUY/WAIT/SELL.' },
+      { label: 'Insights', href: '/insights', icon: TrendingUp, description: 'Daily conviction signals — top BUY/SELL with track record.' },
     ],
   },
   {

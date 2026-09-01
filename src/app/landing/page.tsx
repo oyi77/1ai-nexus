@@ -65,6 +65,83 @@ function Mark() {
   return <span className="text-teal-vivid font-bold tracking-tight">◆ NEXUS</span>
 }
 
+function TrackRecordBuckets() {
+  const [data, setData] = useState<{
+    total: number
+    evaluated: number
+    overallWinRate: number
+    buckets: Array<{ label: string; signals: number; evaluated: number; winRate: number }>
+  } | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/v1/conviction/accuracy')
+      .then((r) => r.json())
+      .then((d) => {
+        const body = d?.data ?? d
+        if (body?.buckets) setData(body)
+      })
+      .catch(() => setData(null))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const buckets = data?.buckets ?? []
+  const totalSignals = data?.total ?? 0
+  const evaluatedSignals = data?.evaluated ?? 0
+
+  const getBucket = (label: string) => buckets.find((b) => b.label === label)
+
+  return (
+    <div className="card p-6">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
+        {(['80+', '60-79', '40-59', '<40'] as const).map((label) => {
+          const bucket = getBucket(label)
+          const hasData = bucket && bucket.evaluated > 0
+          return (
+            <div key={label} className="text-center p-4 rounded-lg border border-bg-border bg-bg-base">
+              <div className="text-xs text-text-muted mb-1">CONV {label}</div>
+              <div className="text-2xl font-bold tabular-nums tracking-tight">
+                {hasData ? (
+                  <span className={bucket!.winRate >= 50 ? 'text-data-bull' : 'text-data-bear'}>
+                    {Math.round(bucket!.winRate)}%
+                  </span>
+                ) : (
+                  <span className="text-text-muted">—</span>
+                )}
+              </div>
+              <div className="text-xs text-text-muted mt-1">
+                {bucket ? `${bucket.signals} signals` : '0 signals'}
+              </div>
+            </div>
+          )
+        })}
+        <div className="text-center p-4 rounded-lg border border-bg-border bg-bg-base">
+          <div className="text-xs text-text-muted mb-1">TOTAL</div>
+          <div className="text-2xl font-bold tabular-nums tracking-tight">
+            {evaluatedSignals > 0 ? (
+              <span className={(data?.overallWinRate ?? 0) >= 50 ? 'text-data-bull' : 'text-data-bear'}>
+                {Math.round(data?.overallWinRate ?? 0)}%
+              </span>
+            ) : (
+              <span className="text-text-muted">—</span>
+            )}
+          </div>
+          <div className="text-xs text-text-muted mt-1">
+            {totalSignals} signals
+          </div>
+        </div>
+      </div>
+      <p className="text-xs text-text-muted text-center">
+        {loading
+          ? 'Loading…'
+          : evaluatedSignals === 0
+          ? 'Awaiting data — signals are measured 24h after emission.'
+          : `${evaluatedSignals} of ${totalSignals} signals evaluated · 24h horizon`}
+      </p>
+    </div>
+  )
+}
+
 export default function LandingPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   useEffect(() => {
@@ -348,6 +425,16 @@ export default function LandingPage() {
         <p className="text-xs text-text-muted mt-3">
           Competitor positioning as of Aug 2026 — Bloomberg Terminal list price, Hyperdash crypto-only scope, Stockbit IDX-focused freemium.
         </p>
+      </section>
+
+      {/* ── Track Record ── */}
+      <section id="track-record" className="max-w-6xl mx-auto px-6 py-20">
+        <p className="eyebrow mb-2">Track Record</p>
+        <h2 className="text-3xl font-bold tracking-tight mb-3">Our Signals, Proven</h2>
+        <p className="text-text-secondary mb-8 max-w-2xl">
+          Every conviction signal is measured 24h later. The higher the conviction, the higher the hit-rate should be.
+        </p>
+        <TrackRecordBuckets />
       </section>
 
       {/* ── Social proof ── */}
