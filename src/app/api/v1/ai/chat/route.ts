@@ -46,43 +46,44 @@ export async function POST(request: NextRequest) {
     }
     const { message, agent: agentId } = parsed.data
 
-    const apiKey = process.env.ANTHROPIC_API_KEY
+    // OmniRoute gateway (OpenAI-compatible) — the ecosystem's unified LLM
+    // router. Pooled providers/model combos, no single-vendor lock.
+    const base = process.env.OMNIROUTE_BASE_URL || 'http://100.123.92.72:20128/v1'
+    const apiKey = process.env.OMNIROUTE_API_KEY
     if (!apiKey) {
-      return apiJson({
-        response: 'AI Assistant is not configured. Add your Anthropic API key in Settings → Modules.',
-      })
+      return apiJson({ response: 'AI Assistant is not configured. Set OMNIROUTE_API_KEY.' })
     }
 
     const systemPrompt = agentId
       ? (getAgent(agentId)?.systemPrompt ?? DEFAULT_SYSTEM_PROMPT)
       : DEFAULT_SYSTEM_PROMPT
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch(`${base}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+        model: process.env.OMNIROUTE_MODEL || 'baicok/deepseek-v4-flash-vision-exp',
         max_tokens: 1024,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: message }],
+        stream: false,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message },
+        ],
       }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(60_000),
     })
 
     if (!res.ok) {
       const err = await res.text()
-      console.error('Anthropic API error:', res.status, err)
-      return apiJson({
-        response: `AI service error (${res.status}). Check your API key in Settings.`,
-      })
+      console.error('OmniRoute API error:', res.status, err)
+      return apiJson({ response: `AI service error (${res.status}). Check OmniRoute config.` })
     }
 
     const data: unknown = await res.json()
-    const response = extractResponse(data)
+    const response = extractOpenAIResponse(data)
 
     return apiJson({ response, agent: agentId ?? 'general' })
   } catch (err) {
@@ -91,12 +92,10 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function extractResponse(data: unknown): string {
-  if (!data || typeof data !== 'object' || !('content' in data)) return 'No response from AI'
-  const content: unknown = data.content
-  if (!Array.isArray(content) || content.length === 0) return 'No response from AI'
-  const first: unknown = content[0]
-  if (!first || typeof first !== 'object' || !('text' in first)) return 'No response from AI'
-  const text: unknown = first.text
-  return typeof text === 'string' ? text : 'No response from AI'
+/** Extract assistant content from an OpenAI-style chat.completion. */
+function extractOpenAIResponse(data: unknown): string {
+  if (!data || typeof data !== 'object') return 'No response from AI'
+  const d = data as { choices?: Array<{ message?: { content?: string } }> }
+  const content = d.choices?.[0]?.message?.content
+  return typeof content === 'string' && content ? content : 'No response from AI'
 }
