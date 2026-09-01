@@ -127,10 +127,10 @@ export default function WelcomePage() {
             </ol>
             <div className="flex flex-wrap gap-3 px-3 pb-3">
               <Link
-                href="/"
+                href="/dashboard"
                 className="px-4 py-2 bg-teal-vivid text-bg-base font-mono font-bold rounded hover:bg-teal-vivid/80 transition-colors"
               >
-                Explore the Terminal
+                Continue to Dashboard
               </Link>
               <Link
                 href="/pricing"

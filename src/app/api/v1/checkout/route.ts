@@ -9,8 +9,9 @@ export const runtime = 'nodejs';
 import { NextResponse } from 'next/server'
 import { getPaymentService } from '@/lib/payment-service'
 import { verifyToken, extractTokenFromCookies } from '@/lib/jwt'
-import { PLAN_PRICING, isPaidPlan } from '@/lib/pricing'
-import type { UserRole } from '@prisma/client'
+import { PLAN_PRICING, isPaidPlan, getPlanRank } from '@/lib/pricing'
+import type { SubscriptionPlan } from '@prisma/client'
+import { prisma } from '@/lib/db'
 
 interface CheckoutRequest {
   plan: string
@@ -72,6 +73,27 @@ export async function POST(request: Request) {
       )
     }
 
+    // Reject downgrades: if the user already has a higher active plan, block it.
+    // A plan is "active" while planExpiresAt is in the future (or a paid plan
+    // with no expiry set). An expired plan no longer blocks a lower re-subscribe.
+    try {
+      const existingUser = await prisma.user.findUnique({ where: { id: userId } })
+      if (existingUser) {
+        const currentPlan = existingUser.plan
+        const expiry = existingUser.planExpiresAt
+        const isActive = expiry ? expiry.getTime() > Date.now() : currentPlan !== 'free'
+        if (isActive && getPlanRank(currentPlan) > getPlanRank(plan)) {
+          return NextResponse.json(
+            { success: false, error: 'You already have a higher active plan. Downgrades are not allowed.' },
+            { status: 400 }
+          )
+        }
+      }
+    } catch (err) {
+      // Fail-open on DB read errors: a lookup failure must not block a legitimate purchase.
+      console.error('Failed to read user plan for downgrade check:', err)
+    }
+
     // Get customer email (from request body or JWT)
     const finalEmail = email || customerEmail || userEmail || ''
 
@@ -90,7 +112,7 @@ export async function POST(request: Request) {
     const paymentService = getPaymentService()
     const order = await paymentService.createSubscriptionPayment({
       userId,
-      plan: plan as UserRole,
+      plan: plan as SubscriptionPlan,
       amount: pricing.amount,
       currency: pricing.currency,
       gateway: selectedGateway,
@@ -98,6 +120,17 @@ export async function POST(request: Request) {
       returnUrl: returnDestination,
       cancelUrl: cancelDestination,
     })
+
+    // Defense-in-depth: the gateway must charge exactly the plan's single-source
+    // price. A mismatched amount is rejected before any order is handed back.
+    if (order.amount !== pricing.amount) {
+      console.error('Checkout amount mismatch', { plan, expected: pricing.amount, got: order.amount })
+      return NextResponse.json(
+        { success: false, error: 'Payment amount does not match plan pricing' },
+        { status: 400 }
+      )
+    }
+
     return NextResponse.json({
       success: true,
       orderId: order.orderId,

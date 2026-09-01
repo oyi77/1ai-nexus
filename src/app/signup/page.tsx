@@ -27,7 +27,7 @@ const STRENGTH_COLORS = ["bg-bg-border", "bg-data-bear", "bg-data-warn", "bg-tea
 export default function SignupPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get("redirect") || "/pricing"
+  const redirectTo = searchParams.get("redirect") || "/welcome"
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)

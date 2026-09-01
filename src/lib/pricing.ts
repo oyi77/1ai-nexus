@@ -48,6 +48,13 @@ export function getPlanPricing(plan: string): PlanPricing | undefined {
   return PLAN_PRICING[plan]
 }
 
+// Ordinal plan tiers for upgrade/downgrade comparisons (free < pro < enterprise)
+const PLAN_RANK: Record<string, number> = { free: 0, pro: 1, enterprise: 2 }
+
+export function getPlanRank(plan: string): number {
+  return PLAN_RANK[plan] ?? 0
+}
+
 export const FREE_PLAN = 'free'
 export const PRO_PLAN = 'pro'
 export const ENTERPRISE_PLAN = 'enterprise'

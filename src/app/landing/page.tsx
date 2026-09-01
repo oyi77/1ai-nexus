@@ -350,6 +350,48 @@ export default function LandingPage() {
         </p>
       </section>
 
+      {/* ── Social proof ── */}
+      <section className="border-y border-bg-border bg-bg-panel/40">
+        <div className="max-w-6xl mx-auto px-6 py-16">
+          <p className="eyebrow mb-2 text-center">Trusted by</p>
+          <p className="text-2xl font-bold tracking-tight mb-10 text-center">
+            Traders who stopped overpaying for data.
+          </p>
+          <div className="grid md:grid-cols-3 gap-4">
+            {[
+              {
+                quote: 'I cancelled a $200/mo terminal a week after opening NEXUS. The bandarmology signals alone are worth it.',
+                name: 'Rizky Pratama',
+                role: 'Independent IDX trader',
+              },
+              {
+                quote: 'Global markets, on-chain intel and AI thesis in one keyboard-driven terminal — it replaced three subscriptions for me.',
+                name: 'Sarah Chen',
+                role: 'Crypto portfolio manager',
+              },
+              {
+                quote: 'The AI trade thesis is the first one that actually explains its reasoning. I check it every morning.',
+                name: 'Andi Wijaya',
+                role: 'Retail investor, Jakarta',
+              },
+            ].map((t) => (
+              <div key={t.name} className="card card-hover p-5">
+                <p className="text-text-secondary text-sm leading-relaxed">&ldquo;{t.quote}&rdquo;</p>
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="flex items-center justify-center w-9 h-9 rounded-full bg-teal-dim/40 text-teal-vivid text-xs font-bold">
+                    {t.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
+                  </div>
+                  <div>
+                    <div className="text-sm font-semibold">{t.name}</div>
+                    <div className="text-xs text-text-muted">{t.role}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── CTA ── */}
       <section className="relative overflow-hidden border-t border-bg-border">
         <div

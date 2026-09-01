@@ -1,68 +1,34 @@
 "use client"
 
 import { useState } from 'react'
+import { PLAN_PRICING } from '@/lib/pricing'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { FinancialDisclaimer } from '@/components/FinancialDisclaimer'
 
-const tiers = [
-  {
-    id: 'free',
-    name: 'Free',
-    price: '$0',
-    priceIdr: 'Rp0',
-    period: '/month',
-    description: 'Basic market data access',
-    features: [
-      '100 API calls/day',
-      'Market data access',
-      'Macro indicators',
-      'News feed',
-      'Basic signals',
-    ],
-    cta: 'Get Started',
-    highlighted: false,
-  },
-  {
-    id: 'pro',
-    name: 'Pro',
-    price: '$49',
-    priceIdr: 'Rp759.500',
-    period: '/month',
-    description: 'Full data access + signals',
-    features: [
-      '10,000 API calls/day',
-      'All Free features',
-      'On-chain analytics',
-      'Alpha signals',
-      'Screener tools',
-      'Backtest results',
-      'Position sizing',
-      'Email support',
-    ],
-    cta: 'Upgrade to Pro',
-    highlighted: true,
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: '$199',
-    priceIdr: 'Rp3.084.500',
-    period: '/month',
-    description: 'Unlimited access + WebSocket',
-    features: [
-      '100,000 API calls/day',
-      'All Pro features',
-      'Historical data',
-      'WebSocket streaming',
-      'Priority support',
-      'Custom alerts',
-      'API key management',
-      'Dedicated account manager',
-    ],
-    cta: 'Contact Sales',
-    highlighted: false,
-  },
-]
+// Presentation-only metadata (not pricing data — amounts/features come from PLAN_PRICING).
+const tierMeta: Record<string, { name: string; cta: string; highlighted: boolean }> = {
+  free: { name: 'Free', cta: 'Get Started', highlighted: false },
+  pro: { name: 'Pro', cta: 'Upgrade to Pro', highlighted: true },
+  enterprise: { name: 'Enterprise', cta: 'Contact Sales', highlighted: false },
+}
+
+const IDR_RATE = 15500 // USD → IDR for Indonesian gateways
+
+const formatUsd = (cents: number) => `$${cents / 100}`
+const formatIdr = (cents: number) => `Rp${Math.round((cents / 100) * IDR_RATE).toLocaleString('id-ID')}`
+
+// Single source of truth: derive every display price from PLAN_PRICING.
+const tiers = Object.entries(PLAN_PRICING).map(([id, plan]) => ({
+  id,
+  name: tierMeta[id]?.name ?? id,
+  price: formatUsd(plan.amount),
+  priceIdr: formatIdr(plan.amount),
+  period: '/month',
+  description: plan.description,
+  features: plan.features,
+  cta: tierMeta[id]?.cta ?? id,
+  highlighted: tierMeta[id]?.highlighted ?? false,
+}))
 
 const paymentMethods = [
   { id: 'tripay', name: 'Tripay', icon: '🏦', description: 'QRIS, VA (BCA, BNI, BRI, Mandiri)' },

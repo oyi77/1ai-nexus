@@ -9,6 +9,7 @@ import { NextResponse } from 'next/server'
 import { createHmac } from 'crypto'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
+import { PLAN_PRICING } from '@/lib/pricing'
 
 interface WebhookPayload {
   order_id: string
@@ -77,6 +78,17 @@ export async function POST(request: Request) {
     const metadata = payload.metadata || {}
     const userId = metadata.userId as string | undefined
     const plan = metadata.plan as string | undefined
+
+    // Defense-in-depth: after HMAC verification, cross-validate the charged
+    // amount against the plan's single-source price. Reject mismatches outright
+    // so a tampered/incorrect amount can never activate a subscription.
+    if (payload.status === 'paid' && plan && userId) {
+      const planPricing = PLAN_PRICING[plan]
+      if (!planPricing || payload.amount !== planPricing.amount) {
+        console.error('Webhook amount mismatch', { plan, expected: planPricing?.amount, got: payload.amount })
+        return NextResponse.json({ error: 'Amount mismatch' }, { status: 400 })
+      }
+    }
 
     // Only process successful payments
     if (payload.status === 'paid' && userId && plan) {

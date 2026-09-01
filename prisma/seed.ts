@@ -333,7 +333,7 @@ async function main() {
   await prisma.user.create({
     data: {
       email: "admin@nexus.local",
-      role: "enterprise",
+      role: "admin",
     },
   });
 

@@ -24,6 +24,13 @@ interface ApiKeyInfo {
   createdAt: string
 }
 
+interface AdminUser {
+  id: string
+  email: string
+  plan: string
+  createdAt: string
+}
+
 interface AccountData {
   user: {
     id: string
@@ -46,6 +53,8 @@ export default function AdminPage() {
   const [keys, setKeys] = useState<ApiKeyInfo[] | null>(null)
   const [keysError, setKeysError] = useState(false)
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
+  const [users, setUsers] = useState<AdminUser[] | null>(null)
+  const [usersError, setUsersError] = useState(false)
   const [analyticsError, setAnalyticsError] = useState(false)
 
   const fetchAll = useCallback(async () => {
@@ -112,6 +121,21 @@ export default function AdminPage() {
       } catch {
         setAnalytics(null)
         setAnalyticsError(true)
+      }
+
+      // Fetch users (admin directory)
+      try {
+        const usersRes = await fetch('/api/v1/admin/users')
+        if (usersRes.ok) {
+          const usersJson = (await usersRes.json()) as { data: { users: AdminUser[] } }
+          setUsers(usersJson.data?.users ?? null)
+        } else {
+          setUsers(null)
+          setUsersError(true)
+        }
+      } catch {
+        setUsers(null)
+        setUsersError(true)
       }
     } catch {
       setStatus('error')
@@ -289,6 +313,43 @@ export default function AdminPage() {
           ) : (
             <p className="p-4 text-sm text-text-muted font-mono">
               {keysError ? 'Keys endpoint unavailable' : 'No API keys found'}
+            </p>
+          )}
+        </Panel>
+
+        {/* Users */}
+        <Panel
+          title="Users"
+          liveStatus={usersError ? 'error' : users ? 'live' : 'stale'}
+        >
+          {(users && users.length > 0) ? (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-bg-border text-left text-xs text-text-muted font-mono uppercase tracking-wider">
+                  <th className="px-4 py-2 font-medium">Email</th>
+                  <th className="px-4 py-2 font-medium">Plan</th>
+                  <th className="px-4 py-2 font-medium">Joined</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className="border-b border-bg-border/50 hover:bg-bg-raised/50">
+                    <td className="px-4 py-2 text-text-primary font-mono">
+                      {u.email}
+                    </td>
+                    <td className="px-4 py-2 text-text-secondary font-mono text-xs uppercase">
+                      {u.plan}
+                    </td>
+                    <td className="px-4 py-2 text-text-muted font-mono text-xs">
+                      {new Date(u.createdAt).toLocaleDateString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="p-4 text-sm text-text-muted font-mono">
+              {usersError ? 'Users endpoint unavailable' : 'No users found'}
             </p>
           )}
         </Panel>
