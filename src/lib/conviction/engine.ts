@@ -37,6 +37,7 @@ export interface ConvictionMarket {
 export interface ConvictionResult {
   generated: string
   markets: ConvictionMarket[]
+  stale?: boolean
 }
 
 /** Minimal structural view of an alpha signal (keeps engine IO-free). */

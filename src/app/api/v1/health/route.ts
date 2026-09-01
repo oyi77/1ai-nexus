@@ -1,9 +1,11 @@
 // ─────────────────────────────────────────────────────────────
 // GET /api/v1/health — Comprehensive health check
-// Returns status of all services: web, ws, redis, indexer
+// Returns status of all services: web, ws, redis, indexer + module health + conviction stats
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
+import { getAllHealth } from '@/lib/modules/health'
+import { peekCachedConviction } from '@/lib/conviction/build'
 
 export async function GET() {
   const checks: Record<string, unknown> = {}
@@ -47,7 +49,6 @@ export async function GET() {
       checks.indexer = 'down'
     }
   } catch {
-    // Indexer may not expose /health endpoint — check if port 4409 is reachable
     try {
       const ctrl = new AbortController()
       setTimeout(() => ctrl.abort(), 3000)
@@ -66,6 +67,32 @@ export async function GET() {
     checks.dataIntegrity = count > 1000 ? 'ok' : 'degraded'
   } catch {
     checks.dataIntegrity = 'unknown'
+  }
+
+  // 6. Module health summary
+  const moduleHealth = getAllHealth()
+  const activeModules = moduleHealth.filter(h => h.status === 'active').length
+  const degradedModules = moduleHealth.filter(h => h.status === 'degraded').length
+  checks.modules = {
+    total: moduleHealth.length,
+    active: activeModules,
+    degraded: degradedModules,
+  }
+
+  // 7. Conviction cache status
+  const cached = peekCachedConviction()
+  checks.conviction = {
+    cached: cached !== null,
+    markets: cached?.markets?.length ?? 0,
+  }
+
+  // 8. Backtest pending count
+  try {
+    const { prisma } = await import('@/lib/db')
+    const pending = await prisma.backtestResult.count({ where: { outcome: 'pending' } })
+    checks.backtest = { pending }
+  } catch {
+    checks.backtest = { pending: -1 }
   }
 
   const allOk = Object.values(checks).every(v => v === 'ok' || typeof v === 'number' || v === true)

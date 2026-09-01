@@ -219,7 +219,10 @@ export async function buildConvictionResult(): Promise<ConvictionResult> {
   }
 
   // ── Track record (PROOF layer) — persist this emission + evaluate matured.
+  // Also bridge to backtest engine so conviction signals get full PnL evaluation.
   void (async () => {
+    const { storeSignal } = await import('@/lib/modules/derived/backtest-engine')
+
     for (const item of idxItems) {
       if (item.action === 'WAIT') continue
       await recordConvictionSignal({
@@ -227,6 +230,23 @@ export async function buildConvictionResult(): Promise<ConvictionResult> {
         action: item.action, direction: item.direction, price: item.price > 0 ? item.price : undefined,
         reasons: item.reasons,
       })
+      // Conviction → backtest bridge (conviction% → TP/SL distance)
+      if (item.price > 0) {
+        const dir = item.action === 'BUY' ? 'bullish' : 'bearish'
+        const conv = item.conviction / 100
+        await storeSignal({
+          id: `conviction-idx-${item.symbol}-${Date.now()}`,
+          symbol: item.symbol,
+          direction: dir,
+          entry: item.price,
+          tp1: item.price * (1 + (item.action === 'BUY' ? conv : -conv) * 0.05),
+          tp2: item.price * (1 + (item.action === 'BUY' ? conv : -conv) * 0.10),
+          tp3: item.price * (1 + (item.action === 'BUY' ? conv : -conv) * 0.20),
+          sl: item.price * (1 - (item.action === 'BUY' ? conv : -conv) * 0.03),
+          timestamp: Date.now(),
+          source: 'conviction',
+        }).catch(() => {})
+      }
     }
     for (const item of cryptoItems) {
       if (item.action === 'WAIT') continue
@@ -235,6 +255,22 @@ export async function buildConvictionResult(): Promise<ConvictionResult> {
         action: item.action, direction: item.direction, price: item.price > 0 ? item.price : undefined,
         reasons: item.reasons,
       })
+      if (item.price > 0) {
+        const dir = item.action === 'BUY' ? 'bullish' : 'bearish'
+        const conv = item.conviction / 100
+        await storeSignal({
+          id: `conviction-crypto-${item.symbol}-${Date.now()}`,
+          symbol: item.symbol,
+          direction: dir,
+          entry: item.price,
+          tp1: item.price * (1 + (item.action === 'BUY' ? conv : -conv) * 0.05),
+          tp2: item.price * (1 + (item.action === 'BUY' ? conv : -conv) * 0.10),
+          tp3: item.price * (1 + (item.action === 'BUY' ? conv : -conv) * 0.20),
+          sl: item.price * (1 - (item.action === 'BUY' ? conv : -conv) * 0.03),
+          timestamp: Date.now(),
+          source: 'conviction',
+        }).catch(() => {})
+      }
     }
     await evaluateTrackRecord().catch(() => {})
   })()
@@ -264,6 +300,7 @@ export function peekCachedConviction(): ConvictionResult | null {
  * Returns a fresh-enough result WITHOUT recomputing if the cache is hot,
  * or shares the single in-flight recompute if one is already running.
  * Guarantees at most one buildConvictionResult() per TTL window.
+ * On compute failure: returns stale cache (with stale:true) if available.
  */
 export async function getCachedConvictionResult(): Promise<ConvictionResult> {
   const hot = peekCachedConviction()
@@ -278,6 +315,10 @@ export async function getCachedConvictionResult(): Promise<ConvictionResult> {
     cachedAt = Date.now()
     return result
   } catch {
+    // Compute failed — serve stale cache if we have any
+    if (cachedResult) {
+      return { ...cachedResult, stale: true }
+    }
     return emptyResult()
   } finally {
     inflight = null

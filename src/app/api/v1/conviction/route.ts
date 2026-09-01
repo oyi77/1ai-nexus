@@ -11,7 +11,11 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
-  const resp = apiJson(await getCachedConvictionResult())
+  const result = await getCachedConvictionResult()
+  const resp = apiJson(result)
   resp.headers.set('Cache-Control', 'public, max-age=30')
+  if ((result as { stale?: boolean }).stale) {
+    resp.headers.set('X-Conviction-Stale', 'true')
+  }
   return resp
 }
