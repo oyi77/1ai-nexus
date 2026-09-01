@@ -14,8 +14,9 @@ export interface ApiKey {
   createdAt: string
   lastUsedAt: string | null
   requestCount: number
-  rateLimit: number // requests per minute
+  rateLimit: number // requests per day
   isActive: boolean
+  windowStart: number // timestamp when current rate-limit window began
 }
 
 // In-memory cache of validated keys (hydrated from DB on first use).
@@ -46,6 +47,7 @@ export async function generateApiKey(params: {
     requestCount: 0,
     rateLimit: rateLimits[params.tier],
     isActive: true,
+    windowStart: Date.now(),
   }
 
   // Register in-memory first so validateApiKey sees it immediately.
@@ -92,10 +94,19 @@ export async function validateApiKey(key: string): Promise<ApiKey | null> {
       requestCount: 0,
       rateLimit: rateLimits[tier],
       isActive: row.isActive,
+      windowStart: Date.now(),
     }
     keys.set(key, apiKey)
   }
   if (!apiKey.isActive) return null
+
+  // Reset counter if window expired (24h)
+  const dayMs = 24 * 60 * 60 * 1000
+  if (Date.now() - apiKey.windowStart >= dayMs) {
+    apiKey.requestCount = 0
+    apiKey.windowStart = Date.now()
+    keys.set(key, apiKey)
+  }
 
   apiKey.lastUsedAt = new Date().toISOString()
   apiKey.requestCount++
@@ -130,6 +141,7 @@ export async function listUserKeys(userId: string): Promise<Omit<ApiKey, 'key'>[
       requestCount: 0,
       rateLimit: rateLimits[tier],
       isActive: k.isActive,
+      windowStart: Date.now(),
     }
   })
 }
@@ -160,7 +172,7 @@ export async function revokeApiKey(key: string, userId?: string): Promise<Revoke
   return 'ok'
 }
 
-// Check rate limit
+// Check rate limit (per-day window)
 export function checkRateLimit(key: string): { allowed: boolean; remaining: number } {
   const apiKey = keys.get(key)
   if (!apiKey) return { allowed: false, remaining: 0 }
