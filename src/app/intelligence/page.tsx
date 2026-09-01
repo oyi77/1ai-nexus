@@ -129,31 +129,7 @@ export default function IntelligencePage() {
     overallWinRate: number
     buckets: Array<{ label: string; signals: number; evaluated: number; winRate: number }>
   } | null>(null)
-
-  const fetchConviction = useCallback(async () => {
-    try {
-      const res = await fetch('/api/v1/conviction')
-      const json = await res.json()
-      const d = json?.data ?? json
-      if (d?.markets) {
-        setData(d)
-        setStatus('live')
-      } else {
-        setStatus('error')
-      }
-      // Track record — win-rate by bucket.
-      try {
-        const accRes = await fetch('/api/v1/conviction/accuracy')
-        const accJson = await accRes.json()
-        const ad = accJson?.data ?? accJson
-        if (ad?.buckets) setAccuracy(ad)
-      } catch {
-        setAccuracy(null)
-      }
-    } catch {
-      setStatus('error')
-    }
-  }, [])
+  const [refreshKey, setRefreshKey] = useState(0)
 
   const fetchWatchlist = useCallback(async () => {
     try {
@@ -173,11 +149,52 @@ export default function IntelligencePage() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchConviction()
     fetchWatchlist()
-    const id = setInterval(fetchConviction, 60_000)
-    return () => clearInterval(id)
-  }, [fetchConviction, fetchWatchlist])
+
+    // ── Live conviction via SSE (push, not 60s polling) ──
+    let es: EventSource | null = null
+    const connectStream = () => {
+      es = new EventSource('/api/v1/conviction/stream')
+      es.onmessage = (e: MessageEvent<string>) => {
+        try {
+          const parsed = JSON.parse(e.data)
+          const d = parsed?.data ?? parsed
+          if (d?.markets) {
+            setData(d)
+            setStatus('live')
+          }
+        } catch {
+          // malformed frame — ignore, keep last good
+        }
+      }
+      es.onerror = () => {
+        setStatus('stale')
+        es?.close()
+        // auto-reconnect
+        setTimeout(connectStream, 3000)
+      }
+    }
+    connectStream()
+
+    // Accuracy (track record) — poll every 60s, independent of the signal stream.
+    const fetchAccuracy = async () => {
+      try {
+        const accRes = await fetch('/api/v1/conviction/accuracy')
+        const accJson = await accRes.json()
+        const ad = accJson?.data ?? accJson
+        if (ad?.buckets) setAccuracy(ad)
+      } catch {
+        // leave last accuracy
+      }
+    }
+    void fetchAccuracy()
+    const accId = setInterval(fetchAccuracy, 60_000)
+
+    return () => {
+      es?.close()
+      clearInterval(accId)
+    }
+    }, [fetchWatchlist, refreshKey])
 
   const allItems = data ? data.markets.flatMap((m) => m.items) : []
   const watchedKeys = new Set(watchlist.map((w) => `${w.market}:${w.symbol}`))
@@ -209,7 +226,7 @@ export default function IntelligencePage() {
           </div>
           <div className="flex items-center gap-2">
             <LiveDot status={status} size={6} />
-            <button onClick={fetchConviction} className="p-1.5 rounded hover:bg-bg-raised text-text-muted hover:text-text-primary">
+            <button onClick={() => setRefreshKey((k) => k + 1)} className="p-1.5 rounded hover:bg-bg-raised text-text-muted hover:text-text-primary">
               <RefreshCw size={14} />
             </button>
           </div>
