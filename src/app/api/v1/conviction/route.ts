@@ -16,6 +16,7 @@ import {
   emptyResult,
   fundingToSignal,
   scoreCrypto,
+  scoreIdxRow,
   smartMoneyToSignal,
   whaleToSignal,
 } from '@/lib/conviction/engine'
@@ -65,6 +66,24 @@ async function fetchBinancePrices(symbols: string[]): Promise<Record<string, { p
 /** Aggregate-asset symbols that are not tradable single tokens. */
 const NON_TOKEN_ASSETS = new Set(['PORTFOLIO', 'MARKET', 'CRYPTO', 'BTC/ETH', 'COMMODITIES'])
 
+// Stablecoins + pegged assets — no conviction value, exclude.
+const STABLE_ASSETS = new Set([
+  'USDC', 'USDT', 'DAI', 'USDE', 'FDUSD', 'TUSD', 'USDD', 'PYUSD',
+  'BUSD', 'USD1', 'USDY', 'GUSD', 'XUSD', 'USDP', 'SUSD', 'FRAX', 'LUSD', 'EURS',
+	'BTCS', 'BIT', 'EURL', 'DAI', 'LUSD', 'CRVUSD', 'GHO', 'MIM', 'USDX',
+])
+// Known garbage/short / leveraged ETF symbols that are NOT tradable tokens.
+const GARBAGE_SYMBOLS = new Set([
+  'CL', 'BTR', 'BZ', 'SOXL', '0G', 'SPCX', 'SKR', 'ZORA', '牛来', 'BTCS',
+  'SOL', 'BONK', 'WIF', 'PEPE', 'DOGE', 'SHIB', 'FLOKI',  // legit but thin
+])
+// Whitelist: only majors the engine genuinely floors conviction on.
+const CRYPTO_ALLOWLIST = new Set([
+  'BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'AVAX', 'DOGE', 'LINK',
+  'DOT', 'MATIC', 'ARB', 'OP', 'LTC', 'UNI', 'ATOM', 'NEAR', 'APT',
+  'SUI', 'SEI', 'INJ', 'TIA', 'PEPE', 'WIF', 'BONK', 'SHIB', 'FLOKI', 'ENA',
+])
+
 export async function GET() {
   try {
     const [leaders, signals, screenerSnap] = await Promise.all([
@@ -77,27 +96,29 @@ export async function GET() {
     const idxItems: ConvictionItem[] = []
     if (screenerSnap?.data) {
       const rows = Object.values(screenerSnap.data)
-      // Top conviction: high ROE + foreign net buy + momentum
+      // Compute population stats for z-scoring (ROE, PER, momentum).
+      const clean = rows.filter((r) => r.roe != null && r.per != null && r.change1d != null)
+      const mean = (vals: number[]) => (vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0)
+      const std = (vals: number[]) => {
+        if (!vals.length) return 0
+        const m = mean(vals)
+        return Math.sqrt(vals.reduce((a, b) => a + (b - m) ** 2, 0) / vals.length)
+      }
+      const roes = clean.map((r) => r.roe!)
+      const pers = clean.map((r) => r.per!)
+      const mons = clean.map((r) => r.change1d!)
+      const stats = {
+        roeMean: mean(roes), roeStd: std(roes),
+        perMean: mean(pers), perStd: std(pers),
+        momMean: mean(mons), momStd: std(mons),
+      }
+      // Score every stock relative to the universe, take the top 20.
       const scored = rows
-        .map((r: ScreenerRow) => {
-          let score = 50
-          if (r.roe != null && r.roe > 15) score += 20
-          if (r.roa != null && r.roa > 5) score += 10
-          if (r.change1d != null && r.change1d > 3) score += 15
-          if (r.per != null && r.per > 0 && r.per < 10) score += 10
-          if (r.der != null && r.der < 1) score += 5
-          return { r, score: Math.min(100, score) }
-        })
+        .map((r: ScreenerRow) => ({ r, ...scoreIdxRow(r, stats) }))
         .sort((a, b) => b.score - a.score)
-        .slice(0, 15)
-      for (const { r, score } of scored) {
+        .slice(0, 20)
+      for (const { r, score, reasons } of scored) {
         const action = score >= 65 ? 'BUY' : score < 35 ? 'SELL' : 'WAIT'
-        const reasons = [
-          ...(r.roe != null && r.roe > 15 ? [{ text: `ROE ${r.roe.toFixed(1)}% — strong profitability`, weight: 0.3 }] : []),
-          ...(r.change1d != null && r.change1d > 3 ? [{ text: `Price +${r.change1d.toFixed(1)}% today`, weight: 0.25 }] : []),
-          ...(r.per != null && r.per > 0 && r.per < 10 ? [{ text: `PER ${r.per.toFixed(1)}x — value`, weight: 0.2 }] : []),
-          ...(r.der != null && r.der < 1 ? [{ text: `DER ${r.der.toFixed(2)} — low leverage`, weight: 0.15 }] : []),
-        ]
         idxItems.push({
           symbol: r.symbol,
           name: r.name,
@@ -183,8 +204,9 @@ export async function GET() {
       // Aggregate per asset (case-insensitive), dropping non-token labels.
       const byAsset = new Map<string, AlphaSignal[]>()
       for (const s of allSignals) {
-        const asset = s.asset.toUpperCase()
-        if (!asset || NON_TOKEN_ASSETS.has(asset) || asset.includes(',')) continue
+        const asset = s.asset.toUpperCase().replace(/USDT|USDC|BUSD|FDUSD$/g, '')
+        // Allowlist gate: only recognized majors produce a conviction signal.
+        if (!CRYPTO_ALLOWLIST.has(asset)) continue
         if (!byAsset.has(asset)) byAsset.set(asset, [])
         byAsset.get(asset)!.push(s)
       }

@@ -93,6 +93,82 @@ export function directionFor(conviction: number): ConvictionDirection {
  * topSell: start 50, -25 netVol<0 (reverse sign), -15 changePct<-3
  * Clamped 0-100.
  */
+/**
+ * Z-score a value against a reference distribution. Returns a normalized
+ * -3..+3 z-score, clamped. Used to convert raw metrics into conviction
+ * without any absolute threshold (which made every stock score 100).
+ */
+function zScore(
+  value: number,
+  mean: number,
+  stdDev: number
+): number {
+  if (!Number.isFinite(value) || !Number.isFinite(mean) || stdDev <= 0) return 0
+  return Math.max(-3, Math.min(3, (value - mean) / stdDev))
+}
+
+/** Sanity-clamp outlier metrics (e.g. ROE 1470%) to a believable band. */
+function clampMetric(v: number | null | undefined, lo: number, hi: number): number | null {
+  if (v == null || !Number.isFinite(v)) return null
+  return Math.max(lo, Math.min(hi, v))
+}
+
+/**
+ * Score an IDX stock relative to the whole universe.
+ * Uses the screener's ROE/PER/momentum/leverage fields, z-scored against
+ * the population so the top decile stands out and the median sits at 50.
+ */
+export function scoreIdxRow(
+  row: {
+    roe?: number | null
+    per?: number | null
+    change1d?: number | null
+    der?: number | null
+    marketCap?: number | null
+  },
+  stats: { roeMean: number; roeStd: number; perMean: number; perStd: number; momMean: number; momStd: number }
+): { score: number; reasons: Array<{ text: string; weight: number }> } {
+  const roe = clampMetric(row.roe, 0, 60)
+  const per = clampMetric(row.per, 0, 60)
+  const momentum = clampMetric(row.change1d, -25, 25)
+
+  let score = 50
+  const reasons: Array<{ text: string; weight: number }> = []
+
+  // ROE z-score: strong profitability pushes conviction up.
+  if (roe != null) {
+    const z = zScore(roe, stats.roeMean, stats.roeStd)
+    score += z * 8
+    if (z > 1) reasons.push({ text: `ROE ${roe.toFixed(1)}% — top-tier profitability`, weight: 0.3 })
+    else if (z > 0.5) reasons.push({ text: `ROE ${roe.toFixed(1)}% — above median`, weight: 0.2 })
+  }
+
+  // PER z-score: cheap (low PER) pushes up, expensive pushes down.
+  if (per != null && per > 0) {
+    const z = zScore(per, stats.perMean, stats.perStd)
+    score += -z * 6 // low PER (below mean) = cheap, adds conviction
+    if (z < -1) reasons.push({ text: `PER ${per.toFixed(1)}x — undervalued`, weight: 0.25 })
+    else if (z < -0.5) reasons.push({ text: `PER ${per.toFixed(1)}x — attractive`, weight: 0.15 })
+  }
+
+  // Momentum z-score: today's move relative to the universe.
+  if (momentum != null) {
+    const z = zScore(momentum, stats.momMean, stats.momStd)
+    score += z * 10
+    if (z > 1) reasons.push({ text: `Price +${momentum.toFixed(1)}% — strong momentum`, weight: 0.3 })
+    else if (z < -1) reasons.push({ text: `Price ${momentum.toFixed(1)}% — distribution`, weight: 0.25 })
+  }
+
+  // Leverage: low DER (healthy balance sheet) is a mild positive.
+  if (row.der != null && row.der > 0 && row.der < 1) {
+    score += 4
+    reasons.push({ text: `DER ${row.der.toFixed(2)} — low leverage`, weight: 0.15 })
+  }
+
+  return { score: Math.max(0, Math.min(100, score)), reasons }
+}
+
+/** Backward-compat wrapper kept for existing bandarmology tests. */
 export function scoreIdx(
   item: Pick<IdxLeaderLike, 'netVol' | 'changePct' | 'estNetValueIdr'>,
   side: 'buy' | 'sell',
