@@ -451,8 +451,53 @@ export default function ApiDocsPage() {
             <p>Base URL: <span className="text-accent-cyan">https://tracker.aitradepulse.com</span></p>
             <p>All endpoints return JSON: <span className="text-accent-cyan">{`{ data: ..., error: null }`}</span></p>
             <p>No authentication required for public endpoints.</p>
-            <p>Rate limit: 300 requests/minute per IP.</p>
+            <p>Rate limit: 100 requests/day (free), 1,000/day (pro), 10,000/day (enterprise).</p>
           </div>
+        </div>
+
+        {/* Public API Pricing */}
+        <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
+          <h2 className="text-xs font-semibold text-text-secondary mb-3">PUBLIC API PRICING</h2>
+          <p className="text-xs text-text-dim mb-4">
+            Need conviction scores in your app? Our Public API gives you programmatic access to real-time conviction data, backtest results, and macro indicators.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="bg-bg-elevated rounded p-3 border border-border-dim">
+              <div className="text-lg font-bold text-text-primary">FREE</div>
+              <div className="text-xs text-text-muted mb-2">For testing &amp; evaluation</div>
+              <ul className="text-xs text-text-dim space-y-1">
+                <li>• 1,000 calls/month</li>
+                <li>• Delayed conviction data</li>
+                <li>• Basic market data</li>
+                <li>• Community support</li>
+              </ul>
+            </div>
+            <div className="bg-bg-elevated rounded p-3 border border-teal-vivid">
+              <div className="text-lg font-bold text-text-primary">$49/mo</div>
+              <div className="text-xs text-text-muted mb-2">Developer</div>
+              <ul className="text-xs text-text-dim space-y-1">
+                <li>• 100,000 calls/month</li>
+                <li>• Real-time conviction</li>
+                <li>• Backtest data</li>
+                <li>• Webhook delivery</li>
+                <li>• Email support</li>
+              </ul>
+            </div>
+            <div className="bg-bg-elevated rounded p-3 border border-border-dim">
+              <div className="text-lg font-bold text-text-primary">$199/mo</div>
+              <div className="text-xs text-text-muted mb-2">Startup</div>
+              <ul className="text-xs text-text-dim space-y-1">
+                <li>• 1,000,000 calls/month</li>
+                <li>• Real-time conviction</li>
+                <li>• Full backtest history</li>
+                <li>• Priority webhooks</li>
+                <li>• Priority support</li>
+              </ul>
+            </div>
+          </div>
+          <p className="text-xs text-text-muted mt-3">
+            Enterprise? <a href="mailto:support@aitradepulse.com" className="text-accent-cyan hover:underline">Contact us</a> for custom limits, SLA, and conviction data licensing.
+          </p>
         </div>
 
         {/* Category Filter */}
