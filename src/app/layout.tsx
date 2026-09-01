@@ -13,7 +13,8 @@ import { PageviewBeacon } from '@/components/primitives/PageviewBeacon'
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
+  // WCAG 1.4.4 Resize Text: maximumScale:1 disables pinch-zoom. Allow zoom.
+  maximumScale: 5,
   themeColor: "#080b0f",
 }
 export const metadata: Metadata = {

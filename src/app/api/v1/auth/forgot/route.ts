@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { signPurposeToken } from '@/lib/jwt';
+import { checkRateLimit } from '@/lib/api/rate-limit';
 
 const forgotSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -50,6 +51,14 @@ async function sendResetEmail(email: string, url: string): Promise<boolean> {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 3 forgot-password requests per 10 min per IP (email-bomb guard).
+    const forwarded = request.headers.get('x-forwarded-for');
+    const ip = forwarded ? forwarded.split(',')[0].trim() : (request.headers.get('x-real-ip') ?? 'unknown');
+    const { allowed } = await checkRateLimit(`auth:forgot:${ip}`, 3, 600_000);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Rate limit exceeded, please try again later.' }, { status: 429 });
+    }
+
     const body = await request.json();
     const parsed = forgotSchema.safeParse(body);
     if (!parsed.success) {

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { apiSuccess, apiError, cacheHeaders } from "@/lib/api/response";
 import { fetchMempoolEvents, persistMempoolEvents } from "@/lib/modules/chain/mempool/intel";
-import { fetchBridgeStats, persistBridgeFlows } from "@/lib/modules/chain/bridge/flows";
+import { fetchBridgeStats, fetchBridgeFlows, persistBridgeFlows } from "@/lib/modules/chain/bridge/flows";
 import { fetchStakingQueue, persistStakingFlow } from "@/lib/modules/chain/ethereum/staking-queue";
 import { cacheGet } from "@/lib/cache"
 
@@ -19,7 +19,9 @@ export async function GET(request: NextRequest) {
 
     // Persist to DB for backtesting (fire-and-forget)
     if (mempool?.length > 0) persistMempoolEvents(mempool).catch(() => {})
-    if (bridge?.bridges?.length > 0) persistBridgeFlows([]).catch(() => {})
+    // Persist actual bridge FLOW events (BridgeFlowEvent[]), not the aggregate stats.
+    const bridgeFlows = await fetchBridgeFlows()
+    if (bridgeFlows.length > 0) persistBridgeFlows(bridgeFlows).catch(() => {})
     if (staking) persistStakingFlow(staking).catch(() => {})
 
     const data: Record<string, unknown> = {}

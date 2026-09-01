@@ -20,11 +20,15 @@ export async function GET(request: Request) {
   if (!symbol) {
     return apiError('symbol is required', 400)
   }
-  const target = symbol.toUpperCase()
+  const target = symbol.toUpperCase().replace(/USDT|USDC|BUSD|FDUSD$/g, '')
+
+  // Match asset like conviction does — strip quote-currency suffix so
+  // ?symbol=BTC catches both 'BTC' and 'BTCUSDT' alpha signals.
+  const norm = (a: string) => a.toUpperCase().replace(/USDT|USDC|BUSD|FDUSD$/g, '')
 
   try {
     const signals = await fetchAlphaSignals(100)
-    const matched = signals.filter(s => s.asset.toUpperCase() === target)
+    const matched = signals.filter(s => norm(s.asset) === target)
 
     let bullish = 0
     let bearish = 0

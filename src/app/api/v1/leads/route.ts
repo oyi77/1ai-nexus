@@ -15,10 +15,13 @@ export async function POST(request: NextRequest) {
     if (!EMAIL_RE.test(email)) return apiError('Invalid email address', 400)
 
     const source = typeof body?.source === 'string' ? body.source.trim() : ''
-    const finalSource = source && VALID_SOURCES.includes(source) ? source : 'landing'
+    // Only accept a KNOWN source; an invalid/absent source must not clobber
+    // an existing lead's real acquisition channel (pricing → referral etc.).
+    const isKnownSource = source && VALID_SOURCES.includes(source)
+    const finalSource = isKnownSource ? source : 'landing'
 
     const updateData: { source?: string } = {}
-    if (source) updateData.source = finalSource
+    if (isKnownSource) updateData.source = finalSource
 
     await prisma.lead.upsert({
       where: { email },

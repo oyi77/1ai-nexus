@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { hashPassword, validatePasswordStrength } from '@/lib/password';
 import { signToken, generateRefreshToken, createRefreshCookie, createSessionCookie } from '@/lib/jwt';
+import { checkRateLimit } from '@/lib/api/rate-limit';
 
 const signupSchema = z.object({
   email: z.string().email('Invalid email format'),
@@ -13,6 +14,14 @@ const signupSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 5 signups per 15 min per IP (abuse + bcrypt CPU DoS guard).
+    const forwarded = request.headers.get('x-forwarded-for');
+    const ip = forwarded ? forwarded.split(',')[0].trim() : (request.headers.get('x-real-ip') ?? 'unknown');
+    const { allowed } = await checkRateLimit(`auth:signup:${ip}`, 5, 900_000);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Too many signups, please try again later.' }, { status: 429 });
+    }
+
     const body = await request.json();
     const parsed = signupSchema.safeParse(body);
 

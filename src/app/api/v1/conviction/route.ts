@@ -64,19 +64,6 @@ async function fetchBinancePrices(symbols: string[]): Promise<Record<string, { p
 }
 
 /** Aggregate-asset symbols that are not tradable single tokens. */
-const NON_TOKEN_ASSETS = new Set(['PORTFOLIO', 'MARKET', 'CRYPTO', 'BTC/ETH', 'COMMODITIES'])
-
-// Stablecoins + pegged assets — no conviction value, exclude.
-const STABLE_ASSETS = new Set([
-  'USDC', 'USDT', 'DAI', 'USDE', 'FDUSD', 'TUSD', 'USDD', 'PYUSD',
-  'BUSD', 'USD1', 'USDY', 'GUSD', 'XUSD', 'USDP', 'SUSD', 'FRAX', 'LUSD', 'EURS',
-	'BTCS', 'BIT', 'EURL', 'DAI', 'LUSD', 'CRVUSD', 'GHO', 'MIM', 'USDX',
-])
-// Known garbage/short / leveraged ETF symbols that are NOT tradable tokens.
-const GARBAGE_SYMBOLS = new Set([
-  'CL', 'BTR', 'BZ', 'SOXL', '0G', 'SPCX', 'SKR', 'ZORA', '牛来', 'BTCS',
-  'SOL', 'BONK', 'WIF', 'PEPE', 'DOGE', 'SHIB', 'FLOKI',  // legit but thin
-])
 // Whitelist: only majors the engine genuinely floors conviction on.
 const CRYPTO_ALLOWLIST = new Set([
   'BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'ADA', 'AVAX', 'DOGE', 'LINK',
@@ -112,12 +99,16 @@ export async function GET() {
         perMean: mean(pers), perStd: std(pers),
         momMean: mean(mons), momStd: std(mons),
       }
-      // Score every stock relative to the universe, take the top 20.
-      const scored = rows
-        .map((r: ScreenerRow) => ({ r, ...scoreIdxRow(r, stats) }))
+      // Score every stock relative to the universe.
+      const scored = rows.map((r: ScreenerRow) => ({ r, ...scoreIdxRow(r, stats) }))
+      // Top 15 (BUY side) + bottom 8 (SELL side) so both buckets appear.
+      const byScore = [...scored].sort((a, b) => b.score - a.score)
+      const topBuy = byScore.slice(0, 15)
+      const bottomSell = byScore.slice(-8)
+      const seen = new Set(topBuy.map((s) => s.r.symbol))
+      const sel = topBuy.concat(bottomSell.filter((s) => !seen.has(s.r.symbol)))
         .sort((a, b) => b.score - a.score)
-        .slice(0, 20)
-      for (const { r, score, reasons } of scored) {
+      for (const { r, score, reasons } of sel) {
         const action = score >= 65 ? 'BUY' : score < 35 ? 'SELL' : 'WAIT'
         idxItems.push({
           symbol: r.symbol,
@@ -140,6 +131,10 @@ export async function GET() {
           existing.reasons.push({ text: `Foreign net buy leader`, weight: 0.35 })
           existing.sources.push('bandarmology')
           existing.conviction = Math.min(100, existing.conviction + 10)
+          // Recompute action/direction — the +10 may cross a boundary (62→72
+          // must become BUY/bull, not stay WAIT/neutral).
+          existing.action = existing.conviction >= 65 ? 'BUY' : existing.conviction < 35 ? 'SELL' : 'WAIT'
+          existing.direction = existing.conviction >= 65 ? 'bull' : existing.conviction <= 35 ? 'bear' : 'neutral'
         } else {
           idxItems.push({
             symbol: l.code,

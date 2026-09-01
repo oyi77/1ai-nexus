@@ -2,6 +2,7 @@ import { type NextRequest } from 'next/server'
 import { apiJson } from '@/lib/api/response'
 import { generateApiKey, listUserKeys, revokeApiKey, TIER_CONFIG } from '@/lib/api-keys'
 import { verifyToken } from '@/lib/jwt'
+import { prisma } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,12 +42,21 @@ export async function POST(request: NextRequest) {
       return apiJson(null, { error: 'Missing required field: name', status: 400 })
     }
 
-    const tier = (body.tier ?? 'free') as 'free' | 'pro' | 'enterprise'
-    if (!['free', 'pro', 'enterprise'].includes(tier)) {
-      return apiJson(null, { error: 'Invalid tier: must be free, pro, or enterprise', status: 400 })
-    }
+    // Security: NEVER trust the client-requested tier. Derive it server-side
+    // from the user's actual plan in DB so a free user cannot mint an
+    // 'enterprise' key (rateLimit 10000 / all features) by POSTing tier.
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.userId },
+      select: { plan: true },
+    })
+    const plan = dbUser?.plan ?? 'free'
+    const tier = (['free', 'pro', 'enterprise'] as const).includes(plan)
+      ? plan
+      : 'free'
 
-    const apiKey = await generateApiKey({ name: body.name, tier, userId: user.userId })
+    // A paid user picks their key tier; a free user is always 'free'.
+    const keyTier = tier !== 'free' && body.tier === 'enterprise' ? 'enterprise' : tier
+    const apiKey = await generateApiKey({ name: body.name, tier: keyTier, userId: user.userId })
 
     return apiJson({
       key: apiKey.key,

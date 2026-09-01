@@ -13,6 +13,11 @@ vi.mock('bcryptjs', () => ({
   },
 }));
 
+// Mock Redis-backed rate limiting (no Redis in test env — would fail closed to 429)
+vi.mock('@/lib/api/rate-limit', () => ({
+  checkRateLimit: vi.fn(async () => ({ allowed: true, remaining: 5 })),
+}));
+
 describe('POST /api/v1/auth/signup', () => {
   beforeEach(async () => {
     // Clean up test users before each test

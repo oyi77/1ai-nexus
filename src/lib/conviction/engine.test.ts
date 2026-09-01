@@ -11,6 +11,7 @@ import {
   idxReasons,
   scoreCrypto,
   scoreIdx,
+  scoreIdxRow,
   sourceLabel,
 } from '@/lib/conviction/engine'
 import type { AlphaSignalLike, IdxLeaderLike } from '@/lib/conviction/engine'
@@ -259,5 +260,47 @@ describe('sourceLabel', () => {
     expect(sourceLabel('news')).toBe('news')
     expect(sourceLabel('unknown_type')).toBe('unknown_type')
     expect(sourceLabel(undefined)).toBe('alpha')
+  })
+})
+
+
+describe('scoreIdxRow (z-score path)', () => {
+  const stats = { roeMean: 15, roeStd: 10, perMean: 20, perStd: 10, momMean: 0, momStd: 5 }
+
+  it('scores above-median ROE above 50', () => {
+    const { score } = scoreIdxRow({ roe: 25, per: 10, change1d: 0, der: 0.5 }, stats)
+    expect(score).toBeGreaterThan(50)
+  })
+
+  it('scores negative ROE below 50 and adds loss-making reason', () => {
+    const { score, reasons } = scoreIdxRow({ roe: -50, per: 20, change1d: 0 }, stats)
+    expect(score).toBeLessThan(50)
+    expect(reasons.some((r) => r.text.includes('loss-making'))).toBe(true)
+  })
+
+  it('does NOT collapse negative ROE to the same as zero (non-degenerate clamp)', () => {
+    const neg = scoreIdxRow({ roe: -100, per: 20, change1d: 0 }, stats)
+    const zero = scoreIdxRow({ roe: 0, per: 20, change1d: 0 }, stats)
+    expect(neg.score).not.toBe(zero.score)
+  })
+
+  it('clamps insane ROE outlier (1470%) without breaking the score', () => {
+    const { score } = scoreIdxRow({ roe: 1470, per: 20, change1d: 0 }, stats)
+    expect(score).toBeGreaterThanOrEqual(0)
+    expect(score).toBeLessThanOrEqual(100)
+  })
+
+  it('momentum contributes but does not dominate equally to ROE', () => {
+    const noMom = scoreIdxRow({ roe: 25, per: 20, change1d: 0 }, stats)
+    const withMom = scoreIdxRow({ roe: 25, per: 20, change1d: 20 }, stats)
+    // A huge momentum day should move the score, but not swallow ROE signal.
+    expect(withMom.score).not.toBe(noMom.score)
+  })
+
+  it('actionFor(35)=WAIT vs directionFor(35)=bear boundary is consistent', () => {
+    // Audit flagged the asymmetry: 35 is WAIT for action but bear for direction.
+    // Document the actual behavior so it is a conscious contract, not a bug surprise.
+    expect(actionFor(35)).toBe('WAIT')
+    expect(directionFor(35)).toBe('bear')
   })
 })

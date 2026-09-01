@@ -32,6 +32,17 @@ export async function GET(request: NextRequest) {
     const where: Prisma.EntityWhereInput = {}
     if (type) where.type = type;
     if (chain) where.chains = { has: chain };
+    // Search: match name OR a wallet address. Wallet/profile pages pass
+    // ?search=0xADDR to resolve a specific entity — without this filter they
+    // always got the top-TVL entity (broken deep links).
+    const search = searchParams.get("search");
+    if (search) {
+      const q = search.toLowerCase();
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { wallets: { some: { address: q } } },
+      ];
+    }
 
     const [entities, total] = await Promise.all([
       prisma.entity.findMany({

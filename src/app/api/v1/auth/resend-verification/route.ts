@@ -12,6 +12,7 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { signPurposeToken } from '@/lib/jwt';
+import { checkRateLimit } from '@/lib/api/rate-limit';
 
 const hasSmtp = Boolean(
   process.env.MAIL_HOST && process.env.MAIL_USER && process.env.MAIL_PASS
@@ -45,6 +46,14 @@ async function sendVerificationEmail(email: string, url: string): Promise<boolea
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limit: 3 resends per 10 min per IP (email-bomb guard).
+    const forwarded = request.headers.get('x-forwarded-for');
+    const ip = forwarded ? forwarded.split(',')[0].trim() : (request.headers.get('x-real-ip') ?? 'unknown');
+    const { allowed } = await checkRateLimit(`auth:resend:${ip}`, 3, 600_000);
+    if (!allowed) {
+      return NextResponse.json({ error: 'Rate limit exceeded, please try again later.' }, { status: 429 });
+    }
+
     const { email } = (await request.json()) as { email?: string };
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
