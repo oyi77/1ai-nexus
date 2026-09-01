@@ -1,4 +1,4 @@
-import { AlertCondition, type WalletMovedCondition, type SmartMoneyCondition, type PredictionThresholdCondition, type PriceThresholdCondition, type ForexRateCondition } from "./schemas";
+import { AlertCondition, type WalletMovedCondition, type SmartMoneyCondition, type PredictionThresholdCondition, type PriceThresholdCondition, type ForexRateCondition, type ConvictionThresholdCondition } from "./schemas";
 
 export interface TradeEvent {
   type: "trade";
@@ -39,6 +39,15 @@ interface PredictionEvent {
   timestamp: string;
 }
 
+interface ConvictionEvent {
+  type: "conviction_threshold";
+  symbol: string;
+  conviction: number;
+  action: 'BUY' | 'WAIT' | 'SELL';
+  direction: 'bull' | 'bear' | 'neutral';
+  timestamp: string;
+}
+
 // ─── TradFi event types ───────────────────────────────────
 
 interface PriceEvent {
@@ -63,7 +72,7 @@ interface ForexEvent {
   timestamp: string;
 }
 
-export type NexusEvent = TradeEvent | WalletEvent | SmartMoneyEvent | PredictionEvent | PriceEvent | MacroEvent | ForexEvent;
+export type NexusEvent = TradeEvent | WalletEvent | SmartMoneyEvent | PredictionEvent | PriceEvent | MacroEvent | ForexEvent | ConvictionEvent;
 
 export function evaluateCondition(
   condition: AlertCondition,
@@ -82,6 +91,8 @@ export function evaluateCondition(
       return evaluateMacroEvent(condition, event);
     case "forex_rate":
       return evaluateForexRate(condition, event);
+    case "conviction_threshold":
+      return evaluateConvictionThreshold(condition, event);
     default:
       return false;
   }
@@ -154,4 +165,16 @@ function evaluateForexRate(
     return event.rate >= condition.threshold;
   }
   return event.rate <= condition.threshold;
+}
+
+function evaluateConvictionThreshold(
+  condition: ConvictionThresholdCondition,
+  event: NexusEvent,
+): boolean {
+  if (event.type !== "conviction_threshold") return false;
+  if (event.symbol !== condition.symbol) return false;
+  if (condition.direction === "above") {
+    return event.conviction >= condition.threshold;
+  }
+  return event.conviction <= condition.threshold;
 }

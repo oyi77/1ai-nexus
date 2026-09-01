@@ -33,6 +33,8 @@ function buildDescription(type: string, config: Record<string, unknown>): string
       return `Smart money: ${config.action}`;
     case "prediction_threshold":
       return `Market ${config.marketId} ${config.direction} ${config.threshold}`;
+    case "conviction_threshold":
+      return `${config.symbol} conviction ${config.direction} ${config.threshold}`;
     default:
       return type;
   }

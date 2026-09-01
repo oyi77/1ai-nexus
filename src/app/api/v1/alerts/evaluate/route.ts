@@ -125,6 +125,32 @@ async function fetchEventForAlert(
       return { type: "macro_event", event: match.event, country: match.country, timestamp };
     }
 
+    case "conviction_threshold": {
+      const symbol = String(config.symbol ?? "");
+      if (!symbol) return null;
+      // Fetch conviction from the conviction API
+      const origin = "http://localhost:4400";
+      try {
+        const res = await fetch(`${origin}/api/v1/conviction`);
+        const data = await res.json();
+        if (!data?.markets) return null;
+        for (const market of data.markets) {
+          const item = market.items?.find((i: { symbol: string }) => i.symbol === symbol);
+          if (item) {
+            return {
+              type: "conviction_threshold",
+              symbol: item.symbol,
+              conviction: item.conviction,
+              action: item.action,
+              direction: item.direction,
+              timestamp,
+            };
+          }
+        }
+      } catch { /* ignore */ }
+      return null;
+    }
+
     case "wallet_moved":
     case "smart_money_action":
     case "prediction_threshold":
@@ -147,6 +173,10 @@ function buildTriggerMessage(type: string, config: Record<string, unknown>, even
     }
     case "macro_event":
       return `Macro event: ${config.event}${config.country ? ` (${config.country})` : ""}`
+    case "conviction_threshold": {
+      const e = event as { conviction: number; action: string };
+      return `${config.symbol} conviction ${e.conviction}% (${e.action}) — ${config.direction} ${config.threshold}`;
+    }
     default:
       return `Alert triggered: ${type}`
   }

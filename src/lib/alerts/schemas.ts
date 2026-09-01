@@ -32,12 +32,20 @@ export const MacroEventCondition = z.object({
   type: z.literal("macro_event"),
   event: z.string(), // e.g. 'FOMC Rate Decision', 'CPI (YoY)', 'Non-Farm Payrolls'
   country: z.string().optional(), // e.g. 'US', 'ID', 'EU'
+
 });
 
 export const ForexRateCondition = z.object({
   type: z.literal("forex_rate"),
   pair: z.string(), // e.g. 'USD/IDR', 'EUR/USD'
   threshold: z.number(),
+  direction: z.enum(["above", "below"]),
+});
+
+export const ConvictionThresholdCondition = z.object({
+  type: z.literal("conviction_threshold"),
+  symbol: z.string(), // e.g. 'BTC', 'ETH', 'LEAD'
+  threshold: z.number().min(0).max(100), // conviction score 0-100
   direction: z.enum(["above", "below"]),
 });
 
@@ -48,7 +56,10 @@ export const AlertCondition = z.discriminatedUnion("type", [
   PriceThresholdCondition,
   MacroEventCondition,
   ForexRateCondition,
+  ConvictionThresholdCondition,
 ]);
+
+export type ConvictionThresholdCondition = z.infer<typeof ConvictionThresholdCondition>;
 
 export type WalletMovedCondition = z.infer<typeof WalletMovedCondition>;
 export type SmartMoneyCondition = z.infer<typeof SmartMoneyCondition>;
