@@ -128,9 +128,13 @@ function checkRateLimit(key: string, maxRequests = 100, windowMs = 60_000): { al
     return addCorsHeaders(response, request);
   }
 
-  // Always public routes
+  // Always public routes — wildcard CORS so any origin can embed (widget, external sites)
   if (ALWAYS_PUBLIC.has(pathname) || pathname.startsWith("/api/auth/") || pathname.startsWith("/api/v1/auth/")) {
-    return addCorsHeaders(NextResponse.next(), request);
+    const response = NextResponse.next()
+    response.headers.set("Access-Control-Allow-Origin", "*")
+    response.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS")
+    response.headers.set("Access-Control-Allow-Headers", "Content-Type")
+    return addCorsHeaders(response, request)
   }
   // Premium / protected routes — require a valid JWT session (browser) or API key (external)
   if (PROTECTED_ROUTES.has(pathname)) {

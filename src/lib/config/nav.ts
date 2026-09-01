@@ -139,6 +139,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: 'API Docs', href: '/api-docs', icon: BarChart3, description: 'Developer API reference.' },
       { label: 'Status', href: '/status', icon: Shield, description: 'System and data status.' },
       { label: 'Live Trades', href: '/trades', icon: Activity, description: 'Real-time trade feed.' },
+      { label: 'Widget', href: '/widget', icon: Code, description: 'Drop-in NEXUS Intelligence embed.' },
     ],
   },
 ]
