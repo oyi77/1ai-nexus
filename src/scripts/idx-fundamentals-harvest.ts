@@ -19,15 +19,14 @@
 //
 // Cron (unchanged):
 //   20 18 * * 1-5 cd /home/openclaw/projects/1ai-tracker && npm run harvest:idx-fundamentals >> /tmp/idx-fundamentals.log 2>&1
-// Output: data/idx/fundamentals.json { capturedAt, done:[codes], data:{CODE:{...}} }
+// Writes: IdxFundamentals (per code per snapshotDate).
 // ─────────────────────────────────────────────────────────────
 
-import { mkdirSync, renameSync, writeFileSync } from 'fs'
-import { join } from 'path'
+import 'dotenv/config'
 import { z } from 'zod'
+import { prisma } from '@/lib/db'
 import { notifyAlert } from '@/lib/config/alerting'
 
-const OUT = join(process.cwd(), 'data', 'idx', 'fundamentals.json')
 const SCAN_URL = 'https://scanner.tradingview.com/indonesia/scan'
 const MAX_ROWS = 20_000
 
@@ -41,19 +40,10 @@ interface FundRow {
   dividendYield?: number | null
 }
 
-type Store = { capturedAt: string; done: string[]; data: Record<string, FundRow> }
-
 const ScanResponse = z.object({
   totalCount: z.number(),
   data: z.array(z.object({ s: z.string(), d: z.unknown().optional() })),
 })
-
-function save(store: Store): void {
-  mkdirSync(join(process.cwd(), 'data', 'idx'), { recursive: true })
-  const tmp = `${OUT}.tmp`
-  writeFileSync(tmp, JSON.stringify(store))
-  renameSync(tmp, OUT)
-}
 
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null
@@ -114,11 +104,19 @@ async function fetchAllFundamentals(): Promise<Array<{ code: string; row: FundRo
 async function main() {
   try {
     const rows = await fetchAllFundamentals()
-    const data: Record<string, FundRow> = {}
-    for (const { code, row } of rows) data[code] = row
-    const store: Store = { capturedAt: new Date().toISOString(), done: Object.keys(data), data }
-    save(store)
-    console.log(`[idx-fund] coverage ${store.done.length} stocks · saved ${OUT}`)
+    const snapshotDate = new Date().toISOString().slice(0, 10)
+
+    await prisma.$transaction(async (tx) => {
+      for (const { code, row } of rows) {
+        await tx.idxFundamentals.upsert({
+          where: { code_snapshotDate: { code, snapshotDate } },
+          create: { ...row, code, snapshotDate },
+          update: { ...row, code, snapshotDate },
+        })
+      }
+    })
+
+    console.log(`[idx-fund] coverage ${rows.length} stocks · snapshotDate ${snapshotDate}`)
   } catch (err) {
     console.error('[idx-fund] harvest failed:', err instanceof Error ? err.message : err)
     await notifyAlert(
@@ -126,6 +124,8 @@ async function main() {
       err instanceof Error ? err.message : String(err),
     )
     process.exitCode = 1
+  } finally {
+    await prisma.$disconnect()
   }
 }
 

@@ -984,3 +984,90 @@ model ConvictionSignal {
   @@index([emittedAt])
   @@index([symbol, emittedAt(sort: Desc)])
 }
+// ── IDX Saham data layer (DB-backed, replaces data/idx/*.json snapshots) ──
+// Harvesters upsert these rows; providers query Prisma instead of reading JSON.
+
+model IdxSahamSession {
+  id          String   @id @default(cuid())
+  code        String
+  tradeDate   String   // YYYY-MM-DD
+  name        String   @default("")
+  prev        Float    @default(0)
+  open        Float    @default(0)
+  high        Float    @default(0)
+  low         Float    @default(0)
+  close       Float    @default(0)
+  change      Float    @default(0)
+  volume      Float    @default(0)
+  value       Float    @default(0)
+  freq        Float    @default(0)
+  foreignBuy  Float    @default(0)
+  foreignSell Float    @default(0)
+
+  @@unique([code, tradeDate])
+  @@index([tradeDate(sort: Desc)])
+  @@index([code, tradeDate(sort: Desc)])
+}
+
+model IdxBrokerBoard {
+  id        String   @id @default(cuid())
+  tradeDate String   // YYYY-MM-DD
+  firm      String   // IDFirm code
+  name      String   @default("")
+  volume    Float    @default(0)
+  value     Float    @default(0)
+  freq      Float    @default(0)
+
+  @@unique([tradeDate, firm])
+  @@index([tradeDate(sort: Desc)])
+}
+
+model IdxScreenerSnapshot {
+  id           String   @id @default(cuid())
+  code         String
+  snapshotDate String   // YYYY-MM-DD
+  name         String   @default("")
+  sector       String   @default("")
+  subsector    String   @default("")
+  industry     String   @default("")
+  subindustry  String   @default("")
+  per          Float?
+  pbv          Float?
+  der          Float?
+  roa          Float?
+  roe          Float?
+  npm          Float?
+  eps          Float?
+  revenue      Float?
+  marketCap    Float?
+  price        Float?
+  change1d     Float?
+  high52w      Float?
+  low52w       Float?
+  volume       Float?
+  change4w     Float?
+  change13w    Float?
+  change26w    Float?
+  change52w    Float?
+  ytd          Float?
+
+  @@unique([code, snapshotDate])
+  @@index([snapshotDate(sort: Desc)])
+  @@index([sector])
+}
+
+model IdxFundamentals {
+  id            String   @id @default(cuid())
+  code          String
+  snapshotDate  String   // YYYY-MM-DD
+  per           Float?
+  pbv           Float?
+  roe           Float?
+  der           Float?
+  eps           Float?
+  marketCap     Float?
+  dividendYield Float?
+
+  @@unique([code, snapshotDate])
+  @@index([snapshotDate(sort: Desc)])
+}

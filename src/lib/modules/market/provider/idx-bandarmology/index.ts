@@ -1,27 +1,17 @@
 // ─────────────────────────────────────────────────────────────
 // IDX Bandarmology Provider — foreign-flow + broker-board
-// analytics computed from harvested snapshots (NO upstream calls
-// at runtime; all reads hit data/idx/*.json).
-//
-// Snapshots written by src/scripts/idx-saham-harvest.ts:
-//   saham-latest.json     latest session rows (OHLCV+foreign)
-//   foreign-history.json  rolling 90-session foreign flows
-//   brokers-latest.json   market broker board
+// analytics computed from Prisma (IdxSahamSession, IdxBrokerBoard,
+// IdxScreenerSnapshot). NO upstream calls at runtime.
 //
 // SERVING PATTERN: parsed datasets live in a process-lifetime
-// singleton invalidated by source mtimes (cron refreshes are
-// picked up on the next call). Sorts are computed once per
-// snapshot — per-request work collapses to slices over prebuilt
+// singleton invalidated by snapshot date. Sorts are computed once
+// per snapshot — per-request work collapses to slices over prebuilt
 // arrays.
 //
-// SERVER-ONLY (node:fs). Consume via /api/v1/saham/bandarmology.
+// SERVER-ONLY. Consume via /api/v1/saham/bandarmology.
 // ─────────────────────────────────────────────────────────────
 
-import { readFile, stat } from 'node:fs/promises'
-import { join } from 'node:path'
-import { z } from 'zod'
-
-const DIR = join(process.cwd(), 'data', 'idx')
+import { prisma } from '@/lib/db'
 
 export interface ForeignLeader {
   code: string
@@ -39,37 +29,6 @@ export interface ForeignStreak extends ForeignLeader {
   direction: 'accumulation' | 'distribution'
 }
 
-const LatestSchema = z.object({
-  capturedAt: z.string(),
-  tradeDate: z.string(),
-  count: z.number(),
-  rows: z.array(z.object({
-    code: z.string(),
-    name: z.string(),
-    prev: z.number(),
-    close: z.number(),
-    change: z.number(),
-    volume: z.number(),
-    value: z.number(),
-    freq: z.number(),
-    foreignBuy: z.number(),
-    foreignSell: z.number(),
-  })),
-}).loose()
-
-const HistorySchema = z.object({
-  sessions: z.array(z.object({
-    date: z.string(),
-    stocks: z.record(z.string(), z.object({ fbuy: z.number(), fsell: z.number(), close: z.number() })),
-  })),
-})
-
-const BrokersSchema = z.object({
-  capturedAt: z.string(),
-  tradeDate: z.string(),
-  rows: z.array(z.object({ firm: z.string(), name: z.string(), volume: z.number(), value: z.number(), freq: z.number() })),
-})
-
 export interface SahamMeta {
   tradeDate: string
   capturedAt: string
@@ -77,29 +36,11 @@ export interface SahamMeta {
   historySessions?: number
 }
 
-type LatestRow = z.infer<typeof LatestSchema>['rows'][number]
-
-interface BandarCache {
-  mtimes: string
-  latestParsed: { capturedAt: string; tradeDate: string; count: number }
-  history: z.infer<typeof HistorySchema>
-  brokersTradeDate: string
-  leadersAll: ForeignLeader[]
-  leadersByValueAsc: ForeignLeader[]
-  brokerRowsByValueDesc: z.infer<typeof BrokersSchema>['rows']
-  /** Sector-level foreign-flow rollup, |net| desc — prebuilt per snapshot. */
-  rotation: SectorRotationRow[]
-  rotationTradeDate: string
-  /** Market-wide foreign flow per session — prebuilt once per snapshot. */
-  marketFlow: MarketFlowPoint[]
-}
-
 export interface MarketFlowPoint {
   date: string
   buyVol: number
   sellVol: number
   netVol: number
-  /** Σ(net volume × close) across stocks with activity that session. */
   netValueIdr: number
 }
 
@@ -110,9 +51,30 @@ export interface SectorRotationRow {
   outflowStocks: number
 }
 
+interface BandarCache {
+  sig: string
+  latestParsed: { capturedAt: string; tradeDate: string; count: number }
+  tradeDate: string
+  leadersAll: ForeignLeader[]
+  leadersByValueAsc: ForeignLeader[]
+  brokerRowsByValueDesc: Array<{ firm: string; name: string; volume: number; value: number; freq: number }>
+  rotation: SectorRotationRow[]
+  rotationTradeDate: string
+  marketFlow: MarketFlowPoint[]
+  historySessions: number
+}
+
 let cache: BandarCache | null = null
 
-function toLeader(r: LatestRow): ForeignLeader {
+function toLeader(r: {
+  code: string
+  name: string
+  prev: number
+  close: number
+  change: number
+  foreignBuy: number
+  foreignSell: number
+}): ForeignLeader {
   const netVol = r.foreignBuy - r.foreignSell
   return {
     code: r.code,
@@ -126,40 +88,50 @@ function toLeader(r: LatestRow): ForeignLeader {
   }
 }
 
-async function mtimeOf(file: string): Promise<number> {
-  try {
-    return (await stat(file)).mtimeMs
-  } catch {
-    return -1
-  }
-}
-
 async function buildCache(): Promise<BandarCache> {
-  const [latestRaw, historyRaw, brokersRaw, universeRaw] = await Promise.all([
-    readFile(join(DIR, 'saham-latest.json'), 'utf8'),
-    readFile(join(DIR, 'foreign-history.json'), 'utf8'),
-    readFile(join(DIR, 'brokers-latest.json'), 'utf8'),
-    readFile(join(DIR, 'universe.json'), 'utf8').catch(() => null),
-  ])
-  const latest = LatestSchema.parse(JSON.parse(latestRaw))
-  const history = HistorySchema.parse(JSON.parse(historyRaw))
-  const brokers = BrokersSchema.parse(JSON.parse(brokersRaw))
-
-  // code → sector from the universe snapshot (rotation cross-reference).
-  const sectorByCode = new Map<string, string>()
-  if (universeRaw) {
-    const universe = JSON.parse(universeRaw) as { stocks?: Array<{ symbol: string; sector?: string }> }
-    for (const s of universe.stocks ?? []) {
-      sectorByCode.set(s.symbol.replace('.JK', ''), s.sector ?? 'Unknown')
+  // Latest session date
+  const latest = await prisma.idxSahamSession.findFirst({
+    orderBy: { tradeDate: 'desc' },
+    select: { tradeDate: true },
+  })
+  if (!latest) {
+    return {
+      sig: '',
+      latestParsed: { capturedAt: '', tradeDate: '', count: 0 },
+      tradeDate: '',
+      leadersAll: [],
+      leadersByValueAsc: [],
+      brokerRowsByValueDesc: [],
+      rotation: [],
+      rotationTradeDate: '',
+      marketFlow: [],
+      historySessions: 0,
     }
   }
-  const leadersAll = latest.rows.map(toLeader)
+  const tradeDate = latest.tradeDate
+
+  // Latest session rows
+  const sessionRows = await prisma.idxSahamSession.findMany({ where: { tradeDate } })
+  const leadersAll = sessionRows.map(toLeader)
   const leadersByValueAsc = [...leadersAll]
     .filter((l) => l.fbuyVol > 0 || l.fsellVol > 0)
     .sort((a, b) => a.estNetValueIdr - b.estNetValueIdr)
 
-  // Precomputed sector rotation: foreign net value aggregated by universe
-  // sector, |net| desc — O(rows) once per snapshot instead of per request.
+  // Sector mapping from screener snapshot
+  const latestScreener = await prisma.idxScreenerSnapshot.findFirst({
+    orderBy: { snapshotDate: 'desc' },
+    select: { snapshotDate: true },
+  })
+  const sectorByCode = new Map<string, string>()
+  if (latestScreener) {
+    const screenerRows = await prisma.idxScreenerSnapshot.findMany({
+      where: { snapshotDate: latestScreener.snapshotDate },
+      select: { code: true, sector: true },
+    })
+    for (const r of screenerRows) sectorByCode.set(r.code, r.sector || 'Unknown')
+  }
+
+  // Sector rotation
   const acc = new Map<string, { netValueIdr: number; inflowStocks: number; outflowStocks: number }>()
   for (const l of leadersAll) {
     if (l.netVol === 0) continue
@@ -174,45 +146,59 @@ async function buildCache(): Promise<BandarCache> {
     .map(([sector, v]) => ({ sector, ...v }))
     .sort((a, b) => Math.abs(b.netValueIdr) - Math.abs(a.netValueIdr))
 
-  // Market-wide flow per session: Σ foreign volumes + net-value estimate.
-  // O(sessions × stocks) once per snapshot (~90 × 1k).
-  const marketFlow: MarketFlowPoint[] = history.sessions.map((s) => {
+  // Market flow: last 90 sessions
+  const distinctDates = await prisma.idxSahamSession.findMany({
+    distinct: ['tradeDate'],
+    orderBy: { tradeDate: 'desc' },
+    select: { tradeDate: true },
+    take: 90,
+  })
+  const dates = distinctDates.map((d) => d.tradeDate).sort()
+  const marketFlow: MarketFlowPoint[] = []
+  for (const date of dates) {
+    const rows = await prisma.idxSahamSession.findMany({
+      where: { tradeDate: date },
+      select: { foreignBuy: true, foreignSell: true, close: true },
+    })
     let buyVol = 0
     let sellVol = 0
     let netValueIdr = 0
-    for (const e of Object.values(s.stocks)) {
-      buyVol += e.fbuy
-      sellVol += e.fsell
-      netValueIdr += (e.fbuy - e.fsell) * e.close
+    for (const r of rows) {
+      buyVol += r.foreignBuy
+      sellVol += r.foreignSell
+      netValueIdr += (r.foreignBuy - r.foreignSell) * r.close
     }
-    return { date: s.date, buyVol, sellVol, netVol: buyVol - sellVol, netValueIdr }
-  })
+    marketFlow.push({ date, buyVol, sellVol, netVol: buyVol - sellVol, netValueIdr })
+  }
+
+  // Broker board
+  const brokers = await prisma.idxBrokerBoard.findMany({ where: { tradeDate } })
+  const brokerRowsByValueDesc = [...brokers]
+    .map((b) => ({ firm: b.firm, name: b.name, volume: b.volume, value: b.value, freq: b.freq }))
+    .sort((a, b) => b.value - a.value)
 
   return {
-    mtimes: '',
-    latestParsed: { capturedAt: latest.capturedAt, tradeDate: latest.tradeDate, count: latest.count },
-    history,
-    brokersTradeDate: brokers.tradeDate,
+    sig: tradeDate,
+    latestParsed: { capturedAt: tradeDate, tradeDate, count: sessionRows.length },
+    tradeDate,
     leadersAll,
     leadersByValueAsc,
-    brokerRowsByValueDesc: [...brokers.rows].sort((a, b) => b.value - a.value),
+    brokerRowsByValueDesc,
     rotation,
-    rotationTradeDate: latest.tradeDate,
+    rotationTradeDate: tradeDate,
     marketFlow,
+    historySessions: dates.length,
   }
 }
 
-/** Singleton access; rebuilds only when any source file's mtime changes. */
 async function getCache(): Promise<BandarCache> {
-  const [m1, m2, m3] = await Promise.all([
-    mtimeOf(join(DIR, 'saham-latest.json')),
-    mtimeOf(join(DIR, 'foreign-history.json')),
-    mtimeOf(join(DIR, 'brokers-latest.json')),
-  ])
-  const sig = `${m1}:${m2}:${m3}`
-  if (!cache || cache.mtimes !== sig) {
+  const latest = await prisma.idxSahamSession.findFirst({
+    orderBy: { tradeDate: 'desc' },
+    select: { tradeDate: true },
+  })
+  const sig = latest?.tradeDate ?? ''
+  if (!cache || cache.sig !== sig) {
     cache = await buildCache()
-    cache.mtimes = sig
   }
   return cache
 }
@@ -226,7 +212,7 @@ export async function getForeignLeaders(limit = 20): Promise<{
   const c = await getCache()
   const asc = c.leadersByValueAsc.filter((l) => l.netVol !== 0)
   return {
-    meta: { ...c.latestParsed, historySessions: c.history.sessions.length },
+    meta: { ...c.latestParsed, historySessions: c.historySessions },
     topBuy: asc.slice(-limit).reverse(),
     topSell: asc.slice(0, limit),
   }
@@ -242,18 +228,44 @@ export async function getForeignStreaks(minDays = 3, limit = 25): Promise<{
   distribution: ForeignStreak[]
 }> {
   const c = await getCache()
-  if (streakMemoSig !== c.mtimes) {
+  if (streakMemoSig !== c.sig) {
     streakMemo.clear()
-    streakMemoSig = c.mtimes
+    streakMemoSig = c.sig
   }
-  const sessions = c.history.sessions.slice(-30)
+
+  // Get last 30 session dates
+  const distinctDates = await prisma.idxSahamSession.findMany({
+    distinct: ['tradeDate'],
+    orderBy: { tradeDate: 'desc' },
+    select: { tradeDate: true },
+    take: 30,
+  })
+  const dates = distinctDates.map((d) => d.tradeDate).sort()
+
+  // Build a map: code → date → { fbuy, fsell, close }
+  const sessionMap = new Map<string, Map<string, { fbuy: number; fsell: number; close: number }>>()
+  for (const date of dates) {
+    const rows = await prisma.idxSahamSession.findMany({
+      where: { tradeDate: date },
+      select: { code: true, foreignBuy: true, foreignSell: true, close: true },
+    })
+    for (const r of rows) {
+      let m = sessionMap.get(r.code)
+      if (!m) {
+        m = new Map()
+        sessionMap.set(r.code, m)
+      }
+      m.set(date, { fbuy: r.foreignBuy, fsell: r.foreignSell, close: r.close })
+    }
+  }
+
   const streakOf = (code: string): { days: number; dir: 'accumulation' | 'distribution' | null } => {
     const hit = streakMemo.get(code)
     if (hit) return hit
     let days = 0
     let dir: 'accumulation' | 'distribution' | null = null
-    for (let i = sessions.length - 1; i >= 0; i--) {
-      const s = sessions[i].stocks[code]
+    for (let i = dates.length - 1; i >= 0; i--) {
+      const s = sessionMap.get(code)?.get(dates[i])
       if (!s) break
       const net = s.fbuy - s.fsell
       if (net === 0) break
@@ -275,7 +287,7 @@ export async function getForeignStreaks(minDays = 3, limit = 25): Promise<{
   const acc = withStreaks.filter((s) => s.direction === 'accumulation').sort((a, b) => b.days - a.days || b.estNetValueIdr - a.estNetValueIdr).slice(0, limit)
   const dist = withStreaks.filter((s) => s.direction === 'distribution').sort((a, b) => b.days - a.days || a.estNetValueIdr - b.estNetValueIdr).slice(0, limit)
   return {
-    meta: { ...c.latestParsed, historySessions: c.history.sessions.length, sessionsUsed: sessions.length },
+    meta: { ...c.latestParsed, historySessions: c.historySessions, sessionsUsed: dates.length },
     accumulation: acc,
     distribution: dist,
   }
@@ -286,19 +298,27 @@ export async function getForeignSeries(symbol: string, days = 30): Promise<{
   symbol: string
   series: Array<{ date: string; fbuy: number; fsell: number; net: number; cum: number; close: number }>
 } | null> {
-  const c = await getCache()
   const code = symbol.replace('.JK', '').toUpperCase()
+  const distinctDates = await prisma.idxSahamSession.findMany({
+    distinct: ['tradeDate'],
+    orderBy: { tradeDate: 'desc' },
+    select: { tradeDate: true },
+    take: days,
+  })
+  const dates = distinctDates.map((d) => d.tradeDate).sort()
+
   let cum = 0
-  const series = c.history.sessions
-    .slice(-days)
-    .map((s) => {
-      const e = s.stocks[code]
-      if (!e) return null
-      const net = e.fbuy - e.fsell
-      cum += net
-      return { date: s.date, fbuy: e.fbuy, fsell: e.fsell, net, cum, close: e.close }
+  const series: Array<{ date: string; fbuy: number; fsell: number; net: number; cum: number; close: number }> = []
+  for (const date of dates) {
+    const row = await prisma.idxSahamSession.findUnique({
+      where: { code_tradeDate: { code, tradeDate: date } },
+      select: { foreignBuy: true, foreignSell: true, close: true },
     })
-    .filter((x): x is NonNullable<typeof x> => x !== null)
+    if (!row) continue
+    const net = row.foreignBuy - row.foreignSell
+    cum += net
+    series.push({ date, fbuy: row.foreignBuy, fsell: row.foreignSell, net, cum, close: row.close })
+  }
   if (series.length === 0) return null
   return { symbol: `${code}.JK`, series }
 }
@@ -306,11 +326,11 @@ export async function getForeignSeries(symbol: string, days = 30): Promise<{
 /** Market-wide broker board ranked by turnover. */
 export async function getBrokerBoard(limit = 25): Promise<{
   tradeDate: string
-  rows: Array<z.infer<typeof BrokersSchema>['rows'][number]>
+  rows: Array<{ firm: string; name: string; volume: number; value: number; freq: number }>
 }> {
   const c = await getCache()
   return {
-    tradeDate: c.brokersTradeDate,
+    tradeDate: c.tradeDate,
     rows: c.brokerRowsByValueDesc.slice(0, limit),
   }
 }
@@ -321,7 +341,7 @@ export async function getMarketFlow(): Promise<{
   sessions: MarketFlowPoint[]
 }> {
   const c = await getCache()
-  return { tradeDate: c.latestParsed.tradeDate, sessions: c.marketFlow }
+  return { tradeDate: c.tradeDate, sessions: c.marketFlow }
 }
 
 /** Sector-level foreign-flow rotation for the latest session (prebuilt). */

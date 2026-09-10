@@ -3,15 +3,10 @@
 // as an instant quote layer for the IDX slice of the universe,
 // eliminating cold-cache Yahoo hammering on /equities.
 //
-// Reads data/idx/saham-latest.json (written daily by
-// harvest:idx-saham). SERVER-ONLY.
+// Reads IdxSahamSession via Prisma. SERVER-ONLY.
 // ─────────────────────────────────────────────────────────────
 
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { z } from 'zod'
-
-const FILE = join(process.cwd(), 'data', 'idx', 'saham-latest.json')
+import { prisma } from '@/lib/db'
 
 export interface SahamQuote {
   close: number
@@ -31,31 +26,28 @@ export interface SahamQuotesResult {
   quotes: Record<string, SahamQuote> // keyed by bare code AND .JK symbol
 }
 
-const Schema = z.object({
-  capturedAt: z.string(),
-  tradeDate: z.string(),
-  rows: z.array(z.object({
-    code: z.string(),
-    prev: z.number(),
-    open: z.number(),
-    high: z.number(),
-    low: z.number(),
-    close: z.number(),
-    change: z.number(),
-    volume: z.number(),
-    value: z.number(),
-    freq: z.number(),
-  })),
-})
-
 let cache: { at: number; data: SahamQuotesResult } | null = null
 const TTL = 5 * 60_000
 
 export async function getSahamLatestQuotes(): Promise<SahamQuotesResult> {
   if (cache && Date.now() - cache.at < TTL) return cache.data
-  const parsed = Schema.parse(JSON.parse(await readFile(FILE, 'utf8')))
+
+  const latest = await prisma.idxSahamSession.findFirst({
+    orderBy: { tradeDate: 'desc' },
+    select: { tradeDate: true },
+  })
+  if (!latest) {
+    const empty: SahamQuotesResult = { tradeDate: '', capturedAt: new Date().toISOString(), quotes: {} }
+    cache = { at: Date.now(), data: empty }
+    return cache.data
+  }
+
+  const rows = await prisma.idxSahamSession.findMany({
+    where: { tradeDate: latest.tradeDate },
+  })
+
   const quotes: Record<string, SahamQuote> = {}
-  for (const r of parsed.rows) {
+  for (const r of rows) {
     const q: SahamQuote = {
       close: r.close,
       change: r.change,
@@ -70,6 +62,6 @@ export async function getSahamLatestQuotes(): Promise<SahamQuotesResult> {
     quotes[r.code] = q
     quotes[`${r.code}.JK`] = q
   }
-  cache = { at: Date.now(), data: { tradeDate: parsed.tradeDate, capturedAt: parsed.capturedAt, quotes } }
+  cache = { at: Date.now(), data: { tradeDate: latest.tradeDate, capturedAt: new Date().toISOString(), quotes } }
   return cache.data
 }

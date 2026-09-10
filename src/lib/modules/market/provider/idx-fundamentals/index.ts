@@ -1,15 +1,13 @@
 // ─────────────────────────────────────────────────────────────
-// IDX Fundamentals provider — reads the nightly snapshot written
-// by src/scripts/idx-fundamentals-harvest.ts (TradingView scan,
-// single-shot). Zero runtime upstream calls.
+// IDX Fundamentals provider — reads IdxFundamentals via Prisma.
+// Zero runtime upstream calls.
 //
 // Units contract (set by the harvester):
 //   per/pbv multiples · roe % · der ratio · eps IDR ·
 //   marketCap IDR · dividendYield %
 // ─────────────────────────────────────────────────────────────
 
-import { readFileSync } from 'fs'
-import { join } from 'path'
+import { prisma } from '@/lib/db'
 import { getCached } from '@/lib/api/server-cache'
 
 export interface FundRow {
@@ -22,23 +20,37 @@ export interface FundRow {
   dividendYield?: number | null
 }
 
-interface Snapshot {
-  capturedAt: string
-  done: string[]
+const CACHE_TTL = 10 * 60_000
+
+interface SnapshotData {
+  snapshotDate: string
   data: Record<string, FundRow>
 }
 
-const SNAPSHOT = join(process.cwd(), 'data', 'idx', 'fundamentals.json')
-const CACHE_TTL = 10 * 60 * 1000
-
-async function loadSnapshot(): Promise<Snapshot | null> {
+async function loadSnapshot(): Promise<SnapshotData> {
   const { data } = await getCached('idx-fundamentals:v1', CACHE_TTL, async () => {
-    try {
-      return JSON.parse(readFileSync(SNAPSHOT, 'utf8')) as Snapshot
-    } catch {
-      // Harvest never ran / file missing — serve an empty snapshot.
-      return { capturedAt: '', done: [], data: {} }
+    const latest = await prisma.idxFundamentals.findFirst({
+      orderBy: { snapshotDate: 'desc' },
+      select: { snapshotDate: true },
+    })
+    if (!latest) return { snapshotDate: '', data: {} }
+
+    const rows = await prisma.idxFundamentals.findMany({
+      where: { snapshotDate: latest.snapshotDate },
+    })
+    const map: Record<string, FundRow> = {}
+    for (const r of rows) {
+      map[r.code] = {
+        per: r.per,
+        pbv: r.pbv,
+        roe: r.roe,
+        der: r.der,
+        eps: r.eps,
+        marketCap: r.marketCap,
+        dividendYield: r.dividendYield,
+      }
     }
+    return { snapshotDate: latest.snapshotDate, data: map }
   })
   return data
 }
@@ -54,10 +66,10 @@ export async function getFundamentalsSnapshot(): Promise<{
   data: Record<string, FundRow>
 }> {
   const snap = await loadSnapshot()
-  return { capturedAt: snap?.capturedAt ?? '', count: snap?.done.length ?? 0, data: snap?.data ?? {} }
+  return { capturedAt: snap.snapshotDate, count: Object.keys(snap.data).length, data: snap.data }
 }
 
 export async function getFundamentals(code: string): Promise<FundRow | null> {
   const snap = await loadSnapshot()
-  return snap?.data[normalizeCode(code)] ?? null
+  return snap.data[normalizeCode(code)] ?? null
 }

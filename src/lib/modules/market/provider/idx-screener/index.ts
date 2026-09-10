@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
-// IDX Screener provider — reads the snapshot written by
-// src/scripts/idx-screener-harvest.ts. Zero runtime upstream.
+// IDX Screener provider — reads IdxScreenerSnapshot via Prisma.
+// Zero runtime upstream.
 //
 // Units contract:
 //   per/pbv multiples · der ratio · roa/roe/npm % · eps IDR ·
@@ -8,8 +8,7 @@
 //   hi52w/lo52w IDR · volume shares · change4w/13w/26w/52w % · ytd %
 // ─────────────────────────────────────────────────────────────
 
-import { readFileSync } from 'fs'
-import { join } from 'path'
+import { prisma } from '@/lib/db'
 import { getCached } from '@/lib/api/server-cache'
 
 export interface ScreenerRow {
@@ -40,30 +39,61 @@ export interface ScreenerRow {
   ytd: number | null
 }
 
-interface Snapshot {
-  capturedAt: string
-  source: string
-  total: number
-  count: number
-  data: Record<string, ScreenerRow>
-}
-
-const SNAPSHOT = join(process.cwd(), 'data', 'idx', 'screener.json')
-const CACHE_TTL = 10 * 60 * 1000
-
-async function loadSnapshot(): Promise<Snapshot | null> {
-  const { data } = await getCached('idx-screener:v1', CACHE_TTL, async () => {
-    try {
-      return JSON.parse(readFileSync(SNAPSHOT, 'utf8')) as Snapshot
-    } catch {
-      return { capturedAt: '', source: '', total: 0, count: 0, data: {} }
-    }
-  })
-  return data
-}
+const CACHE_TTL = 10 * 60_000
 
 export function normalizeCode(input: string): string {
   return input.trim().toUpperCase().replace(/\.JK$/, '')
+}
+
+interface SnapshotData {
+  snapshotDate: string
+  data: Record<string, ScreenerRow>
+}
+
+async function loadSnapshot(): Promise<SnapshotData> {
+  const { data } = await getCached('idx-screener:v1', CACHE_TTL, async () => {
+    const latest = await prisma.idxScreenerSnapshot.findFirst({
+      orderBy: { snapshotDate: 'desc' },
+      select: { snapshotDate: true },
+    })
+    if (!latest) return { snapshotDate: '', data: {} }
+
+    const rows = await prisma.idxScreenerSnapshot.findMany({
+      where: { snapshotDate: latest.snapshotDate },
+    })
+    const map: Record<string, ScreenerRow> = {}
+    for (const r of rows) {
+      map[r.code] = {
+        symbol: r.code,
+        name: r.name,
+        sector: r.sector,
+        subsector: r.subsector,
+        industry: r.industry,
+        subindustry: r.subindustry,
+        per: r.per,
+        pbv: r.pbv,
+        der: r.der,
+        roa: r.roa,
+        roe: r.roe,
+        npm: r.npm,
+        eps: r.eps,
+        revenue: r.revenue,
+        marketCap: r.marketCap,
+        price: r.price,
+        change1d: r.change1d,
+        high52w: r.high52w,
+        low52w: r.low52w,
+        volume: r.volume,
+        change4w: r.change4w,
+        change13w: r.change13w,
+        change26w: r.change26w,
+        change52w: r.change52w,
+        ytd: r.ytd,
+      }
+    }
+    return { snapshotDate: latest.snapshotDate, data: map }
+  })
+  return data
 }
 
 export async function getScreenerSnapshot(): Promise<{
@@ -75,22 +105,22 @@ export async function getScreenerSnapshot(): Promise<{
 }> {
   const snap = await loadSnapshot()
   return {
-    capturedAt: snap?.capturedAt ?? '',
-    source: snap?.source ?? '',
-    total: snap?.total ?? 0,
-    count: snap?.count ?? 0,
-    data: snap?.data ?? {},
+    capturedAt: snap.snapshotDate,
+    source: 'prisma:IdxScreenerSnapshot',
+    total: Object.keys(snap.data).length,
+    count: Object.keys(snap.data).length,
+    data: snap.data,
   }
 }
 
 export async function getScreenerStock(code: string): Promise<ScreenerRow | null> {
   const snap = await loadSnapshot()
-  return snap?.data[normalizeCode(code)] ?? null
+  return snap.data[normalizeCode(code)] ?? null
 }
 
 export async function getScreenerBySector(sector: string): Promise<ScreenerRow[]> {
   const snap = await loadSnapshot()
-  return Object.values(snap?.data ?? {}).filter(
+  return Object.values(snap.data).filter(
     (r) => r.sector.toLowerCase() === sector.toLowerCase()
   )
 }
@@ -100,7 +130,7 @@ export async function getTopMovers(
   direction: 'gainers' | 'losers' = 'gainers'
 ): Promise<ScreenerRow[]> {
   const snap = await loadSnapshot()
-  const items = Object.values(snap?.data ?? {}).filter((r) => r.change1d != null)
+  const items = Object.values(snap.data).filter((r) => r.change1d != null)
   items.sort((a, b) =>
     direction === 'gainers'
       ? (b.change1d ?? 0) - (a.change1d ?? 0)
