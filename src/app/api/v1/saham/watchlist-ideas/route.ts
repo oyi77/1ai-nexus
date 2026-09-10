@@ -2,11 +2,13 @@
 // GET /api/v1/saham/watchlist-ideas — combined value + accumulation
 // screening for IDX stocks.
 //
-// Merges:
-//   Value screen: PER < sector median, PBV < 1, ROE > 15%, DER < 1,
-//                 dividendYield > 3%
-//   Accumulation: foreign net-buy streak >= 3 sessions, volume spike
-//                 with flat price, broker board net
+// Value screen: PER < sector median, PBV < 1, ROE > 15%, DER < 1,
+//               dividendYield > 3%
+// Accumulation: foreign net-buy streak >= 3 sessions (from session data)
+//
+// Works even without session data — value screen runs on screener +
+// fundamentals alone. Accumulation signals appear once session data
+// is harvested.
 //
 // Params:
 //   ?minScore=1        minimum combined score to include (default 1)
@@ -32,15 +34,14 @@ interface WatchlistIdea {
   der: number | null
   dividendYield: number | null
   marketCap: number | null
-  // signals
   foreignNetStreakDays: number
   foreignNetStreakDir: 'accumulation' | 'distribution' | null
   estNetValueIdr: number
-  // scores
   valueScore: number
   accumulationScore: number
   combinedScore: number
 }
+
 
 function num(v: number | null | undefined): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : NaN
@@ -54,32 +55,20 @@ export async function GET(request: NextRequest) {
   const accumWeight = 1 - valueWeight
 
   try {
-    // Latest session date
-    const latest = await prisma.idxSahamSession.findFirst({
-      orderBy: { tradeDate: 'desc' },
-      select: { tradeDate: true },
-    })
-    if (!latest) return apiSuccess({ tradeDate: '', count: 0, ideas: [] })
-
-    const tradeDate = latest.tradeDate
-
-    // Latest session rows
-    const sessionRows = await prisma.idxSahamSession.findMany({ where: { tradeDate } })
-
-    // Latest screener snapshot for fundamentals
+    // Latest screener snapshot
     const latestScreener = await prisma.idxScreenerSnapshot.findFirst({
       orderBy: { snapshotDate: 'desc' },
       select: { snapshotDate: true },
     })
-    const screenerByCode = new Map<string, { per: number | null; pbv: number | null; roe: number | null; der: number | null; marketCap: number | null; sector: string; name: string }>()
+    const screenerByCode = new Map<string, { per: number | null; pbv: number | null; roe: number | null; der: number | null; marketCap: number | null; sector: string; name: string; price: number | null; change1d: number | null; close: number | null }>()
     if (latestScreener) {
       const screenerRows = await prisma.idxScreenerSnapshot.findMany({
         where: { snapshotDate: latestScreener.snapshotDate },
       })
-      for (const r of screenerRows) screenerByCode.set(r.code, { per: r.per, pbv: r.pbv, roe: r.roe, der: r.der, marketCap: r.marketCap, sector: r.sector, name: r.name })
+      for (const r of screenerRows) screenerByCode.set(r.code, { per: r.per, pbv: r.pbv, roe: r.roe, der: r.der, marketCap: r.marketCap, sector: r.sector, name: r.name, price: r.price, change1d: r.change1d, close: r.price })
     }
 
-    // Dividend yield from fundamentals table
+    // Dividend yield from fundamentals
     const latestFund = await prisma.idxFundamentals.findFirst({
       orderBy: { snapshotDate: 'desc' },
       select: { snapshotDate: true },
@@ -93,10 +82,13 @@ export async function GET(request: NextRequest) {
       for (const r of fundRows) fundByCode.set(r.code, { dividendYield: r.dividendYield })
     }
 
+    if (screenerByCode.size === 0) {
+      return apiSuccess({ tradeDate: '', screenerDate: '', count: 0, ideas: [] })
+    }
 
     // Sector medians for PER
     const sectorPerValues = new Map<string, number[]>()
-    for (const [code, s] of screenerByCode) {
+    for (const [, s] of screenerByCode) {
       const per = num(s.per)
       if (!Number.isNaN(per) && per > 0) {
         const arr = sectorPerValues.get(s.sector) ?? []
@@ -110,7 +102,7 @@ export async function GET(request: NextRequest) {
       sectorPerMedian.set(sector, vals[Math.floor(vals.length / 2)])
     }
 
-    // Foreign streaks (last 30 sessions)
+    // BULK: streak data — single query for last 30 sessions
     const distinctDates = await prisma.idxSahamSession.findMany({
       distinct: ['tradeDate'],
       orderBy: { tradeDate: 'desc' },
@@ -118,53 +110,47 @@ export async function GET(request: NextRequest) {
       take: 30,
     })
     const dates = distinctDates.map((d) => d.tradeDate).sort()
+    const streakMap = new Map<string, { days: number; dir: 'accumulation' | 'distribution' | null; latestNetVol: number; latestClose: number; estNetValue: number }>()
 
-    const streakMap = new Map<string, { days: number; dir: 'accumulation' | 'distribution' | null }>()
-    const sessionMap = new Map<string, Map<string, { fbuy: number; fsell: number }>>()
-    for (const date of dates) {
-      const rows = await prisma.idxSahamSession.findMany({
-        where: { tradeDate: date },
-        select: { code: true, foreignBuy: true, foreignSell: true },
+    if (dates.length > 0) {
+      const sessionRows = await prisma.idxSahamSession.findMany({
+        where: { tradeDate: { in: dates } },
+        select: { code: true, tradeDate: true, foreignBuy: true, foreignSell: true, close: true },
       })
-      for (const r of rows) {
-        let m = sessionMap.get(r.code)
-        if (!m) {
-          m = new Map()
-          sessionMap.set(r.code, m)
+      // Group by code
+      const byCode = new Map<string, Array<{ date: string; fbuy: number; fsell: number; close: number }>>()
+      for (const r of sessionRows) {
+        const arr = byCode.get(r.code) ?? []
+        arr.push({ date: r.tradeDate, fbuy: r.foreignBuy, fsell: r.foreignSell, close: r.close })
+        byCode.set(r.code, arr)
+      }
+      for (const [code, rows] of byCode) {
+        let days = 0
+        let dir: 'accumulation' | 'distribution' | null = null
+        for (let i = rows.length - 1; i >= 0; i--) {
+          const s = rows[i]
+          const net = s.fbuy - s.fsell
+          if (net === 0) break
+          const cur: 'accumulation' | 'distribution' = net > 0 ? 'accumulation' : 'distribution'
+          if (dir === null) dir = cur
+          else if (cur !== dir) break
+          days++
         }
-        m.set(date, { fbuy: r.foreignBuy, fsell: r.foreignSell })
+        const latest = rows[rows.length - 1]
+        const latestNetVol = latest ? latest.fbuy - latest.fsell : 0
+        streakMap.set(code, { days, dir, latestNetVol, latestClose: latest?.close ?? 0, estNetValue: latestNetVol * (latest?.close ?? 0) })
       }
-    }
-    const computeStreak = (code: string): { days: number; dir: 'accumulation' | 'distribution' | null } => {
-      const cached = streakMap.get(code)
-      if (cached) return cached
-      let days = 0
-      let dir: 'accumulation' | 'distribution' | null = null
-      for (let i = dates.length - 1; i >= 0; i--) {
-        const s = sessionMap.get(code)?.get(dates[i])
-        if (!s) break
-        const net = s.fbuy - s.fsell
-        if (net === 0) break
-        const cur: 'accumulation' | 'distribution' = net > 0 ? 'accumulation' : 'distribution'
-        if (dir === null) dir = cur
-        else if (cur !== dir) break
-        days++
-      }
-      const out = { days, dir }
-      streakMap.set(code, out)
-      return out
     }
 
     const ideas: WatchlistIdea[] = []
-    for (const row of sessionRows) {
-      const fund = screenerByCode.get(row.code)
-      const dyInfo = fundByCode.get(row.code)
-      const per = num(fund?.per)
-      const pbv = num(fund?.pbv)
-      const roe = num(fund?.roe)
-      const der = num(fund?.der)
+    for (const [code, fund] of screenerByCode) {
+      const dyInfo = fundByCode.get(code)
+      const per = num(fund.per)
+      const pbv = num(fund.pbv)
+      const roe = num(fund.roe)
+      const der = num(fund.der)
       const dy = num(dyInfo?.dividendYield)
-      const sector = fund?.sector ?? 'Unknown'
+      const sector = fund.sector || 'Unknown'
       const perMedian = sectorPerMedian.get(sector) ?? NaN
 
       // Value score: count of bullish conditions met (0-5)
@@ -176,29 +162,28 @@ export async function GET(request: NextRequest) {
       if (!Number.isNaN(dy) && dy > 3) valueScore++
 
       // Accumulation score: streak days (capped at 5)
-      const streak = computeStreak(row.code)
-      const netVol = row.foreignBuy - row.foreignSell
-      const estNetValueIdr = netVol * row.close
-      const accumulationScore = streak.dir === 'accumulation' ? Math.min(streak.days, 5) : 0
+      const streak = streakMap.get(code)
+      const accumulationScore = streak?.dir === 'accumulation' ? Math.min(streak.days, 5) : 0
 
       const combinedScore = valueScore * valueWeight + accumulationScore * accumWeight
 
       if (combinedScore >= minScore) {
+        const close = fund.close ?? 0
         ideas.push({
-          code: row.code,
-          name: fund?.name ?? row.name,
+          code,
+          name: fund.name,
           sector,
-          close: row.close,
-          changePct: row.prev > 0 ? ((row.close - row.prev) / row.prev) * 100 : 0,
-          per: fund?.per ?? null,
-          pbv: fund?.pbv ?? null,
-          roe: fund?.roe ?? null,
-          der: fund?.der ?? null,
+          close,
+          changePct: fund.change1d ?? 0,
+          per: fund.per,
+          pbv: fund.pbv,
+          roe: fund.roe,
+          der: fund.der,
           dividendYield: dyInfo?.dividendYield ?? null,
-          marketCap: fund?.marketCap ?? null,
-          foreignNetStreakDays: streak.days,
-          foreignNetStreakDir: streak.dir,
-          estNetValueIdr,
+          marketCap: fund.marketCap,
+          foreignNetStreakDays: streak?.days ?? 0,
+          foreignNetStreakDir: streak?.dir ?? null,
+          estNetValueIdr: streak?.estNetValue ?? 0,
           valueScore,
           accumulationScore,
           combinedScore,
@@ -209,8 +194,10 @@ export async function GET(request: NextRequest) {
     ideas.sort((a, b) => b.combinedScore - a.combinedScore || b.estNetValueIdr - a.estNetValueIdr)
 
     return apiSuccess({
-      tradeDate,
+      tradeDate: latestScreener?.snapshotDate ?? '',
       screenerDate: latestScreener?.snapshotDate ?? '',
+      fundamentalsDate: latestFund?.snapshotDate ?? '',
+      sessionDates: dates.length,
       count: ideas.length,
       ideas: ideas.slice(0, limit),
     })

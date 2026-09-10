@@ -3,10 +3,9 @@
 // analytics computed from Prisma (IdxSahamSession, IdxBrokerBoard,
 // IdxScreenerSnapshot). NO upstream calls at runtime.
 //
-// SERVING PATTERN: parsed datasets live in a process-lifetime
-// singleton invalidated by snapshot date. Sorts are computed once
-// per snapshot — per-request work collapses to slices over prebuilt
-// arrays.
+// All reads are bulk — zero N+1 queries. Market flow, streaks,
+// and series fetch all session rows in a single query, then
+// compute in memory.
 //
 // SERVER-ONLY. Consume via /api/v1/saham/bandarmology.
 // ─────────────────────────────────────────────────────────────
@@ -62,6 +61,9 @@ interface BandarCache {
   rotationTradeDate: string
   marketFlow: MarketFlowPoint[]
   historySessions: number
+  // Bulk data for streak/series computation
+  sessionMap: Map<string, Map<string, { fbuy: number; fsell: number; close: number }>>
+  datesAsc: string[]
 }
 
 let cache: BandarCache | null = null
@@ -89,7 +91,6 @@ function toLeader(r: {
 }
 
 async function buildCache(): Promise<BandarCache> {
-  // Latest session date
   const latest = await prisma.idxSahamSession.findFirst({
     orderBy: { tradeDate: 'desc' },
     select: { tradeDate: true },
@@ -106,6 +107,8 @@ async function buildCache(): Promise<BandarCache> {
       rotationTradeDate: '',
       marketFlow: [],
       historySessions: 0,
+      sessionMap: new Map(),
+      datesAsc: [],
     }
   }
   const tradeDate = latest.tradeDate
@@ -117,7 +120,9 @@ async function buildCache(): Promise<BandarCache> {
     .filter((l) => l.fbuyVol > 0 || l.fsellVol > 0)
     .sort((a, b) => a.estNetValueIdr - b.estNetValueIdr)
 
-  // Sector mapping from screener snapshot
+
+
+  // Sector mapping
   const latestScreener = await prisma.idxScreenerSnapshot.findFirst({
     orderBy: { snapshotDate: 'desc' },
     select: { snapshotDate: true },
@@ -146,7 +151,7 @@ async function buildCache(): Promise<BandarCache> {
     .map(([sector, v]) => ({ sector, ...v }))
     .sort((a, b) => Math.abs(b.netValueIdr) - Math.abs(a.netValueIdr))
 
-  // Market flow: last 90 sessions
+  // BULK: last 90 sessions — single query, group in memory
   const distinctDates = await prisma.idxSahamSession.findMany({
     distinct: ['tradeDate'],
     orderBy: { tradeDate: 'desc' },
@@ -154,22 +159,39 @@ async function buildCache(): Promise<BandarCache> {
     take: 90,
   })
   const dates = distinctDates.map((d) => d.tradeDate).sort()
-  const marketFlow: MarketFlowPoint[] = []
-  for (const date of dates) {
-    const rows = await prisma.idxSahamSession.findMany({
-      where: { tradeDate: date },
-      select: { foreignBuy: true, foreignSell: true, close: true },
-    })
-    let buyVol = 0
-    let sellVol = 0
-    let netValueIdr = 0
-    for (const r of rows) {
-      buyVol += r.foreignBuy
-      sellVol += r.foreignSell
-      netValueIdr += (r.foreignBuy - r.foreignSell) * r.close
+
+  const allSessionRows = await prisma.idxSahamSession.findMany({
+    where: { tradeDate: { in: dates } },
+    select: { code: true, tradeDate: true, foreignBuy: true, foreignSell: true, close: true },
+  })
+
+  const sessionMap = new Map<string, Map<string, { fbuy: number; fsell: number; close: number }>>()
+  const flowAgg = new Map<string, { buyVol: number; sellVol: number; netValueIdr: number }>()
+  for (const r of allSessionRows) {
+    // session map
+    let m = sessionMap.get(r.code)
+    if (!m) {
+      m = new Map()
+      sessionMap.set(r.code, m)
     }
-    marketFlow.push({ date, buyVol, sellVol, netVol: buyVol - sellVol, netValueIdr })
+    m.set(r.tradeDate, { fbuy: r.foreignBuy, fsell: r.foreignSell, close: r.close })
+
+    // flow aggregation
+    let f = flowAgg.get(r.tradeDate)
+    if (!f) {
+      f = { buyVol: 0, sellVol: 0, netValueIdr: 0 }
+      flowAgg.set(r.tradeDate, f)
+    }
+    f.buyVol += r.foreignBuy
+    f.sellVol += r.foreignSell
+    f.netValueIdr += (r.foreignBuy - r.foreignSell) * r.close
   }
+  const marketFlow: MarketFlowPoint[] = dates
+    .map((date) => {
+      const f = flowAgg.get(date) ?? { buyVol: 0, sellVol: 0, netValueIdr: 0 }
+      return { date, buyVol: f.buyVol, sellVol: f.sellVol, netVol: f.buyVol - f.sellVol, netValueIdr: f.netValueIdr }
+    })
+    .sort((a, b) => a.date.localeCompare(b.date))
 
   // Broker board
   const brokers = await prisma.idxBrokerBoard.findMany({ where: { tradeDate } })
@@ -188,6 +210,8 @@ async function buildCache(): Promise<BandarCache> {
     rotationTradeDate: tradeDate,
     marketFlow,
     historySessions: dates.length,
+    sessionMap,
+    datesAsc: dates,
   }
 }
 
@@ -233,31 +257,8 @@ export async function getForeignStreaks(minDays = 3, limit = 25): Promise<{
     streakMemoSig = c.sig
   }
 
-  // Get last 30 session dates
-  const distinctDates = await prisma.idxSahamSession.findMany({
-    distinct: ['tradeDate'],
-    orderBy: { tradeDate: 'desc' },
-    select: { tradeDate: true },
-    take: 30,
-  })
-  const dates = distinctDates.map((d) => d.tradeDate).sort()
-
-  // Build a map: code → date → { fbuy, fsell, close }
-  const sessionMap = new Map<string, Map<string, { fbuy: number; fsell: number; close: number }>>()
-  for (const date of dates) {
-    const rows = await prisma.idxSahamSession.findMany({
-      where: { tradeDate: date },
-      select: { code: true, foreignBuy: true, foreignSell: true, close: true },
-    })
-    for (const r of rows) {
-      let m = sessionMap.get(r.code)
-      if (!m) {
-        m = new Map()
-        sessionMap.set(r.code, m)
-      }
-      m.set(date, { fbuy: r.foreignBuy, fsell: r.foreignSell, close: r.close })
-    }
-  }
+  const dates = c.datesAsc.slice(-30)
+  const sessionMap = c.sessionMap
 
   const streakOf = (code: string): { days: number; dir: 'accumulation' | 'distribution' | null } => {
     const hit = streakMemo.get(code)
@@ -299,27 +300,24 @@ export async function getForeignSeries(symbol: string, days = 30): Promise<{
   series: Array<{ date: string; fbuy: number; fsell: number; net: number; cum: number; close: number }>
 } | null> {
   const code = symbol.replace('.JK', '').toUpperCase()
-  const distinctDates = await prisma.idxSahamSession.findMany({
-    distinct: ['tradeDate'],
+
+  // Single bulk query
+  const rows = await prisma.idxSahamSession.findMany({
+    where: { code },
     orderBy: { tradeDate: 'desc' },
-    select: { tradeDate: true },
     take: days,
+    select: { tradeDate: true, foreignBuy: true, foreignSell: true, close: true },
   })
-  const dates = distinctDates.map((d) => d.tradeDate).sort()
+
+  if (rows.length === 0) return null
 
   let cum = 0
   const series: Array<{ date: string; fbuy: number; fsell: number; net: number; cum: number; close: number }> = []
-  for (const date of dates) {
-    const row = await prisma.idxSahamSession.findUnique({
-      where: { code_tradeDate: { code, tradeDate: date } },
-      select: { foreignBuy: true, foreignSell: true, close: true },
-    })
-    if (!row) continue
-    const net = row.foreignBuy - row.foreignSell
+  for (const r of rows.reverse()) {
+    const net = r.foreignBuy - r.foreignSell
     cum += net
-    series.push({ date, fbuy: row.foreignBuy, fsell: row.foreignSell, net, cum, close: row.close })
+    series.push({ date: r.tradeDate, fbuy: r.foreignBuy, fsell: r.foreignSell, net, cum, close: r.close })
   }
-  if (series.length === 0) return null
   return { symbol: `${code}.JK`, series }
 }
 

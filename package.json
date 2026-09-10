@@ -24,8 +24,7 @@
     "harvest:crossex": "tsx src/scripts/crossex-harvest.ts",
     "harvest:idx-saham": "tsx src/scripts/idx-saham-harvest.ts",
     "harvest:idx-screener": "tsx src/scripts/idx-screener-harvest.ts",
-    "harvest:idx-fundamentals": "tsx src/scripts/idx-fundamentals-harvest.ts",
-    "start:ws": "cd ws-server && npx tsx server.ts",
+    "seed:idx-saham": "tsx src/scripts/idx-saham-seed.ts",
     "verify-re": "npx tsx src/scripts/verify-re-modules.ts"
   },
   "dependencies": {
