@@ -402,7 +402,8 @@ export const SECTORS_APP_FALLBACK_SYMBOLS = ['^JKSE', ...IDX_FALLBACK.slice(0, 4
 // provider). Unmapped values pass through unchanged.
 // ─────────────────────────────────────────────────────────────
 export const TV_TO_IC_SECTOR: Record<string, string> = {
-  Finance: 'Financials',
+  'Major Banks': 'Perbankan',
+  'Regional Banks': 'Perbankan',
   Communications: 'Infrastructure',
   'Consumer Durables': 'Consumer Cyclicals',
   'Consumer Non-Durables': 'Consumer Non-Cyclicals',

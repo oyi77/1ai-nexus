@@ -36,8 +36,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'Markets',
     items: [
       { label: 'Equities', href: '/equities', icon: Building2, description: 'Stocks and equity market data.' },
-      { label: 'Volume Profile', href: '/bandarmology', icon: BarChart3, description: 'Trading-volume and accumulation analysis.' },
-      { label: 'Forex', href: '/forex', icon: DollarSign, description: 'Currency pair rates and moves.' },
+
       { label: 'Commodities', href: '/commodities', icon: Package, description: 'Gold, oil and commodity prices.' },
       { label: 'Bonds', href: '/bonds', icon: TrendingUp, description: 'Government and corporate bond yields.' },
       { label: 'Derivatives', href: '/derivatives', icon: TrendingUp, description: 'Futures, perps and derivative markets.' },
@@ -116,8 +115,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'Analytics',
     items: [
       { label: 'Analytics Hub', href: '/analytics', icon: Zap, description: 'All analytics tools.' },
-      { label: 'Screener', href: '/screener', icon: BarChart3, description: 'Filter assets by criteria.' },
-      { label: 'Fundamentals', href: '/fundamentals', icon: Building2, description: 'Core company/token fundamentals.' },
+      { label: 'Watchlist Ideas', href: '/saham-ideas', icon: Flame, description: 'Value + accumulation screen for IDX stocks.' },
       { label: 'Financials', href: '/financials', icon: Building2, description: 'Financial statements and ratios.' },
       { label: '20Y History', href: '/historical-financials', icon: Building2, description: 'Twenty years of price history.' },
       { label: 'DCF Model', href: '/dcf', icon: TrendingUp, description: 'Discounted-cash-flow valuation.' },

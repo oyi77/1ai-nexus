@@ -1003,6 +1003,8 @@ model IdxSahamSession {
   freq        Float    @default(0)
   foreignBuy  Float    @default(0)
   foreignSell Float    @default(0)
+  listedShares  Float    @default(0)
+  tradeableShares Float @default(0)
 
   @@unique([code, tradeDate])
   @@index([tradeDate(sort: Desc)])

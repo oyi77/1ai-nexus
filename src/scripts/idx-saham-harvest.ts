@@ -63,6 +63,7 @@ interface StockRow {
   tradeableShares: number
 }
 
+
 function toRow(d: Record<string, unknown>): StockRow {
   return {
     code: String(d.StockCode ?? ''),
@@ -100,7 +101,7 @@ async function fetchAllRows(page: Page, urlBase: string): Promise<{ rows: Array<
 
 async function main() {
   // Headed mode required: Cloudflare fingerprints headless Chrome.
-  const browser = await chromium.launch({ channel: 'chrome', headless: false })
+  const browser = await chromium.launch({ channel: 'chromium', headless: false })
   try {
     const page = await browser.newPage({ locale: 'en-US' })
     await warmup(page)
