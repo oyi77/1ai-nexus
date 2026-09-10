@@ -22,8 +22,8 @@
     "botx:auto-rotate": "tsx src/scripts/botx-auto-rotate.ts",
     "botx:health": "tsx src/scripts/botx-register.ts health",
     "harvest:crossex": "tsx src/scripts/crossex-harvest.ts",
-    "harvest:idx-universe": "tsx src/scripts/idx-universe-harvest.ts",
     "harvest:idx-saham": "tsx src/scripts/idx-saham-harvest.ts",
+    "harvest:idx-screener": "tsx src/scripts/idx-screener-harvest.ts",
     "harvest:idx-fundamentals": "tsx src/scripts/idx-fundamentals-harvest.ts",
     "start:ws": "cd ws-server && npx tsx server.ts",
     "verify-re": "npx tsx src/scripts/verify-re-modules.ts"
