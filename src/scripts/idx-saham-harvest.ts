@@ -16,8 +16,7 @@
 
 import 'dotenv/config'
 import { chromium, type Page } from 'playwright'
-import { readFileSync } from 'fs'
-import { join } from 'path'
+
 import { prisma } from '@/lib/db'
 import { notifyAlert } from '@/lib/config/alerting'
 

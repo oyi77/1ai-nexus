@@ -118,13 +118,6 @@ export async function getScreenerStock(code: string): Promise<ScreenerRow | null
   return snap.data[normalizeCode(code)] ?? null
 }
 
-export async function getScreenerBySector(sector: string): Promise<ScreenerRow[]> {
-  const snap = await loadSnapshot()
-  return Object.values(snap.data).filter(
-    (r) => r.sector.toLowerCase() === sector.toLowerCase()
-  )
-}
-
 export async function getTopMovers(
   n = 20,
   direction: 'gainers' | 'losers' = 'gainers'

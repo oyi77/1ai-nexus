@@ -41,6 +41,7 @@ const fmtTril = (n: number | null) => {
   return `${(n / 1e6).toFixed(0)}M`
 }
 
+
 const signCls = (v: number) => (v >= 0 ? "text-accent-green" : "text-accent-red")
 
 const SCORE_BADGE: Record<number, string> = {
@@ -130,7 +131,7 @@ export default function SahamIdeasPage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-xl font-semibold text-text-primary flex items-center gap-2">
-                <LiveDot /> IDX Watchlist Ideas
+                <LiveDot status="live" /> IDX Watchlist Ideas
               </h1>
               <p className="text-sm text-text-secondary mt-1">
                 Value + accumulation screen · {data?.count ?? 0} ideas
