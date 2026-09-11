@@ -197,12 +197,16 @@ export async function discoverBitgetTokens(limitPerChain = 25): Promise<MemeAlph
 // ── Risk audit ─────────────────────────────────────────────────
 
 export async function auditBitgetToken(chain: string, contract: string): Promise<MemeRiskAudit | null> {
-  const raw = await bitgetPost<{
-    data?: BitgetAuditResult[]
-  }>('/market/v3/coin/security/audits', {
-    list: [{ chain, contract }],
-    source: 'bg',
-  })
+  const [raw, baseInfo] = await Promise.all([
+    bitgetPost<{ data?: BitgetAuditResult[] }>('/market/v3/coin/security/audits', {
+      list: [{ chain, contract }],
+      source: 'bg',
+    }),
+    bitgetPost<{ data?: { list?: BitgetBaseInfo[] } }>('/market/v3/coin/batchGetBaseInfo', {
+      list: [{ chain, contract }],
+    }).catch(() => null),
+  ])
+
   const list = raw.data
   if (!list || list.length === 0) return null
   const audit = list[0]
@@ -214,6 +218,19 @@ export async function auditBitgetToken(chain: string, contract: string): Promise
   const label: MemeRiskAudit['riskLabel'] =
     riskLevel >= 3 ? 'high' : riskLevel === 2 ? 'middle' : riskLevel === 1 ? 'low' : 'safe'
 
+  // Extract tax from risk check labelName patterns
+  const allLabels = [
+    ...(audit.riskChecks ?? []),
+    ...(audit.warnChecks ?? []),
+    ...(audit.lowChecks ?? []),
+  ].map((c) => c.labelName ?? '')
+  const extractTax = (pattern: RegExp): number => {
+    const match = allLabels.join(' ').match(pattern)
+    return match ? Number(match[1]) || 0 : 0
+  }
+
+  const holderInfo = baseInfo?.data?.list?.[0]
+
   return {
     id: `${chain}:${contract}`,
     platform: 'bitget',
@@ -223,16 +240,17 @@ export async function auditBitgetToken(chain: string, contract: string): Promise
     name: '',
     riskLevel,
     riskLabel: label,
-    buyTax: 0, // TODO: extract from riskChecks when semantics confirmed
-    sellTax: 0,
-    top10HolderPercent: 0,
-    lpLockedPercent: -1,
+    buyTax: extractTax(/buy\s*tax[:\s]*([\d.]+)/i),
+    sellTax: extractTax(/sell\s*tax[:\s]*([\d.]+)/i),
+    top10HolderPercent: holderInfo ? toNum(holderInfo.top10_holder_percent, toNum(holderInfo.insider_holder_percent)) / 100 : 0,
+    lpLockedPercent: holderInfo ? toNum(holderInfo.lock_lp_percent) / 100 : -1,
     canFreeze: false,
     canMint: false,
     riskCounts: { high, middle: mid, low },
     auditedAt: Date.now(),
   }
 }
+
 
 /** Fetch one token's security/holder profile (honeypot audit source). */
 export async function getBitgetBaseInfo(
