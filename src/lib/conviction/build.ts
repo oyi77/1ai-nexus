@@ -8,6 +8,8 @@ import { getForeignLeaders } from '@/lib/modules/market/provider/idx-bandarmolog
 import { getScreenerSnapshot, type ScreenerRow } from '@/lib/modules/market/provider/idx-screener'
 import { fetchAlphaSignals, type AlphaSignal } from '@/lib/modules/derived/alpha-feed'
 import { fetchOHLCV } from '@/lib/modules/market'
+import { computeAlpha } from '@/lib/conviction/alpha-engine'
+import { prisma } from '@/lib/db'
 import {
   buildCryptoItem,
   buildResult,
@@ -79,7 +81,7 @@ export async function buildConvictionResult(): Promise<ConvictionResult> {
     getScreenerSnapshot().catch(() => null),
   ])
 
-  // ── IDX (deep: 25-field screener + bandarmology) ──
+  // ── IDX (deep: 25-field screener + bandarmology + 6-signal alpha) ──
   const idxItems: ConvictionItem[] = []
   if (screenerSnap?.data) {
     const rows = Object.values(screenerSnap.data)
@@ -93,19 +95,85 @@ export async function buildConvictionResult(): Promise<ConvictionResult> {
     const roes = clean.map((r) => r.roe!)
     const pers = clean.map((r) => r.per!)
     const mons = clean.map((r) => r.change1d!)
+    // PBV stats added for the alpha engine (legacy stats had no pbv).
+    const pbvs = clean.filter((r) => r.pbv != null && r.pbv > 0 && r.pbv <= 20).map((r) => r.pbv!)
     const stats = {
-      roeMean: mean(roes), roeStd: std(roes),
-      perMean: mean(pers), perStd: std(pers),
+      roeMean: mean(roes), roeStd: std(roes) || 1,
+      perMean: mean(pers), perStd: std(pers) || 1,
       momMean: mean(mons), momStd: std(mons),
+      pbvMean: mean(pbvs), pbvStd: std(pbvs) || 1,
     }
-    const scored = rows.map((r: ScreenerRow) => ({ r, ...scoreIdxRow(r, stats) }))
+    // Bulk session data (last 30 dates) + broker board for the alpha engine.
+    // Best-effort: on any failure, fall back to legacy scoreIdxRow.
+    let sessionsByCode = new Map<string, Array<{
+      date: string; close: number; volume: number; value: number
+      foreignBuy: number; foreignSell: number; high: number; low: number; open: number
+    }>>()
+    let brokersForAlpha: Array<{ firm: string; value: number; volume: number }> = []
+    try {
+      const distinctDates = await prisma.idxSahamSession.findMany({
+        distinct: ["tradeDate"], orderBy: { tradeDate: "desc" }, select: { tradeDate: true }, take: 30,
+      })
+      const dates = distinctDates.map((d) => d.tradeDate).sort()
+      if (dates.length > 0) {
+        const sessionRows = await prisma.idxSahamSession.findMany({
+          where: { tradeDate: { in: dates } },
+          select: { code: true, tradeDate: true, foreignBuy: true, foreignSell: true, close: true, volume: true, value: true, high: true, low: true, open: true },
+        })
+        for (const r of sessionRows) {
+          const arr = sessionsByCode.get(r.code) ?? []
+          arr.push({ date: r.tradeDate, close: r.close, volume: r.volume, value: r.value, foreignBuy: r.foreignBuy, foreignSell: r.foreignSell, high: r.high, low: r.low, open: r.open })
+          sessionsByCode.set(r.code, arr)
+        }
+        const latestSessionDate = dates[dates.length - 1]
+        brokersForAlpha = await prisma.idxBrokerBoard.findMany({
+          where: { tradeDate: latestSessionDate }, select: { firm: true, value: true, volume: true },
+        })
+      }
+    } catch {
+      sessionsByCode = new Map()
+      brokersForAlpha = []
+    }
+    const scored = rows.map((r: ScreenerRow) => {
+      const sess = sessionsByCode.get(r.symbol)
+      // Alpha path: rich 6-signal engine when session data exists.
+      if (sess && sess.length > 0) {
+        try {
+          const result = computeAlpha({
+            sessions: sess,
+            brokers: brokersForAlpha,
+            screener: {
+              per: r.per, pbv: r.pbv, roe: r.roe, der: r.der,
+              change1d: r.change1d, change4w: r.change4w, change13w: r.change13w,
+              change26w: r.change26w, change52w: r.change52w, marketCap: r.marketCap,
+              price: r.price, high52w: r.high52w, low52w: r.low52w,
+            },
+            universeStats: {
+              perMean: stats.perMean, perStd: stats.perStd,
+              roeMean: stats.roeMean, roeStd: stats.roeStd,
+              pbvMean: stats.pbvMean, pbvStd: stats.pbvStd,
+            },
+          })
+          const alphaReasons = result.topReasons.map((t) => ({ text: t, weight: 0.3 }))
+          const base = scoreIdxRow(r, { roeMean: stats.roeMean, roeStd: stats.roeStd, perMean: stats.perMean, perStd: stats.perStd, momMean: stats.momMean, momStd: stats.momStd })
+          // Blend: alpha dominates (70%), legacy fundamentals anchor (30%).
+          const score = Math.round(result.totalScore * 0.7 + base.score * 0.3)
+          const reasons = [...alphaReasons, ...base.reasons].slice(0, 6)
+          return { r, score: Math.max(0, Math.min(100, score)), reasons, viaAlpha: true }
+        } catch {
+          // Alpha threw (bad row shape) — fall through to legacy.
+        }
+      }
+      // Legacy path: simple z-score fundamentals.
+      return { r, ...scoreIdxRow(r, { roeMean: stats.roeMean, roeStd: stats.roeStd, perMean: stats.perMean, perStd: stats.perStd, momMean: stats.momMean, momStd: stats.momStd }), viaAlpha: false }
+    })
     const byScore = [...scored].sort((a, b) => b.score - a.score)
     const topBuy = byScore.slice(0, 15)
     const bottomSell = byScore.slice(-8)
     const seen = new Set(topBuy.map((s) => s.r.symbol))
     const sel = topBuy.concat(bottomSell.filter((s) => !seen.has(s.r.symbol)))
       .sort((a, b) => b.score - a.score)
-    for (const { r, score, reasons } of sel) {
+    for (const { r, score, reasons, viaAlpha } of sel) {
       const action = score >= 65 ? 'BUY' : score < 35 ? 'SELL' : 'WAIT'
       idxItems.push({
         symbol: r.symbol,
@@ -116,12 +184,11 @@ export async function buildConvictionResult(): Promise<ConvictionResult> {
         action,
         direction: score >= 65 ? 'bull' : score < 35 ? 'bear' : 'neutral',
         reasons,
-        sources: ['screener'],
+        sources: viaAlpha ? ['screener', 'alpha-engine'] : ['screener'],
       })
     }
-  }
-  if (leaders) {
-    for (const l of leaders.topBuy.slice(0, 5)) {
+    if (leaders) {
+      for (const l of leaders.topBuy.slice(0, 5)) {
       const existing = idxItems.find((i) => i.symbol === l.code)
       if (existing) {
         existing.reasons.push({ text: `Foreign net buy leader`, weight: 0.35 })
@@ -143,6 +210,7 @@ export async function buildConvictionResult(): Promise<ConvictionResult> {
         })
       }
     }
+  }
   }
 
   // ── CRYPTO ──
