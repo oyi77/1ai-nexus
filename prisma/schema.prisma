@@ -1073,3 +1073,31 @@ model IdxFundamentals {
   @@unique([code, snapshotDate])
   @@index([snapshotDate(sort: Desc)])
 }
+// ── Alpha track record: prove the alpha engine works ──
+model AlphaTrackRecord {
+  id          String   @id @default(cuid())
+  code        String
+  sector      String   @default("")
+  signalDate  String   // YYYY-MM-DD when signal was emitted
+  alphaScore  Int
+  verdict     String   // strong-buy | buy | hold | avoid
+  priceAtSignal Float
+  // Horizon checks
+  price7d     Float?
+  price14d    Float?
+  price30d    Float?
+  pnl7dPct    Float?
+  pnl14dPct   Float?
+  pnl30dPct   Float?
+  // Outcome (filled by evaluator)
+  outcome7d   String?  // win | loss | na
+  outcome14d  String?
+  outcome30d  String?
+  evaluatedAt DateTime?
+  // Snapshot of the signals that produced this score
+  signals     Json?
+
+  @@unique([code, signalDate])
+  @@index([signalDate(sort: Desc)])
+  @@index([verdict, alphaScore(sort: Desc)])
+}

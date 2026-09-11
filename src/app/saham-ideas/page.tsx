@@ -50,6 +50,15 @@ export default function SahamIdeasPage() {
   const [sortField, setSortField] = useState<keyof Idea>("alphaScore")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
 
+  const [trackStats, setTrackStats] = useState<any>(null)
+
+  useEffect(() => {
+    fetch("/api/v1/saham/track-record")
+      .then((r) => r.json())
+      .then((d) => setTrackStats(d.data))
+      .catch(() => {})
+  }, [])
+
   useEffect(() => {
     fetch("/api/v1/saham/watchlist-ideas?limit=200")
       .then((r) => r.json())
@@ -114,6 +123,20 @@ export default function SahamIdeasPage() {
             </div>
           </div>
         </div>
+        {/* Track record proof */}
+        {trackStats && trackStats.total > 0 && (
+          <div className="px-6 py-3 border-b border-border-dim bg-bg-panel/30 flex items-center gap-6 text-xs flex-wrap">
+            <span className="text-text-tertiary">Track Record:</span>
+            <span className="text-text-secondary">{trackStats.evaluated} signals evaluated</span>
+            <span className="text-text-secondary">Win rate: <span className={trackStats.overallWinRate >= 50 ? "text-accent-green" : "text-accent-red"}>{trackStats.overallWinRate.toFixed(0)}%</span></span>
+            <span className="text-text-secondary">Avg 7d: <span className={trackStats.avgReturn7d >= 0 ? "text-accent-green" : "text-accent-red"}>{trackStats.avgReturn7d.toFixed(2)}%</span></span>
+            <span className="text-text-secondary">Avg 30d: <span className={trackStats.avgReturn30d >= 0 ? "text-accent-green" : "text-accent-red"}>{trackStats.avgReturn30d.toFixed(2)}%</span></span>
+            {trackStats.byVerdict.map((v: any) => (
+              <span key={v.verdict} className="text-text-tertiary">{v.verdict}: {v.winRate.toFixed(0)}% ({v.count})</span>
+            ))}
+          </div>
+        )}
+
 
         <div className="flex-1 overflow-auto">
           {loading ? (

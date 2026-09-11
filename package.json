@@ -25,6 +25,8 @@
     "harvest:idx-saham": "tsx src/scripts/idx-saham-harvest.ts",
     "harvest:idx-screener": "tsx src/scripts/idx-screener-harvest.ts",
     "seed:idx-saham": "tsx src/scripts/idx-saham-seed.ts",
+    "cron:alpha-track": "tsx src/scripts/alpha-track-record-cron.ts",
+
     "verify-re": "npx tsx src/scripts/verify-re-modules.ts"
   },
   "dependencies": {
