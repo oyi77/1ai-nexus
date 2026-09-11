@@ -213,9 +213,9 @@ export async function auditGateToken(chainId: string, address: string): Promise<
     ...(d.all_analysis?.low_risk_list ?? []),
   ]
 
-  // Extract values from risk items (e.g. "5%" → 0.05, "0.05" → 0.05)
-  const riskValue = (key: string): number => {
-    const item = all.find((r) => r.risk_key === key)
+  // Extract values from risk items — match by partial key (e.g. "buy_tax", "is_high_tax", "tax_buy")
+  const riskValue = (pattern: RegExp): number => {
+    const item = all.find((r) => r.risk_key && pattern.test(r.risk_key))
     if (!item?.risk_value) return 0
     const raw = String(item.risk_value)
     const m = raw.match(/[\d.]+/)
@@ -223,6 +223,7 @@ export async function auditGateToken(chainId: string, address: string): Promise<
     const val = Number(m[0])
     return raw.includes("%") ? val / 100 : val
   }
+
 
 
   return {
@@ -234,14 +235,15 @@ export async function auditGateToken(chainId: string, address: string): Promise<
     name: '',
     riskLevel,
     riskLabel: label,
-    buyTax: riskValue('buy_tax'),
-    sellTax: riskValue('sell_tax'),
-    top10HolderPercent: riskValue('top10_holder_concentration'),
+    buyTax: riskValue(/buy_tax|tax_buy|buy_tax_rate|is_high_tax/i),
+    sellTax: riskValue(/sell_tax|tax_sell|sell_tax_rate|is_high_tax/i),
+    top10HolderPercent: riskValue(/top10_holder|holder_concentration|top_holder/i),
     lpLockedPercent: -1,
     canFreeze: riskFlag(all, 'freeze_authority') === '1' || riskFlag(all, 'is_freezeable') === '1',
     canMint: riskFlag(all, 'mint_authority') === '1' || riskFlag(all, 'is_mintable') === '1',
     riskCounts: { high, middle: mid, low },
     auditedAt: Date.now(),
   }
+
 
 }
