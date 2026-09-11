@@ -86,7 +86,7 @@ export async function evaluateAlphaTrackRecord(): Promise<{
     // Find signals at this horizon that haven't been evaluated yet
     const whereClause: Record<string, unknown> = {
       signalDate: { lte: cutoffStr },
-      priceAtSignal: { not: null },
+      priceAtSignal: { gt: 0 },
     }
     whereClause[field] = null
     const pending = await prisma.alphaTrackRecord.findMany({
@@ -94,6 +94,7 @@ export async function evaluateAlphaTrackRecord(): Promise<{
       take: 200,
       orderBy: { signalDate: "asc" },
     })
+
 
 
     let wins = 0

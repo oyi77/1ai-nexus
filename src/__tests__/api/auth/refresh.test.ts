@@ -36,6 +36,7 @@ describe('POST /api/v1/auth/refresh', () => {
    passwordResetUsedAt: null,
    telegramUsername: null,
    telegramChatId: null,
+   alphaAlertsEnabled: true,
    referralCode: null,
    referralsCount: 0,
    referralCredits: 0,

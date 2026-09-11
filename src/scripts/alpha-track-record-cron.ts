@@ -12,7 +12,7 @@ import "dotenv/config"
 import { prisma } from "@/lib/db"
 import { recordAlphaSignals, evaluateAlphaTrackRecord, getAlphaTrackStats } from "@/lib/conviction/alpha-track-record"
 import { computeAlpha } from "@/lib/conviction/alpha-engine"
-
+import { runAlphaStrongBuyAlerts } from "@/lib/telegram/alpha-alerts"
 async function main() {
   const today = new Date().toISOString().slice(0, 10)
 
@@ -87,6 +87,9 @@ async function main() {
   const stats = await getAlphaTrackStats()
   console.log(`[alpha-cron] track record: ${stats.evaluated} total, ${stats.overallWinRate.toFixed(0)}% win rate, avg 7d: ${stats.avgReturn7d.toFixed(2)}%`)
 
+  // 4. Push strong-buy alerts to opted-in Telegram users
+  const alerts = await runAlphaStrongBuyAlerts()
+  console.log(`[alpha-cron] alpha alerts: ${alerts.candidates} candidates, ${alerts.alertsSent} sent to ${alerts.usersChecked} users (${alerts.alertsSkipped} skipped)`)
   await prisma.$disconnect()
 }
 
