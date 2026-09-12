@@ -2,11 +2,10 @@
 // GET /api/v1/sfc — Smart-Flow Convergence
 //   ?token=SYM  → per-token SFC convergence (Σ PWSᵢ×independenceᵢ)
 //   (no token)  → SmartMoneyWallet score leaderboard
-// Premium analytics endpoint; refreshes scores then returns data.
 // ─────────────────────────────────────────────────────────────
 
 import { NextRequest } from 'next/server'
-import { apiSuccess, apiError } from '@/lib/api/response'
+import { apiSuccess, apiError, cacheHeaders } from '@/lib/api/response'
 import {
   refreshSmartMoneyScores,
   fetchSmartMoneyScores,
@@ -31,7 +30,7 @@ export async function GET(request: NextRequest) {
         conv = await computeSfcConvergence(token)
         cacheSet(cacheKey, conv, 300).catch(() => {})
       }
-      return apiSuccess({ token, convergence: conv })
+      return cacheHeaders(apiSuccess({ token, convergence: conv }), 300)
     }
 
     const category = sp.get('category') ?? undefined
@@ -45,7 +44,7 @@ export async function GET(request: NextRequest) {
       rows = await fetchSmartMoneyScores({ limit, category, minScore })
       cacheSet(cacheKey, rows, 300).catch(() => {})
     }
-    return apiSuccess({ count: rows.length, wallets: rows })
+    return cacheHeaders(apiSuccess({ count: rows.length, wallets: rows }), 300)
   } catch {
     return apiError('Failed to compute SFC', 502)
   }

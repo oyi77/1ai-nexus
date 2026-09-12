@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { NextRequest } from 'next/server'
-import { apiSuccess, apiError } from '@/lib/api/response'
+import { apiSuccess, apiError, cacheHeaders } from '@/lib/api/response'
 import { rankAndPersist, fetchOpportunities, type Opportunity } from '@/lib/modules/derived/opportunity-ranker'
 import { cacheGet, cacheSet } from '@/lib/cache'
 
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       rows = await fetchOpportunities(limit)
       cacheSet(cacheKey, rows, 120).catch(() => {})
     }
-    return apiSuccess({ count: rows.length, opportunities: rows })
+    return cacheHeaders(apiSuccess({ count: rows.length, opportunities: rows }), 120)
   } catch {
     return apiError('Failed to rank opportunities', 502)
   }

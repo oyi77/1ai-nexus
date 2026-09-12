@@ -116,8 +116,12 @@ export async function GET(_request: NextRequest) {
     ]);
 
     const fngData = fngRes.data;
+    // Must throw, not return a response: this runs inside the getCached
+    // callback, so a returned value is cached and then re-wrapped by the outer
+    // apiSuccess — which serialises the NextResponse to `{}` and hands clients
+    // a truthy payload with no `composite`, crashing every consumer.
     if (!fngData || fngData.length === 0) {
-      return apiError("Empty response from Alternative.me", 502);
+      throw new Error("Empty response from Alternative.me");
     }
 
     const currentFnG = Number(fngData[0].value);

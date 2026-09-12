@@ -37,7 +37,9 @@ export default function OrderBookPage() {
   const [data, setData] = useState<OrderBookData | null>(null)
   const [symbol, setSymbol] = useState('BTC')
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  // Null until the first payload lands: a Date built during SSR formats
+  // differently on the client (locale + clock), which is a hydration mismatch.
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
   const [SYMBOLS, setTabSymbols] = useState<string[]>(FALLBACK_SYMBOLS)
   // Live top-volume perps replace the static fallback once loaded.
   useEffect(() => {
@@ -145,7 +147,8 @@ fetchData()
               <span className="text-teal-vivid">📊</span> Order Book Depth
             </h1>
             <p className="text-[12px] text-text-muted mt-1">
-              Real-time bid/ask depth from Binance • Updated {lastUpdate.toLocaleTimeString()}
+              Real-time bid/ask depth from Binance
+              {lastUpdate ? ` • Updated ${lastUpdate.toLocaleTimeString()}` : ''}
             </p>
           </div>
           <div className="flex items-center gap-3">

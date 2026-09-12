@@ -16,7 +16,11 @@ const SYMBOL_MAP: Record<string, string> = {
 interface DepthLevel { price: number; quantity: number; total: number }
 
 async function fetchOrderBook(symbol: string) {
-  const binanceSymbol = SYMBOL_MAP[symbol.toUpperCase()] ?? `${symbol.toUpperCase()}USDT`
+  // Accept a bare asset ('BTC') or an already-qualified pair ('BTCUSDT').
+  // Blindly appending USDT turns 'BTCUSDT' into 'BTCUSDTUSDT', which Binance
+  // rejects with 400 and the route reports as a misleading 502.
+  const upper = symbol.toUpperCase()
+  const binanceSymbol = SYMBOL_MAP[upper] ?? (upper.endsWith('USDT') ? upper : `${upper}USDT`)
 
   // Fetch depth + 24h ticker in parallel
   const [depthRes, tickerRes] = await Promise.all([

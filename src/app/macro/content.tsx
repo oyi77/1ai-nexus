@@ -124,7 +124,7 @@ fetchData()
             </Panel>
 
             {/* Market Regime */}
-            {fg && (
+            {fg?.composite && (
               <Panel title="Market Regime Analysis" subtitle="AI-powered regime detection" liveStatus={status}>
                 <div className="p-4 space-y-3">
                   <div className="flex items-center gap-4">

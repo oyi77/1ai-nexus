@@ -22,7 +22,7 @@ export interface InsiderSignal {
 
 interface InsiderConfig {
   maxTxCount: number // Fresh wallet = fewer than this many txs
-  minAmountUsd: number // Large tx = above this amount
+  minAmountUsd: number // Large tx = above this amount, in USD
   walletAgeDays: number // Fresh = created within this many days
 }
 
@@ -98,6 +98,10 @@ function calculateRiskScore(tx: {
 
 /**
  * Scan database for fresh wallets with large recent transactions.
+ *
+ * Uses two queries total: one to fetch the large transactions, one to batch
+ * the per-wallet transaction counts. Counting per transaction in a loop costs
+ * one round-trip per row and blows the upstream request budget.
  */
 export async function scanForInsiderSignals(): Promise<InsiderSignal[]> {
   const now = Date.now()
@@ -108,24 +112,33 @@ export async function scanForInsiderSignals(): Promise<InsiderSignal[]> {
   const signals: InsiderSignal[] = []
 
   try {
-    // Find transactions with large values
+    // Transactions above the USD floor — `value` is a raw token amount, so only
+    // `amountUsd` is comparable against a USD threshold.
     const largeTxs = await prisma.transaction.findMany({
-      where: {
-        OR: [
-          { amountUsd: { gte: DEFAULT_CONFIG.minAmountUsd } },
-          { value: { gte: DEFAULT_CONFIG.minAmountUsd } },
-        ],
-      },
+      where: { amountUsd: { gte: DEFAULT_CONFIG.minAmountUsd } },
       include: { wallet: true },
       orderBy: { timestamp: 'desc' },
       take: 200,
     })
 
+    if (largeTxs.length === 0) {
+      cachedSignals = []
+      lastScan = now
+      return cachedSignals
+    }
+
+    // One grouped count for every candidate wallet instead of one count per row.
+    const walletIds = [...new Set(largeTxs.map(tx => tx.walletId).filter((id): id is string => !!id))]
+    const counts = await prisma.transaction.groupBy({
+      by: ['walletId'],
+      where: { walletId: { in: walletIds } },
+      _count: { _all: true },
+    })
+    const txCountByWallet = new Map(counts.map(c => [c.walletId, c._count._all]))
+
     for (const tx of largeTxs) {
       // Count total transactions for this wallet
-      const txCount = await prisma.transaction.count({
-        where: { walletId: tx.walletId },
-      })
+      const txCount = tx.walletId ? (txCountByWallet.get(tx.walletId) ?? 0) : 0
 
       // Skip wallets with many transactions (not fresh)
       if (txCount > DEFAULT_CONFIG.maxTxCount) continue
@@ -141,10 +154,10 @@ export async function scanForInsiderSignals(): Promise<InsiderSignal[]> {
 
       // Calculate risk
       const { score, reasons } = calculateRiskScore({
-        amountUsd: tx.value,
+        amountUsd: tx.amountUsd,
         txCount,
         walletAgeHours,
-        tokenSymbol: tx.wallet?.labels?.[0] || 'UNKNOWN',
+        tokenSymbol: tx.tokenSymbol || 'UNKNOWN',
       })
 
       // Only include signals above threshold
@@ -153,18 +166,18 @@ export async function scanForInsiderSignals(): Promise<InsiderSignal[]> {
       const ageStr = walletAgeDays < 1
         ? `${Math.round(walletAgeHours)}h`
         : walletAgeDays < 7
-        ? `${Math.round(walletAgeDays)}d`
-        : `${Math.round(walletAgeDays / 7)}w`
+          ? `${Math.round(walletAgeDays)}d`
+          : `${Math.round(walletAgeDays / 7)}w`
 
       signals.push({
         id: `insider-${tx.id}`,
         walletAddress: tx.wallet?.address || tx.txHash,
-        chain: tx.wallet?.chain || 'unknown',
+        chain: tx.wallet?.chain || tx.chain,
         totalTxs: txCount,
         walletAge: ageStr,
         firstSeen: new Date(walletCreatedAt).toISOString(),
-        largeTxAmount: tx.value,
-        largeTxToken: tx.wallet?.labels?.[0] || 'UNKNOWN',
+        largeTxAmount: tx.amountUsd,
+        largeTxToken: tx.tokenSymbol || 'UNKNOWN',
         riskScore: score,
         suspicionReasons: reasons,
         detectedAt: tx.timestamp,

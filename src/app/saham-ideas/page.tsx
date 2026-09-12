@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { NexusLayout } from "@/components/layout/NexusLayout"
 import { LiveDot } from "@/components/primitives/LiveDot"
 import Link from "next/link"
@@ -19,11 +19,12 @@ interface Response {
   sessionDates: number; count: number; ideas: Idea[]
 }
 
-const fmtTril = (n: number | null) => {
-  if (n == null) return "—"
-  if (Math.abs(n) >= 1e12) return `${(n / 1e12).toFixed(2)}T`
-  if (Math.abs(n) >= 1e9) return `${(n / 1e9).toFixed(1)}B`
-  return `${(n / 1e6).toFixed(0)}M`
+interface TrackStats {
+  total: number; evaluated: number; overallWinRate: number
+  avgReturn7d: number; avgReturn14d: number; avgReturn30d: number
+  byVerdict: Array<{ verdict: string; winRate: number; count: number }>
+  bySector: Array<{ sector: string; winRate: number; count: number }>
+  recent: unknown[]
 }
 
 const SCORE_BADGE: Record<number, string> = {
@@ -40,6 +41,32 @@ const VERDICT_CLS: Record<string, string> = {
   "avoid": "text-accent-red",
 }
 
+function SortHeader({
+  field,
+  label,
+  sortField,
+  sortDir,
+  onSort,
+}: {
+  field: keyof Idea
+  label: string
+  sortField: keyof Idea
+  sortDir: "asc" | "desc"
+  onSort: (field: keyof Idea) => void
+}) {
+  return (
+    <th
+      className="px-3 py-2 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider cursor-pointer hover:text-text-primary"
+      onClick={() => onSort(field)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {sortField === field && <span className="text-accent-blue">{sortDir === "desc" ? "\u2193" : "\u2191"}</span>}
+      </span>
+    </th>
+  )
+}
+
 export default function SahamIdeasPage() {
   const [data, setData] = useState<Response | null>(null)
   const [loading, setLoading] = useState(true)
@@ -50,7 +77,7 @@ export default function SahamIdeasPage() {
   const [sortField, setSortField] = useState<keyof Idea>("alphaScore")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
 
-  const [trackStats, setTrackStats] = useState<any>(null)
+  const [trackStats, setTrackStats] = useState<TrackStats | null>(null)
 
   useEffect(() => {
     fetch("/api/v1/saham/track-record")
@@ -65,6 +92,11 @@ export default function SahamIdeasPage() {
       .then((d) => { setData(d.data); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
+
+  const handleSort = useCallback((field: keyof Idea) => {
+    if (sortField === field) setSortDir(d => (d === "desc" ? "asc" : "desc"))
+    else { setSortField(field); setSortDir("desc") }
+  }, [sortField])
 
   const sectors = useMemo(() => {
     if (!data) return []
@@ -86,12 +118,6 @@ export default function SahamIdeasPage() {
     })
     return ideas
   }, [data, minScore, sector, search, sortField, sortDir])
-
-  const SortHeader = ({ field, label }: { field: keyof Idea; label: string }) => (
-    <th className="px-3 py-2 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider cursor-pointer hover:text-text-primary" onClick={() => sortField === field ? setSortDir(d => d === "desc" ? "asc" : "desc") : (setSortField(field), setSortDir("desc"))}>
-      <span className="inline-flex items-center gap-1">{label}{sortField === field && <span className="text-accent-blue">{sortDir === "desc" ? "↓" : "↑"}</span>}</span>
-    </th>
-  )
 
   return (
     <NexusLayout>
@@ -131,7 +157,7 @@ export default function SahamIdeasPage() {
             <span className="text-text-secondary">Win rate: <span className={trackStats.overallWinRate >= 50 ? "text-accent-green" : "text-accent-red"}>{trackStats.overallWinRate.toFixed(0)}%</span></span>
             <span className="text-text-secondary">Avg 7d: <span className={trackStats.avgReturn7d >= 0 ? "text-accent-green" : "text-accent-red"}>{trackStats.avgReturn7d.toFixed(2)}%</span></span>
             <span className="text-text-secondary">Avg 30d: <span className={trackStats.avgReturn30d >= 0 ? "text-accent-green" : "text-accent-red"}>{trackStats.avgReturn30d.toFixed(2)}%</span></span>
-            {trackStats.byVerdict.map((v: any) => (
+            {trackStats.byVerdict.map((v) => (
               <span key={v.verdict} className="text-text-tertiary">{v.verdict}: {v.winRate.toFixed(0)}% ({v.count})</span>
             ))}
           </div>
@@ -147,17 +173,17 @@ export default function SahamIdeasPage() {
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-bg-panel border-b border-border-dim z-10">
                 <tr>
-                  <SortHeader field="code" label="Code" />
-                  <SortHeader field="name" label="Name" />
-                  <SortHeader field="sector" label="Sector" />
-                  <SortHeader field="alphaScore" label="Alpha" />
-                  <SortHeader field="per" label="PER" />
-                  <SortHeader field="pbv" label="PBV" />
-                  <SortHeader field="roe" label="ROE%" />
-                  <SortHeader field="dividendYield" label="Yield%" />
-                  <SortHeader field="valueScore" label="Value" />
-                  <SortHeader field="accumulationScore" label="Accum" />
-                  <SortHeader field="combinedScore" label="Score" />
+                  <SortHeader field="code" label="Code" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="name" label="Name" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="sector" label="Sector" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="alphaScore" label="Alpha" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="per" label="PER" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="pbv" label="PBV" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="roe" label="ROE%" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="dividendYield" label="Yield%" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="valueScore" label="Value" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="accumulationScore" label="Accum" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="combinedScore" label="Score" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 </tr>
               </thead>
               <tbody>

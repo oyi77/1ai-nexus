@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { prisma } from "@/lib/db"
+import type { Prisma } from "@prisma/client"
 
 const HORIZONS = [7, 14, 30] as const
 const WIN_THRESHOLD = 0.5 // +0.5% counts as a win
@@ -90,7 +91,7 @@ export async function evaluateAlphaTrackRecord(): Promise<{
     }
     whereClause[field] = null
     const pending = await prisma.alphaTrackRecord.findMany({
-      where: whereClause as any,
+      where: whereClause as Prisma.AlphaTrackRecordWhereInput,
       take: 200,
       orderBy: { signalDate: "asc" },
     })
@@ -115,7 +116,7 @@ export async function evaluateAlphaTrackRecord(): Promise<{
       updateData[outcomeField] = isWin ? "win" : "loss"
       await prisma.alphaTrackRecord.update({
         where: { id: s.id },
-        data: updateData as any,
+        data: updateData as Prisma.AlphaTrackRecordUpdateInput,
       })
 
 

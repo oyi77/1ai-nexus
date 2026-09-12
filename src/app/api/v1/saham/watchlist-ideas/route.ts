@@ -6,9 +6,22 @@
 import { type NextRequest } from "next/server"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
-import { computeAlpha } from "@/lib/conviction/alpha-engine"
+import { computeAlpha, type AlphaInput } from "@/lib/conviction/alpha-engine"
+import type { IdxScreenerSnapshot, Prisma } from "@prisma/client"
 
 export const dynamic = "force-dynamic"
+
+type SessionSlice = AlphaInput["sessions"][number]
+type FundamentalsSlice = Prisma.IdxFundamentalsGetPayload<{ select: { code: true; dividendYield: true } }>
+
+interface StreakInfo {
+  days: number
+  dir: "accumulation" | "distribution" | null
+  latestNetVol: number
+  latestClose: number
+  estNetValue: number
+  sessions: SessionSlice[]
+}
 
 interface Idea {
   code: string; name: string; sector: string; close: number; changePct: number
@@ -42,14 +55,14 @@ export async function GET(request: NextRequest) {
   try {
     // Load screener + fundamentals
     const latestScreener = await prisma.idxScreenerSnapshot.findFirst({ orderBy: { snapshotDate: "desc" }, select: { snapshotDate: true } })
-    const screenerByCode = new Map<string, any>()
+    const screenerByCode = new Map<string, IdxScreenerSnapshot>()
     if (latestScreener) {
       const rows = await prisma.idxScreenerSnapshot.findMany({ where: { snapshotDate: latestScreener.snapshotDate } })
       for (const r of rows) screenerByCode.set(r.code, r)
     }
 
     const latestFund = await prisma.idxFundamentals.findFirst({ orderBy: { snapshotDate: "desc" }, select: { snapshotDate: true } })
-    const fundByCode = new Map<string, any>()
+    const fundByCode = new Map<string, FundamentalsSlice>()
     if (latestFund) {
       const rows = await prisma.idxFundamentals.findMany({ where: { snapshotDate: latestFund.snapshotDate }, select: { code: true, dividendYield: true } })
       for (const r of rows) fundByCode.set(r.code, r)
@@ -69,14 +82,14 @@ export async function GET(request: NextRequest) {
     // BULK: last 30 sessions
     const distinctDates = await prisma.idxSahamSession.findMany({ distinct: ["tradeDate"], orderBy: { tradeDate: "desc" }, select: { tradeDate: true }, take: 30 })
     const dates = distinctDates.map((d) => d.tradeDate).sort()
-    const streakMap = new Map<string, any>()
+    const streakMap = new Map<string, StreakInfo>()
 
     if (dates.length > 0) {
       const rows = await prisma.idxSahamSession.findMany({
         where: { tradeDate: { in: dates } },
         select: { code: true, tradeDate: true, foreignBuy: true, foreignSell: true, close: true, volume: true, value: true, high: true, low: true, open: true },
       })
-      const byCode = new Map<string, any[]>()
+      const byCode = new Map<string, SessionSlice[]>()
       for (const r of rows) {
         const arr = byCode.get(r.code) ?? []
         arr.push({ date: r.tradeDate, close: r.close, volume: r.volume, value: r.value, foreignBuy: r.foreignBuy, foreignSell: r.foreignSell, high: r.high, low: r.low, open: r.open })
@@ -108,7 +121,7 @@ export async function GET(request: NextRequest) {
       const per = num(fund.per), pbv = num(fund.pbv), roe = num(fund.roe), der = num(fund.der), dy = num(dyInfo?.dividendYield)
       const sector = fund.sector || "Unknown"
 
-      const perMedian = mean([...screenerByCode.values()].filter((s: any) => s.sector === sector).map((s: any) => num(s.per)).filter((v: number) => !Number.isNaN(v) && v > 0)) || 1
+      const perMedian = mean([...screenerByCode.values()].filter((s) => s.sector === sector).map((s) => num(s.per)).filter((v: number) => !Number.isNaN(v) && v > 0)) || 1
       let valueScore = 0
       if (!Number.isNaN(per) && per > 0 && per < perMedian) valueScore++
       if (!Number.isNaN(pbv) && pbv > 0 && pbv < 1) valueScore++
@@ -144,7 +157,9 @@ export async function GET(request: NextRequest) {
     }
 
     ideas.sort((a, b) => b.alphaScore - a.alphaScore || b.combinedScore - a.combinedScore)
-    return apiSuccess({ tradeDate: latestScreener?.snapshotDate ?? "", screenerDate: latestScreener?.snapshotDate ?? "", fundamentalsDate: latestFund?.snapshotDate ?? "", sessionDates: dates.length, count: ideas.length, ideas: ideas.slice(0, limit) })
+    const resp = apiSuccess({ tradeDate: latestScreener?.snapshotDate ?? "", screenerDate: latestScreener?.snapshotDate ?? "", fundamentalsDate: latestFund?.snapshotDate ?? "", sessionDates: dates.length, count: ideas.length, ideas: ideas.slice(0, limit) })
+    resp.headers.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=600')
+    return resp
   } catch (error) {
     return apiError((error as Error).message, 502)
   }

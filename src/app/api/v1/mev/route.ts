@@ -22,14 +22,33 @@ interface DexScreenerPair {
 }
 
 async function fetchMevIndicators() {
-  // Fetch trending pairs from DexScreener — real data, zero hardcoded addresses
-  const [trendingRes, newPairsRes] = await Promise.allSettled([
-    fetch('https://api.dexscreener.com/latest/dex/tokens/boosted', { signal: AbortSignal.timeout(10_000) }),
-    fetch('https://api.dexscreener.com/latest/dex/pairs/solana?sort=volume24h&order=desc&limit=20', { signal: AbortSignal.timeout(10_000) }),
-  ])
+  // DexScreener removed the endpoints this used: /tokens/boosted now returns a
+  // null `pairs`, and /pairs/solana 404s — so the scan could never see a pair.
+  // Search still returns full rows (volume, liquidity, txns, price change), so
+  // sample several high-activity terms and dedupe by pair address.
+  const queries = ['SOL', 'WETH', 'USDC', 'PEPE', 'WIF', 'ARB', 'OP', 'LINK']
 
-  const trending = trendingRes.status === 'fulfilled' ? (await trendingRes.value.json().catch(() => ({ pairs: [] }))) as { pairs?: DexScreenerPair[] } : { pairs: [] }
-  const newPairs = newPairsRes.status === 'fulfilled' ? (await newPairsRes.value.json().catch(() => ({ pairs: [] }))) as { pairs?: DexScreenerPair[] } : { pairs: [] }
+  const settled = await Promise.allSettled(
+    queries.map(q =>
+      fetch(`https://api.dexscreener.com/latest/dex/search/?q=${encodeURIComponent(q)}`, {
+        signal: AbortSignal.timeout(10_000),
+      })
+        .then(res => (res.ok ? res.json() : { pairs: [] }))
+        .then((d: { pairs?: DexScreenerPair[] }) => d.pairs ?? [])
+        .catch(() => [] as DexScreenerPair[]),
+    ),
+  )
+
+  const seen = new Set<string>()
+  const allPairs: DexScreenerPair[] = []
+  for (const result of settled) {
+    if (result.status !== 'fulfilled') continue
+    for (const pair of result.value) {
+      if (!pair?.pairAddress || seen.has(pair.pairAddress)) continue
+      seen.add(pair.pairAddress)
+      allPairs.push(pair)
+    }
+  }
 
   // Detect MEV indicators from real pair data
   const indicators: Array<{
@@ -43,7 +62,6 @@ async function fetchMevIndicators() {
   }> = []
 
   // Check for high sell/buy ratio (potential sandwich activity)
-  const allPairs = [...(trending.pairs ?? []), ...(newPairs.pairs ?? [])]
   for (const pair of allPairs) {
     if (!pair.txns?.h24) continue
     const { buys, sells } = pair.txns.h24

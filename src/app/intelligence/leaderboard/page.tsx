@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
-import { Trophy, TrendingUp, TrendingDown, Minus, Target } from 'lucide-react'
+import { Trophy, Target } from 'lucide-react'
 
 interface Bucket {
   label: string
@@ -38,8 +38,8 @@ export default function ConvictionLeaderboardPage() {
   useEffect(() => {
     fetch('/api/v1/conviction/accuracy')
       .then(r => r.json())
-      .then(setData)
-      .catch(e => setError(e.message))
+      .then(r => setData(r.data ?? null))
+      .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
 

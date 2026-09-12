@@ -103,6 +103,8 @@ export async function GET(request: NextRequest) {
       results: finalResults,
       count: finalResults.length,
       filters: { sector, exchange, minMarketCap, maxPE, minDividend, sortBy, sortOrder, limit },
+    }, {
+      headers: { 'Cache-Control': 'public, max-age=120, stale-while-revalidate=240' },
     })
   } catch (err) {
     return apiJson(null, { error: (err as Error).message, status: 502 })

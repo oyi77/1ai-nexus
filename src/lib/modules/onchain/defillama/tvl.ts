@@ -14,8 +14,20 @@ const YIELDS_BASE = 'https://yields.llama.fi'
 const COINS_BASE = 'https://coins.llama.fi'
 const STABLECOINS_BASE = 'https://stablecoins.llama.fi'
 
+/**
+ * DeFiLlama's larger endpoints (`/protocols`, `/pools`, `/overview/fees`) return
+ * multi-megabyte payloads and can stall. Without a deadline an unresponsive
+ * upstream pins the request until the edge proxy kills it, so callers get an
+ * opaque gateway timeout instead of the partial data `Promise.allSettled`
+ * aggregation is designed to return.
+ */
+const LLAMA_TIMEOUT_MS = 12_000
+
 async function llamaFetch<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: { Accept: 'application/json' } })
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(LLAMA_TIMEOUT_MS),
+  })
   if (!res.ok) throw new Error(`DeFiLlama ${res.status}: ${url}`)
   return res.json() as Promise<T>
 }

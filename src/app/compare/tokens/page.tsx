@@ -59,6 +59,7 @@ export default function TokenComparePage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTokens()
     const interval = setInterval(fetchTokens, 30_000)
     return () => clearInterval(interval)

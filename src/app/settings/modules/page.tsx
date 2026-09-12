@@ -43,7 +43,7 @@ export default function ModulesPage() {
   useEffect(() => {
     fetch('/api/v1/modules')
       .then(r => r.json())
-      .then(d => { setModules(d.data?.modules ?? []); setLoading(false) })
+      .then(d => { setModules(d.modules ?? []); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
