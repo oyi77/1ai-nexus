@@ -29,98 +29,118 @@ const FEEDS: Array<{ id: string; url: string; category: FeedCategory }> = [
   { id: 'cointelegraph',  url: 'https://cointelegraph.com/rss',                                   category: 'crypto' },
   { id: 'decrypt',        url: 'https://decrypt.co/feed',                                         category: 'crypto' },
   { id: 'theblock',       url: 'https://www.theblock.co/rss.xml',                                 category: 'crypto' },
-  { id: 'bitcoinmag',     url: 'https://bitcoinmagazine.com/.rss/full/',                           category: 'crypto' },
-  { id: 'cryptoslate',    url: 'https://cryptoslate.com/feed/',                                   category: 'crypto' },
+  { id: 'bitcoinmag',     url: 'https://bitcoinmagazine.com/.rss/full/',                          category: 'crypto' },
   { id: 'blockworks',     url: 'https://blockworks.co/feed',                                      category: 'crypto' },
-  { id: 'dlnews',         url: 'https://www.dlnews.com/rss/',                                     category: 'crypto' },
   { id: 'unchained',      url: 'https://unchainedcrypto.com/feed/',                               category: 'crypto' },
-  { id: 'the-defiant',    url: 'https://thedefiant.io/feed',                                      category: 'crypto' },
+  { id: 'the-defiant',    url: 'https://thedefiant.io/api/feed',                                  category: 'crypto' },
   { id: 'bankless',       url: 'https://www.bankless.com/feed',                                   category: 'crypto' },
-  { id: 'rekt',           url: 'https://rekt.news/feed/',                                         category: 'crypto' },
+  { id: 'dlnews',         url: 'https://www.dlnews.com/arc/outboundfeeds/rss/',                   category: 'crypto' },
+  { id: 'rekt',           url: 'https://rekt.news/rss/feed.xml',                                  category: 'crypto' },
+  { id: 'bitcoinist',     url: 'https://bitcoinist.com/feed/',                                    category: 'crypto' },
 
   // ─── Macro / Economics ─────────────────────────────────────
-  { id: 'fed-rss',        url: 'https://www.federalreserve.gov/feeds/press_all.xml',                category: 'macro' },
+  { id: 'fed-rss',        url: 'https://www.federalreserve.gov/feeds/press_all.xml',              category: 'macro' },
   { id: 'ecb-press',      url: 'https://www.ecb.europa.eu/rss/press.html',                        category: 'macro' },
-  { id: 'imf-blog',       url: 'https://www.imf.org/en/News/rss',                                 category: 'macro' },
-  { id: 'bis',            url: 'https://www.bis.org/doclist/pressrelease.rss',                     category: 'macro' },
   { id: 'bls',            url: 'https://www.bls.gov/feed/bls_latest.rss',                         category: 'macro' },
-  { id: 'bea',            url: 'https://www.bea.gov/news/rss.xml',                                category: 'macro' },
-  { id: 'worldbank',      url: 'https://blogs.worldbank.org/rss.xml',                             category: 'macro' },
-  { id: 'stlouisfed',     url: 'https://www.stlouisfed.org/rss/news-releases',                    category: 'macro' },
+  { id: 'bea',            url: 'https://apps.bea.gov/rss/rss.xml',                                category: 'macro' },
+  { id: 'stlouisfed',     url: 'https://www.stlouisfed.org/on-the-economy/rss',                   category: 'macro' },
 
   // ─── Regulatory / Legal ────────────────────────────────────
-  { id: 'sec-rss',        url: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&type=&dateb=&owner=include&count=40&search_text=&action=getcompany&RSS', category: 'regulatory' },
-  { id: 'cftc',           url: 'https://www.cftc.gov/RSS/PressReleases.xml',                      category: 'regulatory' },
-  { id: 'finra',          url: 'https://www.finra.org/rss/notices',                                category: 'regulatory' },
-  { id: 'doj',            url: 'https://www.justice.gov/opa/press-releases.xml',                  category: 'regulatory' },
-  { id: 'treasury',       url: 'https://home.treasury.gov/rss/press-releases',                    category: 'regulatory' },
-  { id: 'uk-fca',         url: 'https://www.fca.org.uk/news/rss.xml',                              category: 'regulatory' },
-  { id: 'eu-esma',        url: 'https://www.esma.europa.eu/rss.xml',                               category: 'regulatory' },
+  { id: 'treasury',       url: 'https://home.treasury.gov/rss/press-releases',                     category: 'regulatory' },
+  { id: 'uk-fca',         url: 'https://www.fca.org.uk/news/rss.xml',                             category: 'regulatory' },
+  { id: 'eu-esma',        url: 'https://www.esma.europa.eu/rss.xml',                              category: 'regulatory' },
+  { id: 'sec-rss',        url: 'https://www.sec.gov/news/pressreleases.rss',                      category: 'regulatory' },
+  { id: 'cftc',           url: 'https://www.cftc.gov/RSS/RSSGP/rssgp.xml',                        category: 'regulatory' },
+  { id: 'doj',            url: 'https://www.justice.gov/news/rss',                                category: 'regulatory' },
+  { id: 'ecb-supervision', url: 'https://www.bankingsupervision.europa.eu/rss/press.html',        category: 'regulatory' },
 
   // ─── TradFi / Markets ──────────────────────────────────────
   { id: 'bloomberg',      url: 'https://feeds.bloomberg.com/markets/news.rss',                    category: 'tradfi' },
-  { id: 'reuters-biz',    url: 'https://www.reutersagency.com/feed/?best-topics=business-finance&post_type=best', category: 'tradfi' },
-  { id: 'ft',             url: 'https://www.ft.com/?format=rss',                                   category: 'tradfi' },
+  { id: 'ft',             url: 'https://www.ft.com/?format=rss',                                  category: 'tradfi' },
   { id: 'wsj-markets',    url: 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml',                   category: 'tradfi' },
   { id: 'cnbc',           url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html',           category: 'tradfi' },
-  { id: 'marketwatch',    url: 'https://feeds.marketwatch.com/marketwatch/topstories/',            category: 'tradfi' },
-  { id: 'investopedia',   url: 'https://www.investopedia.com/feedbuilder/feed/getfeed?feedName=rss_headline', category: 'tradfi' },
+  { id: 'marketwatch',    url: 'https://feeds.marketwatch.com/marketwatch/topstories/',           category: 'tradfi' },
+  { id: 'investing-com',  url: 'https://www.investing.com/rss/news.rss',                          category: 'tradfi' },
+  { id: 'yahoo-fin',      url: 'https://finance.yahoo.com/news/rssindex',                         category: 'tradfi' },
 
   // ─── Tech ──────────────────────────────────────────────────
-  { id: 'techcrunch',     url: 'https://techcrunch.com/feed/',                                     category: 'tech' },
-  { id: 'arstechnica',    url: 'https://feeds.arstechnica.com/arstechnica/index',                  category: 'tech' },
-  { id: 'verge',          url: 'https://www.theverge.com/rss/index.xml',                           category: 'tech' },
-  { id: 'wired',          url: 'https://www.wired.com/feed/rss',                                   category: 'tech' },
-  { id: 'hackernews',     url: 'https://hnrss.org/frontpage',                                      category: 'tech' },
-  { id: 'mit-tech',       url: 'https://www.technologyreview.com/feed/',                           category: 'tech' },
+  { id: 'techcrunch',     url: 'https://techcrunch.com/feed/',                                    category: 'tech' },
+  { id: 'arstechnica',    url: 'https://feeds.arstechnica.com/arstechnica/index',                 category: 'tech' },
+  { id: 'verge',          url: 'https://www.theverge.com/rss/index.xml',                          category: 'tech' },
+  { id: 'wired',          url: 'https://www.wired.com/feed/rss',                                  category: 'tech' },
+  { id: 'hackernews',     url: 'https://hnrss.org/frontpage',                                     category: 'tech' },
+  { id: 'mit-tech',       url: 'https://www.technologyreview.com/feed/',                          category: 'tech' },
+  { id: 'theregister',    url: 'https://www.theregister.com/headlines.atom',                      category: 'tech' },
+  { id: 'bleepingcomputer', url: 'https://www.bleepingcomputer.com/feed/',                        category: 'tech' },
 
   // ─── Political / Government ────────────────────────────────
-  { id: 'whitehouse',     url: 'https://www.whitehouse.gov/feed/',                                 category: 'political' },
   { id: 'congress',       url: 'https://www.congress.gov/rss/most-viewed-bills.xml',              category: 'political' },
-  { id: 'eu-commission',  url: 'https://ec.europa.eu/commission/presscorner/api/rss',             category: 'political' },
+  { id: 'eu-commission',  url: 'https://ec.europa.eu/commission/presscorner/api/rss?language=en',  category: 'political' },
+  { id: 'thehill', url: 'https://thehill.com/feed/', category: 'political' },
+  { id: 'axios', url: 'https://www.axios.com/feeds/feed.rss', category: 'political' },
 
   // ─── Social / Community ────────────────────────────────────
-  { id: 'reddit-crypto',  url: 'https://www.reddit.com/r/CryptoCurrency/.rss',                    category: 'social' },
-  { id: 'reddit-bitcoin', url: 'https://www.reddit.com/r/Bitcoin/.rss',                            category: 'social' },
-  { id: 'reddit-eth',     url: 'https://www.reddit.com/r/ethereum/.rss',                           category: 'social' },
-  { id: 'lobsters',       url: 'https://lobste.rs/rss',                                            category: 'social' },
+  { id: 'lobsters',       url: 'https://lobste.rs/rss',                                           category: 'social' },
+  { id: 'hn-top', url: 'https://hnrss.org/newest?points=100', category: 'social' },
+  { id: 'producthunt', url: 'https://www.producthunt.com/feed', category: 'social' },
+  { id: 'devto', url: 'https://dev.to/feed', category: 'social' },
 
   // ─── Science / Research ────────────────────────────────────
-  { id: 'arxiv-cs',       url: 'https://rss.arxiv.org/rss/cs.CR',                                 category: 'science' },
-  { id: 'arxiv-econ',     url: 'https://rss.arxiv.org/rss/q-fin',                                 category: 'science' },
-  { id: 'nature',         url: 'https://www.nature.com/nature.rss',                                category: 'science' },
+  { id: 'nature',         url: 'https://www.nature.com/nature.rss',                               category: 'science' },
+  { id: 'quantamagazine', url: 'https://www.quantamagazine.org/feed/',                            category: 'science' },
+  { id: 'physorg', url: 'https://phys.org/rss-feed/', category: 'science' },
+  { id: 'sciencedaily', url: 'https://www.sciencedaily.com/rss/all.xml', category: 'science' },
+  { id: 'newscientist', url: 'https://www.newscientist.com/feed/home/', category: 'science' },
 
   // ─── Energy / Commodities ──────────────────────────────────
-  { id: 'eia',            url: 'https://www.eia.gov/rss/petroleum_gasoline.xml',                   category: 'energy' },
-  { id: 'oilprice',       url: 'https://oilprice.com/rss/main',                                    category: 'energy' },
-  { id: 'iea',            url: 'https://www.iea.org/rss',                                          category: 'energy' },
+  { id: 'oilprice',       url: 'https://oilprice.com/rss/main',                                   category: 'energy' },
+  { id: 'rigzone', url: 'https://www.rigzone.com/news/rss/rigzone_latest.aspx', category: 'energy' },
 
   // ─── Geopolitical ──────────────────────────────────────────
-  { id: 'cfr',            url: 'https://www.cfr.org/rss',                                          category: 'geopolitical' },
-  { id: 'chatham',        url: 'https://www.chathamhouse.org/rss.xml',                              category: 'geopolitical' },
-  { id: 'csis',           url: 'https://www.csis.org/analysis/feed',                                category: 'geopolitical' },
+  { id: 'csis',           url: 'https://www.csis.org/rss.xml',                                    category: 'geopolitical' },
+  { id: 'foreignpolicy',  url: 'https://foreignpolicy.com/feed/',                                 category: 'geopolitical' },
+  { id: 'warontherocks', url: 'https://warontherocks.com/feed/', category: 'geopolitical' },
+  { id: 'defensenews', url: 'https://www.defensenews.com/arc/outboundfeeds/rss/', category: 'geopolitical' },
+  { id: 'thediplomat', url: 'https://thediplomat.com/feed/', category: 'geopolitical' },
+  { id: 'aljazeera', url: 'https://www.aljazeera.com/xml/rss/all.xml', category: 'geopolitical' },
 
   // ─── Indonesia ─────────────────────────────────────────────
-  { id: 'bi',             url: 'https://www.bi.or.id/id/informasi-rss/Default.aspx',               category: 'indonesia' },
-  { id: 'bappebti',       url: 'https://www.bappebti.go.id/rss',                                   category: 'indonesia' },
-  { id: 'ojk',            url: 'https://www.ojk.go.id/id/kanal/iknb/rss.aspx',                     category: 'indonesia' },
-  { id: 'kontan',         url: 'https://www.kontan.co.id/rss',                                      category: 'indonesia' },
-  { id: 'bisnis',         url: 'https://www.bisnis.com/rss',                                        category: 'indonesia' },
-  { id: 'katadata',       url: 'https://katadata.co.id/feed',                                       category: 'indonesia' },
+  { id: 'bi',             url: 'https://www.bi.or.id/id/informasi-rss/Default.aspx',              category: 'indonesia' },
+  { id: 'bappebti',       url: 'https://www.bappebti.go.id/rss',                                  category: 'indonesia' },
+  { id: 'katadata',       url: 'https://katadata.co.id/rss',                                      category: 'indonesia' },
+  { id: 'cnbc-indonesia', url: 'https://www.cnbcindonesia.com/rss',                               category: 'indonesia' },
+  { id: 'detik-finance',  url: 'https://finance.detik.com/rss',                                   category: 'indonesia' },
+  { id: 'tempo-bisnis',   url: 'https://rss.tempo.co/bisnis',                                     category: 'indonesia' },
+  { id: 'antaranews-ekonomi', url: 'https://www.antaranews.com/rss/ekonomi.xml',                  category: 'indonesia' },
 ]
 
-function parseRssItems(xml: string, sourceId: string, category: FeedCategory): RssItem[] {
+export function parseRssItems(xml: string, sourceId: string, category: FeedCategory): RssItem[] {
   const items: RssItem[] = []
-  const itemRegex = /<item>([\s\S]*?)<\/item>/gi
+  // RSS 2.0 <item> and Atom <entry>, each optionally carrying attributes
+  // (`<item rdf:about="...">`). Matching a literal `<item>` skipped whole feeds:
+  // Atom-only sources returned zero items no matter how healthy they were.
+  const itemRegex = /<(?:item|entry)(?:\s[^>]*)?>([\s\S]*?)<\/(?:item|entry)>/gi
   let match: RegExpExecArray | null
 
   while ((match = itemRegex.exec(xml)) !== null) {
     const block = match[1]
     const title = extractTag(block, 'title')
     const link = extractLink(block)
-    const pubDate = extractTag(block, 'pubDate') || extractTag(block, 'dc:date') || ''
-    const summary = cleanHtml(extractTag(block, 'description') || extractTag(block, 'content:encoded') || '')
-
+    const pubDate =
+      extractTag(block, 'pubDate') ||
+      extractTag(block, 'dc:date') ||
+      // Atom dates
+      extractTag(block, 'published') ||
+      extractTag(block, 'updated') ||
+      ''
+    const summary = cleanHtml(
+      extractTag(block, 'description') ||
+        extractTag(block, 'content:encoded') ||
+        // Atom bodies
+        extractTag(block, 'summary') ||
+        extractTag(block, 'content') ||
+        '',
+    )
     if (title) {
       items.push({
         title: cleanHtml(title),
@@ -146,23 +166,41 @@ function extractLink(xml: string): string {
   // RSS 2.0 <link>
   const linkTag = extractTag(xml, 'link')
   if (linkTag && linkTag.startsWith('http')) return linkTag
-  // Atom <link href="...">
+  // Atom: prefer rel="alternate" (the article) over rel="self"/"replies"
+  const alternate = xml.match(/<link[^>]*rel=["']alternate["'][^>]*href=["']([^"']+)["']/i)
+  if (alternate) return alternate[1]
   const atomLink = xml.match(/<link[^>]+href=["']([^"']+)["']/i)
   return atomLink ? atomLink[1] : ''
 }
 
-function cleanHtml(s: string): string {
+const NAMED_ENTITIES: Record<string, string> = {
+  '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&apos;': "'",
+  '&nbsp;': ' ', '&mdash;': '\u2014', '&ndash;': '\u2013', '&hellip;': '\u2026',
+  '&rsquo;': '\u2019', '&lsquo;': '\u2018', '&ldquo;': '\u201c', '&rdquo;': '\u201d',
+  '&euro;': '\u20ac', '&pound;': '\u00a3', '&deg;': '\u00b0', '&times;': '\u00d7',
+}
+
+function decodeEntities(s: string): string {
   return s
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/\s+/g, ' ')
-    .trim()
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec: string) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/&[a-z]+;/gi, (m) => NAMED_ENTITIES[m.toLowerCase()] ?? m)
+}
+
+export function cleanHtml(s: string): string {
+  let out = s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+
+  // Decode BEFORE stripping. Many feeds entity-encode their markup
+  // (`&lt;span class="..."&gt;`), so a tags-first pass strips nothing and the
+  // decode that follows re-materialises live HTML as visible article text.
+  // Iterate so double-encoded content (`&amp;lt;`) collapses too.
+  for (let i = 0; i < 3; i++) {
+    const next = decodeEntities(out).replace(/<[^>]*>/g, ' ')
+    if (next === out) break
+    out = next
+  }
+
+  return out.replace(/\s+/g, ' ').trim()
 }
 
 async function fetchFeed(feed: { id: string; url: string; category: FeedCategory }): Promise<RssItem[]> {

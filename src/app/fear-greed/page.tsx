@@ -31,7 +31,7 @@ export default function FearGreedPage() {
           <LiveDot status={status} label />
         </div>
 
-        {d && (
+        {d?.composite && (
           <>
             <Panel title="Current Reading" subtitle={d.regime?.state}>
               <div className="p-6 text-center">
