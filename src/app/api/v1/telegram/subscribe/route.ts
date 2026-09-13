@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     username?: string
   }
 
-  const session = extractJwtSession(request)
+  const session = await extractJwtSession(request)
   const userId = session?.userId ?? body.userId
 
   if (!userId || !body.chatId) {

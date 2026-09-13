@@ -35,14 +35,16 @@ const userRateLimitMap = new Map<string, UserRateLimitEntry>();
 /**
  * Extract and verify JWT session from request cookies
  */
-export function extractJwtSession(request: NextRequest): JwtSession | null {
+export async function extractJwtSession(request: NextRequest): Promise<JwtSession | null> {
   try {
     const sessionCookie = request.cookies.get("nexus-session");
     if (!sessionCookie?.value) {
       return null;
     }
 
-    const payload = verifyToken(sessionCookie.value);
+    // verifyToken is async (jose) — MUST be awaited or the payload is a
+    // Promise and the shape guard below always fails → every cookie 401s.
+    const payload = await verifyToken(sessionCookie.value);
     if (!payload || typeof payload !== "object") {
       return null;
     }

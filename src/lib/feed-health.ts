@@ -49,7 +49,8 @@ export async function checkFeed(url: string, timeoutMs = 12000): Promise<Omit<Fe
 }
 
 export async function checkAllFeeds(): Promise<FeedReport> {
-  const results = await Promise.all(loadFeeds().map(async (f) => {
+  const feeds = await loadFeeds()
+  const results = await Promise.all(feeds.map(async (f) => {
     const r = await checkFeed(f.url)
     return { id: f.id, category: f.category, ...r } satisfies FeedHealth
   }))

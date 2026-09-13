@@ -1101,3 +1101,34 @@ model AlphaTrackRecord {
   @@index([signalDate(sort: Desc)])
   @@index([verdict, alphaScore(sort: Desc)])
 }
+
+// ── Admin-managed RSS feed registry + per-check health history ──
+model Feed {
+  id        String   @id @default(cuid())
+  feedId    String   @unique // stable slug: coindesk, kontan-investasi, ...
+  url       String
+  category  String   // crypto | macro | regulatory | tradfi | tech | political | social | science | energy | geopolitical | indonesia
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  healthEvents FeedHealthEvent[]
+
+  @@index([category])
+  @@index([enabled])
+}
+
+model FeedHealthEvent {
+  id        String   @id @default(cuid())
+  feedId    String
+  feed      Feed     @relation(fields: [feedId], references: [id], onDelete: Cascade)
+  checkedAt DateTime @default(now())
+  ok        Boolean
+  status    Int
+  items     Int
+  error     String?
+  ms        Int
+
+  @@index([feedId, checkedAt(sort: Desc)])
+  @@index([checkedAt(sort: Desc)])
+}

@@ -193,6 +193,7 @@ const PUBLIC_PREFIXES = ['/api/v1/token/', '/api/v1/wallets/']
 const PROTECTED_ROUTES = new Set([
   '/api/v1/admin/stats',
   '/api/v1/admin/users',
+  '/api/v1/admin/feeds',
   '/api/v1/checkout',
   '/api/v1/keys',
   '/api/v1/signals/history',
@@ -355,7 +356,7 @@ export async function middleware(request: NextRequest) {
   // Allowlisted data modules are the one exception, so the public market pages
   // can read their data from a browser without a credential.
   if (isProtected(pathname) && !isPublicModuleFetch(request)) {
-    const session = extractJwtSession(request)
+    const session = await extractJwtSession(request)
     const authHeader = request.headers.get('authorization')
     const apiKey = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
     const hasApiKey = !!apiKey && API_KEYS.size > 0 && API_KEYS.has(apiKey)

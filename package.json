@@ -29,7 +29,8 @@
     "cron:alpha-track": "tsx src/scripts/alpha-track-record-cron.ts",
     "verify-re": "npx tsx src/scripts/verify-re-modules.ts",
     "cron:feed-health": "tsx src/scripts/feed-health-cron.ts",
-    "deploy": "bash scripts/deploy.sh"
+    "deploy": "bash scripts/deploy.sh",
+    "seed:feeds": "tsx prisma/seed-feeds.ts"
   },
   "dependencies": {
     "@1ai/payment": "file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",

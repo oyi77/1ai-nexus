@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const session = extractJwtSession(request)
+  const session = await extractJwtSession(request)
   const isSelf = session?.userId === body.userId
   const isAdmin = session?.role === 'admin'
 

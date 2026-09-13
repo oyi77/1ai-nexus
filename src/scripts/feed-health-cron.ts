@@ -47,11 +47,26 @@ async function main() {
   console.log(`[feed-health] ${report.working}/${report.total} working, ${report.atomOnly} atom-only, ${report.dead} dead, ${leaks} leaking markup`)
   if (newFailures.length) console.log(`[feed-health] NEW failures: ${newFailures.join(', ')}`)
 
-  // Persist a health row if the schema has one (best-effort)
+  // Persist per-feed health history (FeedHealthEvent) — powers admin uptime stats
   try {
-    await prisma.$executeRaw`INSERT INTO feed_health (checked_at, working, dead, leaks) VALUES (now(), ${report.working}, ${report.dead}, ${leaks})`
-  } catch {
-    // table may not exist; health is still logged to stdout + prev file
+    const rows = report.feeds.map((f) => ({
+      feedId: f.id,
+      ok: f.ok,
+      status: f.status,
+      items: f.items + f.entries,
+      error: f.error,
+      ms: f.ms,
+    }))
+    // Need the internal Feed PK (id) per feedId slug — map once.
+    const dbFeeds = await prisma.feed.findMany({ where: { feedId: { in: rows.map((r) => r.feedId) } }, select: { id: true, feedId: true } })
+    const pkByFeedId = new Map(dbFeeds.map((f) => [f.feedId, f.id]))
+    const events = rows
+      .filter((r) => pkByFeedId.has(r.feedId))
+      .map((r) => ({ feedId: pkByFeedId.get(r.feedId)!, ok: r.ok, status: r.status, items: r.items, error: r.error, ms: r.ms }))
+    if (events.length > 0) await prisma.feedHealthEvent.createMany({ data: events })
+    console.log(`[feed-health] persisted ${events.length} health events`)
+  } catch (e) {
+    console.error('[feed-health] failed to persist health events:', e)
   }
 
   writePrev({ working: report.working, failedIds })

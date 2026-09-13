@@ -224,12 +224,13 @@ async function fetchAllFeeds(params: FetchParams): Promise<RssItem[]> {
   const category = params.category as FeedCategory | undefined
   const limit = (params.limit as number) ?? 200
 
-  // Prefer hot-reloadable config if available; fall back to compiled FEEDS
+  // Prefer hot-reloadable DB-backed config (falls back to file/builtin);
+  // async load — sync FEEDS only if the loader import itself fails.
   let feedList: { id: string; url: string; category: FeedCategory }[]
   try {
     // Lazy require to avoid circular import
     const { loadFeeds } = require('@/lib/feed-config')
-    feedList = loadFeeds()
+    feedList = await loadFeeds()
   } catch {
     feedList = FEEDS
   }
