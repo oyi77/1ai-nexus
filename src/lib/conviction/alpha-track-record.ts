@@ -146,8 +146,13 @@ export async function getAlphaTrackStats(): Promise<{
 }> {
   const all = await prisma.alphaTrackRecord.findMany({
     where: { outcome7d: { not: null } },
+  })
+
+  // Most recent evaluated signals for the "recent" panel.
+  const recentRows = await prisma.alphaTrackRecord.findMany({
+    where: { outcome7d: { not: null } },
     orderBy: { signalDate: "desc" },
-    take: 500,
+    take: 20,
   })
 
   const evaluated = all.length
@@ -197,7 +202,7 @@ export async function getAlphaTrackStats(): Promise<{
     .sort((a, b) => b.count - a.count)
     .slice(0, 10)
 
-  const recent = all.slice(0, 20).map((s) => ({
+  const recent = recentRows.map((s) => ({
     code: s.code,
     signalDate: s.signalDate,
     verdict: s.verdict,

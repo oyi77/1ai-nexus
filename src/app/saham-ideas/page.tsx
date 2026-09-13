@@ -12,6 +12,13 @@ interface Idea {
   foreignNetStreakDays: number; foreignNetStreakDir: "accumulation" | "distribution" | null
   estNetValueIdr: number; valueScore: number; accumulationScore: number; combinedScore: number
   alphaScore: number; alphaVerdict: string; alphaReasons: string[]
+  tradePlan: {
+    entry: number; stop: number; stopPct: number; riskPerShare: number
+    targets: Array<{ level: number; pct: number; rMultiple: number }>
+    riskReward: number
+    sizing: { shares: number; lots: number; allocation: number; allocationPct: number; riskAmount: number } | null
+    warnings: string[]
+  }
 }
 
 interface Response {
@@ -38,6 +45,7 @@ const SCORE_BADGE: Record<number, string> = {
 const VERDICT_CLS: Record<string, string> = {
   "strong-buy": "text-accent-green font-semibold",
   "buy": "text-accent-green",
+  "hold": "text-text-secondary",
   "avoid": "text-accent-red",
 }
 
@@ -55,17 +63,13 @@ function SortHeader({
   onSort: (field: keyof Idea) => void
 }) {
   return (
-    <th
-      className="px-3 py-2 text-left text-xs font-medium text-text-tertiary uppercase tracking-wider cursor-pointer hover:text-text-primary"
-      onClick={() => onSort(field)}
-    >
-      <span className="inline-flex items-center gap-1">
-        {label}
-        {sortField === field && <span className="text-accent-blue">{sortDir === "desc" ? "\u2193" : "\u2191"}</span>}
-      </span>
+    <th className="px-3 py-2 text-left text-xs font-medium text-text-tertiary uppercase tracking-wide cursor-pointer hover:text-text-secondary select-none" onClick={() => onSort(field)}>
+      {label} {sortField === field && (sortDir === "desc" ? "↓" : "↑")}
     </th>
   )
 }
+
+const fmtIdr = (v: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(v)
 
 export default function SahamIdeasPage() {
   const [data, setData] = useState<Response | null>(null)
@@ -76,6 +80,8 @@ export default function SahamIdeasPage() {
   const [selected, setSelected] = useState<Idea | null>(null)
   const [sortField, setSortField] = useState<keyof Idea>("alphaScore")
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc")
+  const [capital, setCapital] = useState<number>(10_000_000)
+  const [capitalInput, setCapitalInput] = useState<string>("10000000")
 
   const [trackStats, setTrackStats] = useState<TrackStats | null>(null)
 
@@ -87,11 +93,12 @@ export default function SahamIdeasPage() {
   }, [])
 
   useEffect(() => {
-    fetch("/api/v1/saham/watchlist-ideas?limit=200")
+    setLoading(true)
+    fetch(`/api/v1/saham/watchlist-ideas?limit=200&capital=${capital}&riskPct=0.01`)
       .then((r) => r.json())
       .then((d) => { setData(d.data); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [])
+  }, [capital])
 
   const handleSort = useCallback((field: keyof Idea) => {
     if (sortField === field) setSortDir(d => (d === "desc" ? "asc" : "desc"))
@@ -118,6 +125,11 @@ export default function SahamIdeasPage() {
     })
     return ideas
   }, [data, minScore, sector, search, sortField, sortDir])
+
+  const applyCapital = useCallback(() => {
+    const v = Number(capitalInput.replace(/[^0-9]/g, ""))
+    if (v > 0) setCapital(v)
+  }, [capitalInput])
 
   return (
     <NexusLayout>
@@ -146,6 +158,19 @@ export default function SahamIdeasPage() {
               {[1, 2, 3, 4, 5].map((n) => (
                 <button key={n} onClick={() => setMinScore(n)} className={`w-7 h-7 rounded text-xs font-medium ${minScore === n ? "bg-accent-blue text-white" : "bg-bg-panel border border-border-dim text-text-secondary hover:border-accent-blue"}`}>{n}</button>
               ))}
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <span className="text-xs text-text-tertiary">Capital:</span>
+              <input
+                type="text"
+                value={capitalInput}
+                onChange={(e) => setCapitalInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") applyCapital() }}
+                onBlur={applyCapital}
+                placeholder="10000000"
+                className="bg-bg-panel border border-border-dim rounded-lg px-3 py-1.5 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none focus:border-accent-blue w-32 tabular-nums"
+              />
+              <span className="text-xs text-text-tertiary">risk 1%/trade</span>
             </div>
           </div>
         </div>
@@ -212,9 +237,9 @@ export default function SahamIdeasPage() {
           )}
         </div>
 
-        {selected && selected.alphaReasons.length > 0 && (
-          <div className="border-t border-border-dim bg-bg-panel/50 px-6 py-4">
-            <div className="flex items-center justify-between mb-2">
+        {selected && (
+          <div className="border-t border-border-dim bg-bg-panel/50 px-6 py-4 overflow-auto max-h-[45vh]">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <span className="font-mono font-semibold text-text-primary">{selected.code}</span>
                 <span className="text-text-secondary text-sm">{selected.name}</span>
@@ -225,11 +250,53 @@ export default function SahamIdeasPage() {
               </div>
               <button onClick={() => setSelected(null)} className="text-text-tertiary hover:text-text-primary text-sm">✕</button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {selected.alphaReasons.map((r, idx) => (
-                <span key={idx} className="inline-flex items-center gap-1 bg-bg-sunken rounded-full px-3 py-1 text-xs text-text-secondary">{r}</span>
-              ))}
-            </div>
+            {selected.alphaReasons.length > 0 && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {selected.alphaReasons.map((r, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-1 bg-bg-sunken rounded-full px-3 py-1 text-xs text-text-secondary">{r}</span>
+                ))}
+              </div>
+            )}
+            {/* Trade plan */}
+            {selected.tradePlan && selected.tradePlan.entry > 0 && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-bg-sunken rounded-lg p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1">Entry (close)</div>
+                  <div className="text-text-primary font-mono tabular-nums">{fmtIdr(selected.tradePlan.entry)}</div>
+                </div>
+                <div className="bg-bg-sunken rounded-lg p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1">Stop Loss (−{selected.tradePlan.stopPct}%)</div>
+                  <div className="text-accent-red font-mono tabular-nums">{fmtIdr(selected.tradePlan.stop)}</div>
+                </div>
+                <div className="bg-bg-sunken rounded-lg p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1">Targets (1R/2R/3R)</div>
+                  <div className="text-accent-green font-mono tabular-nums text-xs space-y-0.5">
+                    {selected.tradePlan.targets.map((t) => (
+                      <div key={t.rMultiple}>{t.rMultiple}R {fmtIdr(t.level)} <span className="text-text-tertiary">(+{t.pct}%)</span></div>
+                    ))}
+                  </div>
+                </div>
+                {selected.tradePlan.sizing ? (
+                  <div className="bg-bg-sunken rounded-lg p-3">
+                    <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1">Position Size (risk 1%)</div>
+                    <div className="text-text-primary font-mono tabular-nums text-xs space-y-0.5">
+                      <div>{selected.tradePlan.sizing.shares.toLocaleString("id-ID")} shares <span className="text-text-tertiary">({selected.tradePlan.sizing.lots} lot)</span></div>
+                      <div className="text-text-secondary">{fmtIdr(selected.tradePlan.sizing.allocation)} <span className="text-text-tertiary">({selected.tradePlan.sizing.allocationPct}% of capital)</span></div>
+                      <div className="text-accent-red">max risk {fmtIdr(selected.tradePlan.sizing.riskAmount)}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-bg-sunken rounded-lg p-3">
+                    <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1">Position Size</div>
+                    <div className="text-text-tertiary text-xs">Set capital above to size</div>
+                  </div>
+                )}
+              </div>
+            )}
+            {selected.tradePlan?.warnings && selected.tradePlan.warnings.length > 0 && (
+              <div className="mt-2 text-xs text-data-warn">{selected.tradePlan.warnings.join(" · ")}</div>
+            )}
+            <p className="mt-3 text-[10px] text-text-tertiary">Educational idea, not financial advice. Stop/targets derived from ATR + swing low; sizing assumes 1% capital risk per trade.</p>
           </div>
         )}
       </div>

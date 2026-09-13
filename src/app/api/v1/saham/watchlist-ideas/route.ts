@@ -7,6 +7,7 @@ import { type NextRequest } from "next/server"
 import { apiSuccess, apiError } from "@/lib/api/response"
 import { prisma } from "@/lib/db"
 import { computeAlpha, type AlphaInput } from "@/lib/conviction/alpha-engine"
+import { buildTradePlan } from "@/lib/conviction/trade-plan"
 import type { IdxScreenerSnapshot, Prisma } from "@prisma/client"
 
 export const dynamic = "force-dynamic"
@@ -30,6 +31,13 @@ interface Idea {
   foreignNetStreakDays: number; foreignNetStreakDir: "accumulation" | "distribution" | null
   estNetValueIdr: number; valueScore: number; accumulationScore: number; combinedScore: number
   alphaScore: number; alphaVerdict: string; alphaReasons: string[]
+  tradePlan: {
+    entry: number; stop: number; stopPct: number; riskPerShare: number
+    targets: Array<{ level: number; pct: number; rMultiple: number }>
+    riskReward: number
+    sizing: { shares: number; lots: number; allocation: number; allocationPct: number; riskAmount: number } | null
+    warnings: string[]
+  }
 }
 
 function num(v: number | null | undefined): number {
@@ -51,6 +59,8 @@ export async function GET(request: NextRequest) {
   const valueWeight = Math.min(1, Math.max(0, Number(p.get("valueWeight") ?? 0.5)))
   const accumWeight = 1 - valueWeight
   const includeAlpha = p.get("alpha") !== "0"
+  const capital = Math.max(0, Number(p.get("capital") ?? 0))
+  const riskPct = Math.min(0.1, Math.max(0.001, Number(p.get("riskPct") ?? 0.01)))
 
   try {
     // Load screener + fundamentals
@@ -143,7 +153,11 @@ export async function GET(request: NextRequest) {
         })
         alphaScore = result.totalScore; alphaVerdict = result.verdict; alphaReasons = result.topReasons
       }
-
+      const plan = buildTradePlan({
+        sessions: (streak?.sessions ?? []).map((s) => ({ date: s.date, open: s.open, high: s.high, low: s.low, close: s.close, volume: s.volume })),
+        capital,
+        riskPct,
+      })
       if (combinedScore >= minScore) {
         ideas.push({
           code, name: fund.name, sector, close: fund.price ?? 0, changePct: fund.change1d ?? 0,
@@ -151,7 +165,7 @@ export async function GET(request: NextRequest) {
           dividendYield: dyInfo?.dividendYield ?? null, marketCap: fund.marketCap,
           foreignNetStreakDays: streak?.days ?? 0, foreignNetStreakDir: streak?.dir ?? null,
           estNetValueIdr: streak?.estNetValue ?? 0, valueScore, accumulationScore, combinedScore,
-          alphaScore, alphaVerdict, alphaReasons,
+          alphaScore, alphaVerdict, alphaReasons, tradePlan: plan,
         })
       }
     }
