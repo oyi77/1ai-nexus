@@ -4,6 +4,7 @@ import { LiveTerminalFeed } from '@/components/features/LiveTerminalFeed'
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { NexusLayout } from '@/components/layout/NexusLayout'
+import { PersonalizedGrid, type PanelDef } from '@/components/features/PersonalizedGrid'
 import { Panel } from '@/components/shell/Panel'
 import { DataTable, type Column } from '@/components/shell/DataTable'
 import { PriceTag } from '@/components/primitives/PriceTag'
@@ -511,6 +512,68 @@ export default function DashboardPage() {
 
   const intelComponents = intel ? Object.entries(intel.components) : []
 
+  // Personalized dashboard panels — drag to reorder when "Customize" is active
+  const gridPanels: PanelDef[] = [
+    {
+      id: 'intel-components', title: 'Intelligence Components', defaultW: 4, defaultH: 6,
+      content: (
+        <div className="p-2 space-y-2">
+          {intelComponents.length === 0 ? (
+            <div className="text-text-muted text-xs p-4">Intelligence score unavailable — retrying automatically.</div>
+          ) : intelComponents.map(([name, c]) => (
+            <div key={name} className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono uppercase text-text-secondary">{name}</span>
+                <span className={`text-[11px] font-mono tabular-nums font-bold ${scoreColor(c.score)}`}>{c.score}</span>
+              </div>
+              <div className="h-1 bg-bg-border rounded-full overflow-hidden">
+                <div
+                  className={`h-full ${c.score >= 70 ? 'bg-data-bull' : c.score >= 55 ? 'bg-teal-vivid' : c.score >= 40 ? 'bg-data-warn' : 'bg-data-bear'}`}
+                  style={{ width: `${Math.max(0, Math.min(100, c.score))}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: 'top-conviction', title: 'Top Conviction', defaultW: 4, defaultH: 6,
+      content: (
+        <div className="max-h-full overflow-y-auto">
+          {symbolScores.length === 0 ? (
+            <div className="text-text-muted text-xs p-4">No scored symbols right now — refreshing automatically.</div>
+          ) : symbolScores.map(ss => (
+            <div key={`${ss.market}:${ss.symbol}`} className="flex items-center justify-between px-2 py-1 border-b border-bg-border/50 last:border-0">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-xs shrink-0">{directionGlyph(ss.direction)}</span>
+                <span className="text-xs font-mono text-text-primary truncate">{ss.symbol}</span>
+              </div>
+              <span className={`text-xs font-mono tabular-nums font-bold ${scoreColor(ss.compositeScore)}`}>{ss.compositeScore}</span>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: 'btc-thesis', title: 'BTC Trade Thesis', defaultW: 4, defaultH: 4,
+      content: thesis ? (
+        <div className="space-y-2 p-2">
+          <span className={`text-xs font-mono font-bold px-2 py-1 border ${
+            thesis.thesis === 'BULLISH' ? 'text-data-bull border-data-bull/30 bg-data-bull/20' :
+            thesis.thesis === 'BEARISH' ? 'text-data-bear border-data-bear/30 bg-data-bear/20' :
+            'text-text-secondary border-bg-border'
+          }`}>{thesis.thesis}</span>
+          <div className="text-[11px] text-text-muted font-mono">
+            Confidence {(thesis.confidence * 100).toFixed(0)}% &middot; {thesis.totalSignals} signals
+          </div>
+        </div>
+      ) : (
+        <div className="text-text-muted text-xs p-4">No trade thesis available for BTC right now.</div>
+      ),
+    },
+  ]
+
   return (
     <NexusLayout>
       <div className="p-3 space-y-3">
@@ -650,64 +713,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* ── Intelligence score breakdown ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          <Panel title="Intelligence Components" subtitle="Weighted sub-scores" liveStatus={status}>
-            <div className="p-2 space-y-2">
-              {intelComponents.length === 0 ? (
-                <div className="text-text-muted text-xs p-4">Intelligence score unavailable — retrying automatically.</div>
-              ) : intelComponents.map(([name, c]) => (
-                <div key={name} className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono uppercase text-text-secondary">{name}</span>
-                    <span className={`text-[11px] font-mono tabular-nums font-bold ${scoreColor(c.score)}`}>{c.score}</span>
-                  </div>
-                  <div className="h-1 bg-bg-border rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${c.score >= 70 ? 'bg-data-bull' : c.score >= 55 ? 'bg-teal-vivid' : c.score >= 40 ? 'bg-data-warn' : 'bg-data-bear'}`}
-                      style={{ width: `${Math.max(0, Math.min(100, c.score))}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel title="Composite Signals" subtitle="Cross-factor confluence" liveStatus={status}>
-            <div className="max-h-[260px] overflow-y-auto p-2 space-y-2">
-              {(!intel || intel.compositeSignals.length === 0) ? (
-                <div className="text-text-muted text-xs p-4">No composite confluence right now — signals surface as factors align.</div>
-              ) : intel.compositeSignals.slice(0, 6).map(s => (
-                <div key={s.id} className="border border-bg-border bg-bg-panel p-2 space-y-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="text-xs font-medium text-text-primary leading-snug">{s.name}</span>
-                    <span className="text-xs shrink-0">{directionGlyph(s.direction)}</span>
-                  </div>
-                  {s.description && <p className="text-[11px] text-text-secondary leading-snug line-clamp-2">{s.description}</p>}
-                  <div className="text-[10px] font-mono text-text-muted">strength {s.strength}</div>
-                </div>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel title="Top Conviction" subtitle="Ranked across markets" liveStatus={status}>
-            <div className="max-h-[260px] overflow-y-auto">
-              {symbolScores.length === 0 ? (
-                <div className="text-text-muted text-xs p-4">No scored symbols right now — refreshing automatically.</div>
-              ) : symbolScores.map(s => (
-                <div key={`${s.market}:${s.symbol}`} className="flex items-center justify-between px-2 py-1 border-b border-bg-border/50 last:border-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs shrink-0">{directionGlyph(s.direction)}</span>
-                    <span className="text-xs font-mono text-text-primary truncate">{s.symbol}</span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[10px] font-mono text-text-muted uppercase">{s.market}</span>
-                    <span className={`text-xs font-mono tabular-nums font-bold ${scoreColor(s.compositeScore)}`}>{s.compositeScore}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
+        {/* ── Intelligence score breakdown (personalized) ── */}
+        <div className="border border-bg-border bg-bg-panel px-3 py-2">
+          <div className="text-[10px] font-mono uppercase tracking-wide text-text-muted mb-2">Intelligence Hub</div>
+          <PersonalizedGrid panels={gridPanels} />
         </div>
 
         {/* ── IDX alpha + meme alpha ── */}

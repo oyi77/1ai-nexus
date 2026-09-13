@@ -1,3 +1,4 @@
 export { Panel } from './Panel'
 export { DataTable } from './DataTable'
-export type { Column } from './DataTable'
+export { AuthGate } from './AuthGate'
+ export type { Column } from './DataTable'

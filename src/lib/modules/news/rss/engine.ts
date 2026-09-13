@@ -224,9 +224,19 @@ async function fetchAllFeeds(params: FetchParams): Promise<RssItem[]> {
   const category = params.category as FeedCategory | undefined
   const limit = (params.limit as number) ?? 200
 
+  // Prefer hot-reloadable config if available; fall back to compiled FEEDS
+  let feedList: { id: string; url: string; category: FeedCategory }[]
+  try {
+    // Lazy require to avoid circular import
+    const { loadFeeds } = require('@/lib/feed-config')
+    feedList = loadFeeds()
+  } catch {
+    feedList = FEEDS
+  }
+
   let candidates = category
-    ? FEEDS.filter(f => f.category === category)
-    : FEEDS
+    ? feedList.filter(f => f.category === category)
+    : feedList
 
   // Shuffle to avoid always hitting the same feeds first
   candidates = [...candidates].sort(() => Math.random() - 0.5).slice(0, MAX_FEEDS_PER_CYCLE)

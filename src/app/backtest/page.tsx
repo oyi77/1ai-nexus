@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
-import { Panel } from '@/components/shell/Panel'
+import { Panel, AuthGate } from '@/components/shell'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { useAuthGatedFetch } from '@/lib/hooks/useAuthGatedFetch'
 import { TrendingUp, Target, Activity, BarChart3, Play } from 'lucide-react'
 
 interface BacktestStats {
@@ -45,39 +46,23 @@ function pnlColor(v: number | null): string {
 }
 
 export default function BacktestPage() {
-  const [stats, setStats] = useState<BacktestStats | null>(null)
-  const [results, setResults] = useState<BacktestResult[]>([])
-  const [loading, setLoading] = useState(true)
   const [period, setPeriod] = useState(30)
   const [symbol, setSymbol] = useState<string | undefined>(undefined)
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      setLoading(true)
-      try {
-        const params = new URLSearchParams({ action: 'stats', period: String(period) })
-        if (symbol) params.set('symbol', symbol)
-        const res = await fetch(`/api/v1/backtest?${params}`)
-        const d = await res.json()
-        setStats(d.stats)
-      } catch { /* ignore */ }
-      setLoading(false)
-    }
-    fetchStats()
-  }, [period, symbol])
+  const statsQuery = useAuthGatedFetch<BacktestStats | null>({
+    url: `/api/v1/backtest?action=stats&period=${period}${symbol ? `&symbol=${symbol}` : ''}`,
+    initialData: null,
+  })
 
-  useEffect(() => {
-    const fetchResults = async () => {
-      try {
-        const params = new URLSearchParams({ action: 'results', period: String(period), limit: '50' })
-        if (symbol) params.set('symbol', symbol)
-        const res = await fetch(`/api/v1/backtest?${params}`)
-        const d = await res.json()
-        setResults(d.results || [])
-      } catch { /* ignore */ }
-    }
-    fetchResults()
-  }, [period, symbol])
+  const resultsQuery = useAuthGatedFetch<BacktestResult[]>({
+    url: `/api/v1/backtest?action=results&period=${period}&limit=50${symbol ? `&symbol=${symbol}` : ''}`,
+    initialData: [],
+  })
+
+  const stats = statsQuery.data
+  const results = resultsQuery.data
+  const loading = statsQuery.status === 'stale'
+  const isAuthenticated = statsQuery.isAuthenticated && resultsQuery.isAuthenticated
 
   return (
     <NexusLayout>
@@ -110,6 +95,10 @@ export default function BacktestPage() {
             <LiveDot status={loading ? 'stale' : 'live'} label />
           </div>
         </div>
+
+        {!isAuthenticated && (
+          <AuthGate feature="Signal Backtest" detail="Historical signal performance — real PnL from alpha + conviction signals" isAuthenticated={isAuthenticated} />
+        )}
 
         {stats && stats.totalSignals > 0 && (
           <>

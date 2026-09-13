@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { DataModule, DataCategory, FetchParams, ModuleResult } from './types'
+import { measure } from '@/lib/telemetry'
 import { recordSuccess, recordFailure, getAllHealth, isModuleDegraded } from './health'
 
 class ModuleRegistry {
@@ -75,7 +76,7 @@ class ModuleRegistry {
     }
 
     try {
-      const result = await mod.fetch<T>(params)
+      const result = await measure(moduleId, () => mod.fetch<T>(params))
       recordSuccess(mod)
       return result
     } catch (err) {

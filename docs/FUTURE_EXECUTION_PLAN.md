@@ -129,9 +129,11 @@ but poor UX. Add a consistent "Sign in to unlock" state for auth-gated panels
 rather than showing empty data tables.
 
 ### 6.2 Indonesia macro route
-`/api/v1/indonesia-macro` exists but the FRED series IDs were wrong (learned in
-prior session). Verify BI rate, CPI, GDP series and wire a panel into the
-dashboard alongside the global-macro panel.
+`/api/v1/indonesia-macro` returns World Bank data; FRED data (BI Rate, CPI, GDP)
+was empty because the live process wasn't loading `.env`. Confirmed fixed after
+restart — BI Rate 6.00%, CPI 133.5 now live. Wire a panel into the dashboard
+alongside the global-macro panel.
+
 
 ### 6.3 Dashboard personalization
 The dashboard is a fixed grid. The next step: let users pin/reorder panels,
