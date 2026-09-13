@@ -14,6 +14,16 @@ import { LiveDot } from '@/components/primitives/LiveDot'
 // The dashboard is the entry point to every deep-dive surface, so the jump-off
 // grid is data rather than hand-written JSX: one map() renders it, and a route
 // added here can never drift out of sync with its label.
+
+interface MacroCountry {
+  GDP?: string
+  'GDP Growth'?: string
+  Inflation?: string
+  Unemployment?: string
+  'Real Interest'?: string
+  Population?: string
+}
+
 const HUB_GROUPS: Array<{ title: string; links: Array<{ label: string; href: string }> }> = [
   {
     title: 'Market Structure',
@@ -284,6 +294,7 @@ export default function DashboardPage() {
   const [thesis, setThesis] = useState<ThesisCard | null>(null)
   const [trending, setTrending] = useState<TrendingCard[]>([])
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('live')
+  const [macro, setMacro] = useState<Record<string, MacroCountry>>({})
   const [lastUpdated, setLastUpdated] = useState('')
 
   // One refresh path for the whole board — every panel shares a single
@@ -302,6 +313,7 @@ export default function DashboardPage() {
       fetch('/api/v1/alpha-feed?limit=6').then(r => r.json()),
       fetch('/api/v1/token/thesis?symbol=BTC').then(r => r.json()),
       fetch('/api/v1/feed?limit=3').then(r => r.json()),
+      fetch('/api/v1/global-macro').then(r => r.json()),
     ])
 
     const val = <T,>(i: number): T | null =>
@@ -434,6 +446,10 @@ export default function DashboardPage() {
       })))
     }
 
+
+    // Global macro snapshot
+    const mc = val<{ data?: Record<string, MacroCountry> }>(12)
+    if (mc?.data && typeof mc.data === 'object') setMacro(mc.data)
     // "live" as long as the core market reads landed.
     const coreOk = results[0].status === 'fulfilled' || results[1].status === 'fulfilled'
     setStatus(coreOk ? 'live' : 'error')
@@ -580,6 +596,30 @@ export default function DashboardPage() {
                   <div className="text-[10px] font-mono uppercase text-text-muted truncate">{t.symbol}</div>
                   <div className="text-xs font-mono tabular-nums text-text-primary truncate">{t.price}</div>
                   <div className={`text-[10px] font-mono tabular-nums ${t.positive ? 'text-data-bull' : 'text-data-bear'}`}>{t.change}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+
+        {/* Global macro: cross-country GDP / inflation / unemployment / rates */}
+        {Object.keys(macro).length > 0 && (
+          <div className="border border-bg-border bg-bg-panel px-3 py-2">
+            <div className="text-[10px] font-mono uppercase tracking-wide text-text-muted mb-2">
+              Global Macro ~ {Object.keys(macro).length} economies
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-9 gap-x-3 gap-y-2">
+              {Object.entries(macro).map(([country, m]) => (
+                <div key={country} className="min-w-0">
+                  <div className="text-[10px] font-mono uppercase text-teal-vivid truncate">{country}</div>
+                  <div className="text-[10px] font-mono text-text-muted truncate">GDP {m.GDP || '-'}</div>
+                  <div className="text-[10px] font-mono text-text-muted truncate">
+                    growth {m['GDP Growth'] || '-'} ~ infl {m.Inflation || '-'}
+                  </div>
+                  <div className="text-[10px] font-mono text-text-muted truncate">
+                    unemp {m.Unemployment || '-'} ~ real {m['Real Interest'] || '-'}
+                  </div>
                 </div>
               ))}
             </div>
