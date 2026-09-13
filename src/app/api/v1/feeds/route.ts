@@ -9,6 +9,7 @@ import {
   type FeedCategory,
   type SourceCredibility,
 } from "@/lib/rss-feeds";
+import { cleanHtml } from "@/lib/modules/news/rss/engine";
 
 // ─── RSS XML Parser (minimal, no deps) ──────────────────────
 
@@ -71,19 +72,6 @@ function extractLink(block: string): string {
   if (hrefMatch) return hrefMatch[1];
   // Atom: <id> as fallback
   return extractTag(block, "id");
-}
-
-function cleanHtml(text: string): string {
-  return text
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 // ─── Feed Fetching with Concurrency ─────────────────────────
