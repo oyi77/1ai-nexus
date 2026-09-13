@@ -2,7 +2,7 @@
 // Feed Health Monitor — validates every configured RSS feed and
 // reports status. Used by the cron + the health dashboard.
 // ─────────────────────────────────────────────────────────────
-import { FEEDS } from '@/lib/modules/news/rss/engine'
+import { loadFeeds } from '@/lib/feed-config'
 
 export interface FeedHealth {
   id: string
@@ -49,7 +49,7 @@ export async function checkFeed(url: string, timeoutMs = 12000): Promise<Omit<Fe
 }
 
 export async function checkAllFeeds(): Promise<FeedReport> {
-  const results = await Promise.all(FEEDS.map(async (f) => {
+  const results = await Promise.all(loadFeeds().map(async (f) => {
     const r = await checkFeed(f.url)
     return { id: f.id, category: f.category, ...r } satisfies FeedHealth
   }))

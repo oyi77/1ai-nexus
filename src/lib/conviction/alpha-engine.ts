@@ -143,7 +143,7 @@ function signalForeignVelocity(input: AlphaInput): SignalResult {
     if (streak >= 3) reasons.push({ text: `Foreign distribution ${streak} sessions`, weight: 0.3 })
   }
 
-  return { score: clamp(score, 0, 100), weight: 0.25, reasons }
+  return { score: clamp(score, 0, 100), weight: 0.05, reasons }
 }
 
 // ── Signal 2: Broker Concentration ──
@@ -176,7 +176,7 @@ function signalBrokerConcentration(input: AlphaInput): SignalResult {
     reasons.push({ text: `${sorted[0].firm} dominates with ${(top1Pct * 100).toFixed(0)}%`, weight: 0.35 })
   }
 
-  return { score: clamp(score, 0, 100), weight: 0.15, reasons }
+  return { score: clamp(score, 0, 100), weight: 0.25, reasons }
 }
 
 // ── Signal 3: Volume-Price Divergence ──
@@ -255,7 +255,7 @@ function signalMultiTemporalMomentum(input: AlphaInput): SignalResult {
     }
   }
 
-  return { score: clamp(score, 0, 100), weight: 0.15, reasons }
+  return { score: clamp(score, 0, 100), weight: 0.25, reasons }
 }
 
 // ── Signal 5: Fundamental Quality ──
@@ -295,7 +295,7 @@ function signalFundamentalQuality(input: AlphaInput): SignalResult {
     reasons.push({ text: `DER ${screener.der.toFixed(2)} — healthy balance sheet`, weight: 0.1 })
   }
 
-  return { score: clamp(score, 0, 100), weight: 0.1, reasons }
+  return { score: clamp(score, 0, 100), weight: 0.05, reasons }
 }
 
 // ── Signal 6: Value-Momentum Combo (GARP) ──
@@ -337,7 +337,7 @@ function signalValueMomentumCombo(input: AlphaInput): SignalResult {
     reasons.push({ text: `Expensive + falling — avoid`, weight: 0.3 })
   }
 
-  return { score: clamp(score, 0, 100), weight: 0.05, reasons }
+  return { score: clamp(score, 0, 100), weight: 0.2, reasons }
 }
 
 // ── Main: compute alpha score ──

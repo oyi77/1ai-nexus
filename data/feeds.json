@@ -1,0 +1,337 @@
+[
+  {
+    "id": "coindesk",
+    "url": "https://www.coindesk.com/arc/outboundfeeds/rss/",
+    "category": "crypto"
+  },
+  {
+    "id": "cointelegraph",
+    "url": "https://cointelegraph.com/rss",
+    "category": "crypto"
+  },
+  {
+    "id": "decrypt",
+    "url": "https://decrypt.co/feed",
+    "category": "crypto"
+  },
+  {
+    "id": "theblock",
+    "url": "https://www.theblock.co/rss.xml",
+    "category": "crypto"
+  },
+  {
+    "id": "bitcoinmag",
+    "url": "https://bitcoinmagazine.com/.rss/full/",
+    "category": "crypto"
+  },
+  {
+    "id": "blockworks",
+    "url": "https://blockworks.co/feed",
+    "category": "crypto"
+  },
+  {
+    "id": "unchained",
+    "url": "https://unchainedcrypto.com/feed/",
+    "category": "crypto"
+  },
+  {
+    "id": "the-defiant",
+    "url": "https://thedefiant.io/api/feed",
+    "category": "crypto"
+  },
+  {
+    "id": "bankless",
+    "url": "https://www.bankless.com/feed",
+    "category": "crypto"
+  },
+  {
+    "id": "dlnews",
+    "url": "https://www.dlnews.com/arc/outboundfeeds/rss/",
+    "category": "crypto"
+  },
+  {
+    "id": "rekt",
+    "url": "https://rekt.news/rss/feed.xml",
+    "category": "crypto"
+  },
+  {
+    "id": "bitcoinist",
+    "url": "https://bitcoinist.com/feed/",
+    "category": "crypto"
+  },
+  {
+    "id": "fed-rss",
+    "url": "https://www.federalreserve.gov/feeds/press_all.xml",
+    "category": "macro"
+  },
+  {
+    "id": "ecb-press",
+    "url": "https://www.ecb.europa.eu/rss/press.html",
+    "category": "macro"
+  },
+  {
+    "id": "bls",
+    "url": "https://www.bls.gov/feed/bls_latest.rss",
+    "category": "macro"
+  },
+  {
+    "id": "bea",
+    "url": "https://apps.bea.gov/rss/rss.xml",
+    "category": "macro"
+  },
+  {
+    "id": "stlouisfed",
+    "url": "https://www.stlouisfed.org/on-the-economy/rss",
+    "category": "macro"
+  },
+  {
+    "id": "treasury",
+    "url": "https://www.bankofengland.co.uk/rss/news",
+    "category": "regulatory"
+  },
+  {
+    "id": "uk-fca",
+    "url": "https://www.fca.org.uk/news/rss.xml",
+    "category": "regulatory"
+  },
+  {
+    "id": "eu-esma",
+    "url": "https://www.esma.europa.eu/rss.xml",
+    "category": "regulatory"
+  },
+  {
+    "id": "sec-rss",
+    "url": "https://www.sec.gov/news/pressreleases.rss",
+    "category": "regulatory"
+  },
+  {
+    "id": "cftc",
+    "url": "https://www.cftc.gov/RSS/RSSGP/rssgp.xml",
+    "category": "regulatory"
+  },
+  {
+    "id": "doj",
+    "url": "https://www.justice.gov/news/rss",
+    "category": "regulatory"
+  },
+  {
+    "id": "ecb-supervision",
+    "url": "https://www.bankingsupervision.europa.eu/rss/press.html",
+    "category": "regulatory"
+  },
+  {
+    "id": "bloomberg",
+    "url": "https://feeds.bloomberg.com/markets/news.rss",
+    "category": "tradfi"
+  },
+  {
+    "id": "ft",
+    "url": "https://www.ft.com/?format=rss",
+    "category": "tradfi"
+  },
+  {
+    "id": "wsj-markets",
+    "url": "https://feeds.a.dj.com/rss/RSSMarketsMain.xml",
+    "category": "tradfi"
+  },
+  {
+    "id": "cnbc",
+    "url": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+    "category": "tradfi"
+  },
+  {
+    "id": "marketwatch",
+    "url": "https://feeds.marketwatch.com/marketwatch/topstories/",
+    "category": "tradfi"
+  },
+  {
+    "id": "investing-com",
+    "url": "https://www.investing.com/rss/news.rss",
+    "category": "tradfi"
+  },
+  {
+    "id": "yahoo-fin",
+    "url": "https://finance.yahoo.com/news/rssindex",
+    "category": "tradfi"
+  },
+  {
+    "id": "techcrunch",
+    "url": "https://techcrunch.com/feed/",
+    "category": "tech"
+  },
+  {
+    "id": "arstechnica",
+    "url": "https://feeds.arstechnica.com/arstechnica/index",
+    "category": "tech"
+  },
+  {
+    "id": "verge",
+    "url": "https://www.theverge.com/rss/index.xml",
+    "category": "tech"
+  },
+  {
+    "id": "wired",
+    "url": "https://www.wired.com/feed/rss",
+    "category": "tech"
+  },
+  {
+    "id": "hackernews",
+    "url": "https://hnrss.org/frontpage",
+    "category": "tech"
+  },
+  {
+    "id": "mit-tech",
+    "url": "https://www.technologyreview.com/feed/",
+    "category": "tech"
+  },
+  {
+    "id": "theregister",
+    "url": "https://www.theregister.com/headlines.atom",
+    "category": "tech"
+  },
+  {
+    "id": "bleepingcomputer",
+    "url": "https://www.bleepingcomputer.com/feed/",
+    "category": "tech"
+  },
+  {
+    "id": "congress",
+    "url": "https://www.congress.gov/rss/most-viewed-bills.xml",
+    "category": "political"
+  },
+  {
+    "id": "eu-commission",
+    "url": "https://ec.europa.eu/commission/presscorner/api/rss?language=en",
+    "category": "political"
+  },
+  {
+    "id": "thehill",
+    "url": "https://thehill.com/feed/",
+    "category": "political"
+  },
+  {
+    "id": "axios",
+    "url": "https://www.axios.com/feeds/feed.rss",
+    "category": "political"
+  },
+  {
+    "id": "lobsters",
+    "url": "https://hackernoon.com/feed",
+    "category": "social"
+  },
+  {
+    "id": "hn-top",
+    "url": "https://hnrss.org/newest?points=100",
+    "category": "social"
+  },
+  {
+    "id": "producthunt",
+    "url": "https://www.producthunt.com/feed",
+    "category": "social"
+  },
+  {
+    "id": "devto",
+    "url": "https://dev.to/feed",
+    "category": "social"
+  },
+  {
+    "id": "nature",
+    "url": "https://www.nature.com/nature.rss",
+    "category": "science"
+  },
+  {
+    "id": "quantamagazine",
+    "url": "https://www.quantamagazine.org/feed/",
+    "category": "science"
+  },
+  {
+    "id": "physorg",
+    "url": "https://phys.org/rss-feed/",
+    "category": "science"
+  },
+  {
+    "id": "sciencedaily",
+    "url": "https://www.sciencedaily.com/rss/all.xml",
+    "category": "science"
+  },
+  {
+    "id": "newscientist",
+    "url": "https://www.newscientist.com/feed/home/",
+    "category": "science"
+  },
+  {
+    "id": "oilprice",
+    "url": "https://oilprice.com/rss/main",
+    "category": "energy"
+  },
+  {
+    "id": "rigzone",
+    "url": "https://www.rigzone.com/news/rss/rigzone_latest.aspx",
+    "category": "energy"
+  },
+  {
+    "id": "csis",
+    "url": "https://www.csis.org/rss.xml",
+    "category": "geopolitical"
+  },
+  {
+    "id": "foreignpolicy",
+    "url": "https://foreignpolicy.com/feed/",
+    "category": "geopolitical"
+  },
+  {
+    "id": "warontherocks",
+    "url": "https://warontherocks.com/feed/",
+    "category": "geopolitical"
+  },
+  {
+    "id": "defensenews",
+    "url": "https://www.defensenews.com/arc/outboundfeeds/rss/",
+    "category": "geopolitical"
+  },
+  {
+    "id": "thediplomat",
+    "url": "https://thediplomat.com/feed/",
+    "category": "geopolitical"
+  },
+  {
+    "id": "aljazeera",
+    "url": "https://www.aljazeera.com/xml/rss/all.xml",
+    "category": "geopolitical"
+  },
+  {
+    "id": "bi",
+    "url": "https://www.cnbcindonesia.com/market/rss",
+    "category": "indonesia"
+  },
+  {
+    "id": "bappebti",
+    "url": "https://www.antaranews.com/rss/ekonomi",
+    "category": "indonesia"
+  },
+  {
+    "id": "katadata",
+    "url": "https://katadata.co.id/rss",
+    "category": "indonesia"
+  },
+  {
+    "id": "cnbc-indonesia",
+    "url": "https://www.cnbcindonesia.com/rss",
+    "category": "indonesia"
+  },
+  {
+    "id": "detik-finance",
+    "url": "https://finance.detik.com/rss",
+    "category": "indonesia"
+  },
+  {
+    "id": "tempo-bisnis",
+    "url": "https://rss.tempo.co/bisnis",
+    "category": "indonesia"
+  },
+  {
+    "id": "antaranews-ekonomi",
+    "url": "https://www.antaranews.com/rss/ekonomi.xml",
+    "category": "indonesia"
+  }
+]
