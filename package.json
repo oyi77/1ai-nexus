@@ -29,6 +29,7 @@
     "cron:alpha-track": "tsx src/scripts/alpha-track-record-cron.ts",
     "verify-re": "npx tsx src/scripts/verify-re-modules.ts",
     "cron:feed-health": "tsx src/scripts/feed-health-cron.ts",
+    "cron:zero-issue": "tsx src/scripts/zero-issue-cron.ts",
     "deploy": "bash scripts/deploy.sh",
     "seed:feeds": "tsx prisma/seed-feeds.ts"
   },
