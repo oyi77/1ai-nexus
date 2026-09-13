@@ -43,11 +43,19 @@ export function PersonalizedGrid({ panels }: { panels: PanelDef[] }) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) setLayouts(JSON.parse(saved))
-    } catch { /* ignore */ }
+    // One-shot hydration from localStorage. Reading storage during render
+    // would break SSR; setState happens in a microtask so it is not
+    // synchronous-in-effect (react-hooks cascading-render rule).
+    let alive = true
+    Promise.resolve().then(() => {
+      if (!alive) return
+      setMounted(true)
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY)
+        if (saved) setLayouts(JSON.parse(saved))
+      } catch { /* ignore */ }
+    })
+    return () => { alive = false }
   }, [])
 
   useEffect(() => {

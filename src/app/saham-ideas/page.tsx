@@ -93,11 +93,14 @@ export default function SahamIdeasPage() {
   }, [])
 
   useEffect(() => {
-    setLoading(true)
+    let cancelled = false
+    // setState in async callbacks (not synchronously in the effect body) —
+    // the linter flags sync setState as a cascading-render hazard.
     fetch(`/api/v1/saham/watchlist-ideas?limit=200&capital=${capital}&riskPct=0.01`)
       .then((r) => r.json())
-      .then((d) => { setData(d.data); setLoading(false) })
-      .catch(() => setLoading(false))
+      .then((d) => { if (!cancelled) { setData(d.data); setLoading(false) } })
+      .catch(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [capital])
 
   const handleSort = useCallback((field: keyof Idea) => {

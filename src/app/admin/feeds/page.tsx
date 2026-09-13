@@ -51,7 +51,7 @@ function uptimeColor(pct: number | null): string {
 
 export default function AdminFeedsPage() {
   const [data, setData] = useState<FeedsData | null>(null)
-  const [error, setError] = useState(false)
+  const [error, setError] = useState<'none' | 'auth' | 'unavailable'>('none')
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [filter, setFilter] = useState<string>('all')
@@ -64,17 +64,21 @@ export default function AdminFeedsPage() {
   const fetchFeeds = useCallback(async () => {
     try {
       const res = await fetch('/api/v1/admin/feeds')
-      if (!res.ok) { setError(true); return }
+      if (res.status === 401) { setError('auth'); return }
+      if (!res.ok) { setError('unavailable'); return }
       const json = (await res.json()) as { data: FeedsData }
       setData(json.data)
-      setError(false)
+      setError('none')
     } catch {
-      setError(true)
+      setError('unavailable')
     }
   }, [])
 
   useEffect(() => {
-    fetchFeeds()
+    // fetchFeeds → setStatus/setData; deferred to a macrotask so nothing in
+    // the effect body synchronously reaches setState (cascading-render rule).
+    const kick = setTimeout(() => void fetchFeeds(), 0)
+    return () => clearTimeout(kick)
   }, [fetchFeeds])
 
   const mutate = useCallback(async (method: string, body?: unknown, qs = '') => {
@@ -221,7 +225,14 @@ export default function AdminFeedsPage() {
               </button>
             ))}
           </div>
-          {error ? (
+          {error === 'auth' ? (
+            <div className="p-4 space-y-2">
+              <p className="text-sm text-data-warn font-mono">Admin sign-in required</p>
+              <p className="text-xs text-text-muted font-mono">
+                This registry is admin-only. <a href="/login" className="text-accent-primary underline">Sign in</a> with an admin account to manage feeds.
+              </p>
+            </div>
+          ) : error === 'unavailable' ? (
             <p className="p-4 text-sm text-data-bad font-mono">Feeds endpoint unavailable</p>
           ) : !data ? (
             <p className="p-4 text-sm text-text-muted font-mono">Loading…</p>

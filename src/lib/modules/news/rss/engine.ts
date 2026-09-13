@@ -228,8 +228,10 @@ async function fetchAllFeeds(params: FetchParams): Promise<RssItem[]> {
   // async load — sync FEEDS only if the loader import itself fails.
   let feedList: { id: string; url: string; category: FeedCategory }[]
   try {
-    // Lazy require to avoid circular import
-    const { loadFeeds } = require('@/lib/feed-config')
+    // Dynamic import: feed-config depends on this module's builtin list, so a
+    // static import would be circular. Deferred load also keeps the RSS
+    // engine usable if the DB-backed loader ever fails to import.
+    const { loadFeeds } = await import('@/lib/feed-config')
     feedList = await loadFeeds()
   } catch {
     feedList = FEEDS

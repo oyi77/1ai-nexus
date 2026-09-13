@@ -58,9 +58,12 @@ export function useAuthGatedFetch<T>({
 
   useEffect(() => {
     mountedRef.current = true
-    fetchData()
-    const id = setInterval(fetchData, interval)
-    return () => { mountedRef.current = false; clearInterval(id) }
+    // First fetch deferred to a macrotask: fetchData reaches setStatus, and
+    // the react-hooks/set-state-in-effect rule rejects any synchronous path
+    // from the effect body to setState. Interval ticks are already callbacks.
+    const kick = setTimeout(() => void fetchData(), 0)
+    const id = setInterval(() => void fetchData(), interval)
+    return () => { mountedRef.current = false; clearTimeout(kick); clearInterval(id) }
   }, [fetchData, interval])
 
   return { data, status, isAuthenticated, refresh: fetchData }

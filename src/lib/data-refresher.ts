@@ -132,6 +132,17 @@ async function refreshRisk() {
   } catch (e) { logger.error("risk failed:", "refresher", { error: (e as Error).message }) }
 }
 
+// Warm the whale-alert server-cache (raw Redis key 'whale-alert') so the
+// /api/v1/whale-alert route never 502s after a cold restart while t.me blips.
+async function refreshWhaleAlert() {
+  try {
+    const { getCached } = await import('@/lib/api/server-cache')
+    const { fetchWhaleAlerts } = await import('@/lib/modules/onchain/whale-alert/fetcher')
+    const { data } = await getCached('whale-alert', 30_000, fetchWhaleAlerts)
+    logger.info(`whale-alert: ${data.length} alerts warmed`, "refresher")
+  } catch (e) { logger.error("whale-alert failed:", "refresher", { error: (e as Error).message }) }
+}
+
 async function refreshOnchain() {
   try {
     const mempool = await fetchMempoolEvents()
@@ -248,7 +259,8 @@ export function startDataRefresher() {
   setInterval(refreshScore, MEDIUM_INTERVAL)
   setInterval(refreshSignalStore, SIGNAL_INTERVAL)      // Store signals hourly
   setInterval(refreshSignalOutcomes, OUTCOME_INTERVAL)  // Check outcomes every 15 min
-  setInterval(refreshMarketTicks, MEDIUM_INTERVAL)
+  setInterval(refreshOnchain, FAST_INTERVAL)
+  setInterval(refreshWhaleAlert, FAST_INTERVAL)
   setInterval(refreshSmartMoney, SIGNAL_INTERVAL)
   setInterval(refreshLaunchAlpha, MEDIUM_INTERVAL)
 
