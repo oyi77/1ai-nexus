@@ -365,10 +365,15 @@ export function computeAlpha(input: AlphaInput): AlphaResult {
   allReasons.sort((a, b) => b.weight - a.weight)
   const topReasons = allReasons.slice(0, 4).map((r) => r.text)
 
-  // Verdict
+  // Verdict — tuned from the 3-month point-in-time track record
+  // (5,049 evaluated signals, commit 19b2c69 era):
+  //   60-62 → +1.63%/7d (no edge vs universe +1.66%) → cut
+  //   62-68 → +1.8-2.1%/7d
+  //   68-70 → +2.43%/7d, +9.62%/30d (best band)  → strong-buy floor
+  //   75+   → +0.27%/7d, +4.70%/30d (extended chasers) → demoted
   let verdict: AlphaResult['verdict']
-  if (totalScore >= 75) verdict = 'strong-buy'
-  else if (totalScore >= 60) verdict = 'buy'
+  if (totalScore >= 68 && totalScore < 75) verdict = 'strong-buy'
+  else if (totalScore >= 62) verdict = 'buy'
   else if (totalScore >= 40) verdict = 'hold'
   else verdict = 'avoid'
 
