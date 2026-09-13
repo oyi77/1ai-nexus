@@ -29,7 +29,17 @@ verify a known chunk hash.
 
 ---
 
-## 2. Data-Source Durability (this week)
+## 1. Immediate Hardening ✅
+
+### 1.1 Audit the remaining "degrade" envelopes ✅
+Five routes return `{data:null, error:null}` — confirmed intentional null-payload responses.
+
+### 1.2 Harden every fear-greed consumer ✅
+All 8 consumers already guarded (fixed in prior session).
+
+### 1.3 Add a regression test for the deploy-parity hazard ✅
+`src/lib/modules/__tests__/deploy-parity.test.ts` builds, fetches a served chunk, asserts md5 matches.
+
 
 The audit found 27/62 feeds dead and both `/mev` upstreams dead. Feeds rot
 continuously — this will happen again.

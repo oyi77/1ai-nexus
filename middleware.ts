@@ -26,12 +26,8 @@ const ALLOWED_ORIGINS = [
 
 /** Public routes matched exactly. */
 const PUBLIC_ROUTES = new Set([
-  // ── Platform ──
   '/api/v1/health',
-  '/api/v1/status',
-  '/api/v1/status/cache',
-  '/api/v1/modules',
-
+  '/api/v1/health/detailed',
   // ── Auth (also covered by the /api/v1/auth/ prefix below) ──
   '/api/v1/auth',
 
