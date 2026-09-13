@@ -236,7 +236,7 @@
   },
   {
     "id": "nature",
-    "url": "https://www.nature.com/nature.rss",
+    "url": "https://www.sciencenews.org/feed",
     "category": "science"
   },
   {
@@ -333,5 +333,210 @@
     "id": "antaranews-ekonomi",
     "url": "https://www.antaranews.com/rss/ekonomi.xml",
     "category": "indonesia"
+  },
+  {
+    "id": "cnbc-news",
+    "url": "https://www.cnbcindonesia.com/news/rss",
+    "category": "indonesia"
+  },
+  {
+    "id": "cnbc-research",
+    "url": "https://www.cnbcindonesia.com/research/rss",
+    "category": "indonesia"
+  },
+  {
+    "id": "tempo-nasional",
+    "url": "https://rss.tempo.co/nasional",
+    "category": "indonesia"
+  },
+  {
+    "id": "jsi-berita",
+    "url": "https://www.idxchannel.com/rss",
+    "category": "indonesia"
+  },
+  {
+    "id": "kontan-investasi",
+    "url": "https://investasi.kontan.co.id/rss",
+    "category": "indonesia"
+  },
+  {
+    "id": "beincrypto",
+    "url": "https://beincrypto.com/feed/",
+    "category": "crypto"
+  },
+  {
+    "id": "newsbtc",
+    "url": "https://www.newsbtc.com/feed/",
+    "category": "crypto"
+  },
+  {
+    "id": "ambcrypto",
+    "url": "https://ambcrypto.com/feed/",
+    "category": "crypto"
+  },
+  {
+    "id": "cryptopotato",
+    "url": "https://cryptopotato.com/feed/",
+    "category": "crypto"
+  },
+  {
+    "id": "u-today",
+    "url": "https://u.today/rss",
+    "category": "crypto"
+  },
+  {
+    "id": "cryptobriefing",
+    "url": "https://cryptobriefing.com/feed/",
+    "category": "crypto"
+  },
+  {
+    "id": "bitcoinmagazine",
+    "url": "https://bitcoinmagazine.com/feed",
+    "category": "crypto"
+  },
+  {
+    "id": "crypto-news",
+    "url": "https://crypto-news.net/feed/",
+    "category": "crypto"
+  },
+  {
+    "id": "crypto-rocks",
+    "url": "https://www.cryptopolitan.com/feed/",
+    "category": "crypto"
+  },
+  {
+    "id": "watcher-guru",
+    "url": "https://watcher.guru/news/feed",
+    "category": "crypto"
+  },
+  {
+    "id": "coinjournal",
+    "url": "https://coinjournal.net/feed/",
+    "category": "crypto"
+  },
+  {
+    "id": "cryptodaily",
+    "url": "https://cryptodaily.co.uk/feed",
+    "category": "crypto"
+  },
+  {
+    "id": "thecoinrepublic",
+    "url": "https://thecoinrepublic.com/feed/",
+    "category": "crypto"
+  },
+  {
+    "id": "blockchainnews",
+    "url": "https://blockchain.news/rss",
+    "category": "crypto"
+  },
+  {
+    "id": "benzinga",
+    "url": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+    "category": "tradfi"
+  },
+  {
+    "id": "seekingalpha-mkt",
+    "url": "https://seekingalpha.com/market_currents.xml",
+    "category": "tradfi"
+  },
+  {
+    "id": "financialpost",
+    "url": "https://financialpost.com/feed",
+    "category": "tradfi"
+  },
+  {
+    "id": "theguardian-biz",
+    "url": "https://www.theguardian.com/uk/business/rss",
+    "category": "tradfi"
+  },
+  {
+    "id": "offshore-tech",
+    "url": "https://www.offshore-technology.com/feed/",
+    "category": "energy"
+  },
+  {
+    "id": "electrek",
+    "url": "https://electrek.co/feed/",
+    "category": "energy"
+  },
+  {
+    "id": "cleantechnica",
+    "url": "https://cleantechnica.com/feed/",
+    "category": "energy"
+  },
+  {
+    "id": "bbc-world",
+    "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+    "category": "geopolitical"
+  },
+  {
+    "id": "nikkei-asia",
+    "url": "https://asia.nikkei.com/rss/feed/nar",
+    "category": "geopolitical"
+  },
+  {
+    "id": "scmp-world",
+    "url": "https://www.scmp.com/rss/91/feed",
+    "category": "geopolitical"
+  },
+  {
+    "id": "nasa-breaking",
+    "url": "https://www.nasa.gov/rss/dyn/breaking_news.rss",
+    "category": "science"
+  },
+  {
+    "id": "space-com",
+    "url": "https://www.space.com/feeds/all",
+    "category": "science"
+  },
+  {
+    "id": "livescience",
+    "url": "https://www.livescience.com/feeds/all",
+    "category": "science"
+  },
+  {
+    "id": "eos-org",
+    "url": "https://eos.org/feed",
+    "category": "science"
+  },
+  {
+    "id": "techspot",
+    "url": "https://www.techspot.com/backend.xml",
+    "category": "tech"
+  },
+  {
+    "id": "engadget",
+    "url": "https://www.engadget.com/rss.xml",
+    "category": "tech"
+  },
+  {
+    "id": "thenextweb",
+    "url": "https://thenextweb.com/feed",
+    "category": "tech"
+  },
+  {
+    "id": "silent-people",
+    "url": "https://www.siliconrepublic.com/feed",
+    "category": "tech"
+  },
+  {
+    "id": "reddit-stocks",
+    "url": "https://www.reddit.com/r/stocks/.rss",
+    "category": "social"
+  },
+  {
+    "id": "hackernoon-crypto",
+    "url": "https://hackernoon.com/tagged/crypto/feed",
+    "category": "social"
+  },
+  {
+    "id": "medium-trading",
+    "url": "https://medium.com/feed/tag/trading",
+    "category": "social"
+  },
+  {
+    "id": "rba-news",
+    "url": "https://www.rba.gov.au/rss/rss-cb-media-releases.xml",
+    "category": "regulatory"
   }
 ]
