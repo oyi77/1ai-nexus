@@ -1079,27 +1079,35 @@ model AlphaTrackRecord {
   code        String
   sector      String   @default("")
   signalDate  String   // YYYY-MM-DD when signal was emitted
+  lane        String   @default("alpha") // alpha | moonshot
   alphaScore  Int
-  verdict     String   // strong-buy | buy | hold | avoid
+  verdict     String   // strong-buy | buy | hold | avoid | moonshot | watch
   priceAtSignal Float
   // Horizon checks
   price7d     Float?
   price14d    Float?
   price30d    Float?
+  price60d    Float?
   pnl7dPct    Float?
   pnl14dPct   Float?
   pnl30dPct   Float?
+  pnl60dPct   Float?
+  // Max favorable excursion from session highs — tail metric for moonshots
+  maxGain30dPct Float?
+  maxGain60dPct Float?
   // Outcome (filled by evaluator)
   outcome7d   String?  // win | loss | na
   outcome14d  String?
   outcome30d  String?
+  outcome60d  String?
   evaluatedAt DateTime?
   // Snapshot of the signals that produced this score
   signals     Json?
 
-  @@unique([code, signalDate])
+  @@unique([code, signalDate, lane])
   @@index([signalDate(sort: Desc)])
   @@index([verdict, alphaScore(sort: Desc)])
+  @@index([lane, signalDate(sort: Desc)])
 }
 
 // ── Admin-managed RSS feed registry + per-check health history ──

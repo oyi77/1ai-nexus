@@ -149,7 +149,7 @@ async function main() {
       const fullyEvaluated = pnl30 !== null
 
       await prisma.alphaTrackRecord.upsert({
-        where: { code_signalDate: { code: s.code, signalDate: date } },
+        where: { code_signalDate_lane: { code: s.code, signalDate: date, lane: 'alpha' } },
         create: {
           code: s.code, sector: s.sector, signalDate: date,
           alphaScore: Math.round(s.alphaScore), verdict: s.verdict, priceAtSignal: s.price,

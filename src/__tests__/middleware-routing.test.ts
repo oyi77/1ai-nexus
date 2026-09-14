@@ -48,6 +48,7 @@ describe('middleware route classification', () => {
       '/api/v1/intelligence-score',
       '/api/v1/meme/leaderboard',
       '/api/v1/saham/watchlist-ideas',
+      '/api/v1/saham/moonshot',
       '/api/v1/defi/overview',
       '/api/v1/sectors',
     ]

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // -------------------------------------------------------------
-// Daily alpha track record cron:
-//   1. Record today's buy/strong-buy signals
-//   2. Evaluate matured signals at 7/14/30 day horizons
+// Daily alpha + moonshot track record cron:
+//   1. Record today's buy/strong-buy (lane=alpha) + moonshot/watch (lane=moonshot)
+//   2. Evaluate matured signals at 7/14/30/60d + MFE tails
 //   3. Log stats
 //
 // Cron: 0 12 * * 1-5 (after harvesters run)
@@ -12,6 +12,7 @@ import "dotenv/config"
 import { prisma } from "@/lib/db"
 import { recordAlphaSignals, evaluateAlphaTrackRecord, getAlphaTrackStats } from "@/lib/conviction/alpha-track-record"
 import { computeAlpha } from "@/lib/conviction/alpha-engine"
+import { computeMoonshot } from "@/lib/conviction/moonshot-engine"
 import { runAlphaStrongBuyAlerts } from "@/lib/telegram/alpha-alerts"
 async function main() {
   const today = new Date().toISOString().slice(0, 10)
@@ -63,7 +64,7 @@ async function main() {
     ? await prisma.idxBrokerBoard.findMany({ where: { tradeDate: latestSessionDate }, select: { firm: true, value: true, volume: true } })
     : []
 
-  const signals: Array<{ code: string; sector: string; alphaScore: number; verdict: string; price: number; reasons: string[] }> = []
+  const signals: Array<{ code: string; sector: string; alphaScore: number; verdict: string; price: number; reasons: string[]; lane?: string }> = []
   for (const r of screenerRows) {
     const sess = sessionsByCode.get(r.code) ?? []
     if (!sess.length || !r.price) continue
@@ -74,6 +75,31 @@ async function main() {
       universeStats,
     })
     signals.push({ code: r.code, sector: r.sector, alphaScore: result.totalScore, verdict: result.verdict, price: r.price, reasons: result.topReasons })
+    // Moonshot lane: separate engine, same sessions — no extra DB reads.
+    try {
+      const sorted = [...sess].sort((a, b) => (a.tradeDate < b.tradeDate ? -1 : 1))
+      const last = sorted[sorted.length - 1]
+      if (last.close > 0) {
+        const chg = (days: number): number | null => {
+          if (sorted.length <= days) return null
+          const past = sorted[sorted.length - 1 - days].close
+          return past > 0 ? ((last.close - past) / last.close) * 100 : null
+        }
+        const ms = computeMoonshot({
+          sessions: sorted.map((s) => ({ date: s.tradeDate, close: s.close, high: s.high, low: s.low, volume: s.volume })),
+          screener: {
+            change4w: chg(20), change13w: chg(65), change26w: chg(130), change52w: chg(260),
+            price: last.close,
+            high52w: Math.max(...sorted.map((s) => s.high)),
+            marketCap: r.marketCap,
+          },
+          sector: r.sector || "Unknown",
+        })
+        if (ms.verdict === "moonshot" || ms.verdict === "watch") {
+          signals.push({ code: r.code, sector: r.sector || "Unknown", alphaScore: ms.totalScore, verdict: ms.verdict, price: last.close, reasons: ms.topReasons, lane: "moonshot" })
+        }
+      }
+    } catch { /* moonshot never breaks the alpha lane */ }
   }
 
   const recorded = await recordAlphaSignals(signals)

@@ -1,43 +1,55 @@
 // ─────────────────────────────────────────────────────────────
-// Alpha Track Record — prove the alpha engine works.
+// Alpha Track Record — prove the engines work.
 //
 // Daily cron:
-//   1. Record today's buy/strong-buy signals (idempotent per code+date).
-//   2. Evaluate matured signals at 7/14/30 day horizons.
-//   3. Compute stats: hit rate, avg return, by verdict + sector.
+//   1. Record today's signals (idempotent per code+date+lane).
+//      lane='alpha': buy/strong-buy. lane='moonshot': moonshot/watch.
+//   2. Evaluate matured signals at 7/14/30/60d + MFE from session highs.
+//   3. Compute stats: hit rate, avg return, tail (P10/P20/P30), by verdict
+//      + sector + lane.
 // ─────────────────────────────────────────────────────────────
 
 import { prisma } from "@/lib/db"
 import type { Prisma } from "@prisma/client"
 
-const HORIZONS = [7, 14, 30] as const
+const HORIZONS = [7, 14, 30, 60] as const
 const WIN_THRESHOLD = 0.5 // +0.5% counts as a win
+const TAIL_LEVELS = [10, 20, 30] as const
+const FWD_30 = 21 // ~30 calendar days in trading sessions
+const FWD_60 = 42 // ~60 calendar days
 
-/** Record today's buy/strong-buy signals. Idempotent per code+date. */
-export async function recordAlphaSignals(
-  signals: Array<{
-    code: string
-    sector: string
-    alphaScore: number
-    verdict: string
-    price: number
-    reasons: string[]
-  }>,
-): Promise<number> {
+export interface TrackSignal {
+  code: string
+  sector: string
+  alphaScore: number
+  verdict: string
+  price: number
+  reasons: string[]
+  lane?: string
+}
+
+/** Record today's signals. Idempotent per code+date+lane. */
+export async function recordAlphaSignals(signals: TrackSignal[]): Promise<number> {
   const today = new Date().toISOString().slice(0, 10)
   let recorded = 0
 
   for (const s of signals) {
-    if (s.verdict !== "buy" && s.verdict !== "strong-buy") continue
+    const lane = s.lane ?? "alpha"
+    const ok =
+      lane === "moonshot"
+        ? s.verdict === "moonshot" || s.verdict === "watch"
+        : s.verdict === "buy" || s.verdict === "strong-buy"
+    if (!ok) continue
     if (!s.price || s.price <= 0) continue
 
     try {
       await prisma.alphaTrackRecord.upsert({
-        where: { code_signalDate: { code: s.code, signalDate: today } },
+        where: { code_signalDate_lane: { code: s.code, signalDate: today, lane } },
         create: {
           code: s.code,
           sector: s.sector,
           signalDate: today,
+          lane,
           alphaScore: s.alphaScore,
           verdict: s.verdict,
           priceAtSignal: s.price,
@@ -68,7 +80,25 @@ async function fetchCurrentPrice(code: string): Promise<number | null> {
   }
 }
 
-/** Evaluate matured signals at all horizons. */
+/** Max high over the N sessions after signalDate (exclusive). Null if <10. */
+async function maxForwardHigh(code: string, signalDate: string, n: number): Promise<number | null> {
+  try {
+    const rows = await prisma.idxSahamSession.findMany({
+      where: { code, tradeDate: { gt: signalDate } },
+      orderBy: { tradeDate: "asc" },
+      take: n,
+      select: { high: true },
+    })
+    if (rows.length < 10) return null
+    let mh = -Infinity
+    for (const r of rows) if (r.high > mh) mh = r.high
+    return mh > 0 ? mh : null
+  } catch {
+    return null
+  }
+}
+
+/** Evaluate matured signals at all horizons + MFE tails. */
 export async function evaluateAlphaTrackRecord(): Promise<{
   evaluated: number
   horizons: Record<string, { evaluated: number; wins: number; avgPnl: number }>
@@ -96,8 +126,6 @@ export async function evaluateAlphaTrackRecord(): Promise<{
       orderBy: { signalDate: "asc" },
     })
 
-
-
     let wins = 0
     let pnlSum = 0
     let evaluated = 0
@@ -114,11 +142,21 @@ export async function evaluateAlphaTrackRecord(): Promise<{
       updateData[field] = current
       updateData[pnlField] = pnlPct
       updateData[outcomeField] = isWin ? "win" : "loss"
+
+      // MFE tails (30d → 21 sessions, 60d → 42 sessions)
+      if (days === 30 && s.maxGain30dPct == null) {
+        const mh = await maxForwardHigh(s.code, s.signalDate, FWD_30)
+        if (mh != null && priceAt > 0) updateData["maxGain30dPct"] = ((mh - priceAt) / priceAt) * 100
+      }
+      if (days === 60 && s.maxGain60dPct == null) {
+        const mh = await maxForwardHigh(s.code, s.signalDate, FWD_60)
+        if (mh != null && priceAt > 0) updateData["maxGain60dPct"] = ((mh - priceAt) / priceAt) * 100
+      }
+
       await prisma.alphaTrackRecord.update({
         where: { id: s.id },
         data: updateData as Prisma.AlphaTrackRecordUpdateInput,
       })
-
 
       evaluated++
       pnlSum += pnlPct
@@ -132,25 +170,40 @@ export async function evaluateAlphaTrackRecord(): Promise<{
   return { evaluated: totalEvaluated, horizons }
 }
 
-/** Compute aggregate stats: hit rate, avg return, by verdict + sector. */
-export async function getAlphaTrackStats(): Promise<{
+function tailRates(rows: Array<{ maxGain30dPct: number | null }>): Record<string, number> {
+  const ms = rows.map((r) => r.maxGain30dPct).filter((v): v is number => v != null)
+  const out: Record<string, number> = {}
+  for (const t of TAIL_LEVELS) {
+    out[`p${t}`] = ms.length > 0 ? (ms.filter((v) => v >= t).length / ms.length) * 100 : 0
+  }
+  out.avgMfe = ms.length > 0 ? ms.reduce((a, b) => a + b, 0) / ms.length : 0
+  out.n = ms.length
+  return out
+}
+
+/** Compute aggregate stats: hit rate, avg return, tail, by verdict + sector + lane. */
+export async function getAlphaTrackStats(lane?: string): Promise<{
   total: number
   evaluated: number
   overallWinRate: number
   avgReturn7d: number
   avgReturn14d: number
   avgReturn30d: number
-  byVerdict: Array<{ verdict: string; count: number; winRate: number; avgReturn: number }>
+  avgReturn60d: number
+  tail: Record<string, number>
+  byVerdict: Array<{ verdict: string; count: number; winRate: number; avgReturn: number; tail: Record<string, number> }>
   bySector: Array<{ sector: string; count: number; winRate: number; avgReturn: number }>
-  recent: Array<{ code: string; signalDate: string; verdict: string; alphaScore: number; pnl7d: number | null; pnl14d: number | null; pnl30d: number | null }>
+  byLane: Array<{ lane: string; count: number; winRate: number; tail: Record<string, number> }>
+  recent: Array<{ code: string; signalDate: string; verdict: string; alphaScore: number; pnl7d: number | null; pnl14d: number | null; pnl30d: number | null; maxGain30d: number | null }>
 }> {
+  const laneFilter = lane ? { lane } : {}
   const all = await prisma.alphaTrackRecord.findMany({
-    where: { outcome7d: { not: null } },
+    where: { ...laneFilter, outcome7d: { not: null } },
   })
 
   // Most recent evaluated signals for the "recent" panel.
   const recentRows = await prisma.alphaTrackRecord.findMany({
-    where: { outcome7d: { not: null } },
+    where: { ...laneFilter, outcome7d: { not: null } },
     orderBy: { signalDate: "desc" },
     take: 20,
   })
@@ -159,11 +212,11 @@ export async function getAlphaTrackStats(): Promise<{
   const wins = all.filter((s) => s.outcome7d === "win").length
   const overallWinRate = evaluated > 0 ? (wins / evaluated) * 100 : 0
 
-  const returns7d = all.filter((s) => s.pnl7dPct != null).map((s) => s.pnl7dPct!)
-  const returns14d = all.filter((s) => s.pnl14dPct != null).map((s) => s.pnl14dPct!)
-  const returns30d = all.filter((s) => s.pnl30dPct != null).map((s) => s.pnl30dPct!)
+  const avg = (xs: number[]) => (xs.length > 0 ? xs.reduce((a, b) => a + b, 0) / xs.length : 0)
+  const pnl = (f: "pnl7dPct" | "pnl14dPct" | "pnl30dPct" | "pnl60dPct") =>
+    all.filter((s) => s[f] != null).map((s) => s[f]!)
 
-  // By verdict
+  // By verdict (with tail per verdict)
   const verdictGroups = new Map<string, typeof all>()
   for (const s of all) {
     const arr = verdictGroups.get(s.verdict) ?? []
@@ -177,7 +230,8 @@ export async function getAlphaTrackStats(): Promise<{
       verdict,
       count: rows.length,
       winRate: rows.length > 0 ? (w / rows.length) * 100 : 0,
-      avgReturn: r7.length > 0 ? r7.reduce((a, b) => a + b, 0) / r7.length : 0,
+      avgReturn: avg(r7),
+      tail: tailRates(rows),
     }
   })
 
@@ -196,11 +250,28 @@ export async function getAlphaTrackStats(): Promise<{
         sector,
         count: rows.length,
         winRate: rows.length > 0 ? (w / rows.length) * 100 : 0,
-        avgReturn: r7.length > 0 ? r7.reduce((a, b) => a + b, 0) / r7.length : 0,
+        avgReturn: avg(r7),
       }
     })
     .sort((a, b) => b.count - a.count)
     .slice(0, 10)
+
+  // By lane (alpha vs moonshot tail comparison)
+  const laneGroups = new Map<string, typeof all>()
+  for (const s of all) {
+    const arr = laneGroups.get(s.lane) ?? []
+    arr.push(s)
+    laneGroups.set(s.lane, arr)
+  }
+  const byLane = [...laneGroups.entries()].map(([l, rows]) => {
+    const w = rows.filter((r) => r.outcome7d === "win").length
+    return {
+      lane: l,
+      count: rows.length,
+      winRate: rows.length > 0 ? (w / rows.length) * 100 : 0,
+      tail: tailRates(rows),
+    }
+  })
 
   const recent = recentRows.map((s) => ({
     code: s.code,
@@ -210,17 +281,21 @@ export async function getAlphaTrackStats(): Promise<{
     pnl7d: s.pnl7dPct,
     pnl14d: s.pnl14dPct,
     pnl30d: s.pnl30dPct,
+    maxGain30d: s.maxGain30dPct,
   }))
 
   return {
-    total: await prisma.alphaTrackRecord.count(),
+    total: await prisma.alphaTrackRecord.count({ where: laneFilter }),
     evaluated,
     overallWinRate,
-    avgReturn7d: returns7d.length > 0 ? returns7d.reduce((a, b) => a + b, 0) / returns7d.length : 0,
-    avgReturn14d: returns14d.length > 0 ? returns14d.reduce((a, b) => a + b, 0) / returns14d.length : 0,
-    avgReturn30d: returns30d.length > 0 ? returns30d.reduce((a, b) => a + b, 0) / returns30d.length : 0,
+    avgReturn7d: avg(pnl("pnl7dPct")),
+    avgReturn14d: avg(pnl("pnl14dPct")),
+    avgReturn30d: avg(pnl("pnl30dPct")),
+    avgReturn60d: avg(pnl("pnl60dPct")),
+    tail: tailRates(all),
     byVerdict,
     bySector,
+    byLane,
     recent,
   }
 }
