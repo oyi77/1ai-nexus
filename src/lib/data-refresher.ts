@@ -232,7 +232,7 @@ async function refreshLrfgSweep() {
     for (const sym of suffixed) {
       try { stored += await detectAndStoreLrfg(sym) } catch { /* per-symbol isolation */ }
     }
-    if (stored > 0) logger.info(`lrfg-sweep: ${stored} events over ${syms.length} symbols`, "refresher")
+    logger.info(`lrfg-sweep: ${stored} events over ${syms.length} symbols`, "refresher")
   } catch (err) {
     logger.error("lrfg-sweep error:", "refresher", { error: (err as Error).message })
   }
