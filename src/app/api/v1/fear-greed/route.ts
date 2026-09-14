@@ -103,8 +103,11 @@ export async function GET(_request: NextRequest) {
   try {
     const { getCached } = await import('@/lib/api/server-cache')
     
-    const { data: result, fromCache } = await getCached('fear-greed', 60_000, async () => {
-
+    // NOTE: key is 'fear-greed:index' (not 'fear-greed') — the alternative-me
+    // market provider caches its raw {value, classification, timestamp} shape
+    // under 'fear-greed'. Sharing that key made this route randomly return
+    // 200 with no `composite` whenever the provider wrote last.
+    const { data: result, fromCache } = await getCached('fear-greed:index', 60_000, async () => {
     // Fetch all sources in parallel
     const [fngRes, geckoRes, globalData, btcTicker] = await Promise.all([
       fetch("https://api.alternative.me/fng/?limit=7", { next: { revalidate: 300 }, signal: AbortSignal.timeout(10_000) })
