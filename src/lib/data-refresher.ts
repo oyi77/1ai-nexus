@@ -224,8 +224,12 @@ async function refreshLrfgSweep() {
     const { signals } = await getAlphaSignals()
     const majors = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'DOGE', 'ADA', 'HYPE', 'SUI', 'LINK']
     const syms = [...new Set([...signals.filter((s) => s.direction !== 'neutral').map((s) => s.symbol.replace(/USDT$/, '')), ...majors])].slice(0, 25)
+    // DerivativesSnapshot symbols carry the USDT suffix (BTCUSDT) — the
+    // LRFg engine matches exact. Without suffix every lookup returns 0 rows
+    // and the leg stays dead (found 2026-09-14: 0 events with live data).
+    const suffixed = syms.map((s) => (s.endsWith('USDT') ? s : `${s}USDT`))
     let stored = 0
-    for (const sym of syms) {
+    for (const sym of suffixed) {
       try { stored += await detectAndStoreLrfg(sym) } catch { /* per-symbol isolation */ }
     }
     if (stored > 0) logger.info(`lrfg-sweep: ${stored} events over ${syms.length} symbols`, "refresher")
