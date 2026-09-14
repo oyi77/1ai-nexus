@@ -5,10 +5,23 @@ import { NexusLayout } from "@/components/layout/NexusLayout"
 import { LiveDot } from "@/components/primitives/LiveDot"
 import Link from "next/link"
 
+interface TradePlan {
+  entry: number
+  stop: number
+  stopPct: number
+  targets: Array<{ level: number; pct: number; rMultiple: number }>
+  sizing: { shares: number; lots: number; allocation: number; allocationPct: number; riskAmount: number } | null
+}
+
 interface Candidate {
   leg: string; asset: string; direction: string
   gainPct: number; horizonHrs: number; hitRate: number; confidence: number
   reason: string; expectedHourly?: number
+  score?: number
+  tradePlan?: TradePlan
+  livePrice?: number
+  chasePct?: number
+  chaseFlag?: string
 }
 
 interface LegSummary {
@@ -28,6 +41,20 @@ const LEG_CLS: Record<string, string> = {
   launch: "text-accent-purple",
   copy: "text-text-secondary",
   predict: "text-text-tertiary",
+}
+
+const CHASE_CLS: Record<string, string> = {
+  ok: "text-accent-green",
+  warm: "text-data-warn",
+  chase: "text-accent-red",
+  stale: "text-text-tertiary",
+}
+
+const CHASE_LABEL: Record<string, string> = {
+  ok: "entry valid",
+  warm: "warming up",
+  chase: "CHASE RISK",
+  stale: "no live quote",
 }
 
 function SortHeader({
@@ -58,6 +85,8 @@ function fmtHorizon(hrs: number): string {
   const d = Math.round(hrs / 24)
   return d >= 30 ? `${Math.round(d / 30)}mo` : `${d}d`
 }
+
+const fmtIdr = (v: number) => new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(v)
 
 export default function MoonshotPage() {
   const [data, setData] = useState<Board | null>(null)
@@ -95,6 +124,11 @@ export default function MoonshotPage() {
     return rows
   }, [data, leg, sortField, sortDir])
 
+  const warmingLegs = useMemo(() => {
+    if (!data) return []
+    return data.legs.filter((l) => l.passed === 0).map((l) => l.leg)
+  }, [data])
+
   return (
     <NexusLayout>
       <div className="flex flex-col h-full overflow-hidden">
@@ -129,6 +163,11 @@ export default function MoonshotPage() {
             ))}
           </div>
         )}
+        {warmingLegs.length > 0 && (
+          <div className="px-6 py-2 border-b border-border-dim text-xs text-text-tertiary">
+            Warming up (no qualified candidates yet): {warmingLegs.join(" · ")} — legs join the board once their setups earn measured history.
+          </div>
+        )}
 
         <div className="flex-1 overflow-auto">
           {loading ? (
@@ -141,11 +180,12 @@ export default function MoonshotPage() {
                 <tr>
                   <SortHeader field="leg" label="Leg" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <SortHeader field="asset" label="Asset" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="score" label="Score" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <SortHeader field="gainPct" label="Gain%" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <SortHeader field="horizonHrs" label="Horizon" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <SortHeader field="hitRate" label="Hit%" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <SortHeader field="confidence" label="Conf" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-                  <SortHeader field="expectedHourly" label="Exp/hr" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <SortHeader field="chasePct" label="vs Entry" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                 </tr>
               </thead>
               <tbody>
@@ -153,11 +193,15 @@ export default function MoonshotPage() {
                   <tr key={`${c.leg}:${c.asset}`} className={`border-b border-border-dim/50 hover:bg-bg-panel/50 transition-colors cursor-pointer ${selected?.asset === c.asset && selected?.leg === c.leg ? "bg-bg-panel/80" : ""}`} onClick={() => setSelected(selected?.asset === c.asset && selected?.leg === c.leg ? null : c)}>
                     <td className={`px-3 py-2.5 font-medium ${LEG_CLS[c.leg] || "text-text-secondary"}`}>{c.leg}</td>
                     <td className="px-3 py-2.5 font-mono font-medium text-text-primary max-w-[220px] truncate">{c.asset}</td>
+                    <td className="px-3 py-2.5 text-text-secondary tabular-nums">{c.score ?? "—"}</td>
                     <td className="px-3 py-2.5 text-accent-green tabular-nums">+{c.gainPct.toFixed(1)}%</td>
                     <td className="px-3 py-2.5 text-text-secondary tabular-nums">{fmtHorizon(c.horizonHrs)}</td>
                     <td className="px-3 py-2.5 text-text-secondary tabular-nums">{c.hitRate.toFixed(1)}%</td>
                     <td className="px-3 py-2.5"><span className="font-semibold text-text-primary tabular-nums">{c.confidence.toFixed(1)}</span></td>
-                    <td className="px-3 py-2.5 text-text-tertiary tabular-nums">{c.expectedHourly != null ? c.expectedHourly.toFixed(4) : "—"}</td>
+                    <td className={`px-3 py-2.5 tabular-nums ${c.chaseFlag ? CHASE_CLS[c.chaseFlag] || "text-text-tertiary" : "text-text-tertiary"}`}>
+                      {c.chasePct != null ? `${c.chasePct > 0 ? "+" : ""}${c.chasePct.toFixed(1)}%` : "—"}
+                      {c.chaseFlag && c.chaseFlag !== "ok" && <span className="ml-1 text-[10px] uppercase">{CHASE_LABEL[c.chaseFlag] || c.chaseFlag}</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -175,7 +219,47 @@ export default function MoonshotPage() {
               </div>
               <button onClick={() => setSelected(null)} className="text-text-tertiary hover:text-text-primary text-sm">✕</button>
             </div>
-            <p className="text-sm text-text-secondary">{selected.reason}</p>
+            <p className="text-sm text-text-secondary mb-3">{selected.reason}</p>
+            {selected.tradePlan && selected.tradePlan.entry > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-bg-sunken rounded-lg p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1">Entry (close)</div>
+                  <div className="text-text-primary font-mono tabular-nums">{fmtIdr(selected.tradePlan.entry)}</div>
+                  {selected.livePrice != null && selected.livePrice > 0 && (
+                    <div className="text-xs text-text-secondary font-mono tabular-nums mt-1">live {fmtIdr(selected.livePrice)}</div>
+                  )}
+                </div>
+                <div className="bg-bg-sunken rounded-lg p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1">Stop Loss (−{selected.tradePlan.stopPct}%)</div>
+                  <div className="text-accent-red font-mono tabular-nums">{fmtIdr(selected.tradePlan.stop)}</div>
+                </div>
+                <div className="bg-bg-sunken rounded-lg p-3">
+                  <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1">Targets (1R/2R/3R)</div>
+                  <div className="text-accent-green font-mono tabular-nums text-xs space-y-0.5">
+                    {selected.tradePlan.targets.map((t) => (
+                      <div key={t.rMultiple}>{t.rMultiple}R {fmtIdr(t.level)} <span className="text-text-tertiary">(+{t.pct}%)</span></div>
+                    ))}
+                  </div>
+                </div>
+                {selected.tradePlan.sizing ? (
+                  <div className="bg-bg-sunken rounded-lg p-3">
+                    <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1">Position Size (risk 1%)</div>
+                    <div className="text-text-primary font-mono tabular-nums text-xs space-y-0.5">
+                      <div>{selected.tradePlan.sizing.shares.toLocaleString("id-ID")} shares <span className="text-text-tertiary">({selected.tradePlan.sizing.lots} lot)</span></div>
+                      <div className="text-text-secondary">{fmtIdr(selected.tradePlan.sizing.allocation)} <span className="text-text-tertiary">({selected.tradePlan.sizing.allocationPct}% of capital)</span></div>
+                      <div className="text-accent-red">max risk {fmtIdr(selected.tradePlan.sizing.riskAmount)}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-bg-sunken rounded-lg p-3">
+                    <div className="text-[10px] uppercase tracking-wide text-text-tertiary mb-1">Position Size</div>
+                    <div className="text-text-tertiary text-xs">Default capital Rp10jt</div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-xs text-text-tertiary">No executable plan for this leg yet — IDX candidates carry entry/stop/targets.</p>
+            )}
             <p className="mt-3 text-[10px] text-text-tertiary">Educational idea, not financial advice. Confidence = measured hit-rate of this setup (P(+10% in 30d) for IDX, backtest win-rate per source for crypto). Only setups with proven history pass the gate.</p>
           </div>
         )}

@@ -20,6 +20,7 @@
 import { prisma } from "@/lib/db"
 import { getCached } from "@/lib/api/server-cache"
 import { computeMoonshot } from "@/lib/conviction/moonshot-engine"
+import { buildTradePlan } from "@/lib/conviction/trade-plan"
 import { getAlphaSignals } from "@/lib/modules/derived/alpha-engine"
 import type { AlphaSignal } from "@/lib/modules/derived/alpha/types"
 import { fetchLrfgEvents } from "@/lib/modules/derived/lrfg-engine"
@@ -32,6 +33,14 @@ import { getCrossPlatformMarkets, getAggregatedMarkets } from "@/lib/modules/pre
 export const CONFIDENCE_GATE = 70
 export const BOARD_LIMIT = 10
 
+export interface MoonshotTradePlan {
+  entry: number
+  stop: number
+  stopPct: number
+  targets: Array<{ level: number; pct: number; rMultiple: number }>
+  sizing: { shares: number; lots: number; allocation: number; allocationPct: number; riskAmount: number } | null
+}
+
 export interface MoonshotCandidate {
   leg: string
   asset: string
@@ -42,6 +51,15 @@ export interface MoonshotCandidate {
   confidence: number
   reason: string
   expectedHourly?: number
+  /** Moonshot engine score (IDX leg) — tie-break display, not the gate. */
+  score?: number
+  /** Executable plan (IDX leg, capital 10jt risk 1%). */
+  tradePlan?: MoonshotTradePlan
+  /** Live price vs entry — chase detection. */
+  livePrice?: number
+  chasePct?: number
+  /** ok | warm (>3% from entry) | chase (>6%) | stale (no live quote) */
+  chaseFlag?: string
 }
 
 export interface LegSummary {
@@ -132,7 +150,7 @@ async function gatherIdx(stats: { p10: Record<string, number>; p20: Record<strin
   if (dates.length === 0) return out
   const sessionRows = await prisma.idxSahamSession.findMany({
     where: { tradeDate: { in: dates } },
-    select: { code: true, tradeDate: true, close: true, high: true, low: true, volume: true },
+    select: { code: true, tradeDate: true, open: true, close: true, high: true, low: true, volume: true },
   })
   const byCode = new Map<string, typeof sessionRows>()
   for (const r of sessionRows) {
@@ -141,7 +159,7 @@ async function gatherIdx(stats: { p10: Record<string, number>; p20: Record<strin
     byCode.set(r.code, arr)
   }
   const screenerByCode = new Map(screenerRows.map((s) => [s.code, s]))
-  const scored: Array<{ code: string; score: number; verdict: string; reasons: string[] }> = []
+  const scored: Array<{ code: string; score: number; verdict: string; reasons: string[]; ohlcv: Array<{ date: string; open: number; high: number; low: number; close: number; volume: number }> }> = []
   for (const [code, sess] of byCode) {
     if (sess.length < 5) continue
     const scr = screenerByCode.get(code)
@@ -165,7 +183,7 @@ async function gatherIdx(stats: { p10: Record<string, number>; p20: Record<strin
       sector: scr.sector || "Unknown",
     })
     if (r.verdict === "moonshot" || r.verdict === "watch") {
-      scored.push({ code, score: r.totalScore, verdict: r.verdict, reasons: r.topReasons })
+      scored.push({ code, score: r.totalScore, verdict: r.verdict, reasons: r.topReasons, ohlcv: sorted.map((s) => ({ date: s.tradeDate, open: s.open, high: s.high, low: s.low, close: s.close, volume: s.volume })) })
     }
   }
   scored.sort((a, b) => b.score - a.score)
@@ -174,11 +192,22 @@ async function gatherIdx(stats: { p10: Record<string, number>; p20: Record<strin
     // Confidence = measured P(+10% in 30d) for this verdict — the moonshot
     // hit definition — not close-to-close win rate.
     const conf = stats.p10[s.verdict] ?? 50
+    // Executable plan from the same sessions (capital 10jt, risk 1%).
+    // buildTradePlan is pure; no extra I/O.
+    let plan: MoonshotCandidate["tradePlan"]
+    try {
+      const p = buildTradePlan({ sessions: s.ohlcv, capital: 10_000_000, riskPct: 0.01 })
+      if (p.entry > 0 && p.stop > 0) {
+        plan = { entry: p.entry, stop: p.stop, stopPct: p.stopPct, targets: p.targets, sizing: p.sizing }
+      }
+    } catch { /* plan unavailable — candidate still valid */ }
     out.push({
       leg: "idx", asset: s.code, direction: "bullish",
       gainPct: 20, horizonHrs: 720, hitRate: Math.round(hit * 10) / 10,
       confidence: Math.round(conf * 10) / 10,
       reason: s.reasons[0] ?? `Moonshot ${s.score}`,
+      score: s.score,
+      tradePlan: plan,
     })
   }
   return out
@@ -321,8 +350,37 @@ export function rankCandidates(
   return candidates
     .filter((c) => c.confidence >= gate && c.gainPct > 0 && c.horizonHrs > 0)
     .map((c) => ({ ...c, expectedHourly: ((c.gainPct * c.hitRate) / 100) / c.horizonHrs }))
-    .sort((a, b) => (b.expectedHourly ?? 0) - (a.expectedHourly ?? 0))
+    .sort((a, b) => {
+      // Tie-break: same expectedHourly (e.g. uniform IDX gain/horizon) sorts
+      // by engine score, so the board order is meaningful, not arbitrary.
+      const d = (b.expectedHourly ?? 0) - (a.expectedHourly ?? 0)
+      if (d !== 0) return d
+      return (b.score ?? 50) - (a.score ?? 50)
+    })
     .slice(0, limit)
+}
+
+// Enrich board IDX candidates with live price + chase flag.
+// Batch realtime fetch (Stockbit keyless, 5s symbol cache) — only for the
+// final top-10, never the full 30-candidate pool.
+async function enrichChase(board: MoonshotCandidate[]): Promise<void> {
+  const idx = board.filter((c) => c.leg === "idx" && c.tradePlan?.entry)
+  if (idx.length === 0) return
+  let getStockbitQuote: ((code: string) => Promise<{ price: number }>) | null = null
+  try {
+    getStockbitQuote = (await import("@/lib/modules/market/provider/stockbit-realtime")).getStockbitQuote
+  } catch { return }
+  const settled = await Promise.allSettled(idx.map((c) => getStockbitQuote!(c.asset)))
+  settled.forEach((r, i) => {
+    if (r.status !== "fulfilled") { idx[i].chaseFlag = "stale"; return }
+    const live = r.value.price
+    if (!(live > 0)) { idx[i].chaseFlag = "stale"; return }
+    const entry = idx[i].tradePlan!.entry
+    const chase = ((live - entry) / entry) * 100
+    idx[i].livePrice = live
+    idx[i].chasePct = Math.round(chase * 10) / 10
+    idx[i].chaseFlag = chase > 6 ? "chase" : chase > 3 ? "warm" : "ok"
+  })
 }
 
 export interface MoonshotBoard {
@@ -356,6 +414,7 @@ async function computeBoard(): Promise<MoonshotBoard> {
   const all = [...idx, ...crypto, ...lrg, ...launch, ...copy, ...predict]
   const board = rankCandidates(all)
   for (const l of legs) l.passed = board.filter((c) => c.leg === l.leg).length
+  await enrichChase(board)
   return {
     updatedAt: new Date().toISOString(),
     gate: CONFIDENCE_GATE,

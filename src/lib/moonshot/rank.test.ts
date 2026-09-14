@@ -48,4 +48,14 @@ describe('rankCandidates', () => {
     const board = rankCandidates([c({ leg: 'launch', confidence: 60 })])
     expect(board).toHaveLength(0)
   })
+
+  it('tie-breaks identical expectedHourly by engine score', () => {
+    // IDX candidates share gain/horizon/hitRate — order must follow score,
+    // not insertion order.
+    const lo = c({ asset: 'LO', score: 78 })
+    const hi = c({ asset: 'HI', score: 85 })
+    const board = rankCandidates([lo, hi])
+    expect(board[0].asset).toBe('HI')
+    expect(board[1].asset).toBe('LO')
+  })
 })
