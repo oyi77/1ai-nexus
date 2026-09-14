@@ -1,7 +1,5 @@
 "use client"
-import { LiveTerminalFeed } from '@/components/features/LiveTerminalFeed'
-
-import { useState, useEffect, useCallback } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { PersonalizedGrid, type PanelDef } from '@/components/features/PersonalizedGrid'
@@ -10,22 +8,17 @@ import { DataTable, type Column } from '@/components/shell/DataTable'
 import { PriceTag } from '@/components/primitives/PriceTag'
 import { DeltaBadge } from '@/components/primitives/DeltaBadge'
 import { LiveDot } from '@/components/primitives/LiveDot'
+import { LiveTerminalFeed } from '@/components/features/LiveTerminalFeed'
 
-// ── Intelligence hubs ──
-// The dashboard is the entry point to every deep-dive surface, so the jump-off
-// grid is data rather than hand-written JSX: one map() renders it, and a route
-// added here can never drift out of sync with its label.
+import type {
+  Regime, Ticker, IntelScore, SymbolScore, IdxIdea, MemeToken, NewsItem,
+  DexTrending, WhaleMove, ActivityEvent, AlphaSignalCard, ThesisCard, TrendingCard,
+  MacroCountry,
+} from './types'
+import { scoreColor, directionGlyph, regimeAccent, fmtUsd } from './types'
+import { fetchAll, type DashboardState } from './fetch'
 
-interface MacroCountry {
-  GDP?: string
-  'GDP Growth'?: string
-  Inflation?: string
-  Unemployment?: string
-  'Real Interest'?: string
-  Population?: string
-}
-
-const HUB_GROUPS: Array<{ title: string; links: Array<{ label: string; href: string }> }> = [
+const HUB_GROUPS: Array<{ title: string; links: Array<{ label: string; href: string }> }> =  [
   {
     title: 'Market Structure',
     links: [
@@ -94,191 +87,6 @@ const HUB_GROUPS: Array<{ title: string; links: Array<{ label: string; href: str
   },
 ]
 
-// ── Market regime (fear-greed composite) ──
-interface Regime {
-  score: number
-  label: string
-  change: number
-  state: string
-  stance: string
-  btcDom: number
-  totalMcap: number
-  mcapChange24h: number
-}
-
-// ── Cross-asset tickers ──
-interface Ticker {
-  symbol: string
-  price: string
-  change: string
-  positive: boolean
-}
-
-// ── Unified intelligence score ──
-interface IntelComponent {
-  score: number
-  signals: unknown[]
-}
-
-interface IntelSignal {
-  id: string
-  name: string
-  description: string
-  direction: string
-  strength: number
-  timestamp: string
-}
-
-interface IntelScore {
-  overall: number
-  grade: string
-  regime: string
-  components: Record<string, IntelComponent>
-  compositeSignals: IntelSignal[]
-  timestamp: string
-}
-
-// ── Per-symbol conviction ──
-interface SymbolScore {
-  symbol: string
-  market: string
-  compositeScore: number
-  direction: string
-  confidence: number
-}
-
-// ── IDX alpha ideas ──
-interface IdxIdea {
-  code: string
-  name: string
-  sector: string
-  close: number
-  changePct: number
-  per: number | null
-  pbv: number | null
-  roe: number | null
-  der: number | null
-  dividendYield: number | null
-  foreignNetStreakDays: number
-  foreignNetStreakDir: string | null
-  valueScore: number
-  accumulationScore: number
-  combinedScore: number
-  alphaScore: number
-  alphaVerdict: string
-  alphaReasons: string[]
-}
-
-interface NewsItem {
-  id: string
-  title: string
-  url: string
-  sourceId: string
-  publishedAt: string
-  category: string
-  [key: string]: unknown
-}
-
-interface DexTrending {
-  name: string
-  priceUsd: number
-  fdv: number
-  volume24h: number
-  priceChange24h: number
-  [key: string]: unknown
-}
-
-interface WhaleMove {
-  id: string
-  amount: number
-  symbol: string
-  usd: number
-  from: string
-  to: string
-  link?: string
-  [key: string]: unknown
-}
-
-interface ActivityEvent {
-  id: string
-  type: string
-  headline: string
-  asset: string
-  direction: string
-  strength: number
-  timestamp: string
-  [key: string]: unknown
-}
-
-interface AlphaSignalCard {
-  id: string
-  type: string
-  asset: string
-  strength: number
-  confidence: number
-  headline: string
-  explanation: string
-  source: string
-  timestamp: string
-}
-
-interface ThesisCard {
-  symbol: string
-  thesis: 'BULLISH' | 'BEARISH' | 'NEUTRAL'
-  confidence: number
-  totalSignals: number
-}
-
-interface TrendingCard {
-  id: string
-  title: string
-  source: string
-}
-
-interface MemeToken {
-  id: string
-  symbol: string
-  name: string
-  platform: string
-  chain: string
-  price: number
-  change24h: number
-  volume24h: number
-  marketCap: number
-  holders: number
-}
-
-function fmtUsd(n: number): string {
-  if (!Number.isFinite(n) || n === 0) return '$0'
-  if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`
-  if (n >= 1e9) return `$${(n / 1e9).toFixed(2)}B`
-  if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`
-  if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`
-  return `$${n.toFixed(0)}`
-}
-
-/** Composite score → colour band, shared by every conviction surface. */
-function scoreColor(score: number): string {
-  if (score >= 70) return 'text-data-bull'
-  if (score >= 55) return 'text-teal-vivid'
-  if (score >= 40) return 'text-data-warn'
-  return 'text-data-bear'
-}
-
-function directionGlyph(direction: string): string {
-  if (direction === 'bullish') return '🟢'
-  if (direction === 'bearish') return '🔴'
-  return '⚪'
-}
-
-/** Greed/fear composite → regime accent. */
-function regimeAccent(score: number): string {
-  if (score >= 75) return 'border-data-bull/40 bg-data-bull/5'
-  if (score >= 55) return 'border-teal-vivid/40 bg-teal-vivid/5'
-  if (score >= 45) return 'border-data-warn/40 bg-data-warn/5'
-  return 'border-data-bear/40 bg-data-bear/5'
-}
-
 export default function DashboardPage() {
   const [regime, setRegime] = useState<Regime | null>(null)
   const [tickers, setTickers] = useState<Ticker[]>([])
@@ -300,169 +108,18 @@ export default function DashboardPage() {
 
   // One refresh path for the whole board — every panel shares a single
   // failure-tolerant fan-out instead of competing polling loops.
-  const fetchAll = useCallback(async () => {
-    const results = await Promise.allSettled([
-      fetch('/api/v1/fear-greed').then(r => r.json()),
-      fetch('/api/v1/market/prices').then(r => r.json()),
-      fetch('/api/v1/intelligence-score').then(r => r.json()),
-      fetch('/api/v1/market-score').then(r => r.json()),
-      fetch('/api/v1/saham/watchlist-ideas?limit=8').then(r => r.json()),
-      fetch('/api/v1/meme/leaderboard').then(r => r.json()),
-      fetch('/api/v1/news?category=crypto&limit=12').then(r => r.json()),
-      fetch('/api/v1/dex/trending?network=solana').then(r => r.json()),
-      fetch('/api/v1/whale-alert').then(r => r.json()),
-      fetch('/api/v1/alpha-feed?limit=6').then(r => r.json()),
-      fetch('/api/v1/token/thesis?symbol=BTC').then(r => r.json()),
-      fetch('/api/v1/feed?limit=3').then(r => r.json()),
-      fetch('/api/v1/global-macro').then(r => r.json()),
-    ])
-
-    const val = <T,>(i: number): T | null =>
-      results[i].status === 'fulfilled' ? (results[i] as PromiseFulfilledResult<T>).value : null
-
-    // Market regime
-    const fg = val<{ data?: { composite?: Record<string, number & string>; regime?: Record<string, string>; headerMetrics?: Record<string, number> } }>(0)
-    const comp = fg?.data?.composite
-    const hm = fg?.data?.headerMetrics
-    if (comp) {
-      setRegime({
-        score: Number(comp.score ?? 0),
-        label: String(comp.label ?? 'Neutral'),
-        change: Number(comp.change ?? 0),
-        state: String(fg?.data?.regime?.state ?? '—'),
-        stance: String(fg?.data?.regime?.stance ?? '—'),
-        btcDom: Number(hm?.btcDom ?? 0),
-        totalMcap: Number(hm?.totalMcap ?? 0),
-        mcapChange24h: Number(hm?.mcapChange24h ?? 0),
-      })
-    }
-
-    // Cross-asset tickers
-    const prices = val<{ data?: { tickers?: Ticker[] } }>(1)
-    if (Array.isArray(prices?.data?.tickers)) setTickers(prices.data.tickers)
-
-    // Unified intelligence score
-    const is = val<{ data?: IntelScore }>(2)
-    if (is?.data) setIntel(is.data)
-
-    // Per-symbol conviction
-    const ms = val<{ data?: { scores?: SymbolScore[] } }>(3)
-    if (Array.isArray(ms?.data?.scores)) {
-      setSymbolScores([...ms.data.scores].sort((a, b) => b.compositeScore - a.compositeScore).slice(0, 12))
-    }
-
-    // IDX alpha ideas
-    const idx = val<{ data?: { ideas?: IdxIdea[]; tradeDate?: string } }>(4)
-    if (Array.isArray(idx?.data?.ideas)) {
-      setIdxIdeas(idx.data.ideas)
-      setIdxTradeDate(String(idx.data.tradeDate ?? ''))
-    }
-
-    // Meme alpha — surface only priced tokens with real volume.
-    const mem = val<{ tokens?: MemeToken[] }>(5)
-    if (Array.isArray(mem?.tokens)) {
-      setMeme(
-        mem.tokens
-          .filter(t => Number(t.volume24h) > 0)
-          .sort((a, b) => Number(b.volume24h) - Number(a.volume24h))
-          .slice(0, 12),
-      )
-    }
-
-    const nw = val<{ data?: { items?: Record<string, unknown>[] } }>(6)
-    if (Array.isArray(nw?.data?.items)) {
-      setNews(nw.data.items.slice(0, 12).map(n => ({
-        id: String(n.id ?? ''),
-        title: String(n.title ?? ''),
-        url: String(n.url ?? ''),
-        sourceId: String(n.sourceId ?? ''),
-        publishedAt: String(n.publishedAt ?? ''),
-        category: String(n.category ?? ''),
-      })))
-    }
-
-    const dx = val<{ data?: { items?: Record<string, unknown>[] } }>(7)
-    if (Array.isArray(dx?.data?.items)) {
-      setDex(dx.data.items.slice(0, 10).map(d => ({
-        name: String(d.symbol ?? d.name ?? ''),
-        priceUsd: Number(d.priceUsd ?? 0),
-        fdv: Number(d.fdv ?? 0),
-        volume24h: Number(d.volume24h ?? 0),
-        priceChange24h: Number(d.priceChange24h ?? 0),
-      })))
-    }
-
-    const wh = val<{ data?: { items?: Record<string, unknown>[] } }>(8)
-    if (Array.isArray(wh?.data?.items)) {
-      setWhaleMoves(wh.data.items.slice(0, 10).map(w => ({
-        id: String(w.id ?? ''),
-        amount: Number(w.amount ?? 0),
-        symbol: String(w.symbol ?? ''),
-        usd: Number(w.usd ?? 0),
-        from: String(w.from ?? ''),
-        to: String(w.to ?? ''),
-        link: w.link ? String(w.link) : undefined,
-      })))
-    }
-
-    // Derived alpha signals (premium — stays empty for anonymous visitors)
-    const af = val<{ data?: Record<string, unknown>[] }>(9)
-    if (Array.isArray(af?.data)) {
-      const mapped = af.data.slice(0, 6).map(s => ({
-        id: String(s.id ?? ''),
-        type: String(s.type ?? 'signal'),
-        asset: String(s.asset ?? ''),
-        strength: Number(s.strength ?? 0),
-        confidence: Number(s.confidence ?? 0),
-        headline: String(s.headline ?? ''),
-        explanation: String(s.explanation ?? ''),
-        source: String(s.source ?? ''),
-        timestamp: s.timestamp ? new Date(String(s.timestamp)).toLocaleTimeString() : '',
-      }))
-      setAlphaSignals(mapped)
-      setActivity(mapped.map(s => ({
-        id: s.id, type: s.type, headline: s.headline, asset: s.asset,
-        direction: String(af.data!.find(x => String(x.id ?? '') === s.id)?.direction ?? 'neutral'),
-        strength: s.strength, timestamp: s.timestamp,
-      })))
-    }
-
-    const th = val<Record<string, unknown>>(10)
-    if (th?.thesis) {
-      const dir = th.thesis === 'BULLISH' || th.thesis === 'BEARISH' ? th.thesis : 'NEUTRAL'
-      setThesis({
-        symbol: String(th.symbol ?? 'BTC'),
-        thesis: dir as 'BULLISH' | 'BEARISH' | 'NEUTRAL',
-        confidence: Number(th.confidence ?? 0),
-        totalSignals: Number(th.totalSignals ?? 0),
-      })
-    }
-
-    const fd = val<{ top?: Record<string, unknown>[] }>(11)
-    if (Array.isArray(fd?.top)) {
-      setTrending(fd.top.slice(0, 3).map(i => ({
-        id: String(i.id ?? ''),
-        title: String(i.t ?? ''),
-        source: String(i.s ?? ''),
-      })))
-    }
-
-
-    // Global macro snapshot
-    const mc = val<{ data?: Record<string, MacroCountry> }>(12)
-    if (mc?.data && typeof mc.data === 'object') setMacro(mc.data)
-    // "live" as long as the core market reads landed.
-    const coreOk = results[0].status === 'fulfilled' || results[1].status === 'fulfilled'
-    setStatus(coreOk ? 'live' : 'error')
-    setLastUpdated(new Date().toLocaleTimeString())
-  }, [])
+  const state: DashboardState = {
+    setRegime, setTickers, setIntel, setSymbolScores, setIdxIdeas, setIdxTradeDate,
+    setMeme, setNews, setDex, setWhaleMoves, setActivity, setAlphaSignals,
+    setThesis, setTrending, setStatus, setMacro, setLastUpdated,
+  }
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchAll()
-    const interval = setInterval(fetchAll, 30_000)
+    fetchAll(state)
+    const interval = setInterval(() => fetchAll(state), 30_000)
     return () => clearInterval(interval)
-  }, [fetchAll])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only polling; setters are stable
+  }, [])
 
   const newsColumns: Column<NewsItem>[] = [
     { key: 'title', header: 'Headline', width: 300, render: r => (
@@ -725,7 +382,7 @@ export default function DashboardPage() {
             title="IDX Alpha Ideas"
             subtitle={idxTradeDate ? `session ${idxTradeDate}` : 'value + foreign accumulation'}
             liveStatus={status}
-            onRefresh={fetchAll}
+            onRefresh={() => fetchAll(state)}
           >
             <div className="max-h-[300px] overflow-y-auto">
               {idxIdeas.length === 0 ? (
@@ -762,7 +419,7 @@ export default function DashboardPage() {
             </div>
           </Panel>
 
-          <Panel title="Meme Alpha" subtitle="Volume leaders across DEX platforms" liveStatus={status} onRefresh={fetchAll}>
+          <Panel title="Meme Alpha" subtitle="Volume leaders across DEX platforms" liveStatus={status} onRefresh={() => fetchAll(state)}>
             <div className="max-h-[300px] overflow-y-auto">
               {meme.length === 0 ? (
                 <div className="text-text-muted text-xs p-4">No meme tokens with volume right now.</div>
@@ -858,7 +515,7 @@ export default function DashboardPage() {
 
         {/* ── News vs DEX ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <Panel title="Global News Feed" subtitle="Macro & crypto" liveStatus={status} onRefresh={fetchAll}>
+          <Panel title="Global News Feed" subtitle="Macro & crypto" liveStatus={status} onRefresh={() => fetchAll(state)}>
             <DataTable
               columns={newsColumns as unknown as Column<Record<string, unknown>>[]}
               data={news as unknown as Record<string, unknown>[]}
@@ -867,7 +524,7 @@ export default function DashboardPage() {
             />
           </Panel>
 
-          <Panel title="DEX Trending" subtitle="Hot pairs on Solana" liveStatus={status} onRefresh={fetchAll}>
+          <Panel title="DEX Trending" subtitle="Hot pairs on Solana" liveStatus={status} onRefresh={() => fetchAll(state)}>
             <DataTable
               columns={dexColumns as unknown as Column<Record<string, unknown>>[]}
               data={dex as unknown as Record<string, unknown>[]}
@@ -879,7 +536,7 @@ export default function DashboardPage() {
 
         {/* ── Smart money vs whale flows ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          <Panel title="Smart Money Signals" subtitle="Entity insights" liveStatus={status} onRefresh={fetchAll}>
+          <Panel title="Smart Money Signals" subtitle="Entity insights" liveStatus={status} onRefresh={() => fetchAll(state)}>
             <DataTable
               columns={activityColumns as unknown as Column<Record<string, unknown>>[]}
               data={activity as unknown as Record<string, unknown>[]}
@@ -888,7 +545,7 @@ export default function DashboardPage() {
             />
           </Panel>
 
-          <Panel title="Whale Moves" subtitle="Large on-chain flows" liveStatus={status} onRefresh={fetchAll}>
+          <Panel title="Whale Moves" subtitle="Large on-chain flows" liveStatus={status} onRefresh={() => fetchAll(state)}>
             <DataTable
               columns={whaleColumns as unknown as Column<Record<string, unknown>>[]}
               data={whaleMoves as unknown as Record<string, unknown>[]}
