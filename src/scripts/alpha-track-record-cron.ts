@@ -103,7 +103,9 @@ async function main() {
   }
 
   const recorded = await recordAlphaSignals(signals)
-  console.log(`[alpha-cron] recorded ${recorded} buy/strong-buy signals (${today})`)
+  const nAlpha = signals.filter((s) => (s.lane ?? "alpha") === "alpha").length
+  const nMoon = signals.length - nAlpha
+  console.log(`[alpha-cron] recorded ${recorded} signals (${today}): ${nAlpha} alpha buy/strong-buy, ${nMoon} moonshot/watch`)
 
   // 2. Evaluate matured signals
   const evalResult = await evaluateAlphaTrackRecord()
