@@ -86,4 +86,14 @@ describe('computeMoonshot', () => {
     expect(rf.components.ignition.score).toBeLessThan(rl.components.ignition.score)
     expect(rf.components.ignition.reasons.some((x) => x.text.includes('Flat base'))).toBe(true)
   })
+
+  it('labels single-timeframe momentum as short history, not "all 1"', () => {
+    const r = computeMoonshot({
+      sessions: sessions(21, 100, 120, 1000, 2500, 100),
+      screener: { change4w: 15, change13w: null, change26w: null, change52w: null, price: 85, high52w: 100, marketCap: 5e11 },
+      sector: 'Energy',
+    })
+    expect(r.components.momentum.reasons.some((x) => x.text.includes('short history'))).toBe(true)
+    expect(r.components.momentum.reasons.some((x) => x.text.includes('all 1'))).toBe(false)
+  })
 })

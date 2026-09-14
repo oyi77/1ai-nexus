@@ -78,7 +78,7 @@ function scoreMomentum(input: MoonshotInput): MoonshotComponent {
   let score = 50
   if (positive === changes.length && avg > 10) {
     score = 90
-    reasons.push({ text: `Uptrend on all ${changes.length} timeframes`, weight: 0.35 })
+    reasons.push({ text: changes.length === 1 ? `Uptrend (short history)` : `Uptrend on all ${changes.length} timeframes`, weight: 0.35 })
   } else if (positive >= 3 && avg > 5) {
     score = 75
     reasons.push({ text: `${positive}/${changes.length} timeframes bullish`, weight: 0.3 })
@@ -88,7 +88,7 @@ function scoreMomentum(input: MoonshotInput): MoonshotComponent {
     score = 45
   } else {
     score = 25
-    reasons.push({ text: `Downtrend on all timeframes`, weight: 0.3 })
+    reasons.push({ text: changes.length === 1 ? `Downtrend (short history)` : `Downtrend on all timeframes`, weight: 0.3 })
   }
   return { score, weight: 0.35, reasons }
 }
