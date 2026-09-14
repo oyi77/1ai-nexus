@@ -298,23 +298,10 @@ export async function buildConvictionResult(): Promise<ConvictionResult> {
         action: item.action, direction: item.direction, price: item.price > 0 ? item.price : undefined,
         reasons: item.reasons,
       })
-      // Conviction → backtest bridge (conviction% → TP/SL distance)
-      if (item.price > 0) {
-        const dir = item.action === 'BUY' ? 'bullish' : 'bearish'
-        const conv = item.conviction / 100
-        await storeSignal({
-          id: `conviction-idx-${item.symbol}-${Date.now()}`,
-          symbol: item.symbol,
-          direction: dir,
-          entry: item.price,
-          tp1: item.price * (1 + (item.action === 'BUY' ? conv : -conv) * 0.05),
-          tp2: item.price * (1 + (item.action === 'BUY' ? conv : -conv) * 0.10),
-          tp3: item.price * (1 + (item.action === 'BUY' ? conv : -conv) * 0.20),
-          sl: item.price * (1 - (item.action === 'BUY' ? conv : -conv) * 0.03),
-          timestamp: Date.now(),
-          source: 'conviction',
-        }).catch(() => {})
-      }
+      // NOTE: no backtest bridge for IDX — BacktestResult evaluates against
+      // Binance klines only, so IDX symbols could never resolve (2,069 dead
+      // pending rows expired 2026-09-14). IDX proof lives in ConvictionSignal
+      // (market=IDX) + AlphaTrackRecord lanes.
     }
     for (const item of cryptoItems) {
       if (item.action === 'WAIT') continue

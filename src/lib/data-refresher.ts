@@ -202,6 +202,37 @@ async function refreshSignalStore() {
   }
 }
 
+// Evaluate matured backtest signals (fills crypto-leg hit-rates for moonshot).
+// Heavy (Binance klines per symbol) — 6h cadence is enough; IDX symbols are
+// expired by the runBacktest guard, never retried.
+async function refreshBacktest() {
+  try {
+    const { runBacktest } = await import('@/lib/modules/derived/backtest-engine')
+    const { results, stats } = await runBacktest(30)
+    if (results.length > 0) logger.info(`backtest: ${results.length} evaluated, winRate ${stats.winRate.toFixed(0)}%`, "refresher")
+  } catch (err) {
+    logger.error("backtest error:", "refresher", { error: (err as Error).message })
+  }
+}
+
+// Sweep leverage-reset detection across active symbols. LRFg needs a warm
+// DerivativesSnapshot series (persisted every minute by refreshDerivatives).
+// Symbols = live alpha-signal assets + majors fallback (no heavy DB scan).
+async function refreshLrfgSweep() {
+  try {
+    const { detectAndStoreLrfg } = await import('@/lib/modules/derived/lrfg-engine')
+    const { signals } = await getAlphaSignals()
+    const majors = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'DOGE', 'ADA', 'HYPE', 'SUI', 'LINK']
+    const syms = [...new Set([...signals.filter((s) => s.direction !== 'neutral').map((s) => s.symbol.replace(/USDT$/, '')), ...majors])].slice(0, 25)
+    let stored = 0
+    for (const sym of syms) {
+      try { stored += await detectAndStoreLrfg(sym) } catch { /* per-symbol isolation */ }
+    }
+    if (stored > 0) logger.info(`lrfg-sweep: ${stored} events over ${syms.length} symbols`, "refresher")
+  } catch (err) {
+    logger.error("lrfg-sweep error:", "refresher", { error: (err as Error).message })
+  }
+}
 // Check expired signals and calculate PnL
 async function refreshSignalOutcomes() {
   try {
@@ -213,6 +244,7 @@ async function refreshSignalOutcomes() {
     logger.error("Signal outcomes error:", "refresher", { error: (err as Error).message })
   }
 }
+
 
 // ─── Orchestrator ───────────────────────────────────────────
 
@@ -243,10 +275,9 @@ export function startDataRefresher() {
   setTimeout(() => refreshSignalStore(), 25_000)
   setTimeout(() => refreshSignalOutcomes(), 30_000)
   setTimeout(() => refreshMarketTicks(), 12_000)
-  setTimeout(() => refreshSmartMoney(), 16_000)
-  setTimeout(() => refreshLaunchAlpha(), 18_000)
-
   setTimeout(() => refreshOpportunities(), 25_000)
+  setTimeout(() => refreshBacktest(), 60_000)
+  setTimeout(() => refreshLrfgSweep(), 90_000)
   // Recurring intervals
   setInterval(refreshDerivatives, FAST_INTERVAL)
   setInterval(refreshETF, MEDIUM_INTERVAL)
@@ -259,11 +290,11 @@ export function startDataRefresher() {
   setInterval(refreshScore, MEDIUM_INTERVAL)
   setInterval(refreshSignalStore, SIGNAL_INTERVAL)      // Store signals hourly
   setInterval(refreshSignalOutcomes, OUTCOME_INTERVAL)  // Check outcomes every 15 min
-  setInterval(refreshOnchain, FAST_INTERVAL)
   setInterval(refreshWhaleAlert, FAST_INTERVAL)
-  setInterval(refreshSmartMoney, SIGNAL_INTERVAL)
+  setInterval(refreshSmartMoney, MEDIUM_INTERVAL)
   setInterval(refreshLaunchAlpha, MEDIUM_INTERVAL)
-
   setInterval(refreshOpportunities, SIGNAL_INTERVAL)
-  logger.info("Scheduled: derivatives(1m), etf(5m), sentiment(5m), news(15m), risk(5m), onchain(1m), composite(5m), score(5m), signals(1h), outcomes(15m)", "refresher")
+  setInterval(refreshBacktest, 6 * SIGNAL_INTERVAL)     // Backtest eval every 6h (heavy)
+  setInterval(refreshLrfgSweep, OUTCOME_INTERVAL)       // LRFg sweep every 15 min
+  logger.info("Scheduled: derivatives(1m), etf(5m), sentiment(5m), news(15m), risk(5m), onchain(1m), composite(5m), score(5m), signals(1h), outcomes(15m), backtest(6h), lrfg(15m)", "refresher")
 }

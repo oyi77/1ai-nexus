@@ -86,7 +86,9 @@ export default function SahamIdeasPage() {
   const [trackStats, setTrackStats] = useState<TrackStats | null>(null)
 
   useEffect(() => {
-    fetch("/api/v1/saham/track-record")
+    // lane=alpha: this page is the steady-compounder lane; moonshot stats
+    // live on /moonshot. Unfiltered stats would mix both lanes.
+    fetch("/api/v1/saham/track-record?lane=alpha")
       .then((r) => r.json())
       .then((d) => setTrackStats(d.data))
       .catch(() => {})

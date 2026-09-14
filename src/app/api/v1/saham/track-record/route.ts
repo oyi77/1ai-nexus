@@ -1,7 +1,8 @@
 // ─────────────────────────────────────────────────────────────
-// GET /api/v1/saham/track-record — alpha accuracy stats.
-//   ?action=record   record today's buy/strong-buy signals
-//   ?action=evaluate evaluate matured signals at 7/14/30d
+// GET /api/v1/saham/track-record — alpha + moonshot accuracy stats.
+//   ?action=record   record today's signals (both lanes)
+//   ?action=evaluate evaluate matured signals at 7/14/30/60d + MFE tails
+//   ?lane=alpha|moonshot  filter stats by lane (default: all)
 //   (default)        return aggregate stats
 // ─────────────────────────────────────────────────────────────
 

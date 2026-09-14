@@ -310,7 +310,21 @@ export async function runBacktest(
 
   const results: BacktestResult[] = []
 
+  // Guard: only Binance-tradable symbols can resolve (klines source).
+  // Non-crypto symbols (e.g. IDX codes) expire instead of retrying forever.
+  let tradable: Set<string> | null = null
+  try {
+    const info = await fetch('https://api.binance.com/api/v3/exchangeInfo', { signal: AbortSignal.timeout(15_000) }).then((r) => r.json()) as { symbols: Array<{ symbol: string; status: string }> }
+    tradable = new Set(info.symbols.filter((x) => x.status === 'TRADING').map((x) => x.symbol))
+  } catch { /* offline — evaluate nothing new, keep pending */ }
+
   for (const [symbol, signals] of bySymbol) {
+    if (tradable && !tradable.has(`${symbol}USDT`)) {
+      for (const signal of signals) {
+        await prisma.backtestResult.update({ where: { id: signal.id }, data: { outcome: 'expired' } }).catch(() => {})
+      }
+      continue
+    }
     const earliest = Math.min(...signals.map(s => s.backtestDate.getTime()))
     const candles = await fetchHistoricalPrices(symbol, earliest, now)
     if (candles.length === 0) continue
