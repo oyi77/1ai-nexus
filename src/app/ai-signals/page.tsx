@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
+import { Panel, AuthGate } from '@/components/shell'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { FinancialDisclaimer } from '@/components/FinancialDisclaimer'
 import { formatPriceUSD } from '@/lib/format'
@@ -68,6 +69,7 @@ export default function AiSignalsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState('All')
+  const [historyGated, setHistoryGated] = useState(false)
   const [tab, setTab] = useState<'signals' | 'history'>('signals')
 
   useEffect(() => {
@@ -179,7 +181,11 @@ export default function AiSignalsPage() {
         }
 
         // Process history
-        if (historyRes.status === 'fulfilled') {
+        // /api/v1/signals/history is premium-gated: 401 = anonymous, show sign-in CTA
+        if (historyRes.status === 'fulfilled' && historyRes.value.status === 401) {
+          setHistoryGated(true)
+          setHistory([])
+        } else if (historyRes.status === 'fulfilled') {
           const historyData = await historyRes.value.json()
           setHistory(historyData.data?.signals ?? [])
           const s = historyData.data?.stats
@@ -526,7 +532,11 @@ export default function AiSignalsPage() {
               </div>
             </div>
             <div className="divide-y divide-border-dim">
-              {filteredHistory.length === 0 ? (
+              {historyGated ? (
+                <div className="p-2">
+                  <AuthGate feature="Signal History" detail="Premium signal track record — sign in to unlock" isAuthenticated={false} />
+                </div>
+              ) : filteredHistory.length === 0 ? (
                 <div className="p-8 text-center text-text-muted text-[12px] font-mono">
                   {historyOutcomeFilter === 'All' 
                     ? 'No signal history yet. Signals will appear after 24h+ when they expire or hit TP/SL.'

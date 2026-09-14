@@ -65,6 +65,7 @@ export function applyCorrelationFilter(
     bcFiltered = boosted.filter(
       (s) =>
         s.symbol === 'BTC' ||
+        s.direction === 'neutral' ||
         (btcBullish
           ? s.direction === 'bullish'
           : s.direction === 'bearish'),
@@ -73,8 +74,9 @@ export function applyCorrelationFilter(
   bcFiltered.sort(
     (a, b) => b.strength * b.confidence - a.strength * a.confidence,
   )
-  const caps = { bullish: 0, bearish: 0 }
+  const caps: Record<'bullish' | 'bearish' | 'neutral', number> = { bullish: 0, bearish: 0, neutral: 0 }
   return bcFiltered.filter((s) => {
+    if (s.direction === 'neutral') return ++caps.neutral <= 3
     if (caps.bullish + caps.bearish >= 15) return false
     const dir = s.direction as 'bullish' | 'bearish'
     return ++caps[dir] <= 5
@@ -97,12 +99,15 @@ export function deduplicateAndConfirm(
   }
 
   // Deduplicate: keep highest strength per symbol+direction
-  // Require either multiple agreeing sources OR high individual confidence
+  // Require either multiple agreeing sources OR high individual confidence.
+  // Neutral warnings (high OI, congestion) are single-source by nature —
+  // admit them alone at a lower floor (40) instead of killing the class.
   const deduped = new Map<string, AlphaSignal>()
   for (const s of correlated) {
     const key = `${s.symbol}-${s.direction}`
     const agree = agreeCount.get(key) ?? 0
-    if (agree < 2 && s.confidence < 65) continue // need confirmation
+    const floor = s.direction === 'neutral' ? 40 : 65
+    if (agree < 2 && s.confidence < floor) continue // need confirmation
     const existing = deduped.get(key)
     if (
       !existing ||

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Panel } from '@/components/shell/Panel'
+import { Panel, AuthGate } from '@/components/shell'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { formatPriceUSD } from '@/lib/format'
 import { FinancialDisclaimer } from '@/components/FinancialDisclaimer'
@@ -102,6 +102,7 @@ function AlphaEnginePageInner() {
   const [status, setStatus] = useState<'live' | 'stale' | 'error'>('stale')
   const [tab, setTab] = useState<'signals' | 'history' | 'predictions' | 'accuracy'>('signals')
   const [marketScore, setMarketScore] = useState<{compositeScore: number; direction: string; confidence: number; topSignals: string[]} | null>(null)
+  const [authRequired, setAuthRequired] = useState(false)
 
   // ─── Signal history pagination/filter/sort state ───
   const [historyOutcome, setHistoryOutcome] = useState<string>('all')
@@ -165,10 +166,14 @@ function AlphaEnginePageInner() {
         const url = buildHistoryUrl(null)
         const res = await fetch(url)
 
-        // If 401 (CSRF not ready yet), retry after a short delay
-        if (res.status === 401 && attempt < 2) {
-          await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
-          if (!cancelled) return fetchPage(attempt + 1)
+        // Premium-gated: anonymous gets 401 — retry twice (CSRF race), then show sign-in CTA
+        if (res.status === 401) {
+          if (attempt < 2) {
+            await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
+            if (!cancelled) return fetchPage(attempt + 1)
+            return
+          }
+          if (!cancelled) { setAuthRequired(true); setHistoryInitialLoaded(true) }
           return
         }
 
@@ -213,20 +218,40 @@ function AlphaEnginePageInner() {
   // Fetch live data (signals, predictions, market score)
   const fetchLiveData = useCallback(async () => {
     try {
-      const [alphaRes, predRes, scoreRes] = await Promise.allSettled([
-        fetch('/api/v1/alpha-engine').then(r => r.json()),
+      const [alphaP, predP, scoreP] = await Promise.allSettled([
+        fetch('/api/v1/alpha-engine'),
         fetch('/api/v1/paper-trading').then(r => r.json()),
         fetch('/api/v1/market-score?symbol=BTC').then(r => r.json()),
       ])
 
-      if (alphaRes.status === 'fulfilled' && alphaRes.value?.data) {
-        setSignals(alphaRes.value.data.signals ?? alphaRes.value.data ?? [])
+      // /api/v1/alpha-engine is premium-gated: 401 = anonymous, show sign-in CTA
+      if (alphaP.status === 'fulfilled') {
+        if (alphaP.value.status === 401) {
+          setAuthRequired(true)
+        } else {
+          setAuthRequired(false)
+          const j: unknown = await alphaP.value.json().catch(() => null)
+          if (j && typeof j === 'object' && 'data' in j) {
+            const d: unknown = j.data
+            if (Array.isArray(d)) setSignals(d as AlphaSignal[])
+            else if (d && typeof d === 'object' && 'signals' in d && Array.isArray(d.signals)) setSignals(d.signals as AlphaSignal[])
+          }
+        }
       }
-      if (predRes.status === 'fulfilled' && predRes.value?.data) {
-        setPredictions(predRes.value.data)
+      if (predP.status === 'fulfilled') {
+        const v: unknown = predP.value
+        if (v && typeof v === 'object' && 'data' in v && v.data && typeof v.data === 'object') {
+          setPredictions(v.data as typeof predictions)
+        }
       }
-      if (scoreRes.status === 'fulfilled' && scoreRes.value?.data?.score) {
-        setMarketScore(scoreRes.value.data.score)
+      if (scoreP.status === 'fulfilled') {
+        const v: unknown = scoreP.value
+        if (v && typeof v === 'object' && 'data' in v) {
+          const d: unknown = v.data
+          if (d && typeof d === 'object' && 'score' in d && d.score && typeof d.score === 'object') {
+            setMarketScore(d.score as typeof marketScore)
+          }
+        }
       }
       setStatus('live')
     } catch {
@@ -410,8 +435,13 @@ function AlphaEnginePageInner() {
                   </div>
                 )
               })}
-              {signals.length === 0 && (
+              {signals.length === 0 && !authRequired && (
                 <div className="p-8 text-center text-text-muted text-[12px] font-mono">Alpha engine is warming up...</div>
+              )}
+              {signals.length === 0 && authRequired && (
+                <div className="p-2">
+                  <AuthGate feature="Alpha Signals" detail="Premium cross-correlated signals — sign in to unlock" isAuthenticated={false} />
+                </div>
               )}
             </div>
           </Panel>
@@ -536,9 +566,14 @@ function AlphaEnginePageInner() {
                 </div>
               )}
               {/* Empty state */}
-              {historyInitialLoaded && history.length === 0 && (
+              {historyInitialLoaded && history.length === 0 && !authRequired && (
                 <div className="p-8 text-center text-text-muted text-[12px] font-mono">
                   No signals match your filters.
+                </div>
+              )}
+              {historyInitialLoaded && history.length === 0 && authRequired && (
+                <div className="p-2">
+                  <AuthGate feature="Signal History" detail="Premium signal track record — sign in to unlock" isAuthenticated={false} />
                 </div>
               )}
             </div>

@@ -86,7 +86,15 @@ export function calculateLevels(
       sl: price + atr14 * slMul,
     }
   }
-  return null
+  // Neutral = volatility warning, not a directional trade: two-sided range
+  // so the signal carries valid levels through the composer instead of
+  return {
+    entry: price,
+    tp1: price + atr14 * tpMul,
+    tp2: price + atr14 * tpMul * 2,
+    tp3: price + atr14 * tpMul * 2,
+    sl: price - atr14 * slMul,
+  }
 }
 
 /**
