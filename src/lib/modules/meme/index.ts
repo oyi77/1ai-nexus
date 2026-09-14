@@ -30,6 +30,7 @@ import { MEME_PLATFORMS, type MemePlatform, type MemeRiskAudit } from './types'
 import { discoverBirdeyeTokens, auditBirdeyeToken } from './birdeye'
 import { auditRugcheckToken } from './rugcheck'
 import { discoverGeckoTerminalTokens } from './geckoterminal'
+import { discoverMobyTokens, auditMobyToken } from './moby'
 
 const MEME_TTL = 180_000 // 3m — mirrors the bitget/gate discovery cadence
 
@@ -186,6 +187,12 @@ const birdeyeDiscovery = makeDiscoveryModule('birdeye-meme', 'Birdeye Forge Meme
 const geckoterminalDiscovery = makeDiscoveryModule('geckoterminal-meme', 'GeckoTerminal Meme Alpha', () =>
   discoverGeckoTerminalTokens(),
 )
+const mobyDiscovery = makeDiscoveryModule('moby-meme', 'Moby Meme Alpha', () =>
+  discoverMobyTokens(),
+)
+const mobyAudit = makeAuditModule('moby-meme-risk', 'Moby Meme Risk Audit', (c, k) =>
+  auditMobyToken(c, k),
+)
 
 // Blocked server-side (browser-session / Cloudflare) — disabled stubs so
 // pages/APIs can enumerate them without a live module.
@@ -221,10 +228,14 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
   },
   moby: {
     platform: 'moby',
-    displayName: 'Moby (pending RE)',
-    discoveryModule: makeDiscoveryModule('moby-meme', 'Moby Meme Alpha (pending RE)', () => Promise.resolve([])),
+    displayName: 'Moby',
+    discoveryModule: mobyDiscovery,
+    auditModule: mobyAudit,
     ttlMs: MEME_TTL,
-    enabled: false,
+    // Key-gated: live only when MOBY_API_KEY (Privy JWT) is configured.
+    // Without it the module throws a descriptive error and routes
+    // error-isolate per platform — same pattern as other keyed sources.
+    enabled: process.env.MOBY_API_KEY != null && process.env.MOBY_API_KEY !== '',
   },
   dexscreener: {
     platform: 'dexscreener',
