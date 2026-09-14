@@ -28,6 +28,7 @@ const DEFAULT_PAGES = [
 const EXPECTED_401 = [
   '/api/v1/watchlist',
   '/api/v1/signals/history',
+  '/api/v1/alpha-engine',
   '/api/v1/alerts',
   '/api/v1/account/',
   '/api/v1/modules/fetch',
