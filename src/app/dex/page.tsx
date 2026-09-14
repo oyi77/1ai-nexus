@@ -1,6 +1,11 @@
 "use client";
+import { NexusLayout } from '@/components/layout/NexusLayout';
 import { DexMonitorPageContent } from "./content";
 
 export default function DexMonitorPage() {
-  return <DexMonitorPageContent />;
+  return (
+    <NexusLayout>
+      <DexMonitorPageContent />
+    </NexusLayout>
+  );
 }

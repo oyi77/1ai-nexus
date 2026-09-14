@@ -1,6 +1,11 @@
 "use client";
+import { NexusLayout } from '@/components/layout/NexusLayout';
 import { MempoolPageContent } from "./content";
 
 export default function MempoolPage() {
-  return <MempoolPageContent />;
+  return (
+    <NexusLayout>
+      <MempoolPageContent />
+    </NexusLayout>
+  );
 }

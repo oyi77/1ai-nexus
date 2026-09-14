@@ -1,6 +1,11 @@
 "use client";
+import { NexusLayout } from '@/components/layout/NexusLayout';
 import { CycleIndicatorsPageContent } from "./content";
 
 export default function CycleIndicatorsPage() {
-  return <CycleIndicatorsPageContent />;
+  return (
+    <NexusLayout>
+      <CycleIndicatorsPageContent />
+    </NexusLayout>
+  );
 }

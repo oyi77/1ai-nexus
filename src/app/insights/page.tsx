@@ -1,4 +1,5 @@
 import { Metadata } from 'next'
+import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { TrendingUp, BarChart3, Target, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react'
 
@@ -215,8 +216,8 @@ export default async function InsightsPage() {
   const generatedAt = conviction?.generated ? new Date(conviction.generated).toLocaleString() : null
 
   return (
-    <main className="min-h-screen bg-bg-base">
-      {/* Hero */}
+    <NexusLayout>
+      <div className="min-h-screen bg-bg-base">
       <header className="border-b border-bg-border bg-bg-panel">
         <div className="max-w-6xl mx-auto px-4 py-10 sm:py-14">
           <div className="flex items-center gap-2 mb-3">
@@ -311,6 +312,7 @@ export default async function InsightsPage() {
           </a>
         </section>
       </div>
-    </main>
+      </div>
+    </NexusLayout>
   )
 }

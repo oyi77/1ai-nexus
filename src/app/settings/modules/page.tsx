@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-
+import { NexusLayout } from "@/components/layout/NexusLayout"
 interface ModuleInfo {
   id: string
   name: string
@@ -52,8 +52,8 @@ export default function ModulesPage() {
   const categories = [...new Set(modules.map(m => m.category))].sort()
 
   return (
-    <div className="min-h-screen bg-[#080b0f] text-[#dce8f0] p-6">
-      <div className="max-w-6xl mx-auto">
+    <NexusLayout>
+      <div className="min-h-screen bg-[#080b0f] text-[#dce8f0] p-6">
         <header className="mb-8">
           <h1 className="text-2xl font-bold font-[family-name:var(--font-head)]" style={{ fontFamily: 'Space Grotesk, sans-serif' }}>
             ⚙ Module Settings
@@ -105,7 +105,7 @@ export default function ModulesPage() {
           </div>
         )}
       </div>
-    </div>
+    </NexusLayout>
   )
 }
 

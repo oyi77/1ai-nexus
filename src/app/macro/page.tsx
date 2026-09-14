@@ -1,5 +1,10 @@
 "use client";
+import { NexusLayout } from '@/components/layout/NexusLayout';
 import { MacroCommandCenterContent } from "./content";
 export default function MacroCommandCenter() {
-  return <MacroCommandCenterContent />;
+  return (
+    <NexusLayout>
+      <MacroCommandCenterContent />
+    </NexusLayout>
+  );
 }

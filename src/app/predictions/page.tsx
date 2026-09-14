@@ -1,6 +1,11 @@
 "use client";
+import { NexusLayout } from '@/components/layout/NexusLayout';
 import { PredictionsPageContent } from "./content";
 
 export default function PredictionsPage() {
-  return <PredictionsPageContent />;
+  return (
+    <NexusLayout>
+      <PredictionsPageContent />
+    </NexusLayout>
+  );
 }
