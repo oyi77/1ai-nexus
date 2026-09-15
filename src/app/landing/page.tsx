@@ -7,11 +7,11 @@ import {
 } from 'lucide-react'
 
 const STATS = [
-  { value: '50+', label: 'Proprietary signals' },
-  { value: '15+', label: 'Data sources' },
-  { value: '15', label: 'Markets' },
+  { value: '77', label: 'Live data modules' },
+  { value: '15', label: 'Markets covered' },
+  { value: '17.5K+', label: 'Signals tracked' },
+  { value: '65%', label: 'Moonshot hit-rate*' },
   { value: 'AI', label: 'Powered signals' },
-  { value: '~3M', label: 'Intelligence queries/sec' },
 ]
 
 const FEATURES = [
@@ -22,7 +22,7 @@ const FEATURES = [
   },
   {
     icon: Globe2,
-    title: 'Market Intelligence — 14 markets, one screen',
+    title: 'Market Intelligence — 15 markets, one screen',
     body: 'US, Japan, UK, Germany, Hong Kong, India, Canada, Korea, Taiwan, Australia, Singapore, Brazil, Switzerland, Netherlands — unified symbols, one search, cross-chain intelligence.',
   },
   {
@@ -219,7 +219,7 @@ export default function LandingPage() {
         <div className="relative max-w-6xl mx-auto px-6 pt-20 pb-16 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-bg-border bg-bg-panel text-xs text-text-secondary mb-7">
             <span className="w-1.5 h-1.5 rounded-full bg-teal-vivid animate-live-dot" />
-            Live — 50+ proprietary signals, 15+ data sources
+            Live — 77 data modules, 15 markets
           </div>
           <h1 className="text-4xl md:text-6xl font-bold tracking-tight leading-[1.05] mb-6">
             Market intelligence,
@@ -227,7 +227,7 @@ export default function LandingPage() {
             <span className="text-teal-vivid">Bloomberg-grade.</span> Zero cost.
           </h1>
           <p className="text-lg text-text-secondary max-w-2xl mx-auto mb-9 leading-relaxed">
-            IDX bandarmology signals, fundamentals, 14 global markets, on-chain intel and AI trade thesis —
+            IDX bandarmology signals, fundamentals, 15 global markets, on-chain intel and AI trade thesis —
             one terminal, every intelligence layer served from memory in milliseconds.
           </p>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 mb-14">
@@ -323,6 +323,10 @@ export default function LandingPage() {
             </div>
           ))}
         </div>
+        <p className="text-xs text-text-muted text-center">
+          *Moonshot lane: P(+10% within 30d) on 10K-scored IDX windows, measured from session highs.
+          Live numbers: <Link href="/moonshot" className="hover:underline">/moonshot</Link>
+        </p>
       </section>
 
       {/* ── Features ── */}
@@ -430,49 +434,41 @@ export default function LandingPage() {
       {/* ── Track Record ── */}
       <section id="track-record" className="max-w-6xl mx-auto px-6 py-20">
         <p className="eyebrow mb-2">Track Record</p>
-        <h2 className="text-3xl font-bold tracking-tight mb-3">Our Signals, Proven</h2>
+        <h2 className="text-3xl font-bold tracking-tight mb-3">Our Signals, Measured</h2>
         <p className="text-text-secondary mb-8 max-w-2xl">
-          Every conviction signal is measured 24h later. The higher the conviction, the higher the hit-rate should be.
+          Every conviction signal is measured 24h later (±0.5% close-to-close). For right-tail
+          performance — the number that matters for runners — see the{' '}
+          <Link href="/moonshot" className="text-teal-vivid hover:underline">moonshot board</Link>:
+          65% measured hit-rate on 10K-scored windows, from session highs.
         </p>
         <TrackRecordBuckets />
       </section>
 
-      {/* ── Social proof ── */}
+      {/* ── Proof, not promises ── */}
       <section className="border-y border-bg-border bg-bg-panel/40">
         <div className="max-w-6xl mx-auto px-6 py-16">
-          <p className="eyebrow mb-2 text-center">Trusted by</p>
+          <p className="eyebrow mb-2 text-center">Why NEXUS</p>
           <p className="text-2xl font-bold tracking-tight mb-10 text-center">
-            Traders who stopped overpaying for data.
+            Measured in the open — no invented quotes.
           </p>
           <div className="grid md:grid-cols-3 gap-4">
             {[
               {
-                quote: 'I cancelled a $200/mo terminal a week after opening NEXUS. The bandarmology signals alone are worth it.',
-                name: 'Rizky Pratama',
-                role: 'Independent IDX trader',
+                title: 'Signals are scored, not marketed',
+                body: 'Every conviction signal is evaluated after emission and published on this page — wins and losses alike. The moonshot lane alone carries 17.5K+ scored signals with a measured hit-rate.',
               },
               {
-                quote: 'Global markets, on-chain intel and AI thesis in one keyboard-driven terminal — it replaced three subscriptions for me.',
-                name: 'Sarah Chen',
-                role: 'Crypto portfolio manager',
+                title: 'Free terminal, honest comparison',
+                body: 'No paywall on the terminal today. Compare the coverage table yourself — competitor rows list list-price and scope as of Aug 2026.',
               },
               {
-                quote: 'The AI trade thesis is the first one that actually explains its reasoning. I check it every morning.',
-                name: 'Andi Wijaya',
-                role: 'Retail investor, Jakarta',
+                title: 'Provenance for every data module',
+                body: '77 data modules each declare their upstream source, cache policy and fallback. Nothing anonymous, nothing hand-waved.',
               },
-            ].map((t) => (
-              <div key={t.name} className="card card-hover p-5">
-                <p className="text-text-secondary text-sm leading-relaxed">&ldquo;{t.quote}&rdquo;</p>
-                <div className="mt-4 flex items-center gap-3">
-                  <div className="flex items-center justify-center w-9 h-9 rounded-full bg-teal-dim/40 text-teal-vivid text-xs font-bold">
-                    {t.name.split(' ').map((n) => n[0]).slice(0, 2).join('')}
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold">{t.name}</div>
-                    <div className="text-xs text-text-muted">{t.role}</div>
-                  </div>
-                </div>
+            ].map((p) => (
+              <div key={p.title} className="card card-hover p-5">
+                <p className="font-semibold text-teal-vivid text-sm mb-2">{p.title}</p>
+                <p className="text-text-secondary text-sm leading-relaxed">{p.body}</p>
               </div>
             ))}
           </div>
