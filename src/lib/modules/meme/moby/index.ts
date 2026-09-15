@@ -44,6 +44,11 @@ import { resolveMobyAccessToken, hasSessionCredentials } from './session'
 function mobyKey(): string {
   const key = process.env.MOBY_API_KEY
   if (!key) {
+    if (process.env.MOBY_EMAIL) {
+      // Self-heal path: caller (mobyGet) falls back to the email-OTP
+      // resolver; this sync gate must not block it.
+      throw new Error('MOBY_EMAIL_SELFHEAL_REQUIRED')
+    }
     throw new Error(
       'No Moby credentials — set MOBY_REFRESH_TOKEN (long-lived Privy refresh token; ' +
         'auto-renews ~1h access JWTs via auth.privy.io/api/v1/sessions) or a static ' +
@@ -168,7 +173,18 @@ async function mobyGet<T>(path: string, params?: Record<string, string>): Promis
 
   // Session store first (RT auto-renew; MOBY_API_KEY seeds it and is the
   // resolver's fallback when no RT exists, so mobyKey()'s expiry guard applies).
-  const token = await (hasSessionCredentials() ? resolveMobyAccessToken() : Promise.resolve(mobyKey()))
+  let token: string
+  try {
+    token = await (hasSessionCredentials() ? resolveMobyAccessToken() : Promise.resolve(mobyKey()))
+  } catch (e) {
+    // Nothing seeded and MOBY_EMAIL configured → bootstrap a session
+    // via email-OTP re-auth (self-heal from empty state).
+    if (e instanceof Error && e.message === 'MOBY_EMAIL_SELFHEAL_REQUIRED') {
+      token = await resolveMobyAccessToken(true)
+    } else {
+      throw e
+    }
+  }
   let res = await call(token)
   if (res.status === 401 && hasSessionCredentials()) {
     // Token died mid-window (clock skew / server-side revoke) — rotate once and retry.

@@ -15,9 +15,10 @@
 // store on first boot; after the first rotation the file's pair wins.
 //
 // Failure semantics:
-// - Privy session_update_action 'clear' (server-side revocation) →
-//   session file deleted + fatal error; operator must re-seed. A retry
-//   loop here would burn nothing but hide the real problem.
+// - Privy session_update_action 'clear' or 401 on refresh (RT burned/
+//   revoked) → clearSession() deletes the file, then SELF-HEALS via
+//   MOBY_EMAIL auto re-auth (email OTP → fresh identity + pair) when
+//   configured; without MOBY_EMAIL it raises a fatal actionable error.
 // - A failed refresh sets a 10-min negative cache so a dead RT doesn't
 //   hammer auth.privy.io on every meme request.
 // ─────────────────────────────────────────────────────────────
@@ -25,6 +26,7 @@
 import { readFileSync, writeFileSync, renameSync, mkdirSync, chmodSync, unlinkSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { logger } from '@/lib/logger'
+import { reauthenticateViaEmail } from './reauth'
 
 const PRIVY_APP_ID = 'cmg5m1dgg025kl20cusn1cypb'
 // Lazily resolved so tests can override MOBY_SESSION_PATH per-test
@@ -121,13 +123,14 @@ export async function refreshPrivySession(
   })
   if (!res.ok) {
     // 401 with a real-shaped AT + RT = Privy no longer recognizes the
-    // session (RT burned/revoked). Retry never heals — clear + fatal.
-    if (res.status === 401) clearSession(`HTTP 401 from ${res.url}`)
+    // session (RT burned/revoked). Retry never heals — clear + self-heal
+    // or fatal.
+    if (res.status === 401) await clearSession(`HTTP 401 from ${res.url}`)
     throw new Error(`Privy session refresh failed: HTTP ${res.status}`)
   }
   const body = (await res.json()) as PrivySessionResponse
   if (body.session_update_action === 'clear') {
-    clearSession('session_update_action=clear')
+    await clearSession('session_update_action=clear')
   }
   const accessTokenNew = body.token ?? ''
   const refreshTokenNew = body.refresh_token ?? refreshToken
@@ -138,24 +141,50 @@ export async function refreshPrivySession(
 /**
  * Privy declared the session dead ('clear' = server-side revocation /
  * RT exhausted). Delete the stale file so restarts don't retry a burned
- * RT, and raise a fatal, actionable error — no retry loop.
+ * RT, then self-heal: MOBY_EMAIL re-auth (email OTP → fresh pair) when
+ * configured, else fatal actionable error.
  */
-function clearSession(reason: string): never {
+async function clearSession(reason: string): Promise<never> {
   cached = null
+  rtPresenceCache = null
+  refreshBlockedUntil = 0
   try {
     if (existsSync(sessionPath())) unlinkSync(sessionPath())
   } catch { /* best-effort cleanup */ }
-  throw new Error(
-    `Moby Privy session revoked (${reason}) — re-seed MOBY_API_KEY + MOBY_REFRESH_TOKEN ` +
-      'from a fresh Privy auth (passwordless/init → passwordless/authenticate).',
-  )
+  const email = process.env.MOBY_EMAIL
+  if (!email) {
+    throw new Error(
+      `Moby Privy session revoked (${reason}) — set MOBY_EMAIL (guerrillamail.com address ` +
+        'auto-re-auths) or re-seed MOBY_API_KEY + MOBY_REFRESH_TOKEN manually.',
+    )
+  }
+  // Self-heal: fresh identity + pair, persisted as the new session.
+  const creds = await reauthenticateViaEmail(email)
+  const fresh: MobySession = {
+    accessToken: creds.token,
+    accessTokenExp: jwtExpMs(creds.token),
+    refreshToken: creds.refreshToken,
+  }
+  cached = fresh
+  writeSessionFile(fresh)
+  logger.warn(`moby self-heal complete: session re-established for ${email}`, 'moby')
+  // Never returns normally — callers already hold a thrown error; we
+  // rethrow a sentinel the resolver converts into a successful retry.
+  throw new SessionReauthSucceeded()
 }
 
-/** Rotate once (single-flight) and persist. */
-async function rotate(): Promise<MobySession> {
+/** Internal control-flow sentinel: session was re-established mid-failure. */
+class SessionReauthSucceeded extends Error {
+  constructor() {
+    super('moby session re-established via email self-heal')
+  }
+}
+
+/** Rotate once (single-flight) and persist. `force` bypasses the negative cache (a live 401 is proof the token is dead). */
+async function rotate(force = false): Promise<MobySession> {
   if (refreshInflight) return refreshInflight
   refreshInflight = (async () => {
-    if (Date.now() < refreshBlockedUntil) {
+    if (!force && Date.now() < refreshBlockedUntil) {
       throw new Error('Moby refresh blocked (recent Privy failure — negative cache active)')
     }
     const current = cached ?? readSessionFile()
@@ -164,20 +193,39 @@ async function rotate(): Promise<MobySession> {
     const at = current?.accessToken ?? process.env.MOBY_API_KEY ?? ''
     const rt = current?.refreshToken ?? process.env.MOBY_REFRESH_TOKEN
     if (!at || !rt) {
-      throw new Error(
-        'No Moby session — set both MOBY_API_KEY (any JWT from the session, expired ok) ' +
-          'and MOBY_REFRESH_TOKEN (long-lived) from ONE Privy auth response; the module ' +
-          'then self-renews and persists data/moby-session.json.',
-      )
+      const email = process.env.MOBY_EMAIL
+      if (!email) {
+        throw new Error(
+          'No Moby session — set both MOBY_API_KEY (any JWT from the session, expired ok) ' +
+            'and MOBY_REFRESH_TOKEN (long-lived) from ONE Privy auth response, or set ' +
+            'MOBY_EMAIL (guerrillamail.com address) to auto-bootstrap via email OTP; ' +
+            'the module then self-renews and persists data/moby-session.json.',
+        )
+      }
+      // Cold boot with only MOBY_EMAIL: bootstrap the session.
+      const creds = await reauthenticateViaEmail(email)
+      const healed: MobySession = { accessToken: creds.token, accessTokenExp: jwtExpMs(creds.token), refreshToken: creds.refreshToken }
+      refreshBlockedUntil = 0
+      cached = healed
+      writeSessionFile(healed)
+      logger.info(`moby session bootstrapped via email self-heal (${email})`, 'moby')
+      return healed
     }
     let fresh: MobySession
     try {
       fresh = await refreshPrivySession(at, rt)
     } catch (e) {
-      // One failure per NEGATIVE_CACHE_MS — a dead RT must not be
-      // re-probed on every meme request.
-      refreshBlockedUntil = Date.now() + NEGATIVE_CACHE_MS
-      throw e
+      if (e instanceof SessionReauthSucceeded) {
+        // clearSession self-healed (fresh pair already in cache + file).
+        // Recursion is safe: cached now valid, next line returns it.
+        fresh = cached!
+      } else {
+        // One failure per NEGATIVE_CACHE_MS — a dead RT must not be
+        // re-probed on every meme request. (Self-heal failures also
+        // land here: don't OTP-spam Privy every request either.)
+        refreshBlockedUntil = Date.now() + NEGATIVE_CACHE_MS
+        throw e
+      }
     }
     refreshBlockedUntil = 0
     cached = fresh
@@ -209,7 +257,7 @@ export async function resolveMobyAccessToken(force = false): Promise<string> {
     }
   }
   try {
-    const fresh = await rotate()
+    const fresh = await rotate(force)
     return fresh.accessToken
   } catch (e) {
     // Static MOBY_API_KEY fallback only when NO refresh path exists
