@@ -194,8 +194,9 @@ export function getMobyLastHealAt(): number {
  */
 async function notifyHeal(email: string, reason: string): Promise<void> {
   try {
-    const token = process.env.TELEGRAM_BOT_TOKEN
-    const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID
+    // Proven pair (zero-issue-cron): hub bot token + hub owner chat.
+    const token = process.env.HUB_TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN
+    const chatId = process.env.HUB_TELEGRAM_OWNER_CHAT_ID || process.env.TELEGRAM_ADMIN_CHAT_ID
     if (!token || !chatId) return
     const t = new Date().toISOString().slice(11, 19)
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
