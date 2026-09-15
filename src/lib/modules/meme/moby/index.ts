@@ -50,6 +50,25 @@ function mobyKey(): string {
         '(mint via email OTP: passwordless/init → passwordless/authenticate).',
     )
   }
+  // Privy JWTs live ~1h. Fail fast on an expired token so the route's
+  // platformsStatus says "expired", not a misleading upstream 401.
+  const parts = key.split('.')
+  if (parts.length === 3) {
+    try {
+      const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')) as {
+        exp?: number
+      }
+      if (typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now()) {
+        throw new Error(
+          'MOBY_API_KEY expired — Privy JWTs live ~1h; mint a fresh one via ' +
+            'passwordless/init → passwordless/authenticate.',
+        )
+      }
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith('MOBY_API_KEY expired')) throw e
+      // non-JWT key (future API-key support) — pass through
+    }
+  }
   return key
 }
 

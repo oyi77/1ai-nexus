@@ -88,6 +88,35 @@ describe('discoverMobyTokens', () => {
     await expect(discoverMobyTokens()).rejects.toThrow('MOBY_API_KEY')
   })
 
+  it('throws expired error for an expired JWT before hitting upstream', async () => {
+    const exp = Math.floor(Date.now() / 1000) - 10
+    const payload = Buffer.from(JSON.stringify({ exp })).toString('base64url')
+    process.env.MOBY_API_KEY = `h.${payload}.sig`
+    const spy = vi.fn()
+    vi.stubGlobal('fetch', spy)
+    await expect(discoverMobyTokens()).rejects.toThrow('MOBY_API_KEY expired')
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('passes through a valid unexpired JWT', async () => {
+    const exp = Math.floor(Date.now() / 1000) + 600
+    const payload = Buffer.from(JSON.stringify({ exp })).toString('base64url')
+    process.env.MOBY_API_KEY = `h.${payload}.sig`
+    mockFetchSequence([
+      { status: 200, body: { entries: [] } },
+      { status: 200, body: { entries: [] } },
+      { status: 200, body: { entries: [] } },
+      { status: 200, body: { entries: [] } },
+    ])
+    const seen = await vi.waitFor(async () => {
+      const t = await discoverMobyTokens(1)
+      return t
+    })
+    expect(seen).toEqual([])
+    const auth = (vi.mocked(fetch).mock.calls[0]?.[1] as { headers: Record<string, string> }).headers.authorization
+    expect(auth).toBe(`Bearer h.${payload}.sig`)
+  })
+
   it('skips entries without contract address', async () => {
     mockFetchSequence([
       { status: 200, body: { entries: [{ network: 'solana' }] } },
