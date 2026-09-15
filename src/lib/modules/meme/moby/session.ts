@@ -8,15 +8,23 @@
 // The Authorization header may carry an EXPIRED access token —
 // the refresh token is the only secret that matters.
 //
-// Storage: data/moby-session.json (plaintext — same trust level as
-// data/botx-keys.sqlite; gitignored). Precedence: in-memory →
+// Storage: data/moby-session.json (plaintext, chmod 0600 — same trust
+// level as data/botx-keys.sqlite; gitignored). Precedence: in-memory →
 // file → refresh via RT → env MOBY_API_KEY static fallback.
-// MOBY_REFRESH_TOKEN env seeds the store on first boot; after the
-// first rotation the file's RT wins (env RT is stale).
+// MOBY_API_KEY + MOBY_REFRESH_TOKEN (one Privy auth response) seed the
+// store on first boot; after the first rotation the file's pair wins.
+//
+// Failure semantics:
+// - Privy session_update_action 'clear' (server-side revocation) →
+//   session file deleted + fatal error; operator must re-seed. A retry
+//   loop here would burn nothing but hide the real problem.
+// - A failed refresh sets a 10-min negative cache so a dead RT doesn't
+//   hammer auth.privy.io on every meme request.
 // ─────────────────────────────────────────────────────────────
 
-import { readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs'
+import { readFileSync, writeFileSync, renameSync, mkdirSync, chmodSync, unlinkSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
+import { logger } from '@/lib/logger'
 
 const PRIVY_APP_ID = 'cmg5m1dgg025kl20cusn1cypb'
 // Lazily resolved so tests can override MOBY_SESSION_PATH per-test
@@ -36,6 +44,10 @@ interface MobySession {
 
 let cached: MobySession | null = null
 let refreshInflight: Promise<MobySession> | null = null
+// After a failed refresh, suppress further Privy calls for this long —
+// a dead RT gets one 401 per window instead of one per request.
+const NEGATIVE_CACHE_MS = 10 * 60 * 1000
+let refreshBlockedUntil = 0
 
 function jwtExpMs(token: string): number {
   const parts = token.split('.')
@@ -64,16 +76,22 @@ function writeSessionFile(s: MobySession): void {
   try {
     mkdirSync(dirname(sessionPath()), { recursive: true })
     const tmp = `${sessionPath()}.tmp`
-    writeFileSync(tmp, JSON.stringify(s))
+    writeFileSync(tmp, JSON.stringify(s), { mode: 0o600 })
     renameSync(tmp, sessionPath()) // atomic
-  } catch {
-    // Unwritable fs — in-memory cache still serves until process restart.
+    try {
+      chmodSync(sessionPath(), 0o600) // tighten pre-existing files too
+    } catch { /* best-effort */ }
+  } catch (e) {
+    // Unwritable fs — in-memory cache serves until restart, but rotation
+    // is then lost (env seeds take over). Make that loud.
+    logger.warn('moby session persist failed — next restart re-seeds from env', 'moby', { err: String(e), path: sessionPath() })
   }
 }
 
 interface PrivySessionResponse {
   token?: string
   refresh_token?: string
+  session_update_action?: string // 'set' | 'clear' | 'ignore'
 }
 
 /**
@@ -102,19 +120,44 @@ export async function refreshPrivySession(
     signal: AbortSignal.timeout(15_000),
   })
   if (!res.ok) {
+    // 401 with a real-shaped AT + RT = Privy no longer recognizes the
+    // session (RT burned/revoked). Retry never heals — clear + fatal.
+    if (res.status === 401) clearSession(`HTTP 401 from ${res.url}`)
     throw new Error(`Privy session refresh failed: HTTP ${res.status}`)
   }
   const body = (await res.json()) as PrivySessionResponse
+  if (body.session_update_action === 'clear') {
+    clearSession('session_update_action=clear')
+  }
   const accessTokenNew = body.token ?? ''
   const refreshTokenNew = body.refresh_token ?? refreshToken
   if (!accessTokenNew) throw new Error('Privy session refresh: no token in response')
   return { accessToken: accessTokenNew, accessTokenExp: jwtExpMs(accessTokenNew), refreshToken: refreshTokenNew }
 }
 
+/**
+ * Privy declared the session dead ('clear' = server-side revocation /
+ * RT exhausted). Delete the stale file so restarts don't retry a burned
+ * RT, and raise a fatal, actionable error — no retry loop.
+ */
+function clearSession(reason: string): never {
+  cached = null
+  try {
+    if (existsSync(sessionPath())) unlinkSync(sessionPath())
+  } catch { /* best-effort cleanup */ }
+  throw new Error(
+    `Moby Privy session revoked (${reason}) — re-seed MOBY_API_KEY + MOBY_REFRESH_TOKEN ` +
+      'from a fresh Privy auth (passwordless/init → passwordless/authenticate).',
+  )
+}
+
 /** Rotate once (single-flight) and persist. */
 async function rotate(): Promise<MobySession> {
   if (refreshInflight) return refreshInflight
   refreshInflight = (async () => {
+    if (Date.now() < refreshBlockedUntil) {
+      throw new Error('Moby refresh blocked (recent Privy failure — negative cache active)')
+    }
     const current = cached ?? readSessionFile()
     // AT: persisted (even expired — Privy accepts it), else env seed.
     // RT: persisted (authoritative — env RT goes stale after first rotation).
@@ -127,7 +170,16 @@ async function rotate(): Promise<MobySession> {
           'then self-renews and persists data/moby-session.json.',
       )
     }
-    const fresh = await refreshPrivySession(at, rt)
+    let fresh: MobySession
+    try {
+      fresh = await refreshPrivySession(at, rt)
+    } catch (e) {
+      // One failure per NEGATIVE_CACHE_MS — a dead RT must not be
+      // re-probed on every meme request.
+      refreshBlockedUntil = Date.now() + NEGATIVE_CACHE_MS
+      throw e
+    }
+    refreshBlockedUntil = 0
     cached = fresh
     writeSessionFile(fresh)
     return fresh
@@ -160,10 +212,15 @@ export async function resolveMobyAccessToken(force = false): Promise<string> {
     const fresh = await rotate()
     return fresh.accessToken
   } catch (e) {
-    // Static MOBY_API_KEY fallback only when rotation is impossible
-    // (no RT configured). If RT exists but Privy refused, surface the
-    // real error — silently degrading to a dying static JWT hides it.
-    if (!process.env.MOBY_REFRESH_TOKEN && !readSessionFile()) {
+    // Static MOBY_API_KEY fallback only when NO refresh path exists
+    // (no env RT and no file RT). If a refresh was *attempted* and
+    // refused, surface the real error — silently degrading to a dying
+    // static JWT hides the session problem.
+    const hasRt =
+      !!process.env.MOBY_REFRESH_TOKEN ||
+      !!cached?.refreshToken ||
+      !!readSessionFile()?.refreshToken
+    if (!hasRt) {
       const fallback = process.env.MOBY_API_KEY
       if (fallback) return fallback
     }
@@ -171,20 +228,30 @@ export async function resolveMobyAccessToken(force = false): Promise<string> {
   }
 }
 
+let rtPresenceCache: { until: number; value: boolean } | null = null
+
 /** True when an RT exists anywhere (memory/file/env) — gates session-first auth. */
 export function hasSessionCredentials(): boolean {
   if (cached?.refreshToken) return true
+  if (rtPresenceCache && Date.now() < rtPresenceCache.until) return rtPresenceCache.value
   try {
     const f = readSessionFile()
-    if (f?.refreshToken) return true
+    if (f?.refreshToken) {
+      rtPresenceCache = { until: Date.now() + 30_000, value: true }
+      return true
+    }
   } catch {
     // fall through
   }
-  return !!process.env.MOBY_REFRESH_TOKEN
+  const v = !!process.env.MOBY_REFRESH_TOKEN
+  rtPresenceCache = { until: Date.now() + 30_000, value: v }
+  return v
 }
 
 /** Test/diag helper: forget in-memory state. */
 export function resetMobySession(): void {
   cached = null
   refreshInflight = null
+  rtPresenceCache = null
+  refreshBlockedUntil = 0
 }

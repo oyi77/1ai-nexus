@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -96,7 +96,7 @@ describe('resolveMobyAccessToken', () => {
       'fetch',
       vi.fn(async () => new Response(JSON.stringify({ error: 'x' }), { status: 401 })),
     )
-    await expect(resolveMobyAccessToken()).rejects.toThrow('Privy session refresh failed')
+    await expect(resolveMobyAccessToken()).rejects.toThrow('Privy session revoked')
   })
 
   it('falls back to static MOBY_API_KEY when no RT', async () => {
@@ -104,5 +104,51 @@ describe('resolveMobyAccessToken', () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('no network expected') }))
     const t = await resolveMobyAccessToken()
     expect(t).toBe(STALE_AT)
+  })
+
+  it('clear action deletes session file and throws fatal', async () => {
+    process.env.MOBY_API_KEY = STALE_AT
+    process.env.MOBY_REFRESH_TOKEN = 'rt-env'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        new Response(JSON.stringify({ session_update_action: 'clear' }), { status: 200 }),
+      ),
+    )
+    await expect(resolveMobyAccessToken()).rejects.toThrow('Privy session revoked')
+    expect(existsSync(process.env.MOBY_SESSION_PATH!)).toBe(false)
+  })
+
+  it('negative-caches a 500 refresh failure (no hammering Privy)', async () => {
+    process.env.MOBY_API_KEY = STALE_AT
+    process.env.MOBY_REFRESH_TOKEN = 'rt-env'
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 500 }))
+    vi.stubGlobal('fetch', fetchMock)
+    await expect(resolveMobyAccessToken()).rejects.toThrow('HTTP 500')
+    const callsAfterFirst = fetchMock.mock.calls.length
+    await expect(resolveMobyAccessToken()).rejects.toThrow('negative cache active')
+    expect(fetchMock.mock.calls.length).toBe(callsAfterFirst) // no extra Privy call
+  })
+
+  it('falls back to static key when file is malformed (AT without RT)', async () => {
+    process.env.MOBY_API_KEY = STALE_AT
+    delete process.env.MOBY_REFRESH_TOKEN
+    writeFileSync(
+      process.env.MOBY_SESSION_PATH!,
+      JSON.stringify({ accessToken: STALE_AT, accessTokenExp: 0, refreshToken: '' }),
+    )
+    resetMobySession()
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('no network expected') }))
+    const t = await resolveMobyAccessToken()
+    expect(t).toBe(STALE_AT)
+  })
+
+  it('session file is written with 0600 perms', async () => {
+    process.env.MOBY_API_KEY = STALE_AT
+    process.env.MOBY_REFRESH_TOKEN = 'rt-env'
+    mockRefreshSequence([{}])
+    await resolveMobyAccessToken()
+    const mode = statSync(process.env.MOBY_SESSION_PATH!).mode & 0o777
+    expect(mode).toBe(0o600)
   })
 })

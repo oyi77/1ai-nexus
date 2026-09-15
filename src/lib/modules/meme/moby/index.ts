@@ -41,9 +41,6 @@ const UA =
 
 import { resolveMobyAccessToken, hasSessionCredentials } from './session'
 
-// Networks from GET /tokens/chains/ (verified 2026-09-15).
-const DISCOVERY_NETWORKS = ['solana', 'base', 'bnb', 'robinhood'] as const
-
 function mobyKey(): string {
   const key = process.env.MOBY_API_KEY
   if (!key) {
@@ -223,20 +220,61 @@ function toToken(e: MobyEntry): MemeAlphaToken | null {
 
 // ── Discovery ───────────────────────────────────────────────
 
+/**
+ * Networks from GET /tokens/chains/ ({chains: [{network, ...}]}, verified
+ * 2026-09-15), cached 24h — Moby adding a chain then auto-covers it.
+ * Falls back to the last-known set on fetch failure.
+ */
+const FALLBACK_NETWORKS = ['solana', 'base', 'bnb', 'robinhood'] as const
+let networksCache: { value: string[]; until: number } | null = null
+
+async function discoveryNetworks(): Promise<string[]> {
+  if (networksCache && Date.now() < networksCache.until) return networksCache.value
+  try {
+    const raw = await mobyGet<{ chains?: Array<{ network?: string }> }>('/tokens/chains/')
+    const nets = (raw.chains ?? [])
+      .map((c) => c.network)
+      .filter((n): n is string => !!n)
+    if (nets.length === 0) throw new Error('empty chains response')
+    networksCache = { value: nets, until: Date.now() + 24 * 3600 * 1000 }
+    return nets
+  } catch {
+    networksCache = { value: [...FALLBACK_NETWORKS], until: Date.now() + 3600 * 1000 }
+    return [...FALLBACK_NETWORKS]
+  }
+}
+
 /** New-token discovery: screener leaderboard per network (whale telemetry). */
 export async function discoverMobyTokens(limitPerChain = 25): Promise<MemeAlphaToken[]> {
+  const networks = await discoveryNetworks()
+  // Parallel per-network fetches; one flaky network must not kill the
+  // rest — but if EVERY network fails (auth dead, upstream down), throw
+  // so the route's platformsStatus reports the error instead of
+  // silently serving an empty board.
+  const settled = await Promise.allSettled(
+    networks.map(async (network) => {
+      const raw = await mobyGet<MobyLeaderboardResponse>('/tokens/screener/leaderboard/', {
+        network,
+      })
+      return { network, entries: raw.entries ?? [] }
+    }),
+  )
+  const failures = settled.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+  if (failures.length === settled.length && failures.length > 0) {
+    throw failures[0].reason
+  }
   const out: MemeAlphaToken[] = []
   const seen = new Set<string>()
-  for (const network of DISCOVERY_NETWORKS) {
-    const raw = await mobyGet<MobyLeaderboardResponse>('/tokens/screener/leaderboard/', {
-      network,
-    })
-    for (const e of raw.entries ?? []) {
+  for (const r of settled) {
+    if (r.status !== 'fulfilled') continue
+    let count = 0
+    for (const e of r.value.entries) {
+      if (count >= limitPerChain) break
       const t = toToken(e)
       if (!t || seen.has(t.id)) continue
       seen.add(t.id)
       out.push(t)
-      if (out.filter((x) => x.chain === network).length >= limitPerChain) break
+      count++
     }
   }
   return out

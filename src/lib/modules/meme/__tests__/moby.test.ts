@@ -66,6 +66,7 @@ const HOLDERS = {
 describe('discoverMobyTokens', () => {
   it('normalizes leaderboard entries across networks', async () => {
     mockFetchSequence([
+      { status: 200, body: { chains: [{ network: 'solana' }, { network: 'base' }, { network: 'bnb' }, { network: 'robinhood' }] } },
       { status: 200, body: { entries: [LB_ENTRY] } },
       { status: 200, body: { entries: [] } },
       { status: 200, body: { entries: [] } },
