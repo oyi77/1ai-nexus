@@ -199,7 +199,7 @@ async function notifyHeal(email: string, reason: string): Promise<void> {
     const chatId = process.env.HUB_TELEGRAM_OWNER_CHAT_ID || process.env.TELEGRAM_ADMIN_CHAT_ID
     if (!token || !chatId) return
     const t = new Date().toISOString().slice(11, 19)
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -208,8 +208,13 @@ async function notifyHeal(email: string, reason: string): Promise<void> {
       }),
       signal: AbortSignal.timeout(10_000),
     })
-  } catch {
+    const body = (await res.json().catch(() => null)) as { ok?: boolean; description?: string } | null
+    // Delivery receipt: ok:true = Telegram accepted the message for the chat.
+    if (res.ok && body?.ok) logger.info('moby heal alert delivered', 'moby')
+    else logger.warn(`moby heal alert FAILED: HTTP ${res.status} ${body?.description ?? ''}`, 'moby')
+  } catch (e) {
     // Alerting is best-effort — never fail the heal itself.
+    logger.warn(`moby heal alert error: ${String(e)}`, 'moby')
   }
 }
 
