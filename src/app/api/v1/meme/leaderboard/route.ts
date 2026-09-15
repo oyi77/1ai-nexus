@@ -11,6 +11,7 @@
 
 import { NextResponse } from 'next/server'
 import { getCached } from '@/lib/api/server-cache'
+import { getMobyLastHealAt } from '@/lib/modules/meme/moby/session'
 import {
   MEME_REGISTRY,
   getDiscoveryModule,
@@ -21,7 +22,7 @@ import {
 import { sortByMetrics, explainScore } from '@/lib/modules/meme/ranking'
 import type { MemeAlphaToken, MemeDiscoveryResponse } from '@/lib/modules/meme/types'
 
-type PlatformStatus = { ok: boolean; error?: string }
+type PlatformStatus = { ok: boolean; error?: string; lastHealAt?: number }
 
 interface PlatformResult {
   tokens: MemeAlphaToken[]
@@ -68,7 +69,10 @@ export async function GET(req: Request) {
           platforms: [platform],
           total: tokens.length,
           updatedAt: new Date().toISOString(),
-          platformsStatus: { [platform]: data.status },
+          platformsStatus: {
+            [platform]:
+              platform === 'moby' ? { ...data.status, lastHealAt: getMobyLastHealAt() } : data.status,
+          },
         },
       }
       if (explain) body.explanations = explainOf(tokens)
@@ -84,7 +88,8 @@ export async function GET(req: Request) {
     const tokens = sortByMetrics(results.flatMap((r) => r.tokens))
     const statusMap: Record<string, PlatformStatus> = {}
     results.forEach((r, i) => {
-      statusMap[enabledPlatforms[i]] = r.status
+      statusMap[enabledPlatforms[i]] =
+        enabledPlatforms[i] === 'moby' ? { ...r.status, lastHealAt: getMobyLastHealAt() } : r.status
     })
     const body: MemeDiscoveryResponse = {
       tokens,

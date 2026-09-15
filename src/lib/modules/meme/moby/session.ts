@@ -167,10 +167,49 @@ async function clearSession(reason: string): Promise<never> {
   }
   cached = fresh
   writeSessionFile(fresh)
+  lastHealAt = Date.now()
   logger.warn(`moby self-heal complete: session re-established for ${email}`, 'moby')
+  // Fire-and-forget operator alert — a heal is notable (RT chain died).
+  void notifyHeal(email, reason)
   // Never returns normally — callers already hold a thrown error; we
   // rethrow a sentinel the resolver converts into a successful retry.
   throw new SessionReauthSucceeded()
+}
+
+/**
+ * Last successful email self-heal (unix ms, 0 = never since boot).
+ * Surfaced via the leaderboard's moby platformStatus for at-a-glance
+ * auth health.
+ */
+let lastHealAt = 0
+export function getMobyLastHealAt(): number {
+  return lastHealAt
+}
+
+/**
+ * Operator notice for a heal — direct to TELEGRAM_ADMIN_CHAT_ID via the
+ * bot API (repo convention, mirrors zero-issue-cron). registeredChats is
+ * runtime-populated and empty on cold boot, so broadcastAlert would
+ * silently no-op. Never throws, never blocks the heal.
+ */
+async function notifyHeal(email: string, reason: string): Promise<void> {
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN
+    const chatId = process.env.TELEGRAM_ADMIN_CHAT_ID
+    if (!token || !chatId) return
+    const t = new Date().toISOString().slice(11, 19)
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: `🩹 Moby session self-healed at ${t} UTC\nreason: ${reason}\nidentity: ${email}`,
+      }),
+      signal: AbortSignal.timeout(10_000),
+    })
+  } catch {
+    // Alerting is best-effort — never fail the heal itself.
+  }
 }
 
 /** Internal control-flow sentinel: session was re-established mid-failure. */
