@@ -39,6 +39,8 @@ const PRIVY_APP_ID = 'cmg5m1dgg025kl20cusn1cypb'
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/147.0.0.0 Safari/537.36'
 
+import { resolveMobyAccessToken, hasSessionCredentials } from './session'
+
 // Networks from GET /tokens/chains/ (verified 2026-09-15).
 const DISCOVERY_NETWORKS = ['solana', 'base', 'bnb', 'robinhood'] as const
 
@@ -46,8 +48,9 @@ function mobyKey(): string {
   const key = process.env.MOBY_API_KEY
   if (!key) {
     throw new Error(
-      'No Moby key — set MOBY_API_KEY to a Privy JWT for app cmg5m1dgg025kl20cusn1cypb ' +
-        '(mint via email OTP: passwordless/init → passwordless/authenticate).',
+      'No Moby credentials — set MOBY_REFRESH_TOKEN (long-lived Privy refresh token; ' +
+        'auto-renews ~1h access JWTs via auth.privy.io/api/v1/sessions) or a static ' +
+        'MOBY_API_KEY Privy JWT (~1h TTL).',
     )
   }
   // Privy JWTs live ~1h. Fail fast on an expired token so the route's
@@ -60,8 +63,8 @@ function mobyKey(): string {
       }
       if (typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now()) {
         throw new Error(
-          'MOBY_API_KEY expired — Privy JWTs live ~1h; mint a fresh one via ' +
-            'passwordless/init → passwordless/authenticate.',
+          'MOBY_API_KEY expired — set MOBY_REFRESH_TOKEN for auto-renew, or mint a ' +
+            'fresh JWT via passwordless/init → passwordless/authenticate.',
         )
       }
     } catch (e) {
@@ -151,19 +154,29 @@ interface MobyHoldersResponse {
 // ── HTTP ────────────────────────────────────────────────────
 
 async function mobyGet<T>(path: string, params?: Record<string, string>): Promise<T> {
-  const key = mobyKey()
   const qs = params ? `?${new URLSearchParams(params)}` : ''
-  const res = await fetch(`${MOBY_BASE}${path}${qs}`, {
-    headers: {
-      accept: 'application/json',
-      'user-agent': UA,
-      origin: 'https://app.moby.win',
-      referer: 'https://app.moby.win/',
-      authorization: `Bearer ${key}`,
-      'privy-app-id': PRIVY_APP_ID,
-    },
-    signal: AbortSignal.timeout(15_000),
-  })
+  const url = `${MOBY_BASE}${path}${qs}`
+  const call = async (token: string) =>
+    fetch(url, {
+      headers: {
+        accept: 'application/json',
+        'user-agent': UA,
+        origin: 'https://app.moby.win',
+        referer: 'https://app.moby.win/',
+        authorization: `Bearer ${token}`,
+        'privy-app-id': PRIVY_APP_ID,
+      },
+      signal: AbortSignal.timeout(15_000),
+    })
+
+  // Session store first (RT auto-renew; MOBY_API_KEY seeds it and is the
+  // resolver's fallback when no RT exists, so mobyKey()'s expiry guard applies).
+  const token = await (hasSessionCredentials() ? resolveMobyAccessToken() : Promise.resolve(mobyKey()))
+  let res = await call(token)
+  if (res.status === 401 && hasSessionCredentials()) {
+    // Token died mid-window (clock skew / server-side revoke) — rotate once and retry.
+    res = await call(await resolveMobyAccessToken(true))
+  }
   if (!res.ok) throw new Error(`Moby ${res.status}: ${path}`)
   return res.json() as Promise<T>
 }

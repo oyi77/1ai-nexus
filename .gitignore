@@ -78,6 +78,7 @@ data/crossex/
 
 # BotX key store (runtime SQLite — contains API keys, never commit)
 data/*.sqlite
+data/moby-session.json
 
 # gamification rollback snapshot (large prod pg_dump — must NOT be committed)
 /backup_before_gamification.sql

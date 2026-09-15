@@ -31,6 +31,8 @@ import { discoverBirdeyeTokens, auditBirdeyeToken } from './birdeye'
 import { auditRugcheckToken } from './rugcheck'
 import { discoverGeckoTerminalTokens } from './geckoterminal'
 import { discoverMobyTokens, auditMobyToken } from './moby'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 
 const MEME_TTL = 180_000 // 3m — mirrors the bitget/gate discovery cadence
 
@@ -232,10 +234,14 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     discoveryModule: mobyDiscovery,
     auditModule: mobyAudit,
     ttlMs: MEME_TTL,
-    // Key-gated: live only when MOBY_API_KEY (Privy JWT) is configured.
-    // Without it the module throws a descriptive error and routes
+    // Credential-gated: live when MOBY_REFRESH_TOKEN (long-lived, auto-renews
+    // the ~1h Privy access JWT) or a static MOBY_API_KEY is configured.
+    // Without either, the module throws a descriptive error and routes
     // error-isolate per platform — same pattern as other keyed sources.
-    enabled: process.env.MOBY_API_KEY != null && process.env.MOBY_API_KEY !== '',
+    enabled:
+      (process.env.MOBY_API_KEY != null && process.env.MOBY_API_KEY !== '') ||
+      (process.env.MOBY_REFRESH_TOKEN != null && process.env.MOBY_REFRESH_TOKEN !== '') ||
+      existsSync(join(process.cwd(), 'data', 'moby-session.json')),
   },
   dexscreener: {
     platform: 'dexscreener',

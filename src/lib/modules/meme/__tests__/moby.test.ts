@@ -20,6 +20,9 @@ function mockFetchSequence(bodies: Array<{ status: number; body: unknown }>) {
 
 beforeEach(() => {
   process.env.MOBY_API_KEY = 'test-privy-jwt'
+  delete process.env.MOBY_REFRESH_TOKEN
+  // Isolate from any real data/moby-session.json on disk.
+  process.env.MOBY_SESSION_PATH = '/tmp/moby-test-nonexistent/session.json'
 })
 
 afterEach(() => {
