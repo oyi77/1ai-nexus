@@ -46,9 +46,9 @@ export async function POST(request: NextRequest) {
     }
     const { message, agent: agentId } = parsed.data
 
-    // OmniRoute gateway (OpenAI-compatible) — the ecosystem's unified LLM
+    // 1ai gateway (OpenAI-compatible) — the ecosystem's unified LLM
     // router. Pooled providers/model combos, no single-vendor lock.
-    const base = process.env.OMNIROUTE_BASE_URL || 'http://100.123.92.72:20128/v1'
+    const base = process.env.OMNIROUTE_BASE_URL || 'http://127.0.0.1:4001/v1'
     const apiKey = process.env.OMNIROUTE_API_KEY
     if (!apiKey) {
       return apiJson({ response: 'AI Assistant is not configured. Set OMNIROUTE_API_KEY.' })
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: process.env.OMNIROUTE_MODEL || 'baicok/deepseek-v4-flash-vision-exp',
+        model: process.env.OMNIROUTE_MODEL || 'auto/best-fast',
         max_tokens: 1024,
         stream: false,
         messages: [
