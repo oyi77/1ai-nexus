@@ -23,7 +23,9 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   )
 }
 
-const TABS = [["rs", "RS CHECK"], ["breakout", "BREAKOUT"], ["ara", "ARA PROX"], ["bandar", "BANDAR FLOW"]] as const
+const TABS = [["rs", "RS CHECK"], ["breakout", "BREAKOUT"], ["ara", "ARA PROX"], ["bandar", "BANDAR FLOW"], ["sectors", "SECTORS"], ["backtest", "BACKTEST"]] as const
+type SectorRow = { sector: string; foreignNetIdr: number | null; inflowStocks: number; outflowStocks: number; bandarAcc: number; bandarDist: number; score: number }
+type BacktestRow = { lane: string; code: string; signalDate: string; horizon: number; retPct: number | null }
 type Tab = (typeof TABS)[number][0]
 type ARARow = { code: string; name: string; prev: number; close: number; ara: number; proximityPct: number }
 
@@ -41,6 +43,10 @@ export default function SignalsView({ externalQuery, limit = 25 }: { externalQue
   const [bandar, setBandar] = useState<BandarRow[]>([])
   const [ara, setAra] = useState<ARARow[]>([])
   const [araDate, setAraDate] = useState<string>("")
+  const [sectors, setSectors] = useState<SectorRow[]>([])
+  const [btLane, setBtLane] = useState<"rs" | "breakout" | "ara">("breakout")
+  const [btSummary, setBtSummary] = useState<{ signals: number; evaluated: number; winRate: number | null; avgRet: number | null }>({ signals: 0, evaluated: 0, winRate: null, avgRet: null })
+  const [btRows, setBtRows] = useState<BacktestRow[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -61,6 +67,15 @@ export default function SignalsView({ externalQuery, limit = 25 }: { externalQue
             setAra(d.data?.items ?? [])
             setAraDate(d.data?.tradeDate ?? "")
           }
+        } else if (tab === "sectors") {
+          const d = await (await fetch(`/api/v1/saham/signals?view=sectormatrix`)).json()
+          if (!cancelled) setSectors(d.data?.items ?? [])
+        } else if (tab === "backtest") {
+          const d = await (await fetch(`/api/v1/saham/signals?view=backtest&lane=${btLane}`)).json()
+          if (!cancelled) {
+            setBtSummary({ signals: d.data?.signals ?? 0, evaluated: d.data?.evaluated ?? 0, winRate: d.data?.winRate ?? null, avgRet: d.data?.avgRet ?? null })
+            setBtRows(d.data?.rows ?? [])
+          }
         } else {
           const d = await (await fetch(`/api/v1/saham/signals?view=bandar&limit=${limit}`)).json()
           if (!cancelled) setBandar(d.data?.items ?? [])
@@ -68,7 +83,7 @@ export default function SignalsView({ externalQuery, limit = 25 }: { externalQue
       } catch { /* leave previous */ }
     })()
     return () => { cancelled = true }
-  }, [tab, limit])
+  }, [tab, limit, btLane])
 
   return (
     <>
@@ -162,6 +177,69 @@ export default function SignalsView({ externalQuery, limit = 25 }: { externalQue
                   <td className="py-1 text-right">{r.close.toLocaleString("id-ID")}</td>
                   <td className="py-1 text-right">{r.ara.toLocaleString("id-ID")}</td>
                   <td className="py-1 text-right text-accent-cyan">+{r.proximityPct.toFixed(1)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+      )}
+
+
+      {tab === "sectors" && (
+        <Panel title="SECTOR × BANDAR MATRIX — FOREIGN FLOW + ACCUMULATION">
+          <table className="w-full text-xs tabular-nums">
+            <thead>
+              <tr className="text-text-muted border-b border-border-dim">
+                <th className="text-left py-1">Sector</th>
+                <th className="text-right py-1">Foreign Net (Rp B)</th>
+                <th className="text-right py-1">Bandar Acc</th>
+                <th className="text-right py-1">Bandar Dist</th>
+                <th className="text-right py-1">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sectors.filter((r) => matchesQuery(externalQuery ?? "", r.sector)).map((r) => (
+                <tr key={r.sector} className="border-b border-border-dim/30">
+                  <td className="py-1 font-semibold text-text-primary">{r.sector}</td>
+                  <td className={`py-1 text-right ${signCls(r.foreignNetIdr)}`}>{r.foreignNetIdr === null ? "—" : fmtIdr(r.foreignNetIdr)}</td>
+                  <td className="py-1 text-right text-accent-green">{r.bandarAcc}</td>
+                  <td className="py-1 text-right text-accent-red">{r.bandarDist}</td>
+                  <td className="py-1 text-right font-mono">{r.score}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Panel>
+      )}
+
+      {tab === "backtest" && (
+        <Panel title={`LANE BACKTEST — 5-SESSION HORIZON (signals ${btSummary.signals} · evaluated ${btSummary.evaluated})`}>
+          <div className="flex gap-2 mb-3">
+            {(["rs", "breakout", "ara"] as const).map((l) => (
+              <button key={l} onClick={() => setBtLane(l)}
+                className={`px-2 py-1 text-xs font-mono uppercase rounded border ${btLane === l ? "bg-teal-vivid text-bg-base border-teal-vivid font-bold" : "bg-bg-panel border-border-dim text-text-muted"}`}>
+                {l}
+              </button>
+            ))}
+            <span className="text-xs text-text-secondary self-center">
+              win {btSummary.winRate === null ? "—" : `${btSummary.winRate.toFixed(1)}%`}
+              {' · '}avg {btSummary.avgRet === null ? "—" : `${btSummary.avgRet >= 0 ? "+" : ""}${btSummary.avgRet.toFixed(2)}%`}
+            </span>
+          </div>
+          <table className="w-full text-xs tabular-nums">
+            <thead>
+              <tr className="text-text-muted border-b border-border-dim">
+                <th className="text-left py-1">Date</th>
+                <th className="text-left py-1">Code</th>
+                <th className="text-right py-1">+5d %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {btRows.filter((r) => matchesQuery(externalQuery ?? "", r.code)).slice(0, 30).map((r, i) => (
+                <tr key={`${r.signalDate}-${r.code}-${i}`} className="border-b border-border-dim/30">
+                  <td className="py-1 font-mono">{r.signalDate}</td>
+                  <td className="py-1 font-mono font-semibold text-teal-vivid">{r.code}</td>
+                  <td className={`py-1 text-right ${signCls(r.retPct)}`}>{r.retPct === null ? "—" : `${r.retPct >= 0 ? "+" : ""}${r.retPct.toFixed(2)}%`}</td>
                 </tr>
               ))}
             </tbody>

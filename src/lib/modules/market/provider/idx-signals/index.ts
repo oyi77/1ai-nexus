@@ -251,6 +251,17 @@ export async function backtestSignals(
   topN = 10,
   horizon = 5,
 ): Promise<{ signals: number; evaluated: number; winRate: number | null; avgRet: number | null; rows: BacktestRow[] }> {
+  const { data } = await getCached(`idx-signals:backtest:${lane}:${topN}:${horizon}`, 6 * 60 * 60_000, async () =>
+    runBacktest(lane, topN, horizon),
+  )
+  return data
+}
+
+async function runBacktest(
+  lane: 'rs' | 'breakout' | 'ara',
+  topN: number,
+  horizon: number,
+): Promise<{ signals: number; evaluated: number; winRate: number | null; avgRet: number | null; rows: BacktestRow[] }> {
   const sessions = await prisma.idxSahamSession.findMany({
     orderBy: [{ code: 'asc' }, { tradeDate: 'asc' }],
     select: { code: true, tradeDate: true, close: true, high: true },

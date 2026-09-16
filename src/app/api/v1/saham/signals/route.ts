@@ -5,6 +5,8 @@
 //   ?view=breakout           within X% below 52w high (&within=5)
 //   ?view=bandar             bandar accumulation × foreign streak
 //   ?view=sectors            sector money flow (bandar top-1 by sector)
+//   ?view=sectormatrix       sector x bandar matrix (foreign + accdist)
+//   ?view=backtest&lane=rs   lane backtest (rs|breakout|ara), 5-session horizon
 // Params: ?limit=20 (1-100).
 // Empty DB → 503 with staging instructions.
 // ─────────────────────────────────────────────────────────────
@@ -17,6 +19,8 @@ import {
   getARAProximity,
   getBandarFlowSignals,
   getSectorFlow,
+  getSectorBandarMatrix,
+  backtestSignals,
 } from '@/lib/modules/market/provider/idx-signals'
 import { EmptySnapshotError } from '@/lib/modules/market/provider/idx-stockbit'
 
@@ -42,6 +46,14 @@ export async function GET(request: NextRequest) {
     }
     if (view === 'bandar') {
       return apiSuccess({ view, ...(await getBandarFlowSignals(limit)) })
+    }
+    if (view === 'sectormatrix') {
+      return apiSuccess({ view, ...(await getSectorBandarMatrix()) })
+    }
+    if (view === 'backtest') {
+      const laneRaw = q.get('lane') ?? 'breakout'
+      const lane = laneRaw === 'rs' || laneRaw === 'ara' ? laneRaw : 'breakout'
+      return apiSuccess({ view, lane, ...(await backtestSignals(lane, 10, 5)) })
     }
     return apiSuccess({ view: 'rs', ...(await getRSSignals(limit)) })
   } catch (error) {
