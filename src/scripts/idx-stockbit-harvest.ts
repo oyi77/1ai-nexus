@@ -39,7 +39,11 @@ async function main() {
   const tplArg = process.argv.find(a => a.startsWith('--templates='))?.slice('--templates='.length)
   try {
     if (!stockbitAvailable()) {
-      throw new Error('No Stockbit session: set STOCKBIT_REFRESH_TOKEN (see local/stockbit-auth-re.md §14)')
+      // Not a failure: operator has not opted in (no refresh token staged).
+      // Exit 0 silently-ish so cron stays green; the route already serves
+      // 503 with staging instructions, which is the visible signal.
+      console.log('[idx-stockbit] skip: no session staged (set STOCKBIT_REFRESH_TOKEN to enable)')
+      return
     }
     const snapshotDate = new Date().toISOString().slice(0, 10)
     const onlyBandar = args.has('--bandar-only')
