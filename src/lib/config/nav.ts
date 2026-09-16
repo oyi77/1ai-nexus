@@ -38,6 +38,8 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'Markets',
     items: [
       { label: 'Equities', href: '/equities', icon: Building2, description: 'Stocks and equity market data.' },
+      { label: 'Markets Hub', href: '/markets', icon: Globe, description: 'Every instrument at a glance — live previews with deep links.' },
+      { label: 'Signals', href: '/signals', icon: Zap, description: 'All signal lanes in one page — conviction, alpha, IDX.' },
 
       { label: 'Commodities', href: '/commodities', icon: Package, description: 'Gold, oil and commodity prices.' },
       { label: 'Bonds', href: '/bonds', icon: TrendingUp, description: 'Government and corporate bond yields.' },
