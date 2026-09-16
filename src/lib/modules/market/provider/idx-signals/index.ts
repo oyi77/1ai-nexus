@@ -360,12 +360,20 @@ export async function getSectorFlow(): Promise<{ tradeDate: string; sectors: Sec
       select: { tradeDate: true },
     })
     if (!latest) throw new EmptySnapshotError('Stockbit bandar (sector flow)')
+    const screenerLatest = await prisma.idxScreenerSnapshot.findFirst({
+      orderBy: { snapshotDate: 'desc' },
+      select: { snapshotDate: true },
+    }).catch(() => null)
     const [bandarRows, screenerRows] = await Promise.all([
       prisma.idxBandarSnapshot.findMany({ where: { tradeDate: latest.tradeDate } }),
-      prisma.idxScreenerSnapshot.findMany({
-        where: { snapshotDate: latest.tradeDate },
-        select: { code: true, sector: true },
-      }).catch(() => [] as Array<{ code: string; sector: string }>),
+      (screenerLatest
+        ? prisma.idxScreenerSnapshot.findMany({
+            where: { snapshotDate: screenerLatest.snapshotDate },
+            select: { code: true, sector: true },
+          })
+        : Promise.resolve([] as Array<{ code: string; sector: string }>)).catch(
+        () => [] as Array<{ code: string; sector: string }>,
+      ),
     ])
     const sectorByCode = new Map(screenerRows.map(r => [r.code, r.sector || 'Unknown']))
     const agg = new Map<string, { codes: number; net: number; acc: number; dist: number }>()
