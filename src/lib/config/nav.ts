@@ -139,6 +139,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Analytics Hub', href: '/analytics', icon: Zap, description: 'All analytics tools.' },
       { label: 'Watchlist Ideas', href: '/saham-ideas', icon: Flame, description: 'Value + accumulation screen for IDX stocks.' },
+      { label: 'IDX Saham Hub', href: '/saham', icon: Flame, description: 'Unified IDX terminal — ideas, signals, bandarmology with instrument filter.' },
       { label: 'Moonshot Board', href: '/moonshot', icon: Target, description: 'Cross-instrument runners, confidence-gated top 10.' },
       { label: 'Financials', href: '/financials', icon: Building2, description: 'Financial statements and ratios.' },
       { label: '20Y History', href: '/historical-financials', icon: Building2, description: 'Twenty years of price history.' },
