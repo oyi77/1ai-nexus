@@ -4,6 +4,7 @@
 //   ?view=rs (default)      relative strength vs universe median
 //   ?view=breakout           within X% below 52w high (&within=5)
 //   ?view=bandar             bandar accumulation × foreign streak
+//   ?view=sectors            sector money flow (bandar top-1 by sector)
 // Params: ?limit=20 (1-100).
 // Empty DB → 503 with staging instructions.
 // ─────────────────────────────────────────────────────────────
@@ -15,6 +16,7 @@ import {
   getBreakoutSignals,
   getARAProximity,
   getBandarFlowSignals,
+  getSectorFlow,
 } from '@/lib/modules/market/provider/idx-signals'
 import { EmptySnapshotError } from '@/lib/modules/market/provider/idx-stockbit'
 
@@ -34,6 +36,9 @@ export async function GET(request: NextRequest) {
     if (view === 'ara') {
       const ara = await getARAProximity(limit)
       return apiSuccess({ view, ...ara })
+    }
+    if (view === 'sectors') {
+      return apiSuccess({ view, ...(await getSectorFlow()) })
     }
     if (view === 'bandar') {
       return apiSuccess({ view, ...(await getBandarFlowSignals(limit)) })

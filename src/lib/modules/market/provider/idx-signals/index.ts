@@ -12,7 +12,7 @@
 import { getCached } from '@/lib/api/server-cache'
 import { prisma } from '@/lib/db'
 import { getScreenerSnapshot, type ScreenerRow } from '@/lib/modules/market/provider/idx-screener'
-import { getForeignStreaks } from '@/lib/modules/market/provider/idx-bandarmology'
+import { getForeignStreaks, getSectorRotation } from '@/lib/modules/market/provider/idx-bandarmology'
 import { EmptySnapshotError } from '@/lib/modules/market/provider/idx-stockbit'
 
 const CACHE_TTL = 10 * 60_000
@@ -231,6 +231,226 @@ export async function getBreakoutSignals(
   }
   items.sort((a, b) => b.distancePct - a.distancePct)
   return { thresholdPct: withinPct, items: items.slice(0, Math.min(1000, Math.max(1, limit))) }
+}
+
+/** Backtest RS/breakout/ARA picks against session closes.
+ * Lookahead-free by construction: signal at session index i uses only
+ * closes[..i]; forward return measured i → i+horizon. In-sample
+ * (62 sessions ≈ 3 months) — direction check, not a full backtest.
+ * Bandar lane excluded (1 snapshot day; needs history to accumulate). */
+export interface BacktestRow {
+  lane: 'rs' | 'breakout' | 'ara'
+  code: string
+  signalDate: string
+  horizon: number
+  retPct: number | null
+}
+
+export async function backtestSignals(
+  lane: 'rs' | 'breakout' | 'ara',
+  topN = 10,
+  horizon = 5,
+): Promise<{ signals: number; evaluated: number; winRate: number | null; avgRet: number | null; rows: BacktestRow[] }> {
+  const sessions = await prisma.idxSahamSession.findMany({
+    orderBy: [{ code: 'asc' }, { tradeDate: 'asc' }],
+    select: { code: true, tradeDate: true, close: true, high: true },
+  })
+  if (sessions.length === 0) throw new EmptySnapshotError('IDX sessions (backtest)')
+  const byCode = new Map<string, Array<{ date: string; close: number; high: number }>>()
+  for (const r of sessions) {
+    if (!(r.close > 0)) continue
+    let arr = byCode.get(r.code)
+    if (!arr) { arr = []; byCode.set(r.code, arr) }
+    arr.push({ date: r.tradeDate, close: r.close, high: r.high > 0 ? r.high : r.close })
+  }
+  const dates = [...new Set(sessions.map(r => r.tradeDate))].sort()
+  const rows: BacktestRow[] = []
+  // Evaluate on ~4 weekly checkpoints to bound compute.
+  const checkpoints = dates.filter((_, i) => i % 5 === 4 && i + horizon < dates.length).slice(-12)
+  for (const date of checkpoints) {
+    // universe median return over lookback using data ≤ idx
+    const rets20: number[] = []
+    const perCode = new Map<string, { r20: number | null; px: number; hi: number }>()
+    for (const [code, arr] of byCode) {
+      const upto = arr.filter(p => p.date <= date)
+      if (upto.length < 21) continue
+      const last = upto[upto.length - 1]
+      const r20 = ((last.close - upto[upto.length - 21].close) / upto[upto.length - 21].close) * 100
+      rets20.push(r20)
+      perCode.set(code, { r20, px: last.close, hi: last.high })
+    }
+    if (perCode.size === 0) continue
+    const med = median(rets20)
+    let picks: Array<{ code: string }> = []
+    if (lane === 'rs') {
+      picks = [...perCode.entries()]
+        .map(([code, v]) => ({ code, s: v.r20 === null ? -Infinity : v.r20 - med }))
+        .sort((a, b) => b.s - a.s)
+        .slice(0, topN)
+    } else if (lane === 'breakout') {
+      // proximity to trailing-60-session high using data ≤ idx
+      picks = [...byCode.entries()]
+        .map(([code, arr]) => {
+          const upto = arr.filter(p => p.date <= date).slice(-60)
+          if (upto.length < 20) return null
+          const hi = Math.max(...upto.map(p => p.high))
+          const last = upto[upto.length - 1].close
+          const d = ((last - hi) / hi) * 100
+          return d <= 0 && d >= -5 ? { code } : null
+        })
+        .filter((x): x is { code: string } => x !== null)
+        .slice(0, topN)
+    } else {
+      // ARA proximity from prev close (session before date)
+      picks = [...byCode.entries()]
+        .map(([code, arr]) => {
+          const upto = arr.filter(p => p.date <= date)
+          if (upto.length < 2) return null
+          const prev = upto[upto.length - 2].close
+          const last = upto[upto.length - 1].close
+          if (!(prev > 0)) return null
+          const rate = prev <= 10 ? 0 : prev <= 200 ? 0.35 : prev <= 5000 ? 0.25 : 0.2
+          const ara = rate === 0 ? prev + 1 : prev * (1 + rate)
+          if (ara <= last) return null
+          return { code, prox: ((ara - last) / last) * 100 }
+        })
+        .filter((x): x is { code: string; prox: number } => x !== null)
+        .sort((a, b) => a.prox - b.prox)
+        .slice(0, topN)
+    }
+    for (const p of picks) {
+      const arr = byCode.get(p.code)!
+      const i0 = arr.findIndex(x => x.date === date)
+      const fwd = arr[i0 + horizon]
+      const base = arr[i0]
+      rows.push({
+        lane,
+        code: p.code,
+        signalDate: date,
+        horizon,
+        retPct: fwd && base.close > 0 ? ((fwd.close - base.close) / base.close) * 100 : null,
+      })
+    }
+  }
+  const ev = rows.filter(r => r.retPct !== null)
+  const wins = ev.filter(r => (r.retPct as number) > 0)
+  return {
+    signals: rows.length,
+    evaluated: ev.length,
+    winRate: ev.length > 0 ? (wins.length / ev.length) * 100 : null,
+    avgRet: ev.length > 0 ? ev.reduce((a, r) => a + (r.retPct as number), 0) / ev.length : null,
+    rows,
+  }
+}
+
+/** Sector money flow: bandar top-1 amounts aggregated by IDX sector
+ * (sector from screener snapshot). Positive = net accumulation. */
+export interface SectorFlowRow {
+  sector: string
+  codes: number
+  netTop1: number
+  acc: number
+  dist: number
+}
+
+export async function getSectorFlow(): Promise<{ tradeDate: string; sectors: SectorFlowRow[] }> {
+  const { data } = await getCached('idx-signals:sectorflow:v1', CACHE_TTL, async () => {
+    const latest = await prisma.idxBandarSnapshot.findFirst({
+      orderBy: { tradeDate: 'desc' },
+      select: { tradeDate: true },
+    })
+    if (!latest) throw new EmptySnapshotError('Stockbit bandar (sector flow)')
+    const [bandarRows, screenerRows] = await Promise.all([
+      prisma.idxBandarSnapshot.findMany({ where: { tradeDate: latest.tradeDate } }),
+      prisma.idxScreenerSnapshot.findMany({
+        where: { snapshotDate: latest.tradeDate },
+        select: { code: true, sector: true },
+      }).catch(() => [] as Array<{ code: string; sector: string }>),
+    ])
+    const sectorByCode = new Map(screenerRows.map(r => [r.code, r.sector || 'Unknown']))
+    const agg = new Map<string, { codes: number; net: number; acc: number; dist: number }>()
+    for (const b of bandarRows) {
+      const sector = sectorByCode.get(b.code) ?? 'Unknown'
+      const e = agg.get(sector) ?? { codes: 0, net: 0, acc: 0, dist: 0 }
+      e.codes++
+      e.net += b.top1Amount ?? 0
+      if (/acc/i.test(b.accdist)) e.acc++
+      else if (/dist/i.test(b.accdist)) e.dist++
+      agg.set(sector, e)
+    }
+    const sectors: SectorFlowRow[] = [...agg.entries()].map(([sector, e]) => ({
+      sector,
+      codes: e.codes,
+      netTop1: e.net,
+      acc: e.acc,
+      dist: e.dist,
+    }))
+    sectors.sort((a, b) => b.netTop1 - a.netTop1)
+    return { tradeDate: latest.tradeDate, sectors }
+  })
+  return data
+}
+
+/** Sector × bandar money-flow matrix: foreign rotation net value per sector
+ * joined with Stockbit bandar accdist counts per sector. Ranks sectors by
+ * combined accumulation pressure. */
+export interface SectorBandarRow {
+  sector: string
+  foreignNetIdr: number | null
+  inflowStocks: number
+  outflowStocks: number
+  bandarAcc: number
+  bandarDist: number
+  score: number
+}
+
+export async function getSectorBandarMatrix(): Promise<{ tradeDate: string; items: SectorBandarRow[] }> {
+  const { data } = await getCached('idx-signals:sectormatrix:v1', CACHE_TTL, async () => {
+    const [rotation, bandar] = await Promise.all([
+      getSectorRotation().catch(() => null),
+      (async () => {
+        try {
+          const { getBandarSnapshots } = await import('@/lib/modules/market/provider/idx-stockbit')
+          return await getBandarSnapshots()
+        } catch (e) {
+          if (e instanceof EmptySnapshotError) return null
+          throw e
+        }
+      })(),
+    ])
+    const snap = await getScreenerSnapshot().catch(() => null)
+    const sectorByCode = new Map<string, string>()
+    if (snap) for (const r of Object.values(snap.data)) sectorByCode.set(r.symbol, r.sector || 'Unknown')
+    const acc = new Map<string, SectorBandarRow>()
+    const ensure = (sector: string): SectorBandarRow => {
+      let row = acc.get(sector)
+      if (!row) {
+        row = { sector, foreignNetIdr: null, inflowStocks: 0, outflowStocks: 0, bandarAcc: 0, bandarDist: 0, score: 0 }
+        acc.set(sector, row)
+      }
+      return row
+    }
+    for (const s of rotation?.sectors ?? []) {
+      const row = ensure(s.sector)
+      row.foreignNetIdr = typeof s.netValueIdr === 'number' ? s.netValueIdr : null
+      row.inflowStocks = s.inflowStocks ?? 0
+      row.outflowStocks = s.outflowStocks ?? 0
+    }
+    for (const b of bandar?.rows ?? []) {
+      const sector = sectorByCode.get(b.code) ?? 'Unknown'
+      const row = ensure(sector)
+      if (/acc/i.test(b.accdist)) row.bandarAcc++
+      else if (/dist/i.test(b.accdist)) row.bandarDist++
+    }
+    const items = [...acc.values()].map(r => ({
+      ...r,
+      score: (r.foreignNetIdr !== null && r.foreignNetIdr > 0 ? 50 : 0) + (r.bandarAcc - r.bandarDist) * 5,
+    }))
+    items.sort((a, b) => b.score - a.score)
+    if (items.length === 0) throw new EmptySnapshotError('sector-bandar')
+    return { tradeDate: rotation?.tradeDate ?? bandar?.tradeDate ?? '', items }
+  })
+  return data
 }
 
 /** Bandar accumulation flow: Stockbit accdist × foreign streak (bandar-confirmed). */

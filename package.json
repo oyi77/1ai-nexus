@@ -27,6 +27,8 @@
     "harvest:idx-fundamentals": "tsx src/scripts/idx-fundamentals-harvest.ts",
     "harvest:idx-ajaib": "tsx src/scripts/idx-ajaib-harvest.ts",
     "harvest:idx-stockbit": "tsx src/scripts/idx-stockbit-harvest.ts",
+    "track:idx-signals": "tsx src/scripts/idx-signal-track.ts",
+    "alert:idx-signals": "tsx src/scripts/idx-signal-alerts.ts",
     "seed:idx-saham": "tsx src/scripts/idx-saham-seed.ts",
     "cron:alpha-track": "tsx src/scripts/alpha-track-record-cron.ts",
     "backfill:moonshot": "tsx src/scripts/moonshot-backfill.ts",

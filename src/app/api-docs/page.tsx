@@ -345,6 +345,25 @@ const API_ENDPOINTS: ApiEndpoint[] = [
 
   {
     method: 'GET',
+    path: '/api/v1/saham/dual',
+    description: 'US-IDX dual listings (TLKM↔TLK ADR): IDX close + US price with day momentum',
+    category: 'Screener',
+    params: 'symbol=TLKM (optional — omit for all pairs)',
+    example: 'curl "https://tracker.aitradepulse.com/api/v1/saham/dual?symbol=TLKM"',
+    response: '{ data: { idx: "TLKM", us: "TLK", idxClose: 2900, usPrice: 19.5, usDayPct: 0.52 } }',
+  },
+
+  {
+    method: 'GET',
+    path: '/api/v1/saham/calendar',
+    description: 'Live dividend/corp-action events from Stockbit (needs staged session; 503 otherwise)',
+    category: 'Screener',
+    params: 'none',
+    example: 'curl "https://tracker.aitradepulse.com/api/v1/saham/calendar"',
+    response: '{ data: { capturedAt: "...", dividends: [{ symbol: "BMRI", exdate: "2026-09-16", value: "66" }] } }',
+  },
+  {
+    method: 'GET',
     path: '/api/v1/saham/signals',
     description: 'IDX trading signals from harvest snapshots: RS vs universe median, near-52w-high breakout scan, bandar accumulation × foreign streak',
     category: 'Screener',

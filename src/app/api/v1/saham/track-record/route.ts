@@ -85,9 +85,12 @@ export async function GET(request: NextRequest) {
       return apiSuccess(result)
     }
 
-    // Default: return stats (optional ?lane=alpha|moonshot filter)
+    // Default: return stats (optional ?lane= filter: alpha|moonshot|rs|breakout|ara)
     const laneParam = request.nextUrl.searchParams.get("lane")
-    const stats = await getAlphaTrackStats(laneParam === "alpha" || laneParam === "moonshot" ? laneParam : undefined)
+    const lanes = ["alpha", "moonshot", "rs", "breakout", "ara"] as const
+    const stats = await getAlphaTrackStats(
+      (lanes as readonly string[]).includes(laneParam ?? "") ? (laneParam as (typeof lanes)[number]) : undefined,
+    )
     return apiSuccess(stats)
   } catch (error) {
     return apiError((error as Error).message, 502)

@@ -5,8 +5,9 @@
 //   ?market=us     US stocks universe, live-only (adds day momentum)
 //   ?market=mf     reksa-dana universe, live-only (AUM, returns, drawdown)
 //   ?market=crypto crypto list, live-only (price + 24h %)
+//   ?market=indices[&index=IDX30]  IDX index membership map, live-only
 // NOTE: per-symbol analysis is populated for IDX STOCK only
-// (US/MF codes 404 here). Non-IDX markets are live-only (6h cache,
+// (US/MF codes 404 here). Non-IDX markets are live-only (cached,
 // no DB tables) — IDX stays DB-first via the nightly harvest.
 // ─────────────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ import {
   getAjaibCrypto,
   EmptySnapshotError,
 } from '@/lib/modules/market/provider/idx-ajaib/universe'
+import { getIndexMembership } from '@/lib/modules/market/provider/idx-ajaib/indices'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,6 +38,16 @@ export async function GET(request: NextRequest) {
     if (market === 'us') return apiSuccess(await getAjaibUS())
     if (market === 'mf') return apiSuccess(await getAjaibMF())
     if (market === 'crypto') return apiSuccess(await getAjaibCrypto())
+    if (market === 'indices') {
+      const index = q.get('index')
+      const map = await getIndexMembership()
+      if (index) {
+        const codes = map.indices[index.toUpperCase()]
+        if (!codes) return apiError(`Unknown index '${index}'`, 404)
+        return apiSuccess({ index: index.toUpperCase(), count: codes.length, codes })
+      }
+      return apiSuccess(map)
+    }
     return apiSuccess(await getAjaibUniverse())
   } catch (error) {
     if (error instanceof EmptySnapshotError) {

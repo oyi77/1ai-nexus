@@ -33,7 +33,7 @@ import {
 
 const DELAY_MS = 400
 const DEFAULT_LIMIT = 60
-const DEFAULT_TEMPLATES = [2, 6, 17] // Fisher P/S, Greenblatt Magic Formula, Piotroski High F-Score
+const DEFAULT_TEMPLATES = [2, 3, 5, 6, 7, 9, 17, 74] // Fisher P/S, Piotroski F-Score P/E, Buffettology, Greenblatt Magic, 52w-momentum, Tiny Titans, Piotroski High F-Score, Value Momentum (unverified ids self-skip via try/catch)
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
