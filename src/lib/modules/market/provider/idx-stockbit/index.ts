@@ -10,6 +10,16 @@ import { getCached } from '@/lib/api/server-cache'
 
 const CACHE_TTL = 10 * 60_000
 
+/** Thrown when the DB holds no snapshot yet — never cached, so the
+ * route serves 503 and the first post-harvest read is fresh.
+ * (Caching an empty result caused a stale-empty incident 2026-09-16.) */
+export class EmptySnapshotError extends Error {
+  constructor(source: string) {
+    super(`No ${source} snapshot in DB yet`)
+    this.name = 'EmptySnapshotError'
+  }
+}
+
 /** Normalize user input: 'BBCA.JK'/'bbri' → 'BBRI'. */
 export function normalizeCode(input: string): string {
   return input.trim().toUpperCase().replace(/\.JK$/, '')
@@ -37,7 +47,7 @@ async function loadBandarLatest(): Promise<{ tradeDate: string; rows: BandarSnap
       orderBy: { tradeDate: 'desc' },
       select: { tradeDate: true },
     })
-    if (!latest) return { tradeDate: '', rows: [] as BandarSnapshotData[] }
+    if (!latest) throw new EmptySnapshotError('Stockbit bandar')
     const dbRows = await prisma.idxBandarSnapshot.findMany({
       where: { tradeDate: latest.tradeDate },
     })
@@ -102,7 +112,7 @@ export async function getGuruScreens(): Promise<GuruScreenData[]> {
       orderBy: { snapshotDate: 'desc' },
       select: { snapshotDate: true },
     })
-    if (!latest) return [] as GuruScreenData[]
+    if (!latest) throw new EmptySnapshotError('Stockbit guru')
     const dbRows = await prisma.idxStockbitGuru.findMany({
       where: { snapshotDate: latest.snapshotDate },
     })
@@ -135,7 +145,7 @@ export async function getAnalysts(): Promise<{ snapshotDate: string; count: numb
       orderBy: { snapshotDate: 'desc' },
       select: { snapshotDate: true },
     })
-    if (!latest) return { snapshotDate: '', rows: [] as AnalystRow[] }
+    if (!latest) throw new EmptySnapshotError('Stockbit analyst')
     const dbRows = await prisma.idxStockbitAnalyst.findMany({
       where: { snapshotDate: latest.snapshotDate },
     })

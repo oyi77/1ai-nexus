@@ -9,9 +9,9 @@
 //   ?analyst=1            analyst ratings universe
 //   ?analyst=BBRI         single-stock analyst rating
 // Empty DB (no harvest yet) → 503 with staging instructions.
+// Unknown symbol with data present → 404.
 // ─────────────────────────────────────────────────────────────
 
-import { hasSessionCredentials as stockbitAvailable } from '@/lib/modules/market/provider/idx-stockbit/session'
 import { type NextRequest } from 'next/server'
 import { apiSuccess, apiError } from '@/lib/api/response'
 import {
@@ -22,6 +22,7 @@ import {
   getAnalysts,
   getAnalyst,
   normalizeCode,
+  EmptySnapshotError,
 } from '@/lib/modules/market/provider/idx-stockbit'
 
 export const dynamic = 'force-dynamic'
@@ -35,11 +36,7 @@ export async function GET(request: NextRequest) {
     const symbol = q.get('symbol')
     if (symbol) {
       const row = await getBandarSnapshot(symbol)
-      if (!row) {
-        return stockbitAvailable()
-          ? apiError(`No bandar snapshot for '${symbol}' in the latest harvest`, 404)
-          : apiError(NO_DATA, 503)
-      }
+      if (!row) return apiError(`No bandar snapshot for '${symbol}' in the latest harvest`, 404)
       return apiSuccess({ symbol: normalizeCode(symbol), ...row })
     }
 
@@ -47,44 +44,25 @@ export async function GET(request: NextRequest) {
     if (leaders === 'acc' || leaders === 'dist') {
       const limit = Math.min(100, Math.max(1, Number(q.get('limit') ?? 20)))
       const rows = await getBandarLeaders(leaders, limit)
-      if (rows.length === 0) {
-        return stockbitAvailable() ? apiSuccess({ leaders, count: 0, items: [] }) : apiError(NO_DATA, 503)
-      }
       return apiSuccess({ leaders, count: rows.length, items: rows })
     }
 
     if (q.has('guru')) {
       const screens = await getGuruScreens()
-      if (screens.length === 0) {
-        return stockbitAvailable() ? apiSuccess({ count: 0, screens: [] }) : apiError(NO_DATA, 503)
-      }
       return apiSuccess({ count: screens.length, screens })
     }
 
     if (q.has('analyst')) {
       const code = q.get('analyst')
-      if (!code || code === '1') {
-        const snap = await getAnalysts()
-        if (snap.count === 0) {
-          return stockbitAvailable() ? apiSuccess({ count: 0, rows: [] }) : apiError(NO_DATA, 503)
-        }
-        return apiSuccess(snap)
-      }
+      if (!code || code === '1') return apiSuccess(await getAnalysts())
       const row = await getAnalyst(code)
-      if (!row) {
-        return stockbitAvailable()
-          ? apiError(`No analyst rating for '${code}' in the latest harvest`, 404)
-          : apiError(NO_DATA, 503)
-      }
+      if (!row) return apiError(`No analyst rating for '${code}' in the latest harvest`, 404)
       return apiSuccess({ symbol: normalizeCode(code), ...row })
     }
 
-    const snap = await getBandarSnapshots()
-    if (snap.count === 0) {
-      return stockbitAvailable() ? apiSuccess(snap) : apiError(NO_DATA, 503)
-    }
-    return apiSuccess(snap)
+    return apiSuccess(await getBandarSnapshots())
   } catch (error) {
+    if (error instanceof EmptySnapshotError) return apiError(NO_DATA, 503)
     return apiError((error as Error).message, 500)
   }
 }

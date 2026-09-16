@@ -109,3 +109,13 @@ describe('extractUniverseRecords', () => {
     expect(() => extractUniverseRecords('"results":[{broken')).toThrow()
   })
 })
+
+describe('EmptySnapshotError', () => {
+  it('carries name + source for route 503 mapping', async () => {
+    const { EmptySnapshotError } = await import('./universe')
+    const err = new EmptySnapshotError('Ajaib universe')
+    expect(err).toBeInstanceOf(Error)
+    expect(err.name).toBe('EmptySnapshotError')
+    expect(err.message).toMatch(/Ajaib universe/)
+  })
+})

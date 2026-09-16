@@ -225,3 +225,13 @@ describe('resolveStockbitAccessToken', () => {
     await expect(resolveStockbitAccessToken()).rejects.toThrow('re-stage a fresh refresh token')
   })
 })
+
+describe('EmptySnapshotError', () => {
+  it('carries name + source for route 503 mapping', async () => {
+    const { EmptySnapshotError } = await import('./index')
+    const err = new EmptySnapshotError('Stockbit bandar')
+    expect(err).toBeInstanceOf(Error)
+    expect(err.name).toBe('EmptySnapshotError')
+    expect(err.message).toMatch(/Stockbit bandar/)
+  })
+})

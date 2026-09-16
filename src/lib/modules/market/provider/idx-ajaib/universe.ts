@@ -48,6 +48,16 @@ export interface AjaibUniverse {
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null
 
+/** Thrown when the DB holds no snapshot yet — never cached, so the
+ * route serves 503 and the first post-harvest read is fresh.
+ * (Caching an empty result caused a stale-empty incident 2026-09-16.) */
+export class EmptySnapshotError extends Error {
+  constructor(source: string) {
+    super(`No ${source} snapshot in DB yet`)
+    this.name = 'EmptySnapshotError'
+  }
+}
+
 function toMomentum(v: unknown): AjaibMomentum | null {
   if (typeof v !== 'object' || v === null) return null
   const o = v as Record<string, unknown>
@@ -195,6 +205,7 @@ export async function getAjaibUniverse(): Promise<AjaibUniverse & { source: 'db'
       const dbRows = await prisma.idxAjaibUniverse.findMany({
         where: { snapshotDate: latest.snapshotDate },
       })
+      if (dbRows.length === 0) throw new EmptySnapshotError('Ajaib universe')
       return {
         count: dbRows.length,
         capturedAt: new Date(`${latest.snapshotDate}T00:00:00Z`).toISOString(),
@@ -202,7 +213,9 @@ export async function getAjaibUniverse(): Promise<AjaibUniverse & { source: 'db'
         source: 'db' as const,
       }
     }
-    return { ...(await fetchUniverse()), source: 'live' as const }
+    const live = await fetchUniverse()
+    if (live.rows.length === 0) throw new EmptySnapshotError('Ajaib universe')
+    return { ...live, source: 'live' as const }
   })
   return data
 }

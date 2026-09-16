@@ -9,7 +9,7 @@
 import { type NextRequest } from 'next/server'
 import { apiSuccess, apiError } from '@/lib/api/response'
 import { getAjaibAnalysis, normalizeCode } from '@/lib/modules/market/provider/idx-ajaib/analysis'
-import { getAjaibUniverse } from '@/lib/modules/market/provider/idx-ajaib/universe'
+import { getAjaibUniverse, EmptySnapshotError } from '@/lib/modules/market/provider/idx-ajaib/universe'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +23,9 @@ export async function GET(request: NextRequest) {
     }
     return apiSuccess(await getAjaibUniverse())
   } catch (error) {
+    if (error instanceof EmptySnapshotError) {
+      return apiError('No Ajaib snapshot yet — run npm run harvest:idx-ajaib (weekdays 19:05 cron)', 503)
+    }
     return apiError((error as Error).message, 500)
   }
 }
