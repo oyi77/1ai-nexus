@@ -219,3 +219,136 @@ export async function getAjaibUniverse(): Promise<AjaibUniverse & { source: 'db'
   })
   return data
 }
+
+// ── Non-IDX markets: live-only (6h cache, no DB tables).
+// IDX stays DB-first above; US/MF/crypto persist only if a consumer needs it.
+// ─────────────────────────────────────────────────────────────
+
+const US_LIST_URL = 'https://ajaib.co.id/saham-amerika/aset'
+const MF_LIST_URL = 'https://ajaib.co.id/reksa-dana/aset'
+const CRYPTO_URL = 'https://magic.ajaib.co.id/api/v1/public/crypto-web/result'
+
+export type AjaibMarket = 'us' | 'mf' | 'crypto'
+
+export interface USRow extends AjaibUniverseRow {
+  day: AjaibMomentum | null
+}
+
+export interface MFRow {
+  code: string
+  name: string
+  type: string
+  aum: number | null
+  expenseRatio: number | null
+  ytdPct: number | null
+  y1Pct: number | null
+  y3Pct: number | null
+  y5Pct: number | null
+  drawdown1yPct: number | null
+}
+
+export interface CryptoRow {
+  id: string
+  name: string
+  price: number | null
+  change24hPct: number | null
+  quote: string
+}
+
+function toMFRow(o: Record<string, unknown>): MFRow | null {
+  if (typeof o.code !== 'string' || typeof o.name !== 'string') return null
+  return {
+    code: o.code,
+    name: o.name,
+    type: typeof o.type === 'string' ? o.type : '',
+    aum: num(o.total_aum),
+    expenseRatio: num(o.expense_ratio),
+    ytdPct: num(o.ytd_price_pct),
+    y1Pct: num(o.year_1_price_pct),
+    y3Pct: num(o.year_3_price_pct),
+    y5Pct: num(o.year_5_price_pct),
+    drawdown1yPct: num(o.year_1_drawdown_pct),
+  }
+}
+
+/** Live US universe (adds day momentum). Throws EmptySnapshotError when empty. */
+export async function getAjaibUS(): Promise<{ market: 'us'; count: number; capturedAt: string; rows: USRow[] }> {
+  const { data } = await getCached('ajaib-us:v1', CACHE_TTL, async () => {
+    const { status, body: raw } = rscGet(`${US_LIST_URL}?page=1&page_size=1400`)
+    if (status !== 200) throw new Error(`Ajaib US HTTP ${status}`)
+    const records = extractUniverseRecords(raw)
+    const rows: USRow[] = []
+    for (const r of records) {
+      const base = toRow(r)
+      if (!base) continue
+      rows.push({ ...base, day: toMomentum(r.price_1_day) })
+    }
+    if (rows.length === 0) throw new EmptySnapshotError('Ajaib US')
+    return { market: 'us' as const, count: rows.length, capturedAt: new Date().toISOString(), rows }
+  })
+  return data
+}
+
+/** Live reksa-dana universe. Throws EmptySnapshotError when empty. */
+export async function getAjaibMF(): Promise<{ market: 'mf'; count: number; capturedAt: string; rows: MFRow[] }> {
+  const { data } = await getCached('ajaib-mf:v1', CACHE_TTL, async () => {
+    const { status, body: raw } = rscGet(`${MF_LIST_URL}?page=1&page_size=200`)
+    if (status !== 200) throw new Error(`Ajaib MF HTTP ${status}`)
+    const records = extractUniverseRecords(raw)
+    const rows: MFRow[] = []
+    for (const r of records) {
+      const row = toMFRow(r)
+      if (row) rows.push(row)
+    }
+    if (rows.length === 0) throw new EmptySnapshotError('Ajaib MF')
+    return { market: 'mf' as const, count: rows.length, capturedAt: new Date().toISOString(), rows }
+  })
+  return data
+}
+
+function toCryptoRow(o: Record<string, unknown>): CryptoRow | null {
+  if (typeof o.asset_id !== 'string') return null
+  return {
+    id: o.asset_id,
+    name: typeof o.asset_name === 'string' ? o.asset_name : o.asset_id,
+    price: num(o.price),
+    change24hPct: num(o.price_change_percentage),
+    quote: typeof o.quote_currency === 'string' ? o.quote_currency : 'IDR',
+  }
+}
+
+/** Live crypto list (753 assets). Undici fetch works here (magic host, no CF Node-block). */
+export async function getAjaibCrypto(): Promise<{ market: 'crypto'; count: number; capturedAt: string; rows: CryptoRow[] }> {
+  const { data } = await getCached('ajaib-crypto:v1', CACHE_TTL, async () => {
+    const all: CryptoRow[] = []
+    let page = 1
+    let total = Infinity
+    while (all.length < total && page <= 10) {
+      const res = await fetch(`${CRYPTO_URL}?page=${page}&page_size=100`, {
+        signal: AbortSignal.timeout(20_000),
+        headers: {
+          'User-Agent': IPHONE_UA,
+          Accept: 'application/json',
+          'x-platform': 'WEB',
+          'x-product': 'STOCK-MF',
+          'X-Ht-Ver-Id': 'asdasdqqwvqv',
+        },
+      })
+      if (!res.ok) throw new Error(`Ajaib crypto HTTP ${res.status}`)
+      const body = (await res.json()) as {
+        err_code?: string
+        result?: { count?: number; results?: Array<Record<string, unknown>> }
+      }
+      if (body.err_code !== 'EC0000000') throw new Error(`Ajaib crypto err ${body.err_code ?? 'unknown'}`)
+      total = typeof body.result?.count === 'number' ? body.result.count : 0
+      for (const r of body.result?.results ?? []) {
+        const row = toCryptoRow(r)
+        if (row) all.push(row)
+      }
+      page++
+    }
+    if (all.length === 0) throw new EmptySnapshotError('Ajaib crypto')
+    return { market: 'crypto' as const, count: total === Infinity ? all.length : total, capturedAt: new Date().toISOString(), rows: all }
+  })
+  return data
+}

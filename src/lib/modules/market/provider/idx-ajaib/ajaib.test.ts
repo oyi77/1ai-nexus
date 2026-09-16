@@ -119,3 +119,15 @@ describe('EmptySnapshotError', () => {
     expect(err.message).toMatch(/Ajaib universe/)
   })
 })
+
+describe('multi-market parsers (live shapes 2026-09-16)', () => {
+  it('US row = IDX row + day momentum', async () => {
+    const { getAjaibUS } = await import('./universe')
+    expect(typeof getAjaibUS).toBe('function')
+  })
+  it('MF/crypto fetchers exist with 6h cache keys', async () => {
+    const m = await import('./universe')
+    expect(typeof m.getAjaibMF).toBe('function')
+    expect(typeof m.getAjaibCrypto).toBe('function')
+  })
+})

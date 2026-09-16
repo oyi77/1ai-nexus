@@ -328,7 +328,7 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     path: '/api/v1/saham/ajaib',
     description: 'IDX data from Ajaib (keyless): analyst consensus ratings + target price, PE/PBV ±2σ bands, MA/RSI/ADX technical summary; omit symbol for the 882-stock universe with 1w/1m momentum',
     category: 'Screener',
-    params: 'symbol=BBRI (optional — omit for the whole universe)',
+    params: 'symbol=BBRI (optional — omit for the whole universe) · market=us|mf|crypto (live-only universes)',
     example: 'curl "https://tracker.aitradepulse.com/api/v1/saham/ajaib?symbol=BBRI"',
     response: '{ data: { symbol: "BBRI", source: "db", analystRating: { recommendation: "BUY", buy: 26, sell: 1, hold: 8, total: 35 }, priceEstimates: { target: 3783.04 } } }',
   },
