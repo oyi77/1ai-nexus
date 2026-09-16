@@ -10,6 +10,10 @@
 //
 // Cron (weekdays 19:05 — after IDX close, after TV harvest):
 //   5 19 * * 1-5 cd /home/openclaw/projects/1ai-tracker && npm run harvest:idx-ajaib >> /tmp/idx-ajaib.log 2>&1
+// NOTE: crontab pins the nvm runtime explicitly —
+// PATH=/home/openclaw/.nvm/versions/node/v22.22.3/bin:/usr/bin:/bin —
+// because a bare cron PATH resolves /usr/bin/npm (node v22.22.1)
+// instead of the v22.22.3 the repo builds/tests with.
 // Writes: IdxAjaibUniverse (all), IdxAjaibConsensus (subset).
 // FLAGS: --universe-only (skip consensus), --full (consensus for
 // all 882), --limit=N (cap consensus symbols).
