@@ -348,7 +348,7 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     path: '/api/v1/saham/signals',
     description: 'IDX trading signals from harvest snapshots: RS vs universe median, near-52w-high breakout scan, bandar accumulation × foreign streak',
     category: 'Screener',
-    params: 'view=rs|breakout|bandar · limit=20 · within=5 (breakout % below high)',
+    params: 'view=rs|breakout|ara|bandar · limit=20 · within=5 (breakout % below high)',
     example: 'curl "https://tracker.aitradepulse.com/api/v1/saham/signals?view=breakout&limit=10"',
     response: '{ data: { view: "breakout", thresholdPct: 5, items: [{ code: "BBCA", distancePct: -2.1 }] } }',
   },

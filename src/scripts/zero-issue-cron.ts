@@ -108,6 +108,7 @@ async function runChecks() {
     ['/api/v1/saham/signals?view=rs&limit=5', 200],
     ['/api/v1/saham/signals?view=breakout&limit=5', 200],
     ['/api/v1/saham/signals?view=bandar&limit=5', 200],
+    ['/api/v1/saham/signals?view=ara&limit=5', 200],
     ['/api/v1/fear-greed', 200],
   ]
   for (const [ep, expect] of smoke) {

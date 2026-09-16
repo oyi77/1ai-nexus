@@ -13,11 +13,10 @@ import { apiSuccess, apiError } from '@/lib/api/response'
 import {
   getRSSignals,
   getBreakoutSignals,
+  getARAProximity,
   getBandarFlowSignals,
 } from '@/lib/modules/market/provider/idx-signals'
 import { EmptySnapshotError } from '@/lib/modules/market/provider/idx-stockbit'
-
-export const dynamic = 'force-dynamic'
 
 const NO_DATA = 'No IDX snapshot yet — run the nightly harvests (npm run harvest:idx-screener)'
 
@@ -31,6 +30,10 @@ export async function GET(request: NextRequest) {
       const withinRaw = Number(q.get('within') ?? 5)
       const within = Math.min(30, Math.max(0.5, Number.isFinite(withinRaw) ? withinRaw : 5))
       return apiSuccess({ view, ...(await getBreakoutSignals(within, limit)) })
+    }
+    if (view === 'ara') {
+      const ara = await getARAProximity(limit)
+      return apiSuccess({ view, ...ara })
     }
     if (view === 'bandar') {
       return apiSuccess({ view, ...(await getBandarFlowSignals(limit)) })

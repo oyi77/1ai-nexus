@@ -136,6 +136,76 @@ export async function getRSSignals(limit = 20): Promise<{
   return { median4w: med20, median13w: med60, items: items.slice(0, Math.min(100, Math.max(1, limit))), names }
 }
 
+/** ARA proximity (BEI symmetric bands, per Kompas 2026-08-20 citing BEI/Stockbit —
+ * still current as of 2026-09-16; reclassification under review, not in force):
+ * Rp1–10: nominal Rp1 · Rp11–200: 35% · Rp201–5000: 25% · >Rp5000: 20%.
+ * ARB 15% all tiers. ARA computed from previous close, floored to IDX tick
+ * (<200:1 · <500:2 · <2000:5 · <5000:10 · else 25). proximityPct = room to
+ * ARA from latest close; small = near limit-up. */
+export function araRate(prev: number): number {
+  if (!(prev > 0)) return 0
+  if (prev <= 10) return 0 // nominal Rp1 band — handled by caller
+  if (prev <= 200) return 0.35
+  if (prev <= 5000) return 0.25
+  return 0.2
+}
+
+export function idxTick(price: number): number {
+  if (price < 200) return 1
+  if (price < 500) return 2
+  if (price < 2000) return 5
+  if (price < 5000) return 10
+  return 25
+}
+
+export interface ARAProximity {
+  code: string
+  name: string
+  prev: number
+  close: number
+  ara: number
+  proximityPct: number
+}
+
+export async function getARAProximity(limit = 20): Promise<{ tradeDate: string; items: ARAProximity[] }> {
+  const { data } = await getCached('idx-signals:ara:v1', CACHE_TTL, async () => {
+    const latest = await prisma.idxSahamSession.findFirst({
+      orderBy: { tradeDate: 'desc' },
+      select: { tradeDate: true },
+    })
+    if (!latest) throw new EmptySnapshotError('IDX sessions (ARA)')
+    const rows = await prisma.idxSahamSession.findMany({
+      where: { tradeDate: latest.tradeDate },
+      select: { code: true, prev: true, close: true },
+    })
+    const snap = await getScreenerSnapshot().catch(() => null)
+    const names: Record<string, string> = {}
+    if (snap) for (const r of Object.values(snap.data)) names[r.symbol] = r.name
+    const items: ARAProximity[] = []
+    for (const r of rows) {
+      if (!(r.prev > 0) || !(r.close > 0)) continue
+      const rate = araRate(r.prev)
+      const raw = rate === 0 ? r.prev + 1 : r.prev * (1 + rate)
+      const tick = idxTick(raw)
+      const ara = Math.floor(raw / tick) * tick
+      if (ara <= r.close) continue // already at/past limit (halted or data lag)
+      items.push({
+        code: r.code,
+        name: names[r.code] ?? r.code,
+        prev: r.prev,
+        close: r.close,
+        ara,
+        proximityPct: ((ara - r.close) / r.close) * 100,
+      })
+    }
+    if (items.length === 0) throw new EmptySnapshotError('IDX sessions (ARA)')
+    items.sort((a, b) => a.proximityPct - b.proximityPct)
+    return { tradeDate: latest.tradeDate, items }
+  })
+  const lim = Math.min(100, Math.max(1, limit))
+  return { tradeDate: data.tradeDate, items: data.items.slice(0, lim) }
+}
+
 /** Near-52w-high scan (idxscreener breakout concept). */
 export async function getBreakoutSignals(
   withinPct = 5,
