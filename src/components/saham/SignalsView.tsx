@@ -33,7 +33,7 @@ const matchesQuery = (q: string, ...fields: (string | null | undefined)[]): bool
   return fields.some(f => (f ?? '').toLowerCase().includes(needle))
 }
 
-export default function SignalsView({ externalQuery }: { externalQuery?: string }) {
+export default function SignalsView({ externalQuery, limit = 25 }: { externalQuery?: string; limit?: number }) {
   const [tab, setTab] = useState<Tab>("rs")
   const [rs, setRs] = useState<RSRow[]>([])
   const [rsMeta, setRsMeta] = useState<{ median4w?: number; median13w?: number }>({})
@@ -47,28 +47,28 @@ export default function SignalsView({ externalQuery }: { externalQuery?: string 
     ;(async () => {
       try {
         if (tab === "rs") {
-          const d = await (await fetch("/api/v1/saham/signals?view=rs&limit=25")).json()
+          const d = await (await fetch(`/api/v1/saham/signals?view=rs&limit=${limit}`)).json()
           if (!cancelled) {
             setRs(d.data?.items ?? [])
             setRsMeta({ median4w: d.data?.median4w, median13w: d.data?.median13w })
           }
         } else if (tab === "breakout") {
-          const d = await (await fetch("/api/v1/saham/signals?view=breakout&limit=25")).json()
+          const d = await (await fetch(`/api/v1/saham/signals?view=breakout&limit=${limit}`)).json()
           if (!cancelled) setBreakout(d.data?.items ?? [])
         } else if (tab === "ara") {
-          const d = await (await fetch("/api/v1/saham/signals?view=ara&limit=25")).json()
+          const d = await (await fetch(`/api/v1/saham/signals?view=ara&limit=${limit}`)).json()
           if (!cancelled) {
             setAra(d.data?.items ?? [])
             setAraDate(d.data?.tradeDate ?? "")
           }
         } else {
-          const d = await (await fetch("/api/v1/saham/signals?view=bandar&limit=25")).json()
+          const d = await (await fetch(`/api/v1/saham/signals?view=bandar&limit=${limit}`)).json()
           if (!cancelled) setBandar(d.data?.items ?? [])
         }
       } catch { /* leave previous */ }
     })()
     return () => { cancelled = true }
-  }, [tab])
+  }, [tab, limit])
 
   return (
     <>

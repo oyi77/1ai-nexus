@@ -48,8 +48,8 @@ export default function SahamHubPage() {
         </div>
         <div className="flex-1 overflow-auto">
           {tab === "ideas" && <IdeasView externalQuery={query} />}
-          {tab === "signals" && <SignalsView externalQuery={query} />}
-          {tab === "bandar" && <BandarmologyView externalQuery={query} />}
+          {tab === "signals" && <SignalsView externalQuery={query} limit={1000} />}
+          {tab === "bandar" && <BandarmologyView externalQuery={query} limit={100} />}
         </div>
       </div>
     </NexusLayout>

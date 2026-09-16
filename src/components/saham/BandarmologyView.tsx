@@ -125,7 +125,7 @@ function SeriesChart({ pts }: { pts: SeriesPoint[] }) {
   )
 }
 
-export default function BandarmologyView({ externalQuery }: { externalQuery?: string }) {
+export default function BandarmologyView({ externalQuery, limit = 25 }: { externalQuery?: string; limit?: number }) {
   const [tab, setTab] = useState<"leaders" | "streaks" | "brokers" | "flow" | "rotation">("leaders")
   const [meta, setMeta] = useState<{ tradeDate?: string; capturedAt?: string; count?: number }>({})
   const [topBuy, setTopBuy] = useState<Leader[]>([])
@@ -146,21 +146,21 @@ export default function BandarmologyView({ externalQuery }: { externalQuery?: st
       setLoading(true)
       try {
         if (tab === "leaders") {
-          const d = await (await fetch("/api/v1/saham/bandarmology?view=leaders&limit=25")).json()
+          const d = await (await fetch(`/api/v1/saham/bandarmology?view=leaders&limit=${limit}`)).json()
           if (!cancelled) {
             setTopBuy(d.data?.topBuy ?? [])
             setTopSell(d.data?.topSell ?? [])
             setMeta(d.data?.meta ?? {})
           }
         } else if (tab === "streaks") {
-          const d = await (await fetch("/api/v1/saham/bandarmology?view=streaks&minDays=3&limit=25")).json()
+          const d = await (await fetch(`/api/v1/saham/bandarmology?view=streaks&minDays=3&limit=${limit}`)).json()
           if (!cancelled) {
             setAcc(d.data?.accumulation ?? [])
             setDist(d.data?.distribution ?? [])
             setMeta(d.data?.meta ?? {})
           }
         } else if (tab === "brokers") {
-          const d = await (await fetch("/api/v1/saham/bandarmology?view=brokers&limit=25")).json()
+          const d = await (await fetch(`/api/v1/saham/bandarmology?view=brokers&limit=${limit}`)).json()
           if (!cancelled) {
             setBrokers(d.data?.rows ?? [])
             setMeta({ tradeDate: d.data?.tradeDate })
@@ -182,7 +182,7 @@ export default function BandarmologyView({ externalQuery }: { externalQuery?: st
       if (!cancelled) setLoading(false)
     })()
     return () => { cancelled = true }
-  }, [tab])
+  }, [tab, limit])
 
   const lookupSeries = () => {
     const sym = symbol.trim().toUpperCase().replace('.JK', '')

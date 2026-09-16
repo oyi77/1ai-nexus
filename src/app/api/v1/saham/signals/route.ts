@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams
   const view = q.get('view') ?? 'rs'
   const limitRaw = Number(q.get('limit') ?? 20)
-  const limit = Math.min(100, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 20))
+  const limit = Math.min(1000, Math.max(1, Number.isFinite(limitRaw) ? limitRaw : 20))
   try {
     if (view === 'breakout') {
       const withinRaw = Number(q.get('within') ?? 5)

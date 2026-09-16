@@ -133,7 +133,7 @@ export async function getRSSignals(limit = 20): Promise<{
     items.push({ code: r.code, name: names[r.code] ?? r.code, rs4w: rs4, rs13w: rs13, rsScore })
   }
   items.sort((a, b) => b.rsScore - a.rsScore)
-  return { median4w: med20, median13w: med60, items: items.slice(0, Math.min(100, Math.max(1, limit))), names }
+  return { median4w: med20, median13w: med60, items: items.slice(0, Math.min(1000, Math.max(1, limit))), names }
 }
 
 /** ARA proximity (BEI symmetric bands, per Kompas 2026-08-20 citing BEI/Stockbit —
@@ -202,7 +202,7 @@ export async function getARAProximity(limit = 20): Promise<{ tradeDate: string; 
     items.sort((a, b) => a.proximityPct - b.proximityPct)
     return { tradeDate: latest.tradeDate, items }
   })
-  const lim = Math.min(100, Math.max(1, limit))
+  const lim = Math.min(1000, Math.max(1, limit))
   return { tradeDate: data.tradeDate, items: data.items.slice(0, lim) }
 }
 
@@ -230,7 +230,7 @@ export async function getBreakoutSignals(
     }
   }
   items.sort((a, b) => b.distancePct - a.distancePct)
-  return { thresholdPct: withinPct, items: items.slice(0, Math.min(100, Math.max(1, limit))) }
+  return { thresholdPct: withinPct, items: items.slice(0, Math.min(1000, Math.max(1, limit))) }
 }
 
 /** Bandar accumulation flow: Stockbit accdist × foreign streak (bandar-confirmed). */
@@ -279,5 +279,5 @@ export async function getBandarFlowSignals(limit = 20): Promise<{ items: BandarF
     (/acc/i.test(i.accdist) ? 500 : 0) +
     Math.min(i.foreignStreakDays, 30)
   items.sort((a, b) => rank(b) - rank(a))
-  return { items: items.slice(0, Math.min(100, Math.max(1, limit))) }
+  return { items: items.slice(0, Math.min(1000, Math.max(1, limit))) }
 }
