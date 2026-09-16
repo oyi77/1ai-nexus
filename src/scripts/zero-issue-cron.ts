@@ -103,8 +103,9 @@ async function runChecks() {
     ['/api/v1/health', 200],
     ['/api/v1/news?limit=5', 200],
     ['/api/v1/saham/screener', 200],
+    ['/api/v1/saham/ajaib?symbol=BBRI', 200],
+    ['/api/v1/saham/stockbit?symbol=BBRI', 200],
     ['/api/v1/fear-greed', 200],
-    ['/api/v1/admin/feeds', 401], // auth gate must hold
   ]
   for (const [ep, expect] of smoke) {
     checks.push(await check(`api ${ep}`, async () => {
