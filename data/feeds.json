@@ -538,5 +538,15 @@
     "id": "rba-news",
     "url": "https://www.rba.gov.au/rss/rss-cb-media-releases.xml",
     "category": "regulatory"
+  },
+  {
+    "id": "cnbcindonesia-market",
+    "url": "https://www.cnbcindonesia.com/market/rss",
+    "category": "indonesia"
+  },
+  {
+    "id": "republika-ekonomi",
+    "url": "https://www.republika.co.id/rss/ekonomi",
+    "category": "indonesia"
   }
 ]
