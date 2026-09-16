@@ -89,3 +89,4 @@ data/stockbit-session.json
 
 # zero-issue audit runtime state (mutates on every run, never commit)
 data/zero-issue-state.json
+data/feed-health-prev.json
