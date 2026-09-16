@@ -71,7 +71,7 @@ export function mergeMembership(pairs: Array<{ index: string; codes: string[] }>
 }
 
 export async function getIndexMembership(): Promise<IndexMembership> {
-  const { data } = await getCached('ajaib-indices:v1', CACHE_TTL, async () => {
+  const { data } = await getCached('ajaib-indices:v2', CACHE_TTL, async () => {
     const pairs: Array<{ index: string; codes: string[] }> = []
     for (const index of IDX_INDICES) {
       try {

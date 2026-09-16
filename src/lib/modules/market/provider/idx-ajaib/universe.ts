@@ -125,6 +125,7 @@ export function rscGet(url: string): { status: number; body: string } {
     'curl',
     [
       '-sS',
+      '-L',
       '--max-time',
       '25',
       '-H',
