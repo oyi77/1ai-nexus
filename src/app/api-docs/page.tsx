@@ -333,6 +333,16 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     response: '{ data: { symbol: "BBRI", source: "db", analystRating: { recommendation: "BUY", buy: 26, sell: 1, hold: 8, total: 35 }, priceEstimates: { target: 3783.04 } } }',
   },
 
+  {
+    method: 'GET',
+    path: '/api/v1/saham/stockbit',
+    description: 'IDX bandar intel from Stockbit (server-authed): broker accumulation/distribution snapshots, counterparty matrix, guru screens, analyst ratings; omit params for the snapshot universe',
+    category: 'Screener',
+    params: 'symbol=BBRI · leaders=acc|dist&limit=20 · guru=1 · analyst=BBRI (or analyst=1 for universe)',
+    example: 'curl "https://tracker.aitradepulse.com/api/v1/saham/stockbit?leaders=acc&limit=10"',
+    response: '{ data: { tradeDate: "2026-09-15", count: 60, rows: [{ code: "BBRI", accdist: "Dist", top1Amount: -61783770000 }] } }',
+  },
+
   // ─── Growth & Social ──────────────────────────────────
   {
     method: 'GET',

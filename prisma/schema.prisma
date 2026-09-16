@@ -1113,6 +1113,55 @@ model IdxAjaibConsensus {
   @@unique([code, snapshotDate])
   @@index([snapshotDate(sort: Desc)])
 }
+
+model IdxBandarSnapshot {
+  id          String   @id @default(cuid())
+  code        String
+  tradeDate   String   // session date from /marketdetectors from..to
+  accdist     String   @default("") // Big Acc | Big Dist | Small Acc | ...
+  avgAmount   Float?
+  avgPct      Float?
+  top1Amount  Float?
+  top3Amount  Float?
+  top5Amount  Float?
+  top10Amount Float?
+  buyCount    Int      @default(0)
+  sellCount   Int      @default(0)
+  brokers     Json?    // { buy: [{code, lot, value, avgPrice, foreign}], sell: [...] }
+  matrix      Json?    // { topBuyer: {code, value, counterparties: [{code, amount}]}, ... }
+
+  @@unique([code, tradeDate])
+  @@index([tradeDate(sort: Desc)])
+}
+
+model IdxStockbitGuru {
+  id           String   @id @default(cuid())
+  templateId   Int
+  templateName String   @default("")
+  snapshotDate String   // YYYY-MM-DD
+  matches      Json     // [{ symbol, name, results: [{id, item, display, raw}] }]
+
+  @@unique([templateId, snapshotDate])
+  @@index([snapshotDate(sort: Desc)])
+}
+
+model IdxStockbitAnalyst {
+  id             String   @id @default(cuid())
+  code           String
+  snapshotDate   String   // YYYY-MM-DD
+  recommendation String   @default("")
+  buy            Int      @default(0)
+  sell           Int      @default(0)
+  hold           Int      @default(0)
+  total          Int      @default(0)
+  target         Float?
+  low            Float?
+  high           Float?
+  updatedAt      String   @default("")
+
+  @@unique([code, snapshotDate])
+  @@index([snapshotDate(sort: Desc)])
+}
 // ── Alpha track record: prove the alpha engine works ──
 model AlphaTrackRecord {
   id          String   @id @default(cuid())
