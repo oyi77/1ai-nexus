@@ -173,6 +173,7 @@ const PUBLIC_ROUTES = new Set([
   '/api/v1/saham/fundamentals',
   '/api/v1/saham/realtime',
   '/api/v1/saham/moonshot',
+  '/api/v1/saham/ajaib',
 
   // ── Telemetry / webhooks (self-authenticating via secret or CORS) ──
   '/api/v1/analytics',

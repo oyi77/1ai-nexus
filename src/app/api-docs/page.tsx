@@ -323,6 +323,16 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     response: '{ data: { symbol: "BBCA", per: 13.62, pbv: 2.81, roe: 21.82, der: 0.20, eps: 471.83, marketCap: 788960300000000, dividendYield: 5.56 } }',
   },
 
+  {
+    method: 'GET',
+    path: '/api/v1/saham/ajaib',
+    description: 'IDX data from Ajaib (keyless): analyst consensus ratings + target price, PE/PBV ±2σ bands, MA/RSI/ADX technical summary; omit symbol for the 882-stock universe with 1w/1m momentum',
+    category: 'Screener',
+    params: 'symbol=BBRI (optional — omit for the whole universe)',
+    example: 'curl "https://tracker.aitradepulse.com/api/v1/saham/ajaib?symbol=BBRI"',
+    response: '{ data: { symbol: "BBRI", source: "db", analystRating: { recommendation: "BUY", buy: 26, sell: 1, hold: 8, total: 35 }, priceEstimates: { target: 3783.04 } } }',
+  },
+
   // ─── Growth & Social ──────────────────────────────────
   {
     method: 'GET',

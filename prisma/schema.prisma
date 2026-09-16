@@ -1073,6 +1073,46 @@ model IdxFundamentals {
   @@unique([code, snapshotDate])
   @@index([snapshotDate(sort: Desc)])
 }
+
+model IdxAjaibUniverse {
+  id           String   @id @default(cuid())
+  code         String
+  snapshotDate String   // YYYY-MM-DD
+  name         String   @default("")
+  price        Float?
+  marketCap    Float?
+  volume       Float?
+  weekPrice    Float?
+  weekPct      Float?
+  weekChg      Float?
+  monthPrice   Float?
+  monthPct     Float?
+  monthChg     Float?
+
+  @@unique([code, snapshotDate])
+  @@index([snapshotDate(sort: Desc)])
+}
+
+model IdxAjaibConsensus {
+  id             String   @id @default(cuid())
+  code           String
+  snapshotDate   String   // YYYY-MM-DD
+  recommendation String   @default("")
+  buy            Int      @default(0)
+  sell           Int      @default(0)
+  hold           Int      @default(0)
+  total          Int      @default(0)
+  targetPrice    Float?
+  currentPrice   Float?
+  highPrice      Float?
+  lowPrice       Float?
+  consensus      Json?    // { year: { revenue, operatingIncome, netIncome, eps } }
+  technicals     Json?    // { buy, sell, neutral, ma[], indicators[], pivots[] }
+  bands          Json?    // { pbv: ValueBand, pe: ValueBand }
+
+  @@unique([code, snapshotDate])
+  @@index([snapshotDate(sort: Desc)])
+}
 // ── Alpha track record: prove the alpha engine works ──
 model AlphaTrackRecord {
   id          String   @id @default(cuid())
