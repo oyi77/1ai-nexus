@@ -200,6 +200,7 @@ const PROTECTED_ROUTES = new Set([
   '/api/v1/admin/stats',
   '/api/v1/admin/users',
   '/api/v1/admin/feeds',
+  '/api/v1/admin/integrations',
   '/api/v1/checkout',
   '/api/v1/keys',
   '/api/v1/signals/history',

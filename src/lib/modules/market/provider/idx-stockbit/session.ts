@@ -176,17 +176,38 @@ async function rotate(force = false): Promise<StockbitSession> {
   if (refreshInflight) return refreshInflight
   refreshInflight = (async () => {
     const current = cached ?? readSessionFile()
-    const rt =
-      current?.refreshToken ?? process.env.STOCKBIT_REFRESH_TOKEN ?? ''
+    let rt = current?.refreshToken ?? process.env.STOCKBIT_REFRESH_TOKEN ?? ''
+    let dbBacked = false
+    if (!rt) {
+      try {
+        const { readSecret } = await import('@/lib/secrets')
+        const dbRt = await readSecret('stockbit_refresh_token')
+        if (dbRt) {
+          rt = dbRt
+          dbBacked = true
+        }
+      } catch {
+        // secrets store unavailable (no table / no master key) — fall through
+      }
+    }
     if (!rt) {
       throw new Error(
-        'No Stockbit session: stage a refresh token via STOCKBIT_REFRESH_TOKEN env (or data/stockbit-session.json) — see local/stockbit-auth-re.md §14',
+        'No Stockbit session: stage a refresh token via Admin → Integrations or STOCKBIT_REFRESH_TOKEN env — see docs/product/02-blueprint-market-ready.md',
       )
     }
     try {
       const fresh = await refreshStockbitSession(rt)
       cached = fresh
-      writeSessionFile(fresh)
+      if (dbBacked) {
+        try {
+          const { writeSecret } = await import('@/lib/secrets')
+          await writeSecret('stockbit_refresh_token', fresh.refreshToken)
+        } catch {
+          writeSessionFile(fresh)
+        }
+      } else {
+        writeSessionFile(fresh)
+      }
       return fresh
     } catch (err) {
       refreshBlockedUntil = Date.now() + NEGATIVE_CACHE_MS
@@ -238,6 +259,17 @@ export function hasSessionCredentials(): boolean {
   if (cached?.refreshToken) return true
   if (readSessionFile()?.refreshToken) return true
   return Boolean(process.env.STOCKBIT_REFRESH_TOKEN)
+}
+
+/** Async variant that also checks the DB-backed secret store. */
+export async function hasSessionCredentialsAsync(): Promise<boolean> {
+  if (hasSessionCredentials()) return true
+  try {
+    const { readSecret } = await import('@/lib/secrets')
+    return Boolean(await readSecret('stockbit_refresh_token'))
+  } catch {
+    return false
+  }
 }
 
 /** Test/diag helper: forget in-memory state. */

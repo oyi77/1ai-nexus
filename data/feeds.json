@@ -141,7 +141,7 @@
   },
   {
     "id": "marketwatch",
-    "url": "https://feeds.marketwatch.com/marketwatch/topstories/",
+    "url": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
     "category": "tradfi"
   },
   {
@@ -176,7 +176,7 @@
   },
   {
     "id": "hackernews",
-    "url": "https://hnrss.org/frontpage",
+    "url": "https://news.ycombinator.com/rss",
     "category": "tech"
   },
   {
@@ -518,11 +518,6 @@
     "id": "silent-people",
     "url": "https://www.siliconrepublic.com/feed",
     "category": "tech"
-  },
-  {
-    "id": "reddit-stocks",
-    "url": "https://www.reddit.com/r/stocks/.rss",
-    "category": "social"
   },
   {
     "id": "hackernoon-crypto",

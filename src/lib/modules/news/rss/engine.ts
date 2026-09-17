@@ -59,7 +59,7 @@ const FEEDS: Array<{ id: string; url: string; category: FeedCategory }> = [
   { id: 'ft',             url: 'https://www.ft.com/?format=rss',                                  category: 'tradfi' },
   { id: 'wsj-markets',    url: 'https://feeds.a.dj.com/rss/RSSMarketsMain.xml',                   category: 'tradfi' },
   { id: 'cnbc',           url: 'https://www.cnbc.com/id/100003114/device/rss/rss.html',           category: 'tradfi' },
-  { id: 'marketwatch',    url: 'https://feeds.marketwatch.com/marketwatch/topstories/',           category: 'tradfi' },
+  { id: 'marketwatch',    url: 'https://feeds.content.dowjones.io/public/rss/mw_topstories',        category: 'tradfi' }, // G4 2026-09-17: feeds.marketwatch.com 400 retired upstream; official Dow Jones RSS (live-verified 200, 10 items)
   { id: 'investing-com',  url: 'https://www.investing.com/rss/news.rss',                          category: 'tradfi' },
   { id: 'yahoo-fin',      url: 'https://finance.yahoo.com/news/rssindex',                         category: 'tradfi' },
 
@@ -68,7 +68,7 @@ const FEEDS: Array<{ id: string; url: string; category: FeedCategory }> = [
   { id: 'arstechnica',    url: 'https://feeds.arstechnica.com/arstechnica/index',                 category: 'tech' },
   { id: 'verge',          url: 'https://www.theverge.com/rss/index.xml',                          category: 'tech' },
   { id: 'wired',          url: 'https://www.wired.com/feed/rss',                                  category: 'tech' },
-  { id: 'hackernews',     url: 'https://hnrss.org/frontpage',                                     category: 'tech' },
+  { id: 'hackernews',     url: 'https://news.ycombinator.com/rss',                                category: 'tech' }, // G4 2026-09-17: hnrss.org flaky from Node runtime (fetch failed); official HN RSS (live-verified 200, 30 items)
   { id: 'mit-tech',       url: 'https://www.technologyreview.com/feed/',                          category: 'tech' },
   { id: 'theregister',    url: 'https://www.theregister.com/headlines.atom',                      category: 'tech' },
   { id: 'bleepingcomputer', url: 'https://www.bleepingcomputer.com/feed/',                        category: 'tech' },

@@ -3,8 +3,8 @@
 // consensus from keyless Ajaib endpoints (no auth needed).
 //
 // Universe: 1 call (page_size=900) → ~882 rows.
-// Consensus: per-symbol poll (hour-polite: 300ms delay, top-200
-// by marketCap first, single batch; full universe on weekends).
+// Consensus: per-symbol poll (hour-polite: 300ms delay, FULL universe
+// by marketCap by default; ~880 symbols x 300ms ~= 5min nightly).
 // Units contract: price IDR · marketCap IDR · volume SHARES ·
 // week/month momentum multiples (price) + pct (%) + priceChange (IDR).
 //
@@ -29,7 +29,6 @@ const IPHONE_UA =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
 const ANALYSIS_BASE = 'https://external-api.ajaib.co.id/api/v1/public/investment-experience/asset/analysis'
 const CONSENSUS_DELAY_MS = 300
-const DEFAULT_CONSENSUS_LIMIT = 200
 
 const num = (v: unknown): number | null =>
   typeof v === 'number' && Number.isFinite(v) ? v : null
@@ -78,9 +77,11 @@ async function main() {
     // ── 2. Consensus (polite per-symbol poll) ──
     let consensusCount = 0
     if (!args.has('--universe-only')) {
-      const limit = args.has('--full')
-        ? universeRows.length
-        : Math.min(limitArg ? Number(limitArg) : DEFAULT_CONSENSUS_LIMIT, universeRows.length)
+      // G1 market-ready: full universe by default; --limit=N caps manual runs.
+      // (--full kept as alias for explicitness.)
+      const limit = limitArg
+        ? Math.min(Number(limitArg) || 0, universeRows.length)
+        : universeRows.length
       const ranked = [...universeRows]
         .sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0))
         .slice(0, limit)

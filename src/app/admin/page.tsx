@@ -31,6 +31,14 @@ interface AdminUser {
   createdAt: string
 }
 
+interface IntegrationInfo {
+  key: string
+  label: string
+  staged: boolean
+  updatedAt: string | null
+  healthy: boolean
+}
+
 interface AccountData {
   user: {
     id: string
@@ -55,6 +63,11 @@ export default function AdminPage() {
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null)
   const [users, setUsers] = useState<AdminUser[] | null>(null)
   const [usersError, setUsersError] = useState(false)
+  const [integrations, setIntegrations] = useState<IntegrationInfo[] | null>(null)
+  const [integrationsError, setIntegrationsError] = useState(false)
+  const [tokenInput, setTokenInput] = useState('')
+  const [tokenBusy, setTokenBusy] = useState(false)
+  const [tokenMsg, setTokenMsg] = useState<string | null>(null)
   const [analyticsError, setAnalyticsError] = useState(false)
 
   const fetchAll = useCallback(async () => {
@@ -137,6 +150,21 @@ export default function AdminPage() {
         setUsers(null)
         setUsersError(true)
       }
+
+      // Fetch integrations (admin secrets)
+      try {
+        const intRes = await fetch('/api/v1/admin/integrations')
+        if (intRes.ok) {
+          const intJson = (await intRes.json()) as { data: { items: IntegrationInfo[] } }
+          setIntegrations(intJson.data?.items ?? null)
+        } else {
+          setIntegrations(null)
+          setIntegrationsError(true)
+        }
+      } catch {
+        setIntegrations(null)
+        setIntegrationsError(true)
+      }
     } catch {
       setStatus('error')
     }
@@ -212,6 +240,65 @@ export default function AdminPage() {
   }
 
   // ── Live ──
+  async function stageToken() {
+    const value = tokenInput.trim()
+    if (!value) {
+      setTokenMsg('Paste a refresh token first.')
+      return
+    }
+    setTokenBusy(true)
+    setTokenMsg(null)
+    try {
+      const res = await fetch('/api/v1/admin/integrations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'stockbit_refresh_token', value }),
+      })
+      const json = (await res.json()) as { data: { ok?: boolean } | null; error: string | null }
+      if (res.ok && json.data?.ok) {
+        setTokenInput('')
+        setTokenMsg('Token staged — rotated pair saved encrypted.')
+      } else {
+        setTokenMsg(json.error ?? 'Staging failed.')
+      }
+    } catch {
+      setTokenMsg('Network error while staging.')
+    } finally {
+      setTokenBusy(false)
+      // Refresh the list (value never re-fetched — only status)
+      try {
+        const intRes = await fetch('/api/v1/admin/integrations')
+        if (intRes.ok) {
+          const intJson = (await intRes.json()) as { data: { items: IntegrationInfo[] } }
+          setIntegrations(intJson.data?.items ?? null)
+        }
+      } catch {
+        // keep previous list
+      }
+    }
+  }
+
+  async function revokeToken(key: string) {
+    setTokenBusy(true)
+    setTokenMsg(null)
+    try {
+      const res = await fetch(`/api/v1/admin/integrations?key=${encodeURIComponent(key)}`, { method: 'DELETE' })
+      const json = (await res.json()) as { data: unknown; error: string | null }
+      setTokenMsg(res.ok ? 'Token revoked.' : (json.error ?? 'Revoke failed.'))
+      if (res.ok) {
+        const intRes = await fetch('/api/v1/admin/integrations')
+        if (intRes.ok) {
+          const intJson = (await intRes.json()) as { data: { items: IntegrationInfo[] } }
+          setIntegrations(intJson.data?.items ?? null)
+        }
+      }
+    } catch {
+      setTokenMsg('Network error while revoking.')
+    } finally {
+      setTokenBusy(false)
+    }
+  }
+
   const statItems: { label: string; value: string | number }[] = []
 
   if (stats) {
@@ -315,6 +402,88 @@ export default function AdminPage() {
               {keysError ? 'Keys endpoint unavailable' : 'No API keys found'}
             </p>
           )}
+        </Panel>
+
+        {/* Integrations */}
+        <Panel
+          title="Integrations"
+          subtitle="Secrets are validated live, stored encrypted, never shown back"
+          liveStatus={integrationsError ? 'error' : integrations ? 'live' : 'stale'}
+        >
+          <div className="p-4 space-y-4">
+            {(integrations && integrations.length > 0) ? (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-bg-border text-left text-xs text-text-muted font-mono uppercase tracking-wider">
+                    <th className="px-4 py-2 font-medium">Integration</th>
+                    <th className="px-4 py-2 font-medium">Status</th>
+                    <th className="px-4 py-2 font-medium">Updated</th>
+                    <th className="px-4 py-2 font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {integrations.map((it) => (
+                    <tr key={it.key} className="border-b border-bg-border/50 hover:bg-bg-raised/50">
+                      <td className="px-4 py-2 text-text-primary font-mono">
+                        {it.label}
+                      </td>
+                      <td className="px-4 py-2 font-mono text-xs">
+                        {it.staged ? (
+                          <span className="text-teal-vivid">● staged{it.healthy ? '' : ' (unverified)'}</span>
+                        ) : (
+                          <span className="text-data-warn">○ not staged</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2 text-text-muted font-mono text-xs">
+                        {it.updatedAt ? new Date(it.updatedAt).toLocaleString() : '—'}
+                      </td>
+                      <td className="px-4 py-2">
+                        {it.staged && (
+                          <button
+                            onClick={() => revokeToken(it.key)}
+                            disabled={tokenBusy}
+                            className="px-3 py-1 text-xs font-mono border border-data-bear/50 text-data-bear rounded hover:bg-data-bear/10 disabled:opacity-50"
+                          >
+                            Revoke
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="text-sm text-text-muted font-mono">
+                {integrationsError ? 'Integrations endpoint unavailable' : 'No integrations found'}
+              </p>
+            )}
+            <div className="space-y-2 border-t border-bg-border/50 pt-4">
+              <p className="text-xs text-text-muted font-mono">
+                Stage Stockbit refresh token — validated live, then the rotated pair is saved encrypted.
+                Validation spends one upstream rotation (documented behavior).
+              </p>
+              <textarea
+                value={tokenInput}
+                onChange={(e) => setTokenInput(e.target.value)}
+                placeholder="Paste Stockbit refresh JWT (three segments)…"
+                rows={3}
+                spellCheck={false}
+                className="w-full px-3 py-2 text-xs font-mono bg-bg-raised border border-bg-border rounded text-text-primary placeholder:text-text-muted/60"
+              />
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={stageToken}
+                  disabled={tokenBusy}
+                  className="px-4 py-2 bg-teal-vivid text-bg-base font-mono font-bold text-sm rounded hover:bg-teal-vivid/80 disabled:opacity-50"
+                >
+                  {tokenBusy ? 'Working…' : 'Stage token'}
+                </button>
+                {tokenMsg && (
+                  <span className="text-xs font-mono text-text-secondary">{tokenMsg}</span>
+                )}
+              </div>
+            </div>
+          </div>
         </Panel>
 
         {/* Users */}

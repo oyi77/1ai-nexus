@@ -1,9 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // US-IDX dual listings — Indonesian companies trading abroad.
-// Live-verified 2026-09-16:
-// - TLK present in FOREIGN_STOCK codes + asset/info (price $14.78)
-//   but ABSENT from the US RSC universe (887 large-caps only) —
-//   so the US leg reads asset/info, not the universe.
+// Live-verified 2026-09-16, re-confirmed 2026-09-17 (G5):
+// - TLK present in FOREIGN_STOCK codes + asset/info — the US leg reads
+//   asset/info per-ticker, NEVER a universe snapshot (no universe-size
+//   dependence; the old "1314-vs-887" session note referred to a stale
+//   snapshot and no longer reproduces — data/global/us.json is 5705 rows).
 // - IDX leg from IdxSahamSession closes.
 // SERVER-ONLY. Consume via /api/v1/saham/dual?symbol=TLKM.
 // ─────────────────────────────────────────────────────────────

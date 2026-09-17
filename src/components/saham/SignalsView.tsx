@@ -157,6 +157,9 @@ export default function SignalsView({ externalQuery, limit = 25 }: { externalQue
 
       {tab === "ara" && (
         <Panel title={`ARA PROXIMITY — ROOM TO LIMIT-UP (session ${araDate})`}>
+          <p className="px-3 pt-2 text-[11px] font-mono text-data-warn">
+            CAUTION — backtest ARA lane: 32.9% win / −1.82% avg over 70 signals (5-session horizon). Chasing near-limit-up prints is a documented loser; treat this tab as mean-reversion context, not a buy signal.
+          </p>
           <table className="w-full text-xs tabular-nums">
             <thead>
               <tr className="text-text-muted border-b border-border-dim">

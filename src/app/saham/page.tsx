@@ -6,8 +6,9 @@ import { LiveDot } from "@/components/primitives/LiveDot"
 import IdeasView from "@/components/saham/IdeasView"
 import SignalsView from "@/components/saham/SignalsView"
 import BandarmologyView from "@/components/saham/BandarmologyView"
+import MarketsView from "@/components/saham/MarketsView"
 
-const TABS = [["ideas", "IDEAS"], ["signals", "SIGNALS"], ["bandar", "BANDARMOLOGY"]] as const
+const TABS = [["ideas", "IDEAS"], ["signals", "SIGNALS"], ["bandar", "BANDARMOLOGY"], ["markets", "MARKETS"]] as const
 type Tab = (typeof TABS)[number][0]
 
 export default function SahamHubPage() {
@@ -22,7 +23,7 @@ export default function SahamHubPage() {
             <h1 className="text-xl font-semibold text-text-primary flex items-center gap-2">
               <LiveDot status="live" /> IDX Saham Hub
             </h1>
-            <span className="text-xs text-text-tertiary">unified · ideas + signals + bandarmology</span>
+            <span className="text-xs text-text-tertiary">unified · ideas + signals + bandarmology + markets</span>
           </div>
           <div className="flex flex-wrap items-center gap-3 mt-4">
             <div className="flex gap-2">
@@ -50,6 +51,7 @@ export default function SahamHubPage() {
           {tab === "ideas" && <IdeasView externalQuery={query} />}
           {tab === "signals" && <SignalsView externalQuery={query} limit={1000} />}
           {tab === "bandar" && <BandarmologyView externalQuery={query} limit={100} />}
+          {tab === "markets" && <MarketsView externalQuery={query} />}
         </div>
       </div>
     </NexusLayout>

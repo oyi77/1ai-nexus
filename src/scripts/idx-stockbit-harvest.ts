@@ -4,7 +4,8 @@
 //
 // Auth: STOCKBIT_REFRESH_TOKEN env (or data/stockbit-session.json).
 // Access JWTs auto-rotate + persist single-writer (this cron).
-// polite: 400ms between symbols, top-60 by marketCap default.
+// polite: 400ms between symbols, FULL universe by marketCap default
+// (~880 symbols x ~1.2s = ~18min nightly; --limit=N caps for manual runs).
 // Units: blot=lots, bval=IDR (verified arithmetically 2026-09-16).
 //
 // Cron (weekdays 19:15 — after Ajaib harvest):
@@ -15,7 +16,7 @@
 // instead of the v22.22.3 the repo builds/tests with.
 // Writes: IdxBandarSnapshot, IdxStockbitGuru, IdxStockbitAnalyst.
 // FLAGS: --bandar-only (skip guru+analyst), --guru-only,
-//   --analyst-only, --limit=N (cap symbols, default 60),
+//   --analyst-only, --limit=N (cap symbols, default FULL universe),
 //   --templates=2,5,6 (guru preset ids, default Fisher+Piotroski+Greenblatt).
 // ─────────────────────────────────────────────────────────────
 
@@ -32,7 +33,8 @@ import {
 } from '@/lib/modules/market/provider/idx-stockbit/client'
 
 const DELAY_MS = 400
-const DEFAULT_LIMIT = 60
+// No default cap: nightly cron covers the full universe (G1 market-ready).
+// Pass --limit=N for manual capped runs.
 const DEFAULT_TEMPLATES = [2, 3, 5, 6, 7, 9, 17, 74] // Fisher P/S, Piotroski F-Score P/E, Buffettology, Greenblatt Magic, 52w-momentum, Tiny Titans, Piotroski High F-Score, Value Momentum (unverified ids self-skip via try/catch)
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -55,8 +57,7 @@ async function main() {
     const onlyAnalyst = args.has('--analyst-only')
     const runAll = !onlyBandar && !onlyGuru && !onlyAnalyst
 
-    // Universe ranking: top-N by marketCap from our own fundamentals snapshot.
-    const limit = Math.min(limitArg ? Number(limitArg) : DEFAULT_LIMIT, 500)
+    // Universe ranking: full list by marketCap from our own fundamentals snapshot.
     const funds = await prisma.idxFundamentals.findMany({
       orderBy: { snapshotDate: 'desc' },
       take: 1,
@@ -66,10 +67,11 @@ async function main() {
     const fundRows = fundDate
       ? await prisma.idxFundamentals.findMany({ where: { snapshotDate: fundDate } })
       : []
-    const codes = [...fundRows]
+    const ranked = [...fundRows]
       .sort((a, b) => (b.marketCap ?? 0) - (a.marketCap ?? 0))
-      .slice(0, limit)
       .map(r => r.code)
+    const cap = limitArg ? Math.max(1, Number(limitArg) || 0) : ranked.length
+    const codes = ranked.slice(0, cap)
 
     let bandarCount = 0
     if (runAll || onlyBandar) {

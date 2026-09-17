@@ -1162,6 +1162,12 @@ model IdxStockbitAnalyst {
   @@unique([code, snapshotDate])
   @@index([snapshotDate(sort: Desc)])
 }
+
+model IntegrationSecret {
+  key       String   @id // e.g. stockbit_refresh_token
+  encValue  String   // v1.<base64 iv>.<base64 ciphertext>.<base64 tag>
+  updatedAt DateTime @updatedAt
+}
 // ── Alpha track record: prove the alpha engine works ──
 model AlphaTrackRecord {
   id          String   @id @default(cuid())
