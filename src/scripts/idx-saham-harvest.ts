@@ -162,8 +162,44 @@ async function main() {
 
 main().catch(async (err) => {
   const msg = err instanceof Error ? err.message : err
-  console.error('[idx-saham] harvest failed:', msg)
-  await notifyAlert('IDX saham harvest FAILED', String(msg))
-  await prisma.$disconnect()
-  process.exit(1)
+  // Fallback: IDX Cloudflare-blocks this host (403 even in-browser).
+  // Seed today's closes from the TV screener snapshot so price views
+  // (dual, quotes, ARA, momentum, backtest) stay current. Foreign flows
+  // stay zero — IDX-only fields, honestly degraded until block lifts.
+  // update:{} never overwrites real session rows.
+  try {
+    const latest = await prisma.idxScreenerSnapshot.findFirst({
+      orderBy: { snapshotDate: 'desc' },
+      select: { snapshotDate: true },
+    })
+    if (!latest) throw new Error('no screener snapshot for fallback')
+    const rows = await prisma.idxScreenerSnapshot.findMany({
+      where: { snapshotDate: latest.snapshotDate },
+      select: { code: true, name: true, price: true },
+    })
+    let n = 0
+    await prisma.$transaction(async (tx) => {
+      for (const r of rows) {
+        if (!r.price || r.price <= 0) continue
+        await tx.idxSahamSession.upsert({
+          where: { code_tradeDate: { code: r.code, tradeDate: latest.snapshotDate } },
+          create: {
+            code: r.code, tradeDate: latest.snapshotDate, name: r.name,
+            prev: r.price, open: r.price, high: r.price, low: r.price,
+            close: r.price, change: 0, volume: 0, value: 0, freq: 0,
+            foreignBuy: 0, foreignSell: 0,
+          },
+          update: {},
+        })
+        n++
+      }
+    })
+    console.log(`[idx-saham] DEGRADED (IDX blocked: ${msg}) — seeded ${n} closes from screener ${latest.snapshotDate}, flows zero`)
+  } catch (fb) {
+    console.error('[idx-saham] harvest failed:', msg)
+    await notifyAlert('IDX saham harvest FAILED', `${msg} (fallback also failed: ${fb instanceof Error ? fb.message : fb})`)
+    process.exitCode = 1
+  } finally {
+    await prisma.$disconnect()
+  }
 })

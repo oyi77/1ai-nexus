@@ -485,8 +485,8 @@
     "category": "science"
   },
   {
-    "id": "space-com",
-    "url": "https://www.space.com/feeds/all",
+    "id": "spacenews",
+    "url": "https://spacenews.com/feed/",
     "category": "science"
   },
   {
@@ -507,11 +507,6 @@
   {
     "id": "engadget",
     "url": "https://www.engadget.com/rss.xml",
-    "category": "tech"
-  },
-  {
-    "id": "thenextweb",
-    "url": "https://thenextweb.com/feed",
     "category": "tech"
   },
   {
