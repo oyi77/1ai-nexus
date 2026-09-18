@@ -20,6 +20,27 @@ import { chromium, type Page } from 'playwright'
 import { prisma } from '@/lib/db'
 import { notifyAlert } from '@/lib/config/alerting'
 
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
+import { join } from 'path'
+
+// Block-state cache: after an IDX 403/block, skip ALL browser hits for
+// 24h (cron falls back to screener-seed). Prevents probe-hammering from
+// escalating a soft block into a hard Ray-ID ban. Counter file pattern.
+const BLOCK_FLAG = join(process.cwd(), 'data', 'idx-blocked-until.txt')
+function blockActive(): string | null {
+  try {
+    if (!existsSync(BLOCK_FLAG)) return null
+    const until = Number(readFileSync(BLOCK_FLAG, 'utf8').trim())
+    if (Date.now() < until) return new Date(until).toISOString()
+    unlinkSync(BLOCK_FLAG)
+    return null
+  } catch {
+    return null
+  }
+}
+function setBlock(hours = 24): void {
+  try { writeFileSync(BLOCK_FLAG, String(Date.now() + hours * 3600_000)) } catch { /* noop */ }
+}
 const WARMUP_URL = 'https://www.idx.co.id/listed-companies/company-list'
 const PAGE_SIZE = 1000
 const HISTORY_SESSIONS = 90
@@ -99,6 +120,12 @@ async function fetchAllRows(page: Page, urlBase: string): Promise<{ rows: Array<
 }
 
 async function main() {
+  const blocked = blockActive()
+  if (blocked) {
+    console.log(`[idx-saham] SKIP — IDX blocked until ${blocked}`)
+    await prisma.$disconnect()
+    return
+  }
   // Headed mode required: Cloudflare fingerprints headless Chrome.
   const browser = await chromium.launch({ channel: 'chromium', headless: false })
   try {
@@ -195,6 +222,7 @@ main().catch(async (err) => {
       }
     })
     console.log(`[idx-saham] DEGRADED (IDX blocked: ${msg}) — seeded ${n} closes from screener ${latest.snapshotDate}, flows zero`)
+    setBlock(24)
   } catch (fb) {
     console.error('[idx-saham] harvest failed:', msg)
     await notifyAlert('IDX saham harvest FAILED', `${msg} (fallback also failed: ${fb instanceof Error ? fb.message : fb})`)
