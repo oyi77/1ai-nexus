@@ -75,8 +75,9 @@ async function fetchAll(page: Page, type: 'fundingRate' | 'priceSpreadRate', ext
 async function main() {
   // Headed mode: Akamai fingerprints headless Chrome and 403s the API even
   // with valid sensor cookies. The box runs a desktop session (DISPLAY set),
-  // so cron wraps this script in xvfb-run.
-  const browser = await chromium.launch({ channel: 'chrome', headless: false })
+  // so cron wraps this script in xvfb-run. Bundled chromium (no channel):
+  // /opt/google/chrome is a broken symlink to a deleted build.
+  const browser = await chromium.launch({ headless: false })
   try {
     const context = await browser.newContext({ locale: 'en-US' })
     const page = await context.newPage()

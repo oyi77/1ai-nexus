@@ -127,7 +127,8 @@ async function main() {
     return
   }
   // Headed mode required: Cloudflare fingerprints headless Chrome.
-  const browser = await chromium.launch({ channel: 'chromium', headless: false })
+  // Bundled chromium (no channel): /opt/google/chrome is a broken symlink.
+  const browser = await chromium.launch({ headless: false })
   try {
     const page = await browser.newPage({ locale: 'en-US' })
     await warmup(page)
