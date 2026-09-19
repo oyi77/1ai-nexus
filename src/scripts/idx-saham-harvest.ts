@@ -23,6 +23,11 @@ import { notifyAlert } from '@/lib/config/alerting'
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs'
 import { join } from 'path'
 
+// CloakBrowser stealth binary breezes past IDX Cloudflare (verified
+// 2026-09-19: real 963-row JSON). Falls back to bundled chromium if
+// the binary is absent (other dev boxes).
+const CLOAK_EXE = '/home/openclaw/.cloakbrowser/chromium-146.0.7680.177.5/chrome'
+
 // Block-state cache: after an IDX 403/block, skip ALL browser hits for
 // 24h (cron falls back to screener-seed). Prevents probe-hammering from
 // escalating a soft block into a hard Ray-ID ban. Counter file pattern.
@@ -126,9 +131,8 @@ async function main() {
     await prisma.$disconnect()
     return
   }
-  // Headed mode required: Cloudflare fingerprints headless Chrome.
-  // Bundled chromium (no channel): /opt/google/chrome is a broken symlink.
-  const browser = await chromium.launch({ headless: false })
+  // Headed + CloakBrowser stealth binary (verified past IDX CF 2026-09-19).
+  const browser = await chromium.launch(existsSync(CLOAK_EXE) ? { executablePath: CLOAK_EXE, headless: false } : { headless: false })
   try {
     const page = await browser.newPage({ locale: 'en-US' })
     await warmup(page)
