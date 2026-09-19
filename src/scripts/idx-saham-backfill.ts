@@ -10,6 +10,7 @@
 import 'dotenv/config'
 import { chromium, type Page } from 'playwright'
 import { prisma } from '@/lib/db'
+import { existsSync } from 'fs'
 
 const WARMUP_URL = 'https://www.idx.co.id/listed-companies/company-list'
 const BASE = 'https://www.idx.co.id/primary/TradingSummary/GetStockSummary'
@@ -67,7 +68,8 @@ async function main() {
   const dates = weekdayDatesBack(days)
   console.log(`[idx-backfill] fetching ${dates.length} weekday sessions (last ${days} calendar days)`)
 
-  const browser = await chromium.launch({ channel: 'chromium', headless: false })
+  const CLOAK = '/home/openclaw/.cloakbrowser/chromium-146.0.7680.177.5/chrome'
+  const browser = await chromium.launch(existsSync(CLOAK) ? { executablePath: CLOAK, headless: false } : { headless: false })
   try {
     const page = await browser.newPage({ locale: 'en-US' })
     await warmup(page)
