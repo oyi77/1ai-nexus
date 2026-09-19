@@ -20,6 +20,13 @@ const ScanResponse = z.object({
 })
 
 async function main() {
+  // Market closed Sat/Sun — weekend seed masks Friday real session.
+  const dow = new Date().getUTCDay()
+  if (dow === 0 || dow === 6) {
+    console.log('[seed] SKIP — market closed (weekend)')
+    await prisma.$disconnect()
+    return
+  }
   const res = await fetch(SCAN_URL, {
     method: 'POST',
     signal: AbortSignal.timeout(40_000),
