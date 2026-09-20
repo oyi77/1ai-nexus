@@ -8,7 +8,8 @@
 
 import { prisma } from '@/lib/db'
 
-export const HORIZON_HOURS = 24
+export const HORIZON_HOURS = 24 // crypto wall-clock gate only; IDX uses session offset
+export const IDX_HORIZON_SESSIONS = 1 // IDX: resolve the 1st session strictly after emission
 export const WIN_THRESHOLD_PCT = 0.5 // +0.5% counts as a win for BUY
 
 /** Persist a conviction emission (idempotent per symbol+conviction per day). */
@@ -39,7 +40,11 @@ export async function recordConvictionSignal(params: {
   }
 }
 
-/** Evaluate past signals that have matured (price data available after horizon). */
+/** Evaluate past signals that have matured (price data available after horizon).
+ * Semantics (measured 2026-09-20): IDX horizon = next trading session close
+ * after emission (market is daily; wall-clock 24h is meaningless across
+ * weekends/holidays). evaluatedAt is the settling session's close, so elapsed
+ * time is truthful. Crypto keeps the 24h wall-clock gate. */
 export async function evaluateTrackRecord(): Promise<{
   evaluated: number
   wins: number
@@ -47,6 +52,8 @@ export async function evaluateTrackRecord(): Promise<{
   winRate: number
 }> {
   // Pick signals older than HORIZON that have a price but no outcome yet.
+  // IDX rows are gated on a forward session existing (session-based horizon);
+  // crypto rows keep the wall-clock gate.
   const cutoff = new Date(Date.now() - HORIZON_HOURS * 60 * 60 * 1000)
   const pending = await prisma.convictionSignal.findMany({
     where: { price: { not: null }, outcome: null, emittedAt: { lt: cutoff } },
@@ -56,8 +63,21 @@ export async function evaluateTrackRecord(): Promise<{
 
   let wins = 0, losses = 0, evaluated = 0
   for (const s of pending) {
-    // Fetch current price for this symbol (crypto USDT / IDX) via a fresh quote.
-    const current = await fetchCurrentPrice(s.symbol.toUpperCase(), s.market)
+    // IDX: resolve the forward session close strictly after emission — never
+    // the emit snapshot itself. Rows with zero/negative stored price need a
+    // forward session too; skip (never loss) until one exists.
+    let current: number | null
+    let settledAt: Date | null = null
+    if (s.market === 'IDX') {
+      const emitDate = s.emittedAt.toISOString().slice(0, 10)
+      const fwd = await fetchIdxForwardClose(s.symbol.toUpperCase(), emitDate, IDX_HORIZON_SESSIONS)
+      if (fwd == null) continue // forward session not harvested yet — skip, not evaluable
+      current = fwd.close
+      settledAt = new Date(fwd.tradeDate + 'T15:00:00+07:00')
+    } else {
+      // Fetch current price for crypto via a fresh quote.
+      current = await fetchCurrentPrice(s.symbol.toUpperCase(), s.market)
+    }
     if (current == null) continue // skip — not evaluable this cycle
 
     const priceAt = s.price!
@@ -75,7 +95,7 @@ export async function evaluateTrackRecord(): Promise<{
         priceAfter: current,
         pnlPercent,
         outcome: isWin === null ? 'na' : isWin ? 'win' : 'loss',
-        evaluatedAt: new Date(),
+        evaluatedAt: settledAt ?? new Date(),
       },
     })
     evaluated++
@@ -116,6 +136,27 @@ export async function getTrackAccuracy(): Promise<{
     evaluated: scored,
     overallWinRate: scored > 0 ? (wins / scored) * 100 : 0,
     buckets,
+  }
+}
+
+/** Forward session close for IDX — the price that actually existed after the signal.
+ * Reads IdxSahamSession (dated market rows), never the emit screener snapshot,
+ * so evaluation can never compare a price against itself. Returns null when
+ * no forward session exists yet — the caller must SKIP, never score. */
+async function fetchIdxForwardClose(symbol: string, emitDate: string, horizonSessions = 1): Promise<{ close: number; tradeDate: string } | null> {
+  try {
+    const rows = await prisma.idxSahamSession.findMany({
+      where: { code: symbol.toUpperCase(), tradeDate: { gt: emitDate } },
+      orderBy: { tradeDate: 'asc' },
+      take: horizonSessions,
+      select: { close: true, tradeDate: true },
+    })
+    if (rows.length < horizonSessions) return null
+    const target = rows[rows.length - 1]
+    if (!(target.close > 0)) return null
+    return { close: target.close, tradeDate: target.tradeDate }
+  } catch {
+    return null
   }
 }
 

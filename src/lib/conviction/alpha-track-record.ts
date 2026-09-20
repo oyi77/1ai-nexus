@@ -66,20 +66,6 @@ export async function recordAlphaSignals(signals: TrackSignal[]): Promise<number
   return recorded
 }
 
-/** Fetch current price for an IDX stock from the latest screener snapshot. */
-async function fetchCurrentPrice(code: string): Promise<number | null> {
-  try {
-    const latest = await prisma.idxScreenerSnapshot.findFirst({
-      orderBy: { snapshotDate: "desc" },
-      where: { code },
-      select: { price: true },
-    })
-    return latest?.price ?? null
-  } catch {
-    return null
-  }
-}
-
 /** Max high over the N sessions after signalDate (exclusive). Null if <10. */
 async function maxForwardHigh(code: string, signalDate: string, n: number): Promise<number | null> {
   try {
@@ -98,30 +84,48 @@ async function maxForwardHigh(code: string, signalDate: string, n: number): Prom
   }
 }
 
-/** Evaluate matured signals at all horizons + MFE tails. */
+/** Forward close at the exact horizon: close of the Nth trading session after
+ * the signal date (N = sessions, NOT calendar days). Returns null when the
+ * horizon has not matured — the caller must SKIP, never score. */
+async function forwardCloseAtHorizon(code: string, signalDate: string, sessions: number): Promise<number | null> {
+  try {
+    const rows = await prisma.idxSahamSession.findMany({
+      where: { code, tradeDate: { gt: signalDate } },
+      orderBy: { tradeDate: "asc" },
+      take: sessions,
+      select: { close: true },
+    })
+    if (rows.length < sessions) return null
+    const c = rows[rows.length - 1].close
+    return c > 0 ? c : null
+  } catch {
+    return null
+  }
+}
+
+// Horizons in trading sessions (avg 21 sessions ≈ 30 calendar days).
+const HORIZON_SESSIONS: Record<number, number> = { 7: 5, 14: 10, 30: 21, 60: 42 }
+
+/** Evaluate matured signals at all horizons + MFE tails.
+ * Every horizon price is the close at that exact session offset — never the
+ * latest snapshot. A horizon fills only when its forward sessions exist. */
 export async function evaluateAlphaTrackRecord(): Promise<{
   evaluated: number
   horizons: Record<string, { evaluated: number; wins: number; avgPnl: number }>
 }> {
-  const today = new Date()
   const horizons: Record<string, { evaluated: number; wins: number; avgPnl: number }> = {}
   let totalEvaluated = 0
 
   for (const days of HORIZONS) {
-    const cutoff = new Date(today.getTime() - days * 24 * 60 * 60 * 1000)
-    const cutoffStr = cutoff.toISOString().slice(0, 10)
     const field = `price${days}d` as const
     const pnlField = `pnl${days}dPct` as const
     const outcomeField = `outcome${days}d` as const
+    const sessions = HORIZON_SESSIONS[days] ?? days
 
-    // Find signals at this horizon that haven't been evaluated yet
-    const whereClause: Record<string, unknown> = {
-      signalDate: { lte: cutoffStr },
-      priceAtSignal: { gt: 0 },
-    }
-    whereClause[field] = null
+    // Only rows old enough to have the full forward window can be scored.
+    // (No calendar cutoff: a row without its forward sessions simply waits.)
     const pending = await prisma.alphaTrackRecord.findMany({
-      where: whereClause as Prisma.AlphaTrackRecordWhereInput,
+      where: { [field]: null, priceAtSignal: { gt: 0 } } as Prisma.AlphaTrackRecordWhereInput,
       take: 200,
       orderBy: { signalDate: "asc" },
     })
@@ -131,8 +135,8 @@ export async function evaluateAlphaTrackRecord(): Promise<{
     let evaluated = 0
 
     for (const s of pending) {
-      const current = await fetchCurrentPrice(s.code)
-      if (current == null) continue
+      const current = await forwardCloseAtHorizon(s.code, s.signalDate, sessions)
+      if (current == null) continue // horizon not matured — wait, never score
 
       const priceAt = s.priceAtSignal!
       const pnlPct = priceAt > 0 ? ((current - priceAt) / priceAt) * 100 : 0

@@ -47,7 +47,7 @@ export async function generateEdgeReport(): Promise<EdgeReport> {
         asset: 'Market',
         direction: score > 60 ? 'bullish' : score < 40 ? 'bearish' : 'neutral',
         signalType: 'Fear & Greed',
-        confidence: Math.abs(score - 50) / 50,
+        confidence: Math.round(Math.min(95, Math.abs(score - 50) * 1.9)), // 0–100
         explanation: `Fear & Greed Index at ${score} (${fgRes.data.label || 'Unknown'}). ${score > 70 ? 'Extreme greed — consider taking profits.' : score < 30 ? 'Extreme fear — potential buying opportunity.' : 'Neutral sentiment.'}`,
         riskReward: score > 70 ? '1:2 (unfavorable)' : score < 30 ? '2:1 (favorable)' : '1:1 (neutral)',
         timestamp: new Date(),
@@ -66,7 +66,7 @@ export async function generateEdgeReport(): Promise<EdgeReport> {
           asset: 'Smart Money',
           direction: accumulations.length > smSignals.length / 2 ? 'bullish' : 'bearish',
           signalType: 'Whale Activity',
-          confidence: Math.min(0.9, smSignals.length / 10),
+          confidence: Math.round(Math.min(90, smSignals.length * 9)), // 0–100
           explanation: `${smSignals.length} smart money signals detected — ${accumulations.length} accumulations totaling $${(totalAccum / 1e6).toFixed(1)}M.`,
           riskReward: accumulations.length > smSignals.length / 2 ? '2:1 (favorable)' : '1:2 (unfavorable)',
           timestamp: new Date(),
@@ -88,7 +88,7 @@ export async function generateEdgeReport(): Promise<EdgeReport> {
           asset: 'BTC Perpetuals',
           direction: avgFunding > 0.001 ? 'bearish' : avgFunding < -0.001 ? 'bullish' : 'neutral',
           signalType: 'Derivatives',
-          confidence: Math.min(0.8, Math.abs(avgFunding) * 100),
+          confidence: Math.round(Math.min(80, Math.abs(avgFunding) * 10000)), // 0–100
           explanation: `Avg funding ${(avgFunding * 100).toFixed(4)}% — ${avgFunding > 0.001 ? 'high long leverage, reversal risk' : avgFunding < -0.001 ? 'high short leverage, squeeze risk' : 'neutral leverage'}. BTC ${btcChange >= 0 ? '+' : ''}${btcChange.toFixed(2)}% 24h.`,
           riskReward: Math.abs(avgFunding) > 0.001 ? '1:2 (unfavorable)' : '1:1 (neutral)',
           timestamp: new Date(),
@@ -109,7 +109,7 @@ export async function generateEdgeReport(): Promise<EdgeReport> {
           asset: 'Macro',
           direction: rate > 5 ? 'bearish' : rate < 3 ? 'bullish' : 'neutral',
           signalType: 'Macro Environment',
-          confidence: 0.6,
+          confidence: 60, // fixed macro read; not measured — scheduled for calibration ledger
           explanation: `Fed Funds Rate at ${rate.toFixed(2)}% — ${rate > 5 ? 'tight policy, risk-off environment' : rate < 3 ? 'accommodative policy, risk-on environment' : 'neutral monetary stance'}.`,
           riskReward: rate > 5 ? '1:2 (unfavorable)' : rate < 3 ? '2:1 (favorable)' : '1:1 (neutral)',
           timestamp: new Date(),

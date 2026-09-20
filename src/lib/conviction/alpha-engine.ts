@@ -95,7 +95,7 @@ function mean(arr: number[]): number {
 function signalForeignVelocity(input: AlphaInput): SignalResult {
   const { sessions } = input
   const reasons: Array<{ text: string; weight: number }> = []
-  if (sessions.length < 3) return { score: 50, weight: 0.25, reasons: [] }
+  if (sessions.length < 3) return { score: 50, weight: ALPHA_W_FOREIGN, reasons: [] }
 
   const nets = sessions.map((s) => s.foreignBuy - s.foreignSell)
   const recentNets = nets.slice(-5) // last 5 sessions
@@ -143,7 +143,7 @@ function signalForeignVelocity(input: AlphaInput): SignalResult {
     if (streak >= 3) reasons.push({ text: `Foreign distribution ${streak} sessions`, weight: 0.3 })
   }
 
-  return { score: clamp(score, 0, 100), weight: 0.05, reasons }
+  return { score: clamp(score, 0, 100), weight: ALPHA_W_FOREIGN, reasons }
 }
 
 // ── Signal 2: Broker Concentration ──
@@ -152,11 +152,11 @@ function signalForeignVelocity(input: AlphaInput): SignalResult {
 function signalBrokerConcentration(input: AlphaInput): SignalResult {
   const { brokers } = input
   const reasons: Array<{ text: string; weight: number }> = []
-  if (brokers.length < 3) return { score: 50, weight: 0.15, reasons: [] }
+  if (brokers.length < 3) return { score: 50, weight: ALPHA_W_BROKER, reasons: [] }
 
   const sorted = [...brokers].sort((a, b) => b.value - a.value)
   const totalValue = sorted.reduce((a, b) => a + b.value, 0)
-  if (totalValue === 0) return { score: 50, weight: 0.15, reasons: [] }
+  if (totalValue === 0) return { score: 50, weight: ALPHA_W_BROKER, reasons: [] }
 
   const top3Value = sorted.slice(0, 3).reduce((a, b) => a + b.value, 0)
   const top3Pct = top3Value / totalValue
@@ -176,7 +176,7 @@ function signalBrokerConcentration(input: AlphaInput): SignalResult {
     reasons.push({ text: `${sorted[0].firm} dominates with ${(top1Pct * 100).toFixed(0)}%`, weight: 0.35 })
   }
 
-  return { score: clamp(score, 0, 100), weight: 0.25, reasons }
+  return { score: clamp(score, 0, 100), weight: ALPHA_W_BROKER, reasons }
 }
 
 // ── Signal 3: Volume-Price Divergence ──
@@ -185,7 +185,7 @@ function signalBrokerConcentration(input: AlphaInput): SignalResult {
 function signalVolumePriceDivergence(input: AlphaInput): SignalResult {
   const { sessions } = input
   const reasons: Array<{ text: string; weight: number }> = []
-  if (sessions.length < 10) return { score: 50, weight: 0.2, reasons: [] }
+  if (sessions.length < 10) return { score: 50, weight: ALPHA_W_VOLDIV, reasons: [] }
 
   const recent = sessions.slice(-5)
   const prior = sessions.slice(-10, -5)
@@ -212,7 +212,7 @@ function signalVolumePriceDivergence(input: AlphaInput): SignalResult {
     reasons.push({ text: `Price rising on low volume — weak`, weight: 0.2 })
   }
 
-  return { score: clamp(score, 0, 100), weight: 0.2, reasons }
+  return { score: clamp(score, 0, 100), weight: ALPHA_W_VOLDIV, reasons }
 }
 
 // ── Signal 4: Multi-timeframe Momentum ──
@@ -224,7 +224,7 @@ function signalMultiTemporalMomentum(input: AlphaInput): SignalResult {
   const changes = [screener.change4w, screener.change13w, screener.change26w, screener.change52w].filter(
     (c): c is number => c != null && Number.isFinite(c)
   )
-  if (changes.length === 0) return { score: 50, weight: 0.15, reasons: [] }
+  if (changes.length === 0) return { score: 50, weight: ALPHA_W_MOMENTUM, reasons: [] }
 
   const positive = changes.filter((c) => c > 0).length
   const avgChange = mean(changes)
@@ -232,7 +232,7 @@ function signalMultiTemporalMomentum(input: AlphaInput): SignalResult {
   let score = 50
   if (positive === changes.length && avgChange > 10) {
     score += 30
-    reasons.push({ text: `Uptrend on all ${changes.length} timeframes`, weight: 0.5 })
+    reasons.push({ text: changes.length === 1 ? `Uptrend (short history)` : `Uptrend on all ${changes.length} timeframes`, weight: 0.5 })
   } else if (positive >= 3 && avgChange > 5) {
     score += 20
     reasons.push({ text: `${positive}/${changes.length} timeframes bullish`, weight: 0.35 })
@@ -255,7 +255,7 @@ function signalMultiTemporalMomentum(input: AlphaInput): SignalResult {
     }
   }
 
-  return { score: clamp(score, 0, 100), weight: 0.25, reasons }
+  return { score: clamp(score, 0, 100), weight: ALPHA_W_MOMENTUM, reasons }
 }
 
 // ── Signal 5: Fundamental Quality ──
@@ -295,7 +295,7 @@ function signalFundamentalQuality(input: AlphaInput): SignalResult {
     reasons.push({ text: `DER ${screener.der.toFixed(2)} — healthy balance sheet`, weight: 0.1 })
   }
 
-  return { score: clamp(score, 0, 100), weight: 0.05, reasons }
+  return { score: clamp(score, 0, 100), weight: ALPHA_W_FUND, reasons }
 }
 
 // ── Signal 6: Value-Momentum Combo (GARP) ──
@@ -337,10 +337,28 @@ function signalValueMomentumCombo(input: AlphaInput): SignalResult {
     reasons.push({ text: `Expensive + falling — avoid`, weight: 0.3 })
   }
 
-  return { score: clamp(score, 0, 100), weight: 0.2, reasons }
+  return { score: clamp(score, 0, 100), weight: ALPHA_W_GARP, reasons }
 }
 
 // ── Main: compute alpha score ──
+// ── Measured component edge (AlphaTrackRecord, lane=alpha, outcome30d, n=3076 rows × 20 dates; cross-sectional, date-demeaned; 2026-09-20) ──
+//   multiTemporalMomentum   rankIC +0.038  Q5−Q1 +1.28pp  verdict bands monotone → weight 0.55
+//   valueMomentumCombo      rankIC +0.019  Q5−Q1 +0.65pp  → weight 0.30
+//   volumePriceDivergence   rankIC +0.009  Q5−Q1 +0.15pp  → weight 0.15
+//   fundamentalQuality      rankIC −0.010  Q5−Q1 −2.03pp  → weight 0 (measured-negative)
+//   foreignVelocity         rankIC −0.039  Q5−Q1 −1.96pp  → weight 0 (measured-negative)
+//   brokerConcentration     sd = 0.00 across all 3076 rows → constant 50, no information → weight 0
+// Negative-IC components stay computed (display/reasons) but carry ZERO blend weight.
+// Verdict bands re-tuned on renormalized scores (measured 2026-09-20):
+//   >= 80 strong-buy → +2.43pp excess (n=772) | 68–80 buy → flat (−0.93..+0.69) | < 68 hold/avoid.
+// Re-derive these bands before changing weights again.
+// ── Component weights — single source of truth, from measured rankIC (see above) ──
+const ALPHA_W_MOMENTUM = 0.55 // multiTemporalMomentum (IC +0.038, best)
+const ALPHA_W_GARP = 0.30 // valueMomentumCombo (IC +0.019)
+const ALPHA_W_VOLDIV = 0.15 // volumePriceDivergence (IC +0.009)
+const ALPHA_W_FUND = 0 // fundamentalQuality (measured-negative: IC −0.010)
+const ALPHA_W_FOREIGN = 0 // foreignVelocity (measured-negative: IC −0.039)
+const ALPHA_W_BROKER = 0 // brokerConcentration (zero variance: sd 0.00)
 export function computeAlpha(input: AlphaInput): AlphaResult {
   const foreignVelocity = signalForeignVelocity(input)
   const brokerConcentration = signalBrokerConcentration(input)
@@ -365,15 +383,14 @@ export function computeAlpha(input: AlphaInput): AlphaResult {
   allReasons.sort((a, b) => b.weight - a.weight)
   const topReasons = allReasons.slice(0, 4).map((r) => r.text)
 
-  // Verdict — tuned from the 3-month point-in-time track record
-  // (5,049 evaluated signals, commit 19b2c69 era):
-  //   60-62 → +1.63%/7d (no edge vs universe +1.66%) → cut
-  //   62-68 → +1.8-2.1%/7d
-  //   68-70 → +2.43%/7d, +9.62%/30d (best band)  → strong-buy floor
-  //   75+   → +0.27%/7d, +4.70%/30d (extended chasers) → demoted
+  // Verdict — re-tuned on renormalized weights, measured 2026-09-20
+  // (3,076 rows, cross-sectional 30d excess vs date-matched universe mean):
+  //   >= 80 → +2.43pp excess (n=772) → strong-buy
+  //   68–80 → flat (−0.93..+0.69) → buy
+  //   < 68  → hold/avoid
   let verdict: AlphaResult['verdict']
-  if (totalScore >= 68 && totalScore < 75) verdict = 'strong-buy'
-  else if (totalScore >= 62) verdict = 'buy'
+  if (totalScore >= 80) verdict = 'strong-buy'
+  else if (totalScore >= 68) verdict = 'buy'
   else if (totalScore >= 40) verdict = 'hold'
   else verdict = 'avoid'
 

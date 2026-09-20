@@ -1,3 +1,7 @@
+// ── IDX tail gate (re-measured 2026-09-20, lane=moonshot, n=9,693 w/ maxGain30dPct) ──
+//   score>=78 moonshot: P20 49.3 (n=756), watch dilution 70–77: P20 41.2 (n=2,484),
+//   watch 60–69: P20 37.9, pass: 33.9. Band order holds: moonshot > dilution > watch > pass.
+//   Confidence stays measured P10 (gatherIdx) with the 70 confidence gate.
 // ─────────────────────────────────────────────────────────────
 // Moonshot Rank — one board across all instruments.
 //
