@@ -159,6 +159,7 @@ const PUBLIC_ROUTES = new Set([
   '/api/v1/alt-data',
   '/api/v1/weather-signals',
   '/api/v1/composite-alerts',
+  '/api/v1/insight-brief',
   '/api/v1/alpha-feed',
   '/api/v1/alpha-cross-correlation',
   '/api/v1/conviction',

@@ -107,6 +107,36 @@ export default function AiInsightsPage() {
           }
         } catch { /* skip */ }
 
+        // 5b. Fetch cross-domain transmission brief (server-fused, measured confidence)
+        try {
+          const briefRes = await fetch('/api/v1/insight-brief')
+          const briefJson = await briefRes.json()
+          const brief = briefJson.data ?? briefJson
+          const txs = Array.isArray(brief?.transmissions) ? brief.transmissions : []
+          if (brief?.regime) {
+            generated.push({
+              id: 'brief-regime',
+              timestamp: now.toISOString(),
+              category: 'transmission',
+              title: `Cross-asset regime: ${String(brief.regime).toUpperCase()}`,
+              data: `${txs.length} active transmissions`,
+              source: 'NEXUS insight-brief',
+            })
+          }
+          for (const t of txs.slice(0, 8)) {
+            const conf = typeof t.confidence === 'number' ? ` · conf ${t.confidence}` : ''
+            const flag = t.unproven ? ' · unproven' : ' · measured'
+            generated.push({
+              id: `brief-${String(t.id)}`,
+              timestamp: now.toISOString(),
+              category: 'transmission',
+              title: `${t.direction === 'bullish' ? '[+]' : t.direction === 'bearish' ? '[-]' : '[=]'} ${t.narrative ?? t.id}`,
+              data: `from ${t.from ?? '?'} → ${(Array.isArray(t.to) ? t.to.join(', ') : t.to) ?? '?'}${conf}${flag}`,
+              source: 'NEXUS insight-brief',
+            })
+          }
+        } catch { /* skip */ }
+
         // 5. Fetch forex from our API (server-proxied)
         try {
           const fxRes = await fetch('/api/v1/forex')
