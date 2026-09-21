@@ -237,8 +237,8 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
         id: 'fear-greed-extreme',
         from: `Fear & Greed ${fg.score} (${fg.regime})`,
         to: ['BTC', 'broad crypto'],
-        direction: fg.score > 70 ? 'bearish' : 'bullish',
-        narrative: fg.score > 70
+        direction: fg.score >= 70 ? 'bearish' : 'bullish',
+        narrative: fg.score >= 70
           ? 'Extreme greed — upside chase is statistically the worst entry; wait for funding to cool.'
           : 'Extreme fear — capitulation zone; scale only into measured setups (moonshot P10-gated).',
         evidence: [{ metric: 'fear-greed score', value: String(fg.score), source: 'SentimentSnapshot' }],
