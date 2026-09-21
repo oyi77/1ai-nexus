@@ -57,3 +57,16 @@ test('formatFlowUsd: adaptive units, no collapsed $0.00M wall', () => {
   expect(formatFlowUsd(2500000)).toBe('+$2.50M')
   expect(formatFlowUsd(-1300000)).toBe('-$1.30M')
 })
+
+test('funding legs carry measured unwind rates, not unproven-50', async () => {
+  const brief = await buildInsightBrief()
+  const funding = brief.transmissions.filter((t) => t.id.startsWith('funding:'))
+  expect(funding.length).toBeGreaterThan(0)
+  const known = funding.filter((t) => /:(Binance|Bybit):/.test(t.id))
+  expect(known.length).toBeGreaterThan(0)
+  for (const t of known) {
+    expect(t.unproven).toBe(false)
+    expect(t.measured?.n ?? 0).toBeGreaterThanOrEqual(20)
+    expect(t.evidence.some((e) => e.metric === 'unwind hit rate (24h)')).toBe(true)
+  }
+}, 90_000)

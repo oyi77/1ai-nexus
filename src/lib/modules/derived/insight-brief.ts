@@ -22,6 +22,8 @@ export interface Transmission {
   confidence: number // 0-100: measured P10/P20 of the cited verdict, or 50 + flagged
   unproven: boolean
   measured?: { n: number; p20: number; p10: number }
+  // measured semantics are per-leg, stated in evidence: IDX legs carry
+  // P(MFE>=20%/10%); funding legs carry the 24h unwind hit rate in both.
 }
 
 export interface InsightBrief {
@@ -90,6 +92,47 @@ async function fundingExtremes(limit = 8): Promise<Array<{ symbol: string; excha
       .map((r) => ({ ...r, z: Math.round(r.z * 100) / 100 }))
   } catch { return [] }
   return rows.sort((a, b) => Math.abs(b.z) - Math.abs(a.z)).slice(0, limit)
+}
+
+/** Measured 24h contrarian-unwind hit rates per exchange+side+tier.
+ * Backtest 2026-06-30..2026-09-21 over DerivativesSnapshot hourly bars:
+ * event = trailing-7d funding |z|>=tier episode start (side from RATE sign,
+ * exactly like fundingExtremes); outcome = 24h forward markPrice move
+ * opposing the crowded side. Crowded longs unwind 53-56% (measured);
+ * crowded shorts do NOT (47-49%) — the leg reports the rate either way.
+ * Refresh via scripts/measure-funding-unwind.py and paste new cells here.
+ * measuredAsOf stamps the evidence so readers see staleness. */
+const FUNDING_UNWIND_ASOF = '2026-09-21'
+const FUNDING_UNWIND_CELLS: Record<string, Record<string, Record<string, { n: number; hits: number }>>> = {
+  Binance: {
+    long: { '2': { n: 2609, hits: 1403 }, '3': { n: 866, hits: 459 }, '5': { n: 446, hits: 228 } },
+    short: { '2': { n: 2122, hits: 1044 }, '3': { n: 936, hits: 449 }, '5': { n: 663, hits: 319 } },
+  },
+  Bybit: {
+    long: { '2': { n: 329, hits: 181 }, '3': { n: 141, hits: 79 }, '5': { n: 93, hits: 50 } },
+    short: { '2': { n: 549, hits: 248 }, '3': { n: 269, hits: 123 }, '5': { n: 181, hits: 94 } },
+  },
+}
+
+/** Pooled unwind hit rate for an exchange+side leg at a given |z|.
+ * Exact tier cell when n>=20, else the exchange+side pool, else null. */
+function fundingUnwind(exchange: string, side: 'long' | 'short', z: number): { n: number; rate: number } | null {
+  const bySide = FUNDING_UNWIND_CELLS[exchange]?.[side]
+  if (!bySide) return null
+  const az = Math.abs(z)
+  let tier = '2'
+  if (az >= 5) tier = '5'
+  else if (az >= 3) tier = '3'
+  const cell = bySide[tier]
+  if (cell && cell.n >= 20) return { n: cell.n, rate: Math.round((cell.hits / cell.n) * 1000) / 10 }
+  let n = 0
+  let hits = 0
+  for (const c of Object.values(bySide)) {
+    n += c.n
+    hits += c.hits
+  }
+  if (n < 20) return null
+  return { n, rate: Math.round((hits / n) * 1000) / 10 }
 }
 
 /** IDX foreign flow direction over the latest sessions. */
@@ -165,7 +208,7 @@ async function fearGreed(): Promise<{ score: number; regime: string } | null> {
 }
 
 export async function buildInsightBrief(): Promise<InsightBrief> {
-  const { data } = await getCached<InsightBrief>('insight-brief:v3', CACHE_TTL, async () => {
+  const { data } = await getCached<InsightBrief>('insight-brief:v4', CACHE_TTL, async () => {
     const [tails, funding, foreign, sectors, fg] = await Promise.all([
       idxTailRates(),
       fundingExtremes(),
@@ -182,6 +225,7 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
       // Crowding side comes from the RATE SIGN (longs pay shorts when positive);
       // z only measures how unusual that sign is vs the pair's own 7d history.
       const crowdedLong = f.rate > 0
+      const uw = fundingUnwind(f.exchange, crowdedLong ? 'long' : 'short', f.z)
       tx.push({
         id: `funding:${f.exchange}:${f.symbol}`,
         from: `perps funding ${f.rate >= 0 ? '+' : ''}${(f.rate * 100).toFixed(4)}%/interval (${f.z >= 0 ? '+' : ''}${f.z}σ vs its own 7d)`,
@@ -190,9 +234,15 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
         narrative: crowdedLong
           ? `Crowded longs on ${f.symbol} — funding ${f.z >= 0 ? '+' : ''}${f.z}σ vs its own 7d mean ${f.z < 0 ? '(cooling, but still paid by longs)' : '(rich)'}. Long-unwind risk.`
           : `Crowded shorts on ${f.symbol} — funding ${f.z >= 0 ? '+' : ''}${f.z}σ vs its own 7d mean ${f.z < 0 ? '(deeply negative)' : '(recovering, shorts still pay)'}. Short-squeeze risk.`,
-        evidence: [{ metric: 'funding z-score (7d)', value: String(f.z), source: 'DerivativesSnapshot' }],
-        confidence: 50,
-        unproven: true,
+        evidence: [
+          { metric: 'funding z-score (7d)', value: String(f.z), source: 'DerivativesSnapshot' },
+          ...(uw
+            ? [{ metric: 'unwind hit rate (24h)', value: `${uw.rate}% (n=${uw.n}, as of ${FUNDING_UNWIND_ASOF})`, source: 'DerivativesSnapshot backtest' }]
+            : []),
+        ],
+        confidence: uw ? Math.round(uw.rate) : 50,
+        unproven: !uw,
+        measured: uw ? { n: uw.n, p20: uw.rate, p10: uw.rate } : undefined,
       })
     }
 
