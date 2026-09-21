@@ -176,6 +176,23 @@ const SECTOR_PERSIST: Record<string, { n: number; hits: number }> = {
   bottom: { n: 101, hits: 67 },
 }
 
+function sectorPersistRate(side: 'top' | 'bottom'): { n: number; rate: number } {
+  const c = SECTOR_PERSIST[side]
+  return { n: c.n, rate: Math.round((c.hits / c.n) * 1000) / 10 }
+}
+
+function sectorPersistLine(): string {
+  const top = sectorPersistRate('top')
+  const bottom = sectorPersistRate('bottom')
+  return `inflow ${top.rate}% (n=${top.n}), outflow ${bottom.rate}% (n=${bottom.n}), as of ${SECTOR_PERSIST_ASOF}`
+}
+
+function sectorPersistPooled(): { n: number; rate: number } {
+  const n = SECTOR_PERSIST.top.n + SECTOR_PERSIST.bottom.n
+  const hits = SECTOR_PERSIST.top.hits + SECTOR_PERSIST.bottom.hits
+  return { n, rate: Math.round((hits / n) * 1000) / 10 }
+}
+
 /** Sector rotation: net smart-money flow per sector over the latest session day. */
 async function sectorRotation(): Promise<{ day: string; top: Array<{ sector: string; net: number }>; bottom: Array<{ sector: string; net: number }> } | null> {
   try {
@@ -286,11 +303,11 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
         evidence: [
           ...sectors.top.map((t) => ({ metric: `inflow · ${t.sector}`, value: formatFlowUsd(t.net), source: 'SectorFlowSnapshot' })),
           ...sectors.bottom.map((t) => ({ metric: `outflow · ${t.sector}`, value: formatFlowUsd(t.net), source: 'SectorFlowSnapshot' })),
-          { metric: 'flow persistence (next day)', value: `inflow 63.5% (n=115), outflow 66.3% (n=101), as of ${SECTOR_PERSIST_ASOF}`, source: 'SectorFlowSnapshot backtest' },
+          { metric: 'flow persistence (next day)', value: sectorPersistLine(), source: 'SectorFlowSnapshot backtest' },
         ],
-        confidence: 65,
+        confidence: Math.round(sectorPersistPooled().rate),
         unproven: false,
-        measured: { n: 216, p20: 64.8, p10: 64.8 },
+        measured: { n: sectorPersistPooled().n, p20: sectorPersistPooled().rate, p10: sectorPersistPooled().rate },
       })
     }
 

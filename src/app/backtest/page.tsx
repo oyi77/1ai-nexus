@@ -5,7 +5,7 @@ import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel, AuthGate } from '@/components/shell'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { useAuthGatedFetch } from '@/lib/hooks/useAuthGatedFetch'
-import { TrendingUp, Target, Activity, BarChart3, Play } from 'lucide-react'
+import { BarChart3 } from 'lucide-react'
 
 interface BacktestStats {
   totalSignals: number

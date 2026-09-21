@@ -1,8 +1,5 @@
 import { randomBytes } from 'crypto'
 
-const REFERRAL_REWARD_MONTHS = 1
-const MAX_REFERRAL_CREDITS = 5
-
 export function generateReferralCode(): string {
   return randomBytes(4).toString('hex').toUpperCase()
 }

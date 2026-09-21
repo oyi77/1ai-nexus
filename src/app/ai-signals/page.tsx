@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
-import { Panel, AuthGate } from '@/components/shell'
+import { AuthGate } from '@/components/shell'
 import { LiveDot } from '@/components/primitives/LiveDot'
 import { FinancialDisclaimer } from '@/components/FinancialDisclaimer'
 import { formatPriceUSD } from '@/lib/format'

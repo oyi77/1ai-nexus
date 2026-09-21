@@ -48,7 +48,6 @@ function setBlock(hours = 24): void {
 }
 const WARMUP_URL = 'https://www.idx.co.id/listed-companies/company-list'
 const PAGE_SIZE = 1000
-const HISTORY_SESSIONS = 90
 
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))

@@ -82,7 +82,7 @@
       var hh = String(d.getHours()).padStart(2, '0');
       var mm = String(d.getMinutes()).padStart(2, '0');
       return hh + ':' + mm;
-    } catch (e) {
+    } catch (_e) {
       return '';
     }
   }
@@ -132,7 +132,7 @@
     return set.join('\n');
   }
 
-  function renderLoading(t) {
+  function renderLoading() {
     var root = document.getElementById(containerId);
     if (!root) return;
     root.innerHTML = '';
@@ -142,7 +142,7 @@
     root.appendChild(el('div', { class: 'nxg-err' }, 'Signals loading…'));
   }
 
-  function renderError(t) {
+  function renderError() {
     var root = document.getElementById(containerId);
     if (!root) return;
     root.innerHTML = '';
@@ -228,7 +228,7 @@
   function load() {
     var t = THEMES[theme] || THEMES.dark;
     css(buildStyles(t));
-    renderLoading(t);
+    renderLoading();
 
     var xhr = new XMLHttpRequest();
     xhr.open('GET', API, true);
@@ -241,16 +241,16 @@
             var data = json.data;
             var items = flatten(data);
             render(items, data && data.generated, t);
-          } catch (e) {
-            renderError(t);
+          } catch (_e) {
+            renderError();
           }
         } else {
-          renderError(t);
+          renderError();
         }
       }
     };
-    xhr.ontimeout = function () { renderError(t); };
-    xhr.onerror = function () { renderError(t); };
+    xhr.ontimeout = function () { renderError(); };
+    xhr.onerror = function () { renderError(); };
     xhr.send();
   }
 

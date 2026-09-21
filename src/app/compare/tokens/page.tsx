@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { NexusLayout } from '@/components/layout/NexusLayout'
-import { Search, X, Plus, TrendingUp, TrendingDown, Minus, BarChart3 } from 'lucide-react'
+import { X, BarChart3 } from 'lucide-react'
 
 interface ConvictionItem {
   symbol: string
@@ -40,7 +40,7 @@ export default function TokenComparePage() {
   const [tokens, setTokens] = useState<ConvictionItem[]>([])
   const [loading, setLoading] = useState(false)
 
-  const fetchTokens = async () => {
+  const fetchTokens = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch('/api/v1/conviction')
@@ -56,14 +56,14 @@ export default function TokenComparePage() {
       setTokens(items)
     } catch { /* ignore */ }
     setLoading(false)
-  }
+  }, [symbols])
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTokens()
     const interval = setInterval(fetchTokens, 30_000)
     return () => clearInterval(interval)
-  }, [symbols])
+  }, [fetchTokens])
 
   const addSymbol = (s: string) => {
     const sym = s.toUpperCase()
