@@ -135,6 +135,16 @@ function fundingUnwind(exchange: string, side: 'long' | 'short', z: number): { n
   return { n, rate: Math.round((hits / n) * 1000) / 10 }
 }
 
+/** Measured foreign-flow edge (backtest 2026-06-15..2026-09-19, 67 days,
+ * 64,368 stock-day rows of IdxSahamSession).
+ * Cross-sectional: top-decile foreign-net stocks beat bottom-decile by
+ * +0.36pp next session (0.36% vs 0.01%), rank IC +0.044 — stock selection
+ * edge is real. Broad-market: daily aggregate sign predicts next-day market
+ * sign only 30/67 = 44.8% — the directional leg stays basket-gated, never
+ * a market call. Refresh via scripts/measure-foreign-edge.py. */
+const FOREIGN_EDGE_ASOF = '2026-09-22'
+const FOREIGN_EDGE = { spreadPp: 0.36, rankIC: 0.044, days: 67, broadHitPct: 44.8, broadN: 67 }
+
 /** IDX foreign flow direction over the latest sessions. */
 async function idxForeignFlow(): Promise<{ dir: 'accumulation' | 'distribution' | 'flat'; streak: number; netRp: number } | null> {
   try {
@@ -236,7 +246,7 @@ async function fearGreed(): Promise<{ score: number; regime: string } | null> {
 }
 
 export async function buildInsightBrief(): Promise<InsightBrief> {
-  const { data } = await getCached<InsightBrief>('insight-brief:v5', CACHE_TTL, async () => {
+  const { data } = await getCached<InsightBrief>('insight-brief:v6', CACHE_TTL, async () => {
     const [tails, funding, foreign, sectors, fg] = await Promise.all([
       idxTailRates(),
       fundingExtremes(),
@@ -285,7 +295,10 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
         narrative: foreign.dir === 'accumulation'
           ? `Foreigners accumulating IDX ${foreign.streak} sessions running — tailwind for the measured strong-buy basket.`
           : `Foreigners distributing IDX ${foreign.streak} sessions running — headwind; strong-buy needs session-level confirmation.`,
-        evidence: [{ metric: 'foreign net streak', value: `${foreign.streak}d ${foreign.dir}`, source: 'IdxSahamSession' }],
+        evidence: [
+          { metric: 'foreign net streak', value: `${foreign.streak}d ${foreign.dir}`, source: 'IdxSahamSession' },
+          { metric: 'foreign cross-sectional edge', value: `top-decile +${FOREIGN_EDGE.spreadPp}pp vs bottom, IC ${FOREIGN_EDGE.rankIC} (${FOREIGN_EDGE.days}d, as of ${FOREIGN_EDGE_ASOF}); broad-sign hit ${FOREIGN_EDGE.broadHitPct}% — basket-gated`, source: 'IdxSahamSession backtest' },
+        ],
         confidence: conf,
         unproven: !(moon && moon.n >= 20),
         measured: moon && moon.n >= 20 ? { n: moon.n, p20: Math.round(moon.p20 * 10) / 10, p10: Math.round(moon.p10 * 10) / 10 } : undefined,
