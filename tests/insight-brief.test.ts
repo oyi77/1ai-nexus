@@ -70,3 +70,13 @@ test('funding legs carry measured unwind rates, not unproven-50', async () => {
     expect(t.evidence.some((e) => e.metric === 'unwind hit rate (24h)')).toBe(true)
   }
 }, 90_000)
+
+test('sector leg carries measured persistence, not unproven-50', async () => {
+  const brief = await buildInsightBrief()
+  const sector = brief.transmissions.find((t) => t.id === 'sector-rotation')
+  expect(sector).toBeDefined()
+  expect(sector!.unproven).toBe(false)
+  expect(sector!.confidence).toBe(65)
+  expect(sector!.measured?.n ?? 0).toBeGreaterThanOrEqual(20)
+  expect(sector!.evidence.some((e) => e.metric === 'flow persistence (next day)')).toBe(true)
+}, 90_000)

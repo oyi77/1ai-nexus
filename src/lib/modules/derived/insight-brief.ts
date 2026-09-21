@@ -165,6 +165,17 @@ async function idxForeignFlow(): Promise<{ dir: 'accumulation' | 'distribution' 
   } catch { return null }
 }
 
+/** Measured next-day flow persistence per leg side (backtest 2026-06-30..2026-09-21,
+ * 81 days of SectorFlowSnapshot: a leg side persists when the same sector
+ * reappears in the same directional third the next day with data).
+ * Inflow legs persist 63.5% (73/115); outflow legs 66.3% (67/101).
+ * Refresh via scripts/measure-sector-persistence.py and paste new cells here. */
+const SECTOR_PERSIST_ASOF = '2026-09-21'
+const SECTOR_PERSIST: Record<string, { n: number; hits: number }> = {
+  top: { n: 115, hits: 73 },
+  bottom: { n: 101, hits: 67 },
+}
+
 /** Sector rotation: net smart-money flow per sector over the latest session day. */
 async function sectorRotation(): Promise<{ day: string; top: Array<{ sector: string; net: number }>; bottom: Array<{ sector: string; net: number }> } | null> {
   try {
@@ -208,7 +219,7 @@ async function fearGreed(): Promise<{ score: number; regime: string } | null> {
 }
 
 export async function buildInsightBrief(): Promise<InsightBrief> {
-  const { data } = await getCached<InsightBrief>('insight-brief:v4', CACHE_TTL, async () => {
+  const { data } = await getCached<InsightBrief>('insight-brief:v5', CACHE_TTL, async () => {
     const [tails, funding, foreign, sectors, fg] = await Promise.all([
       idxTailRates(),
       fundingExtremes(),
@@ -275,9 +286,11 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
         evidence: [
           ...sectors.top.map((t) => ({ metric: `inflow · ${t.sector}`, value: formatFlowUsd(t.net), source: 'SectorFlowSnapshot' })),
           ...sectors.bottom.map((t) => ({ metric: `outflow · ${t.sector}`, value: formatFlowUsd(t.net), source: 'SectorFlowSnapshot' })),
+          { metric: 'flow persistence (next day)', value: `inflow 63.5% (n=115), outflow 66.3% (n=101), as of ${SECTOR_PERSIST_ASOF}`, source: 'SectorFlowSnapshot backtest' },
         ],
-        confidence: 50,
-        unproven: true,
+        confidence: 65,
+        unproven: false,
+        measured: { n: 216, p20: 64.8, p10: 64.8 },
       })
     }
 
