@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { buildInsightBrief } from '@/lib/modules/derived/insight-brief'
+import { buildInsightBrief, formatFlowUsd } from '@/lib/modules/derived/insight-brief'
 
 /**
  * Insight Brief — cross-domain transmission engine.
@@ -48,3 +48,12 @@ test('insight brief: honest provenance, correct crowding side, sane z', async ()
     for (const s of outflow) expect(inflow).not.toContain(s)
   }
 }, 90_000)
+
+test('formatFlowUsd: adaptive units, no collapsed $0.00M wall', () => {
+  expect(formatFlowUsd(12265.65)).toBe('+$12.3K')
+  expect(formatFlowUsd(6212.78)).toBe('+$6.2K')
+  expect(formatFlowUsd(-500)).toBe('-$500')
+  expect(formatFlowUsd(0)).toBe('+$0')
+  expect(formatFlowUsd(2500000)).toBe('+$2.50M')
+  expect(formatFlowUsd(-1300000)).toBe('-$1.30M')
+})

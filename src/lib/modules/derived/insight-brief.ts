@@ -30,6 +30,17 @@ export interface InsightBrief {
   transmissions: Transmission[]
 }
 
+/** Adaptive USD flow formatting: M >= $1M, K >= $1K, raw below.
+ * The old single-unit M formatter collapsed every real sector flow ($5-12K)
+ * into a useless "+$0.00M" wall (proven live 2026-09-21). */
+export function formatFlowUsd(n: number): string {
+  const a = Math.abs(n)
+  const sign = n >= 0 ? '+' : '-'
+  if (a >= 1e6) return `${sign}$${(a / 1e6).toFixed(2)}M`
+  if (a >= 1e3) return `${sign}$${(a / 1e3).toFixed(1)}K`
+  return `${sign}$${Math.round(a)}`
+}
+
 /** Measured IDX tail rates per verdict: P(MFE>=20%/>=10% in 30d). */
 async function idxTailRates(): Promise<Record<string, { p20: number; p10: number; n: number }>> {
   const out: Record<string, { p20: number; p10: number; n: number }> = {}
@@ -92,18 +103,21 @@ async function idxForeignFlow(): Promise<{ dir: 'accumulation' | 'distribution' 
     const agg = await prisma.$queryRaw<Array<{ d: string; net: number }>>`
       SELECT "tradeDate" AS d, SUM("foreignBuy" - "foreignSell")::float AS net
       FROM "IdxSahamSession" WHERE "tradeDate" = ANY(${ds}) GROUP BY "tradeDate" ORDER BY "tradeDate" DESC LIMIT 5`
-    if (agg.length === 0) return null
+    // Skip zero-net days (weekends/holidays print a 0.0 session row that would
+    // otherwise anchor dir='flat' and kill the leg — proven live 2026-09-21).
+    const nz = agg.filter((r) => r.net !== 0)
+    if (nz.length === 0) return null
     let streak = 0
-    const dir0 = agg[0].net > 0 ? 1 : agg[0].net < 0 ? -1 : 0
-    for (const r of agg) {
-      const d = r.net > 0 ? 1 : r.net < 0 ? -1 : 0
-      if (d === dir0 && d !== 0) streak++
+    const dir0 = nz[0].net > 0 ? 1 : -1
+    for (const r of nz) {
+      const d = r.net > 0 ? 1 : -1
+      if (d === dir0) streak++
       else break
     }
     return {
-      dir: dir0 > 0 ? 'accumulation' : dir0 < 0 ? 'distribution' : 'flat',
+      dir: dir0 > 0 ? 'accumulation' : 'distribution',
       streak,
-      netRp: Math.round(agg[0].net),
+      netRp: Math.round(nz[0].net),
     }
   } catch { return null }
 }
@@ -202,16 +216,15 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
 
     // 3) Sector rotation → which cross-asset pockets receive flow vs bleed it.
     if (sectors) {
-      const fmt = (n: number) => `${n >= 0 ? '+' : '-'}$${(Math.abs(n) / 1e6).toFixed(2)}M`
       tx.push({
         id: 'sector-rotation',
         from: `smart-money rotation ${sectors.day}: ${sectors.top.map((t) => t.sector).join(', ')} receiving`,
         to: [...sectors.top.map((t) => t.sector), ...sectors.bottom.map((s) => `${s.sector} (outflow)`)],
         direction: 'bullish',
-        narrative: `${sectors.day} net flow in ${sectors.top.map((t) => `${t.sector} ${fmt(t.net)}`).join(', ')}; out of ${sectors.bottom.map((t) => `${t.sector} ${fmt(t.net)}`).join(', ')}.`,
+        narrative: `${sectors.day} net flow in ${sectors.top.map((t) => `${t.sector} ${formatFlowUsd(t.net)}`).join(', ')}; out of ${sectors.bottom.map((t) => `${t.sector} ${formatFlowUsd(t.net)}`).join(', ')}.`,
         evidence: [
-          ...sectors.top.map((t) => ({ metric: `inflow · ${t.sector}`, value: fmt(t.net), source: 'SectorFlowSnapshot' })),
-          ...sectors.bottom.map((t) => ({ metric: `outflow · ${t.sector}`, value: fmt(t.net), source: 'SectorFlowSnapshot' })),
+          ...sectors.top.map((t) => ({ metric: `inflow · ${t.sector}`, value: formatFlowUsd(t.net), source: 'SectorFlowSnapshot' })),
+          ...sectors.bottom.map((t) => ({ metric: `outflow · ${t.sector}`, value: formatFlowUsd(t.net), source: 'SectorFlowSnapshot' })),
         ],
         confidence: 50,
         unproven: true,
@@ -219,7 +232,7 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
     }
 
     // 4) Sentiment extreme → contrarian read (display + gate, not a trade).
-    if (fg && (fg.score > 70 || fg.score < 30)) {
+    if (fg && (fg.score >= 70 || fg.score <= 30)) {
       tx.push({
         id: 'fear-greed-extreme',
         from: `Fear & Greed ${fg.score} (${fg.regime})`,
