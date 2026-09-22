@@ -68,6 +68,10 @@ export default function AdminPage() {
   const [tokenInput, setTokenInput] = useState('')
   const [tokenBusy, setTokenBusy] = useState(false)
   const [tokenMsg, setTokenMsg] = useState<string | null>(null)
+  const [refundId, setRefundId] = useState('')
+  const [refundReason, setRefundReason] = useState('')
+  const [refundBusy, setRefundBusy] = useState(false)
+  const [refundMsg, setRefundMsg] = useState<string | null>(null)
   const [analyticsError, setAnalyticsError] = useState(false)
 
   const fetchAll = useCallback(async () => {
@@ -483,6 +487,63 @@ export default function AdminPage() {
                 )}
               </div>
             </div>
+          </div>
+        </Panel>
+
+        {/* Refunds — fulfills Terms §9: gateway-first refund, then local downgrade */}
+        <Panel
+          title="Refunds"
+          subtitle="Terms §9 error-charge review: gateway refund first, local downgrade follows"
+        >
+          <div className="p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                value={refundId}
+                onChange={(e) => setRefundId(e.target.value)}
+                placeholder="Payment ID (from /account/payments order)"
+                spellCheck={false}
+                className="flex-1 px-3 py-2 text-xs font-mono bg-bg-raised border border-bg-border rounded text-text-primary placeholder:text-text-muted/60"
+              />
+              <input
+                value={refundReason}
+                onChange={(e) => setRefundReason(e.target.value)}
+                placeholder="Reason (e.g. duplicate charge)"
+                spellCheck={false}
+                className="flex-1 px-3 py-2 text-xs font-mono bg-bg-raised border border-bg-border rounded text-text-primary placeholder:text-text-muted/60"
+              />
+              <button
+                disabled={refundBusy || !refundId.trim()}
+                onClick={async () => {
+                  setRefundBusy(true)
+                  setRefundMsg(null)
+                  try {
+                    const res = await fetch('/api/v1/admin/refund', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ paymentId: refundId.trim(), reason: refundReason.trim() || undefined }),
+                    })
+                    const json = (await res.json()) as { data: { refunded?: boolean } | null; error: string | null }
+                    if (res.ok && json.data?.refunded) {
+                      setRefundId('')
+                      setRefundReason('')
+                      setRefundMsg('Refunded — gateway first, subscription downgraded to free.')
+                    } else {
+                      setRefundMsg(`Failed: ${json.error ?? `HTTP ${res.status}`}`)
+                    }
+                  } catch (e) {
+                    setRefundMsg(`Failed: ${(e as Error).message}`)
+                  } finally {
+                    setRefundBusy(false)
+                  }
+                }}
+                className="px-4 py-2 bg-data-bear/20 text-data-bear font-mono font-bold rounded hover:bg-data-bear/30 transition-colors disabled:opacity-50"
+              >
+                {refundBusy ? 'Refunding…' : 'Refund'}
+              </button>
+            </div>
+            {refundMsg && (
+              <p className="text-xs font-mono text-text-secondary">{refundMsg}</p>
+            )}
           </div>
         </Panel>
 
