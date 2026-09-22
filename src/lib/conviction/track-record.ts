@@ -23,6 +23,19 @@ export async function recordConvictionSignal(params: {
   reasons?: Array<{ text: string; weight: number }>
 }): Promise<void> {
   try {
+    const day = new Date().toISOString().slice(0, 10)
+    const dupe = await prisma.convictionSignal.findFirst({
+      where: {
+        symbol: params.symbol.toUpperCase(),
+        market: params.market,
+        action: params.action,
+        emittedAt: { gte: new Date(day + 'T00:00:00Z'), lt: new Date(day + 'T23:59:59Z') },
+      },
+      select: { id: true },
+    })
+    if (dupe) return // one emission per symbol+action per day — the 09-18
+    // flood wrote 338 dupes/symbol when TTL recomputes raced; dupes bias
+    // the base rate toward flood-day regimes, never new information.
     await prisma.convictionSignal.create({
       data: {
         symbol: params.symbol.toUpperCase(),

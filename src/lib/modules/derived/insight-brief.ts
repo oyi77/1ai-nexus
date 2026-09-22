@@ -9,6 +9,8 @@
 // ─────────────────────────────────────────────────────────────
 import { prisma } from '@/lib/db'
 import { getCached } from '@/lib/api/server-cache'
+import { getFundingCells, getSectorCells, getForeignCells } from '@/lib/modules/derived/brief-calibration'
+import type { FundingUnwindCells, SectorPersistCells, ForeignEdgeCells } from '@/lib/modules/derived/brief-calibration'
 
 const CACHE_TTL = 10 * 60_000
 
@@ -102,22 +104,10 @@ async function fundingExtremes(limit = 8): Promise<Array<{ symbol: string; excha
  * crowded shorts do NOT (47-49%) — the leg reports the rate either way.
  * Refresh via scripts/measure-funding-unwind.py and paste new cells here.
  * measuredAsOf stamps the evidence so readers see staleness. */
-const FUNDING_UNWIND_ASOF = '2026-09-21'
-const FUNDING_UNWIND_CELLS: Record<string, Record<string, Record<string, { n: number; hits: number }>>> = {
-  Binance: {
-    long: { '2': { n: 2609, hits: 1403 }, '3': { n: 866, hits: 459 }, '5': { n: 446, hits: 228 } },
-    short: { '2': { n: 2122, hits: 1044 }, '3': { n: 936, hits: 449 }, '5': { n: 663, hits: 319 } },
-  },
-  Bybit: {
-    long: { '2': { n: 329, hits: 181 }, '3': { n: 141, hits: 79 }, '5': { n: 93, hits: 50 } },
-    short: { '2': { n: 549, hits: 248 }, '3': { n: 269, hits: 123 }, '5': { n: 181, hits: 94 } },
-  },
-}
-
 /** Pooled unwind hit rate for an exchange+side leg at a given |z|.
  * Exact tier cell when n>=20, else the exchange+side pool, else null. */
-function fundingUnwind(exchange: string, side: 'long' | 'short', z: number): { n: number; rate: number } | null {
-  const bySide = FUNDING_UNWIND_CELLS[exchange]?.[side]
+function fundingUnwind(cells: FundingUnwindCells['cells'], exchange: string, side: 'long' | 'short', z: number): { n: number; rate: number } | null {
+  const bySide = cells[exchange]?.[side]
   if (!bySide) return null
   const az = Math.abs(z)
   let tier = '2'
@@ -142,8 +132,6 @@ function fundingUnwind(exchange: string, side: 'long' | 'short', z: number): { n
  * edge is real. Broad-market: daily aggregate sign predicts next-day market
  * sign only 30/67 = 44.8% — the directional leg stays basket-gated, never
  * a market call. Refresh via scripts/measure-foreign-edge.py. */
-const FOREIGN_EDGE_ASOF = '2026-09-22'
-const FOREIGN_EDGE = { spreadPp: 0.36, rankIC: 0.044, days: 67, broadHitPct: 44.8, broadN: 67 }
 
 /** IDX foreign flow direction over the latest sessions. */
 async function idxForeignFlow(): Promise<{ dir: 'accumulation' | 'distribution' | 'flat'; streak: number; netRp: number } | null> {
@@ -180,26 +168,21 @@ async function idxForeignFlow(): Promise<{ dir: 'accumulation' | 'distribution' 
  * reappears in the same directional third the next day with data).
  * Inflow legs persist 63.5% (73/115); outflow legs 66.3% (67/101).
  * Refresh via scripts/measure-sector-persistence.py and paste new cells here. */
-const SECTOR_PERSIST_ASOF = '2026-09-21'
-const SECTOR_PERSIST: Record<string, { n: number; hits: number }> = {
-  top: { n: 115, hits: 73 },
-  bottom: { n: 101, hits: 67 },
-}
 
-function sectorPersistRate(side: 'top' | 'bottom'): { n: number; rate: number } {
-  const c = SECTOR_PERSIST[side]
+function sectorPersistRate(cells: SectorPersistCells, side: 'top' | 'bottom'): { n: number; rate: number } {
+  const c = side === 'top' ? cells.top : cells.bottom
   return { n: c.n, rate: Math.round((c.hits / c.n) * 1000) / 10 }
 }
 
-function sectorPersistLine(): string {
-  const top = sectorPersistRate('top')
-  const bottom = sectorPersistRate('bottom')
-  return `inflow ${top.rate}% (n=${top.n}), outflow ${bottom.rate}% (n=${bottom.n}), as of ${SECTOR_PERSIST_ASOF}`
+function sectorPersistLine(cells: SectorPersistCells): string {
+  const top = sectorPersistRate(cells, 'top')
+  const bottom = sectorPersistRate(cells, 'bottom')
+  return `inflow ${top.rate}% (n=${top.n}), outflow ${bottom.rate}% (n=${bottom.n}), as of ${cells.asOf}`
 }
 
-function sectorPersistPooled(): { n: number; rate: number } {
-  const n = SECTOR_PERSIST.top.n + SECTOR_PERSIST.bottom.n
-  const hits = SECTOR_PERSIST.top.hits + SECTOR_PERSIST.bottom.hits
+function sectorPersistPooled(cells: SectorPersistCells): { n: number; rate: number } {
+  const n = cells.top.n + cells.bottom.n
+  const hits = cells.top.hits + cells.bottom.hits
   return { n, rate: Math.round((hits / n) * 1000) / 10 }
 }
 
@@ -246,13 +229,16 @@ async function fearGreed(): Promise<{ score: number; regime: string } | null> {
 }
 
 export async function buildInsightBrief(): Promise<InsightBrief> {
-  const { data } = await getCached<InsightBrief>('insight-brief:v6', CACHE_TTL, async () => {
-    const [tails, funding, foreign, sectors, fg] = await Promise.all([
+  const { data } = await getCached<InsightBrief>('insight-brief:v8', CACHE_TTL, async () => {
+    const [tails, funding, foreign, sectors, fg, fCells, sCells, gCells] = await Promise.all([
       idxTailRates(),
       fundingExtremes(),
       idxForeignFlow(),
       sectorRotation(),
       fearGreed(),
+      getFundingCells(),
+      getSectorCells(),
+      getForeignCells(),
     ])
 
     const tx: Transmission[] = []
@@ -263,7 +249,7 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
       // Crowding side comes from the RATE SIGN (longs pay shorts when positive);
       // z only measures how unusual that sign is vs the pair's own 7d history.
       const crowdedLong = f.rate > 0
-      const uw = fundingUnwind(f.exchange, crowdedLong ? 'long' : 'short', f.z)
+      const uw = fundingUnwind(fCells.cells, f.exchange, crowdedLong ? 'long' : 'short', f.z)
       tx.push({
         id: `funding:${f.exchange}:${f.symbol}`,
         from: `perps funding ${f.rate >= 0 ? '+' : ''}${(f.rate * 100).toFixed(4)}%/interval (${f.z >= 0 ? '+' : ''}${f.z}σ vs its own 7d)`,
@@ -275,7 +261,7 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
         evidence: [
           { metric: 'funding z-score (7d)', value: String(f.z), source: 'DerivativesSnapshot' },
           ...(uw
-            ? [{ metric: 'unwind hit rate (24h)', value: `${uw.rate}% (n=${uw.n}, as of ${FUNDING_UNWIND_ASOF})`, source: 'DerivativesSnapshot backtest' }]
+            ? [{ metric: 'unwind hit rate (24h)', value: `${uw.rate}% (n=${uw.n}, as of ${fCells.asOf})`, source: 'DerivativesSnapshot backtest' }]
             : []),
         ],
         confidence: uw ? Math.round(uw.rate) : 50,
@@ -297,7 +283,7 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
           : `Foreigners distributing IDX ${foreign.streak} sessions running — headwind; strong-buy needs session-level confirmation.`,
         evidence: [
           { metric: 'foreign net streak', value: `${foreign.streak}d ${foreign.dir}`, source: 'IdxSahamSession' },
-          { metric: 'foreign cross-sectional edge', value: `top-decile +${FOREIGN_EDGE.spreadPp}pp vs bottom, IC ${FOREIGN_EDGE.rankIC} (${FOREIGN_EDGE.days}d, as of ${FOREIGN_EDGE_ASOF}); broad-sign hit ${FOREIGN_EDGE.broadHitPct}% — basket-gated`, source: 'IdxSahamSession backtest' },
+          { metric: 'foreign cross-sectional edge', value: `top-decile +${gCells.spreadPp}pp vs bottom, IC ${gCells.rankIC} (${gCells.days}d, as of ${gCells.asOf}); broad-sign hit ${gCells.broadHitPct}% — basket-gated`, source: 'IdxSahamSession backtest' },
         ],
         confidence: conf,
         unproven: !(moon && moon.n >= 20),
@@ -316,11 +302,11 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
         evidence: [
           ...sectors.top.map((t) => ({ metric: `inflow · ${t.sector}`, value: formatFlowUsd(t.net), source: 'SectorFlowSnapshot' })),
           ...sectors.bottom.map((t) => ({ metric: `outflow · ${t.sector}`, value: formatFlowUsd(t.net), source: 'SectorFlowSnapshot' })),
-          { metric: 'flow persistence (next day)', value: sectorPersistLine(), source: 'SectorFlowSnapshot backtest' },
+          { metric: 'flow persistence (next day)', value: sectorPersistLine(sCells), source: 'SectorFlowSnapshot backtest' },
         ],
-        confidence: Math.round(sectorPersistPooled().rate),
+        confidence: Math.round(sectorPersistPooled(sCells).rate),
         unproven: false,
-        measured: { n: sectorPersistPooled().n, p20: sectorPersistPooled().rate, p10: sectorPersistPooled().rate },
+        measured: { n: sectorPersistPooled(sCells).n, p20: sectorPersistPooled(sCells).rate, p10: sectorPersistPooled(sCells).rate },
       })
     }
 
@@ -334,7 +320,10 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
         narrative: fg.score >= 70
           ? 'Extreme greed — upside chase is statistically the worst entry; wait for funding to cool.'
           : 'Extreme fear — capitulation zone; scale only into measured setups (moonshot P10-gated).',
-        evidence: [{ metric: 'fear-greed score', value: String(fg.score), source: 'SentimentSnapshot' }],
+        evidence: [
+          { metric: 'fear-greed score', value: String(fg.score), source: 'SentimentSnapshot' },
+          { metric: 'contrarian read (BTC fwd)', value: 'greed>=70 1d +0.39% / 7d -0.88% (n=11); fear<=30 n=0 in 29d overlap — no measured edge, display-only', source: 'MarketSnapshot backtest' },
+        ],
         confidence: 50,
         unproven: true,
       })

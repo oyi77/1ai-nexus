@@ -238,6 +238,18 @@ async function refreshLrfgSweep() {
   }
 }
 // Check expired signals and calculate PnL
+// Warm the brief calibration cells (funding unwind / sector persistence /
+// foreign edge). Daily cadence is enough.
+async function refreshBriefCalib() {
+  try {
+    const { refreshBriefCalibration } = await import('@/lib/modules/derived/brief-calibration')
+    const stamps = await refreshBriefCalibration()
+    logger.info(`brief-calib: funding ${stamps.funding}, sector ${stamps.sector}, foreign ${stamps.foreign}`, 'refresher')
+  } catch (err) {
+    logger.error('brief-calib error:', 'refresher', { error: (err as Error).message })
+  }
+}
+
 async function refreshSignalOutcomes() {
   try {
     const result = await checkExpiredSignals()
@@ -282,6 +294,7 @@ export function startDataRefresher() {
   setTimeout(() => refreshOpportunities(), 25_000)
   setTimeout(() => refreshBacktest(), 60_000)
   setTimeout(() => refreshLrfgSweep(), 90_000)
+  setTimeout(() => refreshBriefCalib(), 120_000)
   // Recurring intervals
   setInterval(refreshDerivatives, FAST_INTERVAL)
   setInterval(refreshETF, MEDIUM_INTERVAL)
@@ -300,5 +313,6 @@ export function startDataRefresher() {
   setInterval(refreshOpportunities, SIGNAL_INTERVAL)
   setInterval(refreshBacktest, 6 * SIGNAL_INTERVAL)     // Backtest eval every 6h (heavy)
   setInterval(refreshLrfgSweep, OUTCOME_INTERVAL)       // LRFg sweep every 15 min
+  setInterval(refreshBriefCalib, 24 * SIGNAL_INTERVAL) // Brief calibration daily
   logger.info("Scheduled: derivatives(1m), etf(5m), sentiment(5m), news(15m), risk(5m), onchain(1m), composite(5m), score(5m), signals(1h), outcomes(15m), backtest(6h), lrfg(15m)", "refresher")
 }
