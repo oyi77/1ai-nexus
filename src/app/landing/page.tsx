@@ -436,10 +436,13 @@ export default function LandingPage() {
         <p className="eyebrow mb-2">Track Record</p>
         <h2 className="text-3xl font-bold tracking-tight mb-3">Our Signals, Measured</h2>
         <p className="text-text-secondary mb-8 max-w-2xl">
-          Every conviction signal is measured 24h later (±0.5% close-to-close). For right-tail
-          performance — the number that matters for runners — see the{' '}
+          Every conviction signal is measured 24h later (±0.5% close-to-close) and shown
+          above — wins and losses alike, including the Sep-18 flood rows that dilute the
+          population rate. For right-tail performance — the number that matters for
+          runners — see the{' '}
           <Link href="/moonshot" className="text-teal-vivid hover:underline">moonshot board</Link>:
-          65% measured hit-rate on 10K-scored windows, from session highs.
+          64% of moonshot-verdict windows reach +10% from session highs (9.7K scored).
+          IDX BUY emissions are gated at alphaScore≥68 (measured edge only).
         </p>
         <TrackRecordBuckets />
       </section>
