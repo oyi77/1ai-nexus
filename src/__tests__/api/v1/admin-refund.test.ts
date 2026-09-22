@@ -59,7 +59,7 @@ describe('POST /api/v1/admin/refund', () => {
     vi.mocked(prisma.payment.findUnique).mockResolvedValue({
       id: 'p1',
       status: 'refunded',
-    })
+    } as never)
     const res = await POST(post({ paymentId: 'p1' }))
     expect(res.status).toBe(409)
   })
@@ -68,7 +68,7 @@ describe('POST /api/v1/admin/refund', () => {
     vi.mocked(prisma.payment.findUnique).mockResolvedValue({
       id: 'p1',
       status: 'failed',
-    })
+    } as never)
     const res = await POST(post({ paymentId: 'p1' }))
     expect(res.status).toBe(400)
   })
@@ -81,7 +81,7 @@ describe('POST /api/v1/admin/refund', () => {
       externalId: 'ord_123',
       subscriptionId: 's1',
       subscription: { userId: 'u1', id: 's1' },
-    })
+    } as never)
     const refundPayment = vi.fn().mockResolvedValue({ id: 'r1', status: 'ok' })
     vi.mocked(getPaymentService).mockReturnValue({ refundPayment } as never)
     const res = await POST(post({ paymentId: 'p1', reason: 'duplicate charge' }))
@@ -113,7 +113,7 @@ describe('POST /api/v1/admin/refund', () => {
       externalId: 'ord_123',
       subscriptionId: 's1',
       subscription: { userId: 'u1', id: 's1' },
-    })
+    } as never)
     vi.mocked(getPaymentService).mockReturnValue({
       refundPayment: vi.fn().mockRejectedValue(new Error('gateway down')),
     } as never)
