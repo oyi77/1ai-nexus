@@ -63,7 +63,8 @@ One command starts everything — PostgreSQL, Redis, database seeding, Next.js a
 
 ```bash
 git clone https://github.com/oyi77/1ai-nexus.git
-cd 1ai-nexus/nexus
+cd 1ai-tracker
+cp .env.example .env  # fill REQUIRED first — see docs/HANDOVER.md
 docker compose up --build
 ```
 
@@ -73,12 +74,12 @@ This boots 5 services:
 |---------|------|-------------|
 | `postgres` | 5432 | PostgreSQL 16 database |
 | `redis` | 6379 | Redis Pub/Sub event bus |
-| `db-init` | — | Runs once: schema push + seed (50 entities, 500 markets, 10K trades) |
+| `db-init` | — | Runs once: `prisma migrate deploy` against Postgres |
 | `web` | 4400 | Next.js 16 application |
 | `ws` | 4401 | WebSocket sidecar (Socket.io) |
 | `indexer` | — | Multi-chain blockchain indexer |
 
-Open [http://localhost:4400](http://localhost:4400) — login with `admin` / `admin`.
+Open [http://localhost:4400](http://localhost:4400) — sign up, then promote yourself to admin in psql (docs/HANDOVER.md §3).
 
 **Production**: [https://tracker.aitradepulse.com](https://tracker.aitradepulse.com)
 
@@ -91,7 +92,7 @@ docker-compose up -d redis
 
 # Install and setup
 npm install
-npm run db:push
+npx prisma migrate deploy  # NEVER db:push on a migrated DB
 npm run db:seed
 
 # Run
@@ -119,13 +120,13 @@ cd indexer && npm run dev    # Blockchain indexer
 
 ```bash
 git clone https://github.com/oyi77/1ai-nexus.git
-cd 1ai-nexus/nexus
+cd 1ai-tracker
 cp .env.example .env
 sed -i "s/NEXTAUTH_SECRET=.*/NEXTAUTH_SECRET=$(openssl rand -hex 32)/" .env
 sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 16)/" .env
 sed -i "s/NEXUS_API_KEYS=.*/NEXUS_API_KEYS=$(openssl rand -hex 32)/" .env
 docker compose up -d --build
-curl http://localhost:4400/api/v1/status
+curl http://localhost:4400/api/v1/health
 ```
 
 ### Optional: Telegram Alerts
@@ -139,7 +140,7 @@ docker compose restart web
 ### Backup
 
 ```bash
-docker compose exec postgres pg_dump -U nexus nexus > backup_$(date +%Y%m%d).sql
+docker compose exec postgres pg_dump -U nexus nexus | gzip > backup_$(date +%Y%m%d).sql.gz  # restore: see docs/HANDOVER.md §5
 ```
 
 ### Cost: ~$5/month (VPS only, all APIs free)
