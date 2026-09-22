@@ -53,6 +53,9 @@ interface AccountData {
 
 export default function AccountPage() {
   const [data, setData] = useState<AccountData | null>(null)
+  // Days-left is computed in the fetch handler (event context), never in
+  // render — the purity rule flags Date.now in render/body/memo.
+  const [daysLeft, setDaysLeft] = useState<number | null>(null)
   const [status, setStatus] = useState<'loading' | 'live' | 'error' | 'unauthenticated'>('loading')
 
   const fetchAccount = useCallback(async () => {
@@ -66,6 +69,8 @@ export default function AccountPage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const d = (await res.json()) as { data: AccountData }
       setData(d.data)
+      const endStr = d.data?.subscription?.endDate
+      setDaysLeft(endStr ? Math.ceil((new Date(endStr).getTime() - Date.now()) / 86400000) : null)
       setStatus('live')
     } catch {
       setStatus('error')
@@ -98,6 +103,7 @@ export default function AccountPage() {
   }
 
   const user = data?.user
+  const subEnd = data?.subscription?.endDate ? new Date(data.subscription.endDate) : null
   const planInfo = data?.plan
   const planLabel = user?.plan?.toUpperCase() ?? (data?.subscription?.plan.toUpperCase() ?? 'FREE')
   const planPrice = planInfo?.label ?? ''
@@ -124,9 +130,15 @@ export default function AccountPage() {
             <div>
               <p className="text-xl font-bold text-text-primary capitalize">{planLabel}</p>
               <p className="text-sm text-text-muted">{planPrice}</p>
-              {data?.subscription?.endDate && (
+              {subEnd && daysLeft !== null && (
                 <p className="text-xs text-text-muted mt-1">
-                  Renews {new Date(data.subscription.endDate).toLocaleDateString()}
+                  {daysLeft < 0
+                    ? 'Expired — renew below to restore access.'
+                    // Honest prepay language: no auto-charge rail exists,
+                    // so "Renews" would be a sale lie. Renewal = re-pay.
+                    : daysLeft <= 7
+                      ? `Expires in ${daysLeft}d — renew now to avoid interruption.`
+                      : `Active until ${subEnd.toLocaleDateString()} — renew anytime via Pricing.`}
                 </p>
               )}
             </div>
