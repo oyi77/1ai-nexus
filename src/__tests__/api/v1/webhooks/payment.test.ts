@@ -159,10 +159,12 @@ describe('POST /api/v1/webhooks/payment', () => {
     expect(response.status).toBe(401)
   })
 
-  it('ignores paid webhook without userId in metadata', async () => {
+  it('rejects paid webhook without userId in metadata (400 so gateway retries)', async () => {
     const body = mockBody({ metadata: {} })
     const response = await POST(signedRequest(body))
-    expect(response.status).toBe(200)
+    // Paid-but-unroutable must be loud: a silent 200 burns a real payment
+    // with no subscription activation. 400 forces the gateway to retry.
+    expect(response.status).toBe(400)
     expect(prisma.subscription.upsert).not.toHaveBeenCalled()
     expect(prisma.payment.create).not.toHaveBeenCalled()
   })

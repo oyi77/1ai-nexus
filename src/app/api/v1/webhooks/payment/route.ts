@@ -90,6 +90,13 @@ export async function POST(request: Request) {
       }
     }
 
+    if (payload.status === 'paid' && (!userId || !plan)) {
+      // Paid but unroutable: gateway must retry, never silent-drop —
+      // a silent 200 here burns a real customer payment with no activation.
+      console.error('[PAYMENT] PAID webhook missing userId/plan — rejecting for retry:', { orderId: payload.order_id })
+      return NextResponse.json({ error: 'Missing userId/plan for paid order' }, { status: 400 })
+    }
+
     // Only process successful payments
     if (payload.status === 'paid' && userId && plan) {
       try {
@@ -150,6 +157,9 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Internal error' }, { status: 500 })
       }
     } else if (payload.status === 'failed' || payload.status === 'expired') {
+      if (!userId) {
+        return NextResponse.json({ error: 'Missing userId for failed order' }, { status: 400 })
+      }
       // Create failed Payment record if we have enough info
       if (userId) {
         const sub = await prisma.subscription.findUnique({ where: { userId } })
