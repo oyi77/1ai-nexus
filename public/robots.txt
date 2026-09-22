@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Allow: /pricing
+Allow: /api-docs
+Disallow: /api/
+Disallow: /admin/
+Disallow: /account/
+
+Sitemap: https://tracker.aitradepulse.com/sitemap.xml
