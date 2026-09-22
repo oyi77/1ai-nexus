@@ -86,7 +86,28 @@ export default function TermsOfServicePage() {
         </section>
 
         <section className="space-y-4">
-          <h2 className="page-title text-lg">8. Contact</h2>
+          <h2 className="page-title text-lg">8. Subscriptions, Renewal & Cancellation</h2>
+          <p className="text-sm text-text-secondary">
+            Paid plans (Pro, Enterprise) are billed for 30-day periods. Your subscription renews when you
+            complete a new payment before the current period ends — there is no automatic charge. You may
+            cancel at any time from the account page; cancellation takes effect at the end of the current
+            paid period and your plan reverts to Free. Expired subscriptions are downgraded automatically.
+          </p>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="page-title text-lg">9. Refunds</h2>
+          <p className="text-sm text-text-secondary">
+            Because the Service delivers digital data access immediately upon payment, payments are
+            generally non-refundable. If you were charged in error (duplicate payment, wrong plan, or a
+            payment that never activated your subscription), contact us at support@aitradepulse.com within
+            14 days with your order ID and we will investigate and refund where appropriate. Unroutable
+            payments that our system rejects are never captured.
+          </p>
+        </section>
+
+        <section className="space-y-4">
+          <h2 className="page-title text-lg">10. Contact</h2>
           <p className="text-sm text-text-secondary">
             If you have any questions about these Terms of Service, please contact us at support@aitradepulse.com
           </p>

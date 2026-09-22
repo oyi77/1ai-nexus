@@ -145,7 +145,23 @@ export default function PricingPage() {
           </div>
         )}
 
-        {/* Pricing Cards */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'Product',
+              name: 'NEXUS Pro',
+              description: 'Market intelligence terminal: IDX bandarmology, measured signals, backtests.',
+              brand: { '@type': 'Brand', name: 'NEXUS' },
+              offers: [
+                { '@type': 'Offer', name: 'Pro', price: '49', priceCurrency: 'USD' },
+                { '@type': 'Offer', name: 'Enterprise', price: '199', priceCurrency: 'USD' },
+              ],
+            }),
+          }}
+        />
+                {/* Pricing Cards */}
         <div className="grid grid-cols-3 gap-6">
           {tiers.map((tier) => (
             <div
