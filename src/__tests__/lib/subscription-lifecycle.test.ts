@@ -8,6 +8,7 @@ vi.mock('@/lib/db', () => ({
     },
     user: {
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }))
@@ -60,5 +61,28 @@ describe('runSubscriptionLifecycle', () => {
     const res = await runSubscriptionLifecycle(new Date('2026-09-22T00:00:00Z'))
     expect(res).toEqual({ expired: 0, reminded: 0, checked: 2 })
     expect(prisma.subscription.update).not.toHaveBeenCalled()
+  })
+})
+
+describe('effectivePlan', () => {
+  it('prefers a live paid subscription over a stale free cache', async () => {
+    const { effectivePlan } = await import('@/lib/subscription-lifecycle')
+    expect(
+      effectivePlan('free', { plan: 'pro', status: 'active', endDate: new Date('2026-10-22T00:00:00Z') }, new Date('2026-09-22T00:00:00Z')),
+    ).toBe('pro')
+  })
+
+  it('falls back to user plan when subscription expired', async () => {
+    const { effectivePlan } = await import('@/lib/subscription-lifecycle')
+    expect(
+      effectivePlan('free', { plan: 'pro', status: 'expired', endDate: new Date('2026-08-01T00:00:00Z') }, new Date('2026-09-22T00:00:00Z')),
+    ).toBe('free')
+  })
+
+  it('ignores free subscriptions', async () => {
+    const { effectivePlan } = await import('@/lib/subscription-lifecycle')
+    expect(
+      effectivePlan('free', { plan: 'free', status: 'active', endDate: new Date('2026-10-22T00:00:00Z') }, new Date('2026-09-22T00:00:00Z')),
+    ).toBe('free')
   })
 })

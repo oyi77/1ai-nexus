@@ -10,6 +10,7 @@ import { prisma } from '@/lib/db'
 import { listUserKeys } from '@/lib/api-keys'
 import { getPlanPricing } from '@/lib/pricing'
 import { getUserGamification } from '@/lib/gamification'
+import { effectivePlan } from '@/lib/subscription-lifecycle'
 
 export async function GET(request: NextRequest) {
   let token: string | undefined
@@ -51,14 +52,18 @@ export async function GET(request: NextRequest) {
 
     if (!user) return apiError('User not found', 404)
 
-    const plan = getPlanPricing(user.plan)
+    const effPlan = effectivePlan(
+      user.plan,
+      subscription ? { plan: subscription.plan, status: subscription.status, endDate: subscription.endDate } : null,
+    )
+    const plan = getPlanPricing(effPlan)
 
     return apiJson({
       user: {
         id: user.id,
         email: user.email,
         role: user.role,
-        plan: user.plan,
+        plan: effPlan,
         planStartedAt: user.planStartedAt,
         planExpiresAt: user.planExpiresAt,
         apiUsageCount: user.apiUsageCount,

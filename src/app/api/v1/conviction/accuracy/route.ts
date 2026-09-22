@@ -19,6 +19,16 @@ export async function GET() {
     const resp = apiJson({
       ...accuracy,
       lastEvaluation: evalResult,
+      // Provenance: history includes the 2026-09-18 flood (338 dupes/symbol
+      // through a bare create on 15-60s TTL recomputes). Dedup enforced for
+      // new emissions; the population rate is flood-diluted, NOT the edge.
+      // Edge lives in the gated subset (alphaScore>=68: Sept OOS 38.3% /
+      // +0.64 vs <68 33.1% / +0.13).
+      provenance: {
+        floodNote: '2026-09-18 flood rows included; population rate diluted',
+        edgeSubset: 'alphaScore>=68: Sept OOS hit 38.3% avg +0.64',
+        dedupSince: '2026-09-22',
+      },
     })
     resp.headers.set('Cache-Control', 'public, max-age=60, stale-while-revalidate=120')
     return resp
