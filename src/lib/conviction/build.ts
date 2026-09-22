@@ -73,6 +73,12 @@ const CRYPTO_ALLOWLIST = new Set([
 
 export type ConvictionResult = ReturnType<typeof buildResult>
 
+/** IDX BUY floor: measured edge lives at alphaScore>=68 only
+ * (Sept OOS hit 38.3% avg +0.64 vs <68 33.1% / +0.13;
+ * resolved-history P10 64% n=112). Single source — every IDX BUY
+ * decision (screener path, bandar merge, bandar insert) must use it. */
+export const IDX_BUY_FLOOR = 68
+
 /** Compute the full conviction result (IDX + CRYPTO) and persist BUY/SELL emissions. */
 export async function buildConvictionResult(): Promise<ConvictionResult> {
   const [leaders, signals, screenerSnap] = await Promise.all([
@@ -174,7 +180,10 @@ export async function buildConvictionResult(): Promise<ConvictionResult> {
     const sel = topBuy.concat(bottomSell.filter((s) => !seen.has(s.r.symbol)))
       .sort((a, b) => b.score - a.score)
     for (const { r, score, reasons, viaAlpha } of sel) {
-      const action = score >= 65 ? 'BUY' : score < 35 ? 'SELL' : 'WAIT'
+      // BUY floor 68: below-68 IDX longs show no edge (Sept OOS 33.1% /
+      // +0.13 vs 68+ 38.3% / +0.64). Emitting them burns the win rate
+      // toward 1.8% population. WAIT instead — never score noise.
+      const action = score >= IDX_BUY_FLOOR ? 'BUY' : score < 35 ? 'SELL' : 'WAIT'
       idxItems.push({
         symbol: r.symbol,
         name: r.name,
@@ -182,7 +191,7 @@ export async function buildConvictionResult(): Promise<ConvictionResult> {
         changePct: r.change1d ?? 0,
         conviction: score,
         action,
-        direction: score >= 65 ? 'bull' : score < 35 ? 'bear' : 'neutral',
+        direction: score >= IDX_BUY_FLOOR ? 'bull' : score < 35 ? 'bear' : 'neutral',
         reasons,
         sources: viaAlpha ? ['screener', 'alpha-engine'] : ['screener'],
       })
@@ -194,15 +203,15 @@ export async function buildConvictionResult(): Promise<ConvictionResult> {
         existing.reasons.push({ text: `Foreign net buy leader`, weight: 0.35 })
         existing.sources.push('bandarmology')
         existing.conviction = Math.min(100, existing.conviction + 10)
-        existing.action = existing.conviction >= 65 ? 'BUY' : existing.conviction < 35 ? 'SELL' : 'WAIT'
-        existing.direction = existing.conviction >= 65 ? 'bull' : existing.conviction <= 35 ? 'bear' : 'neutral'
+        existing.action = existing.conviction >= IDX_BUY_FLOOR ? 'BUY' : existing.conviction < 35 ? 'SELL' : 'WAIT'
+        existing.direction = existing.conviction >= IDX_BUY_FLOOR ? 'bull' : existing.conviction <= 35 ? 'bear' : 'neutral'
       } else {
         idxItems.push({
           symbol: l.code,
           name: l.name,
           price: l.close,
           changePct: l.changePct,
-          conviction: 70,
+          conviction: Math.max(70, IDX_BUY_FLOOR),
           action: 'BUY',
           direction: 'bull',
           reasons: [{ text: `Foreign net buy leader (top daily)`, weight: 0.4 }],
