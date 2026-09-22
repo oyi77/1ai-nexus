@@ -91,3 +91,6 @@ data/stockbit-session.json
 data/zero-issue-state.json
 data/feed-health-prev.json
 data/idx-blocked-until.txt
+
+# nightly DB dumps (large, regenerated — never commit)
+backups/

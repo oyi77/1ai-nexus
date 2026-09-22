@@ -74,6 +74,12 @@ export class PaymentService {
     return this.client.listGateways();
   }
 
+  async refundPayment(orderId: string, amount?: number, reason?: string) {
+    // Passthrough to the gateway aggregator (Midtrans/Tripay/etc handle
+    // the actual money movement). Returns the gateway refund record.
+    return this.client.refund(orderId, amount, reason);
+  }
+
   private normalizeOrder(order: Order): PaymentOrder {
     return {
       orderId: order.id,
