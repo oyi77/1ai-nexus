@@ -134,13 +134,25 @@ async function refreshRisk() {
 
 // Warm the whale-alert server-cache (raw Redis key 'whale-alert') so the
 // /api/v1/whale-alert route never 502s after a cold restart while t.me blips.
+// t.me is flaky: consecutive failures back off (skip N cycles) instead of
+// spamming the error log every minute.
+let whaleAlertFails = 0
+let whaleAlertSkipUntil = 0
 async function refreshWhaleAlert() {
+  if (Date.now() < whaleAlertSkipUntil) return
   try {
     const { getCached } = await import('@/lib/api/server-cache')
     const { fetchWhaleAlerts } = await import('@/lib/modules/onchain/whale-alert/fetcher')
     const { data } = await getCached('whale-alert', 30_000, fetchWhaleAlerts)
     logger.info(`whale-alert: ${data.length} alerts warmed`, "refresher")
-  } catch (e) { logger.error("whale-alert failed:", "refresher", { error: (e as Error).message }) }
+    whaleAlertFails = 0
+    whaleAlertSkipUntil = 0
+  } catch (e) {
+    whaleAlertFails++
+    const backoffMin = [5, 15, 30, 60][Math.min(whaleAlertFails - 1, 3)]
+    whaleAlertSkipUntil = Date.now() + backoffMin * 60_000
+    logger.error(`whale-alert failed x${whaleAlertFails} — backing off ${backoffMin}m:`, 'refresher', { error: (e as Error).message })
+  }
 }
 
 async function refreshOnchain() {

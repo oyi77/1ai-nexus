@@ -1,6 +1,6 @@
 # NEXUS — Buyer Handover Runbook
 
-Verified 2026-09-22 against HEAD `83c7e06`. Follow in order; every step has
+Verified 2026-09-22 against HEAD `3083f83`. Follow in order; every step has
 a check so you know it worked before moving on.
 
 ## 1. What you bought
