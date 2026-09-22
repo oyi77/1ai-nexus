@@ -10,7 +10,7 @@
 import { prisma } from '@/lib/db'
 import { getCached } from '@/lib/api/server-cache'
 import { getFundingCells, getSectorCells, getForeignCells } from '@/lib/modules/derived/brief-calibration'
-import type { FundingUnwindCells, SectorPersistCells, ForeignEdgeCells } from '@/lib/modules/derived/brief-calibration'
+import type { FundingUnwindCells, SectorPersistCells } from '@/lib/modules/derived/brief-calibration'
 
 const CACHE_TTL = 10 * 60_000
 
