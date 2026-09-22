@@ -40,7 +40,7 @@ async function sendResetEmail(email: string, url: string): Promise<boolean> {
       to: email,
       subject: 'Nexus — Reset your password',
       text: `Reset your Nexus password here:\n\n${url}\n\nThis link expires in 30 minutes.`,
-      html: `<p>Reset your Nexus password:</p><p><a href="${url}">${url}</a></p><p>This link expires in 30 minutes.</p>`,
+      html: `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#e6edf3;background:#080b0f;border:1px solid #1e2328;border-radius:12px;"><div style="font-size:13px;letter-spacing:.3px;color:#5eead4;font-weight:700;margin-bottom:12px;">NEXUS</div><h1 style="font-size:20px;margin:0 0 12px;">Reset your Nexus password</h1><p style="font-size:14px;color:#9aa4b2;">Tap the button below to choose a new password.</p><p><a href="${url}" style="display:inline-block;padding:10px 20px;background:#5eead4;color:#080b0f;font-weight:700;border-radius:8px;text-decoration:none;">Reset password</a></p><p style="font-size:12px;color:#6b7281;">This link expires in 30 minutes. If the button does not work, paste this link:<br/><span style="word-break:break-all;">${url}</span></p></div>`,
     });
     return true;
   } catch (err) {

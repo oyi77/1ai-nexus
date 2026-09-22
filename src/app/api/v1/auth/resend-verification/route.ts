@@ -35,7 +35,7 @@ async function sendVerificationEmail(email: string, url: string): Promise<boolea
       to: email,
       subject: 'Verify your email — Nexus Tracker',
       text: `Verify your Nexus Tracker email here:\n\n${url}\n\nThis link expires in 24 hours.`,
-      html: `<p>Click <a href="${url}">here</a> to verify your email.</p><p>This link expires in 24 hours.</p>`,
+      html: `<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#e6edf3;background:#080b0f;border:1px solid #1e2328;border-radius:12px;"><div style="font-size:13px;letter-spacing:.3px;color:#5eead4;font-weight:700;margin-bottom:12px;">NEXUS</div><h1 style="font-size:20px;margin:0 0 12px;">Verify your email</h1><p style="font-size:14px;color:#9aa4b2;">Confirm this address to activate your NEXUS account.</p><p><a href="${url}" style="display:inline-block;padding:10px 20px;background:#5eead4;color:#080b0f;font-weight:700;border-radius:8px;text-decoration:none;">Verify email</a></p><p style="font-size:12px;color:#6b7281;">This link expires in 24 hours. If the button does not work, paste this link:<br/><span style="word-break:break-all;">${url}</span></p></div>`,
     });
     return true;
   } catch (err) {
