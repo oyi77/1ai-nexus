@@ -6,6 +6,7 @@ import { apiSuccess, apiError } from "@/lib/api/response";
 import { evaluateCondition, type NexusEvent } from "@/lib/alerts/evaluator";
 import { fireAlert } from "@/lib/modules/derived/alert-engine";
 import { AlertCondition } from "@/lib/alerts/schemas";
+import { verifyToken } from "@/lib/jwt";
 import { registerAllModules } from "@/lib/modules";
 
 interface CalendarApiResponse {
@@ -16,7 +17,20 @@ interface CalendarApiResponse {
 
 export async function GET(request: NextRequest) {
   try {
-    const dbAlerts = await prisma.alert.findMany({ where: { isActive: true } });
+    // Scope to the caller's own alerts: the unscoped findMany exposed every
+    // user's alert configs (ids, trigger types, thresholds) to any authed
+    // caller, and evaluation fired other users' delivery paths.
+    const authHeader = request.headers.get("authorization");
+    let token: string | undefined;
+    if (authHeader?.startsWith("Bearer ")) {
+      token = authHeader.slice(7);
+    } else {
+      token = request.cookies.get("nexus-session")?.value;
+    }
+    if (!token) return apiError("Authentication required", 401);
+    const payload = await verifyToken(token);
+    if (!payload?.userId) return apiError("Invalid or expired token", 401);
+    const dbAlerts = await prisma.alert.findMany({ where: { isActive: true, userId: payload.userId } });
     if (dbAlerts.length === 0) {
       return apiSuccess({ evaluated: 0, triggered: 0, results: [] });
     }
