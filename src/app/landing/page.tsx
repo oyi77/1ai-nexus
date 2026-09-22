@@ -563,6 +563,7 @@ export default function LandingPage() {
               <li><Link href="/api-docs" className="hover:text-text-primary">API Docs</Link></li>
               <li><Link href="/pricing" className="hover:text-text-primary">Pricing</Link></li>
               <li><Link href="/terms" className="hover:text-text-primary">Terms</Link></li>
+                <li><Link href="/privacy" className="hover:text-text-primary">Privacy</Link></li>
             </ul>
           </div>
           <div>

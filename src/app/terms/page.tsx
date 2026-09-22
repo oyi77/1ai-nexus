@@ -109,7 +109,7 @@ export default function TermsOfServicePage() {
         <section className="space-y-4">
           <h2 className="page-title text-lg">10. Contact</h2>
           <p className="text-sm text-text-secondary">
-            If you have any questions about these Terms of Service, please contact us at support@aitradepulse.com
+            If you have any questions about these Terms of Service, please contact us at support@aitradepulse.com. See also our Privacy Policy at /privacy.
           </p>
         </section>
       </div>
