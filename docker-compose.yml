@@ -47,7 +47,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["sh", "-c", "npx prisma db push --skip-generate && npm run db:seed"]
+    command: ["sh", "-c", "npx prisma migrate deploy && npm run db:seed"]
     environment:
       - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus
       - DB_PASSWORD_FILE=/run/secrets/db_password
@@ -167,5 +167,3 @@ secrets:
     file: ./secrets/redis_password.txt
   clickhouse_password:
     file: ./secrets/clickhouse_password.txt
-  redis_data:
-  clickhouse_data:

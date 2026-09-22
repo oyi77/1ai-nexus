@@ -2,7 +2,7 @@ require('dotenv').config()
 module.exports = {
   apps: [
     {
-      name: 'nexus-web',
+      name: '1ai-tracker-web',
       script: './node_modules/.bin/next',
       args: 'start -p 4400',
       cwd: '/home/openclaw/projects/1ai-tracker',
@@ -25,8 +25,8 @@ module.exports = {
       max_restarts: 100,
       min_uptime: '10s',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
-      error_file: '/tmp/nexus-web-error.log',
-      out_file: '/tmp/nexus-web-out.log',
+      error_file: '/tmp/1ai-tracker-web-error.log',
+      out_file: '/tmp/1ai-tracker-web-out.log',
       merge_logs: true,
     },
     {
