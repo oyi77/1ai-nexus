@@ -1,6 +1,6 @@
 # NEXUS — Buyer Handover Runbook
 
-Verified 2026-09-22 against HEAD `466df48`. Follow in order; every step has
+Verified 2026-09-22 against HEAD `git rev-parse --short HEAD` (verify: tree must be clean). Follow in order; every step has
 a check so you know it worked before moving on.
 
 ## 1. What you bought
