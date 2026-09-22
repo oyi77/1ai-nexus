@@ -250,6 +250,21 @@ async function refreshBriefCalib() {
   }
 }
 
+// Sweep subscription lifecycle: expire past-due actives (downgrade to
+// free), count 3-day renewal-due. Without this, paid plans stay `active`
+// forever after endDate — an honest recurring story needs enforcement.
+async function refreshSubscriptionLifecycle() {
+  try {
+    const { runSubscriptionLifecycle } = await import('@/lib/subscription-lifecycle')
+    const res = await runSubscriptionLifecycle()
+    if (res.expired > 0 || res.reminded > 0) {
+      logger.info(`lifecycle: ${res.expired} expired, ${res.reminded} renewal-due (${res.checked} actives)`, "refresher")
+    }
+  } catch (err) {
+    logger.error("lifecycle error:", "refresher", { error: (err as Error).message })
+  }
+}
+
 async function refreshSignalOutcomes() {
   try {
     const result = await checkExpiredSignals()
@@ -295,6 +310,7 @@ export function startDataRefresher() {
   setTimeout(() => refreshBacktest(), 60_000)
   setTimeout(() => refreshLrfgSweep(), 90_000)
   setTimeout(() => refreshBriefCalib(), 120_000)
+  setTimeout(() => refreshSubscriptionLifecycle(), 150_000)
   // Recurring intervals
   setInterval(refreshDerivatives, FAST_INTERVAL)
   setInterval(refreshETF, MEDIUM_INTERVAL)
@@ -314,5 +330,6 @@ export function startDataRefresher() {
   setInterval(refreshBacktest, 6 * SIGNAL_INTERVAL)     // Backtest eval every 6h (heavy)
   setInterval(refreshLrfgSweep, OUTCOME_INTERVAL)       // LRFg sweep every 15 min
   setInterval(refreshBriefCalib, 24 * SIGNAL_INTERVAL) // Brief calibration daily
+  setInterval(refreshSubscriptionLifecycle, SIGNAL_INTERVAL) // Subscription lifecycle hourly
   logger.info("Scheduled: derivatives(1m), etf(5m), sentiment(5m), news(15m), risk(5m), onchain(1m), composite(5m), score(5m), signals(1h), outcomes(15m), backtest(6h), lrfg(15m)", "refresher")
 }
