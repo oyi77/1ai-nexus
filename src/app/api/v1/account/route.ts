@@ -44,7 +44,7 @@ export async function DELETE(request: NextRequest) {
     resp.cookies.set('nexus-session', '', { path: '/', maxAge: 0 })
     resp.cookies.set('nexus-refresh', '', { path: '/api/v1/auth/refresh', maxAge: 0 })
     return resp
-  } catch (err) {
+  } catch {
     return apiError('Account deletion failed', 500)
   }
 }
