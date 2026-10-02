@@ -352,3 +352,147 @@ export async function auditMobyToken(
     return null
   }
 }
+
+
+// ── Screening surface (groups / launchpads / group board / chart / PnL) ──
+
+/** Screener group (e.g. Majors, Stablecoins) on one network. */
+export interface MobyScreenerGroup {
+  id: string
+  network: string
+  name: string
+  description: string
+}
+
+/** Launchpad (e.g. Pump.fun, Lets Bonk) filter option. */
+export interface MobyLaunchpad {
+  id: string
+  name: string
+}
+
+/** PnL leaderboard row (trader ranking, not a token). */
+export interface MobyPnlEntry {
+  rank: number
+  userId: string
+  memberNumber: string
+  displayIdentifier: string
+  pnl: number
+  twitterUsername: string | null
+}
+
+/** Price chart point (unix seconds + USD value). */
+export interface MobyChartPoint {
+  ts: number
+  price: number
+}
+
+interface MobyRawGroup {
+  id?: string
+  group_id?: string
+  network?: string
+  name?: string
+  description?: string
+}
+
+interface MobyRawLaunchpad {
+  id?: string
+  launchpad_id?: string
+  name?: string
+}
+
+interface MobyRawPnlEntry {
+  rank?: number
+  user_id?: string
+  member_number?: string
+  display_identifier?: string
+  pnl?: number
+  twitter_username?: string | null
+}
+
+/**
+ * Screener groups for a network (GET /tokens/screener/groups/).
+ * Cached 24h per network — these change about as often as chains do.
+ */
+const groupsCache = new Map<string, { value: MobyScreenerGroup[]; until: number }>()
+
+/** @internal Test hook: clears the in-memory screener-group cache. */
+export function __resetMobyGroupsCacheForTests(): void {
+  groupsCache.clear()
+}
+
+export async function listMobyScreenerGroups(network: string): Promise<MobyScreenerGroup[]> {
+  const hit = groupsCache.get(network)
+  if (hit && Date.now() < hit.until) return hit.value
+  const raw = await mobyGet<{ groups?: MobyRawGroup[] }>('/tokens/screener/groups/', { network })
+  const groups = (raw.groups ?? [])
+    .map((g) => ({
+      id: g.id ?? g.group_id ?? '',
+      network: g.network ?? network,
+      name: g.name ?? '',
+      description: g.description ?? '',
+    }))
+    .filter((g) => g.id !== '')
+  groupsCache.set(network, { value: groups, until: Date.now() + 24 * 3600 * 1000 })
+  return groups
+}
+
+/** Launchpad filter options for a network (GET /tokens/screener/launchpads/). */
+export async function listMobyLaunchpads(network: string): Promise<MobyLaunchpad[]> {
+  const raw = await mobyGet<{ launchpads?: MobyRawLaunchpad[] }>('/tokens/screener/launchpads/', { network })
+  return (raw.launchpads ?? [])
+    .map((l) => ({ id: l.id ?? l.launchpad_id ?? '', name: l.name ?? '' }))
+    .filter((l) => l.id !== '')
+}
+
+/**
+ * Group-filtered leaderboard → same normalized MemeAlphaToken rows as
+ * discovery (GET /tokens/screener/leaderboard/group/).
+ */
+export async function listMobyGroupTokens(
+  network: string,
+  groupId: string,
+  limit = 25,
+): Promise<MemeAlphaToken[]> {
+  const raw = await mobyGet<MobyLeaderboardResponse>('/tokens/screener/leaderboard/group/', {
+    network,
+    group_id: groupId,
+  })
+  return (raw.entries ?? [])
+    .slice(0, limit)
+    .map(toToken)
+    .filter((t): t is MemeAlphaToken => t !== null)
+}
+
+/** Price history for a token (GET /tokens/token/chart). */
+export async function getMobyChart(
+  chain: string,
+  contract: string,
+): Promise<MobyChartPoint[]> {
+  const raw = await mobyGet<{ data?: Array<{ unixTime?: number; ts?: number; value?: number }> }>(
+    '/tokens/token/chart',
+    { token_address: contract, network: chain },
+  )
+  return (raw.data ?? [])
+    .map((p) => ({ ts: toNum(p.unixTime ?? p.ts), price: toNum(p.value) }))
+    .filter((p) => p.ts > 0)
+}
+
+/**
+ * Trader PnL leaderboard (GET /users/pnl-leaderboard/list).
+ * window: '24h' | '7d' (server-verified 2026-09-16).
+ */
+export async function listMobyPnlLeaderboard(
+  window: '24h' | '7d' = '24h',
+): Promise<MobyPnlEntry[]> {
+  const raw = await mobyGet<{ entries?: MobyRawPnlEntry[] }>('/users/pnl-leaderboard/list', { window })
+  return (raw.entries ?? [])
+    .map((e) => ({
+      rank: toNum(e.rank),
+      userId: e.user_id ?? '',
+      memberNumber: e.member_number ?? '',
+      displayIdentifier: e.display_identifier ?? '',
+      pnl: toNum(e.pnl),
+      twitterUsername: e.twitter_username ?? null,
+    }))
+    .filter((e) => e.userId !== '')
+}
