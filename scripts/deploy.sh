@@ -30,21 +30,31 @@ echo "=== [4/5] restart PM2 ==="
 pm2 restart 1ai-tracker-web
 sleep 10
 
-echo "=== [5/5] deploy parity check ==="
-CHUNK_REL=$(curl -s "$ORIGIN$CHUNK_PATH" | grep -oE '_next/static/chunks/[^"]+\.js' | sort -u | head -1)
-if [ -z "$CHUNK_REL" ]; then
-  echo "WARN: could not find a chunk to compare"
-  exit 0
-fi
-LOCAL_MD5=$(md5sum ".next/static/chunks/$(basename "$CHUNK_REL")" 2>/dev/null | cut -d' ' -f1 || echo "MISSING")
-SERVED_MD5=$(curl -s "$ORIGIN$CHUNK_REL" | md5sum | cut -d' ' -f1)
-echo "chunk: $CHUNK_REL"
-echo "local : $LOCAL_MD5"
-echo "served: $SERVED_MD5"
-if [ "$LOCAL_MD5" != "$SERVED_MD5" ]; then
-  echo "PARITY FAIL: served bundle does not match freshly built bundle"
+CHUNK_TYPES=("js" "css")
+PARITY_FAILED=0
+for EXT in "${CHUNK_TYPES[@]}"; do
+  CHUNK_REL=$(curl -s "$ORIGIN$CHUNK_PATH" | grep -oE "_next/static/chunks/[^\"]+\.${EXT}" | sort -u | head -1)
+  if [ -z "$CHUNK_REL" ]; then
+    echo "WARN: no .${EXT} chunk referenced by $ORIGIN$CHUNK_PATH — skipping"
+    continue
+  fi
+  LOCAL_FILE=".next/static/chunks/$(basename "$CHUNK_REL")"
+  LOCAL_MD5=$(md5sum "$LOCAL_FILE" 2>/dev/null | cut -d' ' -f1 || echo "MISSING")
+  SERVED_CODE=$(curl -s -o /tmp/_parity_chunk -w '%{http_code}' "$ORIGIN/$CHUNK_REL")
+  SERVED_MD5=$(md5sum /tmp/_parity_chunk 2>/dev/null | cut -d' ' -f1 || echo "FETCH_FAIL")
+  echo "chunk: $CHUNK_REL (HTTP $SERVED_CODE)"
+  echo "local : $LOCAL_MD5"
+  echo "served: $SERVED_MD5"
+  if [ "$SERVED_CODE" != "200" ] || [ "$LOCAL_MD5" != "$SERVED_MD5" ]; then
+    echo "PARITY FAIL: served .$EXT chunk does not match freshly built chunk"
+    PARITY_FAILED=1
+  fi
+done
+if [ "$PARITY_FAILED" != "0" ]; then
+  echo "PARITY FAIL: rebuild→restart ordering broken?"
+  echo "Recovery: wait for build completion, then: pm2 restart 1ai-tracker-web"
   exit 1
 fi
-echo "PARITY OK: served == built"
+echo "PARITY OK: served == built (js + css)"
 
 echo "=== deploy complete ==="
