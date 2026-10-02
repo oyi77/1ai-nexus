@@ -76,7 +76,14 @@ test('sector leg carries measured persistence, not unproven-50', async () => {
   const sector = brief.transmissions.find((t) => t.id === 'sector-rotation')
   expect(sector).toBeDefined()
   expect(sector!.unproven).toBe(false)
-  expect(sector!.confidence).toBe(65)
+  // The exact rate drifts as the daily calibration recompute accrues live
+  // data (65 on fallback cells → 66 once recomputeSector outruns them), so
+  // pin the contract, not the snapshot: a measured persistence rate that is
+  // NOT the neutral 50 and matches the cited cells.
+  expect(sector!.confidence).not.toBe(50)
+  expect(sector!.confidence).toBeGreaterThanOrEqual(40)
+  expect(sector!.confidence).toBeLessThanOrEqual(90)
+  expect(sector!.confidence).toBe(Math.round(sector!.measured!.p20))
   expect(sector!.measured?.n ?? 0).toBeGreaterThanOrEqual(20)
   expect(sector!.evidence.some((e) => e.metric === 'flow persistence (next day)')).toBe(true)
 }, 90_000)

@@ -40,6 +40,7 @@ const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/147.0.0.0 Safari/537.36'
 
 import { resolveMobyAccessToken, hasSessionCredentials } from './session'
+export { hasMobyFallbackCredentials } from './session'
 
 function mobyKey(): string {
   const key = process.env.MOBY_API_KEY
