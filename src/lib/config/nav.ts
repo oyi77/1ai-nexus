@@ -130,7 +130,8 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Meme',
     items: [
-      { label: 'Meme Alpha', href: '/meme', icon: Flame, description: 'Meme-token discovery & risk audit.' },
+      { label: 'Meme Alpha', href: '/meme', icon: Flame, description: 'Meme-token discovery and risk audit.' },
+      { label: 'Moby Screener', href: '/moby', icon: Target, description: 'Moby smart-money groups, launchpads, charts and PnL.' },
       { label: 'Leaderboard', href: '/meme/leaderboard', icon: Flame, description: 'Ranked meme-token discovery feed.' },
       { label: 'Risk Audit', href: '/meme/risk', icon: Shield, description: 'Honeypot / rug-pull risk audit.' },
       { label: 'Launch Alpha', href: '/meme/launch-alpha', icon: Flame, description: 'Recently launched meme tokens.' },

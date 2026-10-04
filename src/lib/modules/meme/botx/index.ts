@@ -268,6 +268,7 @@ export async function auditBotXToken(chain: string, contract: string): Promise<M
       lpLockedPercent: -1,
       canFreeze: si?.canFrozen ?? false,
       canMint: si?.canMint ?? false,
+      isHoneypot: false, // not reported by this source
       riskCounts: { high: 0, middle: 0, low: 0 },
       auditedAt: Date.now(),
     }

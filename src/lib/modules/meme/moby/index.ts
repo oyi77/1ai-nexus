@@ -345,6 +345,7 @@ export async function auditMobyToken(
       lpLockedPercent: -1, // unknown
       canFreeze: false, // unknown from web-api
       canMint: false, // unknown from web-api
+      isHoneypot: false, // not reported by this source
       riskCounts,
       auditedAt: Date.now(),
     }

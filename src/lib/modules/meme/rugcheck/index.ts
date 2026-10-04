@@ -111,6 +111,7 @@ export async function auditRugcheckToken(chain: string, contract: string): Promi
       lpLockedPercent: -1,
       canFreeze: !!report.freezeAuthority,
       canMint: !!report.mintAuthority,
+      isHoneypot: false, // not reported by this source
       riskCounts: riskCountsFrom(report.risks),
       auditedAt: Date.now(),
     }

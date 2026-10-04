@@ -39,7 +39,13 @@ for EXT in "${CHUNK_TYPES[@]}"; do
     continue
   fi
   LOCAL_FILE=".next/static/chunks/$(basename "$CHUNK_REL")"
-  LOCAL_MD5=$(md5sum "$LOCAL_FILE" 2>/dev/null | cut -d' ' -f1 || echo "MISSING")
+  if [ ! -f "$LOCAL_FILE" ]; then
+    echo "PARITY FAIL: served .$EXT chunk is not present in the freshly built .next output: $LOCAL_FILE"
+    echo "The running process is likely serving a stale build. Recovery: restart after build completion: pm2 restart 1ai-tracker-web"
+    PARITY_FAILED=1
+    continue
+  fi
+  LOCAL_MD5=$(md5sum "$LOCAL_FILE" | cut -d' ' -f1)
   SERVED_CODE=$(curl -s -o /tmp/_parity_chunk -w '%{http_code}' "$ORIGIN/$CHUNK_REL")
   SERVED_MD5=$(md5sum /tmp/_parity_chunk 2>/dev/null | cut -d' ' -f1 || echo "FETCH_FAIL")
   echo "chunk: $CHUNK_REL (HTTP $SERVED_CODE)"

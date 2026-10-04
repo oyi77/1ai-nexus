@@ -241,6 +241,7 @@ export async function auditGateToken(chainId: string, address: string): Promise<
     lpLockedPercent: -1,
     canFreeze: riskFlag(all, 'freeze_authority') === '1' || riskFlag(all, 'is_freezeable') === '1',
     canMint: riskFlag(all, 'mint_authority') === '1' || riskFlag(all, 'is_mintable') === '1',
+    isHoneypot: false, // not reported by this source
     riskCounts: { high, middle: mid, low },
     auditedAt: Date.now(),
   }

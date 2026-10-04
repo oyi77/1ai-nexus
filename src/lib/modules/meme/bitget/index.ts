@@ -246,6 +246,7 @@ export async function auditBitgetToken(chain: string, contract: string): Promise
     lpLockedPercent: holderInfo ? toNum(holderInfo.lock_lp_percent) / 100 : -1,
     canFreeze: false,
     canMint: false,
+    isHoneypot: false, // not reported by this source
     riskCounts: { high, middle: mid, low },
     auditedAt: Date.now(),
   }

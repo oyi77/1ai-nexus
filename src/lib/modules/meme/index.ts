@@ -31,6 +31,10 @@ import { discoverBirdeyeTokens, auditBirdeyeToken } from './birdeye'
 import { auditRugcheckToken } from './rugcheck'
 import { discoverGeckoTerminalTokens } from './geckoterminal'
 import { discoverMobyTokens, auditMobyToken, hasMobyFallbackCredentials } from './moby'
+import { discoverTokens as discoverNansenTokens, auditToken as auditNansenToken } from './nansen'
+import { discoverGmgnTokens, auditGmgnToken } from './gmgn'
+import { discoverFomoTokens, auditFomoToken } from './fomo'
+import { auditToken as auditAxiomToken } from './axiom'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -182,6 +186,12 @@ const birdeyeAudit = makeAuditModule('birdeye-meme-risk', 'Birdeye Forge Meme Ri
 const rugcheckAudit = makeAuditModule('rugcheck-meme-risk', 'RugCheck Meme Risk Audit', (c, k) =>
   auditRugcheckToken(c, k),
 )
+const axiomAudit = makeAuditModule(
+  'axiom-meme-risk',
+  'Axiom Meme Risk Audit',
+  (c, k) => auditAxiomToken(c, k),
+)
+
 
 const birdeyeDiscovery = makeDiscoveryModule('birdeye-meme', 'Birdeye Forge Meme Alpha', () =>
   discoverBirdeyeTokens(),
@@ -194,6 +204,24 @@ const mobyDiscovery = makeDiscoveryModule('moby-meme', 'Moby Meme Alpha', () =>
 )
 const mobyAudit = makeAuditModule('moby-meme-risk', 'Moby Meme Risk Audit', (c, k) =>
   auditMobyToken(c, k),
+)
+const gmgnDiscovery = makeDiscoveryModule('gmgn-meme', 'GMGN Meme Alpha', () =>
+  discoverGmgnTokens(),
+)
+const gmgnAudit = makeAuditModule('gmgn-meme-risk', 'GMGN Meme Risk Audit', (c, k) =>
+  auditGmgnToken(c, k),
+)
+const fomoDiscovery = makeDiscoveryModule('fomo-meme', 'Fomo Meme Alpha', () =>
+  discoverFomoTokens(),
+)
+const fomoAudit = makeAuditModule('fomo-meme-risk', 'Fomo Meme Risk Audit', (c, k) =>
+  auditFomoToken(c, k),
+)
+const nansenDiscovery = makeDiscoveryModule('nansen-meme', 'Nansen Smart Money Alpha', () =>
+  discoverNansenTokens(),
+)
+const nansenAudit = makeAuditModule('nansen-meme-risk', 'Nansen Meme Risk Audit', (c, k) =>
+  auditNansenToken(c, k),
 )
 
 // Blocked server-side (browser-session / Cloudflare) — disabled stubs so
@@ -270,6 +298,13 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     ttlMs: MEME_TTL,
     enabled: true,
   },
+  axiom: {
+    platform: 'axiom',
+    displayName: 'Axiom Security',
+    auditModule: axiomAudit,
+    ttlMs: MEME_TTL,
+    enabled: true,
+  },
   geckoterminal: {
     platform: 'geckoterminal',
     displayName: 'GeckoTerminal',
@@ -277,27 +312,42 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     ttlMs: MEME_TTL,
     enabled: true,
   },
-  // Blocked server-side (browser-session / Cloudflare) — disabled stubs:
+  // Verification-gated live adapters: gmgn needs a Cloudflare session
+  // cookie (its public rank API returns 403 to header-minimal requests);
+  // fomo is a public feed but rate-limited (~30 req/min), so it stays
+  // opt-in behind FOMO_API_ENABLED until load-tested server-side.
   gmgn: {
     platform: 'gmgn',
-    displayName: 'GMGN (blocked server-side)',
-    discoveryModule: blockedDiscovery('gmgn-meme'),
+    displayName: 'GMGN',
+    discoveryModule: gmgnDiscovery,
+    auditModule: gmgnAudit,
     ttlMs: MEME_TTL,
-    enabled: false,
+    enabled: !!process.env.GMGN_SESSION_COOKIE,
   },
   fomo: {
     platform: 'fomo',
-    displayName: 'Fomo Family (blocked server-side)',
-    discoveryModule: blockedDiscovery('fomo-meme'),
+    displayName: 'Fomo',
+    discoveryModule: fomoDiscovery,
+    auditModule: fomoAudit,
     ttlMs: MEME_TTL,
-    enabled: false,
+    enabled: process.env.FOMO_API_ENABLED === 'true',
   },
+  // Blocked server-side (browser-session / Cloudflare) — disabled stub:
   photon: {
     platform: 'photon',
     displayName: 'Photon (blocked server-side)',
     discoveryModule: blockedDiscovery('photon-meme'),
     ttlMs: MEME_TTL,
     enabled: false,
+  },
+  // Nansen Smart Money screener — credential-gated on MOBY_NANSEN_API_KEY.
+  nansen: {
+    platform: 'nansen',
+    displayName: 'Nansen',
+    discoveryModule: nansenDiscovery,
+    auditModule: nansenAudit,
+    ttlMs: MEME_TTL,
+    enabled: !!process.env.MOBY_NANSEN_API_KEY,
   },
 }
 

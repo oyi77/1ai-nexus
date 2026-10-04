@@ -32,7 +32,7 @@ interface DataTableProps<T> {
   stickyHeader?: boolean
 }
 
-export function DataTable<T extends Record<string, unknown>>({
+export function DataTable<T extends object>({
   columns,
   data,
   sortable = false,
@@ -80,7 +80,7 @@ export function DataTable<T extends Record<string, unknown>>({
   const safeData = useMemo(() => Array.isArray(data) ? data : [], [data])
   const accessors = useMemo(() => {
     const map: Record<string, CellAccessor<T>> = {}
-    for (const col of columns) map[col.key] = col.accessor ?? ((row: T) => row[col.key])
+    for (const col of columns) map[col.key] = col.accessor ?? ((row: T) => (row as Record<string, unknown>)[col.key])
     return map
   }, [columns])
   const filtered = useMemo(
@@ -154,7 +154,7 @@ export function DataTable<T extends Record<string, unknown>>({
               const actualIndex = startIndex + i
               return (
                 <tr role="row" key={actualIndex} className={`border-b border-bg-border/50 hover:bg-bg-raised/50 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`} style={{ height: rowHeight }} onClick={() => onRowClick?.(row, actualIndex)}>
-                  {columns.map(col => <td role="cell" key={col.key} className={`px-2 text-xs font-mono text-text-primary ${alignClass(col.align)}`}>{col.render ? col.render(row, actualIndex) : String(row[col.key] ?? '')}</td>)}
+                  {columns.map(col => <td role="cell" key={col.key} className={`px-2 text-xs font-mono text-text-primary ${alignClass(col.align)}`}>{col.render ? col.render(row, actualIndex) : String((row as Record<string, unknown>)[col.key] ?? '')}</td>)}
                 </tr>
               )
             })}

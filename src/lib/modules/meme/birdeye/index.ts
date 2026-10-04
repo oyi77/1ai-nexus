@@ -258,6 +258,7 @@ export async function auditBirdeyeToken(chain: string, contract: string): Promis
       lpLockedPercent: -1,
       canFreeze: sev.canFreeze,
       canMint: sev.canMint,
+      isHoneypot: false, // not reported by this source
       riskCounts: sev.riskCounts,
       auditedAt: Date.now(),
     }

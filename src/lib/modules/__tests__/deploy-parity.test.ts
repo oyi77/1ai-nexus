@@ -28,6 +28,10 @@ describe('Deploy Parity', () => {
     expect(chunkMatch, 'found a chunk reference').toBeTruthy()
 
     const localPath = path.join('.next/static/chunks', path.basename(chunkMatch!))
+    expect(
+      fs.existsSync(localPath),
+      `served chunk ${chunkMatch} is not present in the freshly built .next output; the running process is likely serving a stale build (restart it after the build completes)`,
+    ).toBe(true)
     const local = fs.readFileSync(localPath)
     const servedRes = await fetch(joinUrl(DEPLOY_ORIGIN, chunkMatch!))
     const servedArr = new Uint8Array(await servedRes.arrayBuffer())

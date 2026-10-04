@@ -7,7 +7,7 @@
 //   2. Honeypot / rug audit  (risk scoring before you ape in)
 // ─────────────────────────────────────────────────────────────
 
-export type MemePlatform = 'bitget' | 'gate' | 'moby' | 'botx' | 'dexscreener' | 'birdeye' | 'rugcheck' | 'geckoterminal' | 'gmgn' | 'fomo' | 'photon'
+export type MemePlatform = 'bitget' | 'gate' | 'moby' | 'botx' | 'dexscreener' | 'birdeye' | 'rugcheck' | 'geckoterminal' | 'gmgn' | 'fomo' | 'photon' | 'nansen' | 'axiom'
 
 export const MEME_PLATFORMS: MemePlatform[] = [
   'bitget',
@@ -21,15 +21,19 @@ export const MEME_PLATFORMS: MemePlatform[] = [
   //   birdeye  — forge API (discovery + security audit)
   //   rugcheck — security report (audit only)
   //   geckoterminal — trending/new pools discovery
-  // Blocked server-side (browser-session / Cloudflare) — registered as
-  // disabled stub entries so pages/APIs can enumerate them:
-  //   gmgn, fomo, photon
+  // gmgn/fomo have live adapters (credential/flag-gated in the registry);
+  // photon is still blocked server-side (browser-session / Cloudflare) and
+  // stays a disabled stub so pages/APIs can enumerate it.
+  //   nansen — smart-money screener (MOBY_NANSEN_API_KEY gated)
+  //   axiom  — contract risk audit (AXIOM_API_KEY gated)
   'birdeye',
   'rugcheck',
   'geckoterminal',
   'gmgn',
   'fomo',
   'photon',
+  'nansen',
+  'axiom',
 ]
 
 /** Normalized new-token discovery row — shared across platforms. */
@@ -106,6 +110,8 @@ export interface MemeRiskAudit {
   /** Freeze / mint authority flags when known. */
   canFreeze: boolean
   canMint: boolean
+  /** Honeypot detection flag (GMGN/Axiom supported). */
+  isHoneypot: boolean
   /** Raw upstream risk counters (platform-specific). */
   riskCounts: { high: number; middle: number; low: number }
   auditedAt: number
