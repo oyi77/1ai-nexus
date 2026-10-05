@@ -22,8 +22,10 @@ function getNansenApiKey(): string | undefined {
   return process.env.MOBY_NANSEN_API_KEY
 }
 const NANSEN_BASE_URL = 'https://api.nansen.ai/v1'
+const NANSEN_TIMEOUT_MS = 15_000
 const NANSEN_RETRY_ATTEMPTS = 5
 const NANSEN_RETRY_BASE_MS = 500
+const NANSEN_ERROR_SNIPPET_CHARS = 200
 
 // ───────────────────── NANSEN-SPECIFIC TYPES ──────────────────
 
@@ -116,6 +118,12 @@ const NansenScreenerResponseSchema = z.object({
     is_last_page: z.boolean(),
   }),
 })
+class NonRetryableError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'NonRetryableError'
+  }
+}
 
 // ───────────────────── HELPER FUNCTIONS ───────────────────────
 
@@ -127,72 +135,55 @@ async function sleepWithBackoff(attempt: number): Promise<void> {
 }
 
 /** Make authenticated request to Nansen with retry logic */
-async function fetchNansen<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function fetchNansen<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const apiKey = getNansenApiKey()
   if (!apiKey) {
     throw new Error('MOBY_NANSEN_API_KEY not configured')
   }
 
+  const signal = options.signal ?? AbortSignal.timeout(NANSEN_TIMEOUT_MS)
   let lastError: Error | null = null
 
-/** Error thrown for permanent (non-retryable) API failures, e.g. 401/403 */
-class NonRetryableError extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'NonRetryableError'
-  }
-}
-
   for (let attempt = 0; attempt < NANSEN_RETRY_ATTEMPTS; attempt++) {
-
-      try {
-        const url = `${NANSEN_BASE_URL}${endpoint}`
-        const headers = {
+    try {
+      const res = await fetch(`${NANSEN_BASE_URL}${endpoint}`, {
+        ...options,
+        signal,
+        headers: {
           'Content-Type': 'application/json',
           apikey: apiKey,
           ...options.headers,
-        }
+        },
+      })
 
-        const res = await fetch(url, {
-          ...options,
-          headers,
+      if (!res.ok) {
+        const errorText = await res.text()
+        const snippet = errorText.replace(/^"|"$/g, '').slice(0, NANSEN_ERROR_SNIPPET_CHARS)
+        logger.warn(`nansen HTTP ${res.status}: ${snippet}`, 'meme-nansen', {
+          endpoint,
+          attempt,
         })
-
-        if (!res.ok) {
-          const errorText = await res.text()
-          logger.warn(`nansen HTTP ${res.status}: ${errorText}`, 'meme-nansen', {
-            endpoint,
-            attempt,
-          })
-
-          // 429 and 5xx are retryable; all other 4xx are permanent failures
-          if (res.status === 429 || res.status >= 500) {
-            lastError = new Error(`Nansen API error: ${res.status}`)
-            await sleepWithBackoff(attempt)
-            continue
-          }
-
-          throw new NonRetryableError(`Nansen API error ${res.status}: ${errorText}`)
+        if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+          throw new NonRetryableError(`Nansen API error: ${res.status}: ${snippet}`)
         }
-
+        lastError = new Error(`Nansen API error: ${res.status}: ${snippet}`)
+      } else {
         return (await res.json()) as T
-      } catch (e) {
-        if (e instanceof NonRetryableError) throw e
-
-        lastError = e instanceof Error ? e : new Error(String(e))
-
-        if (attempt === NANSEN_RETRY_ATTEMPTS - 1) break
-
-        await sleepWithBackoff(attempt)
       }
+    } catch (error) {
+      if (error instanceof NonRetryableError) throw error
+      if (signal.aborted) throw error
+      if (error instanceof SyntaxError) throw error
+      lastError = error instanceof Error ? error : new Error(String(error))
+    }
+
+    if (attempt < NANSEN_RETRY_ATTEMPTS - 1) {
+      await sleepWithBackoff(attempt)
+    }
   }
 
   throw lastError ?? new Error('Nansen request failed after retries')
 }
-
 // ───────────────────── DISCOVERY ENDPOINT ─────────────────────
 
 /**
@@ -273,6 +264,14 @@ export async function discoverTokens(limit: number = 20): Promise<MemeAlphaToken
         buyCount24h: undefined,
         sellCount24h: undefined,
         riskLevel,
+        provenance: {
+          sourceType: 'reverse-engineered',
+          provider: 'nansen',
+          experimental: true,
+          note: 'Nansen screener response; subscription/API contract varies by plan',
+        },
+        // Discovery heuristic only; this is not a security audit.
+        riskKnown: false,
       }
     })
 

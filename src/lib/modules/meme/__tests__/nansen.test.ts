@@ -108,6 +108,13 @@ describe('discoverTokens', () => {
     expect(t.top10HolderPercent).toBe(0) // not in screener response
     expect(t.social).toEqual({})
     expect(t.audited).toBe(false) // audit is separate
+    expect(t.provenance).toEqual({
+      sourceType: 'reverse-engineered',
+      provider: 'nansen',
+      experimental: true,
+      note: 'Nansen screener response; subscription/API contract varies by plan',
+    })
+    expect(t.riskKnown).toBe(false)
     expect(t.buyCount24h).toBeUndefined()
     expect(t.sellCount24h).toBeUndefined()
     // netflow negative → smart money inflow → riskLevel 0
@@ -234,6 +241,34 @@ describe('discoverTokens', () => {
     // discoverTokens swallows errors → []; assert fetchNansen surfaced once then was caught
     expect(await discoverTokens()).toEqual([])
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1) // no retry on 401
+  })
+  it('bounds non-retryable HTTP error snippets at 200 characters', async () => {
+    const body = 'x'.repeat(500)
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    mockFetchSequence([{ status: 401, body }])
+    expect(await discoverTokens()).toEqual([])
+    expect(warning).toHaveBeenCalledTimes(1)
+    const message = String(warning.mock.calls[0]?.[0])
+    expect(message).toContain('nansen HTTP 401')
+    expect(message).toContain('x'.repeat(200))
+    expect(message).not.toContain('x'.repeat(201))
+    warning.mockRestore()
+  })
+
+  it('aborts an in-flight request at the shared timeout', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_input: string, init?: RequestInit) =>
+        new Promise<never>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('request aborted')))
+        }),
+      ),
+    )
+    const pending = discoverTokens()
+    await vi.advanceTimersByTimeAsync(15_000)
+    await expect(pending).resolves.toEqual([])
+    vi.useRealTimers()
   })
 
   it('throws clear error on 403 forbidden without retrying', async () => {
