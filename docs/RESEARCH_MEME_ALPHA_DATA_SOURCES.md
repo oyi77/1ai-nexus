@@ -499,6 +499,8 @@ Cloudflare bypass). If/when a key is provisioned, add a `tokensniffer` /
 `defi` platform adapter behind the existing `MemePlatform` union +
 `MEME_REGISTRY` pattern with `provenance.sourceType: 'public-api'`.
 
+**Candidate future meme adapter workstream; needs API key provisioning.**
+
 ---
 
 ## 9. Existing Repo Meme Modules (REFERENCE)

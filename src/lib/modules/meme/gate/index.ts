@@ -21,7 +21,7 @@ import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
 
 const GATE_HOST = 'https://openapi.gateweb3.cc'
 const GATE_PATH = '/api/v1/dex'
-
+const GATE_TIMEOUT_MS = 10_000
 const API_KEY = process.env.GATE_DEX_API_KEY ?? '7RAYBKMG5MNMKK7LN6YGCO5UDI'
 const SECRET_KEY =
   process.env.GATE_DEX_SECRET_KEY ?? 'COnwcshYA3EK4BjBWWrvwAqUXrvxgo0wGNvmoHk7rl4.6YLniz4h'
@@ -114,10 +114,11 @@ async function gateDex<T>(action: string, params: Record<string, unknown>): Prom
     method: 'POST',
     headers: buildGateHeaders(body),
     body,
-    signal: AbortSignal.timeout(10_000),
+    signal: AbortSignal.timeout(GATE_TIMEOUT_MS),
   })
-  if (!res.ok) throw new Error(`Gate ${res.status}: ${action}`)
-  return res.json() as Promise<T>
+  const text = await res.text()
+  if (!res.ok) throw new Error(`Gate ${res.status}: ${action} — ${text.slice(0, 200)}`)
+  return JSON.parse(text) as T
 }
 
 function toNum(v: unknown, fallback = 0): number {
@@ -164,6 +165,14 @@ export async function discoverGateTokens(limitPerChain = 25): Promise<MemeAlphaT
         top10HolderPercent: 0,
         social: {},
         audited: false,
+        provenance: {
+          sourceType: 'public-api',
+          provider: 'gate',
+          experimental: true,
+          note: 'Gate Web3 OpenAPI discovery feed, not a security audit',
+        },
+        // Discovery rows carry no audit — riskLevel 0 is a placeholder.
+        riskKnown: false,
       })
     }
   }

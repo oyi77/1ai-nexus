@@ -18,6 +18,7 @@ import crypto from 'node:crypto'
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
 
 const BITGET_HOST = 'copenapi.bgwapi.io'
+const BITGET_TIMEOUT_MS = 10_000
 
 // Chain ids Bitget Wallet uses for meme tokens (BSC / ETH / Base / Solana).
 const DISCOVERY_CHAINS = ['BSC', 'ETH', 'BASE', 'SOL']
@@ -139,13 +140,16 @@ async function bitgetPost<T>(path: string, body: Record<string, unknown>): Promi
         res.on('data', (c) => (data += c))
         res.on('end', () => {
           if (res.statusCode !== 200) {
-            reject(new Error(`Bitget ${res.statusCode}: ${path}`))
+            reject(new Error(`Bitget ${res.statusCode}: ${path} — ${data.slice(0, 200)}`))
           } else {
             resolve(JSON.parse(data) as T)
           }
         })
       },
     )
+    req.setTimeout(BITGET_TIMEOUT_MS, () => {
+      req.destroy(new Error(`Bitget request timeout: ${path}`))
+    })
     req.on('error', reject)
     req.write(bodyStr)
     req.end()
@@ -188,6 +192,14 @@ export async function discoverBitgetTokens(limitPerChain = 25): Promise<MemeAlph
         top10HolderPercent: toNum(item.top10_holder_percent),
         social: {},
         audited: false,
+        provenance: {
+          sourceType: 'public-api',
+          provider: 'bitget',
+          experimental: true,
+          note: 'Bitget Wallet topRank discovery feed, not a security audit',
+        },
+        // Discovery rows carry no audit — riskLevel is derived from a coarse upstream grade.
+        riskKnown: false,
       })
     }
   }
