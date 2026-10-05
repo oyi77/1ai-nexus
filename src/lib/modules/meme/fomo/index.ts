@@ -1,13 +1,14 @@
 // ─────────────────────────────────────────────────────────────
 // Module: Fomo (fomofun.xyz) — Meme Alpha
-// sourceType: public
+// sourceType: reverse-engineered
 // upstreamProduct: Fomo.fun — real-time new token launch tracker
 // endpoint: https://api.fomofun.xyz/v1 (public GET endpoints)
-// discoveredVia: reverse-engineered from fomofun.xyz web app
-// lastVerified: 2026-10-04
+// lastVerified: 2026-10-05
 //
 // NOTE: This is a PUBLIC API (no auth required) but rate limited
-// (~30 req/min conservative). Implement token bucket + exponential backoff.
+// (~30 req/min conservative). Token bucket + exponential backoff implemented.
+// Request style is header-minimal and respectful: no stealth headers, no
+// cookie scraping, no bot-control bypass. Graceful partial failure.
 // ─────────────────────────────────────────────────────────────
 
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
@@ -186,6 +187,14 @@ function normalizeToken(entry: FomoFeedEntry): MemeAlphaToken | null {
     top10HolderPercent: 0, // not available from public feed
     social: {},
     audited: false,
+    provenance: {
+      sourceType: 'reverse-engineered',
+      provider: 'fomo',
+      experimental: true,
+      note: 'Feed endpoint RE-ed from fomofun.xyz web app; unverified stability',
+    },
+    // Discovery-only platform: riskLevel is placeholder, no real audit.
+    riskKnown: false,
   }
 }
 

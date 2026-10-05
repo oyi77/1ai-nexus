@@ -1,8 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // Meme-Alpha — shared types
 //
-// Normalized token shape common to Bitget Wallet, Gate.io DEX, and
-// Moby (moby.win). Two surfaces:
+// Normalized token shape shared by meme discovery and risk adapters. Two surfaces:
 //   1. New-token discovery  (the "catch the next 100x" feed)
 //   2. Honeypot / rug audit  (risk scoring before you ape in)
 // ─────────────────────────────────────────────────────────────
@@ -13,17 +12,16 @@ export const MEME_PLATFORMS: MemePlatform[] = [
   'bitget',
   'gate',
   'botx',
-  // Moby module is pending APK RE — registered so pages/APIs can
-  // enumerate it, but disabled in the meme registry until it lands.
+  // Platform order is stable for API output; registry capability and
+  // credentials determine which entries are enabled at runtime.
   'moby',
   'dexscreener',
-  // Zero-key sources (research-verified 2026-08-30):
+  // Platform inventory (discovery and/or risk capability varies by adapter):
   //   birdeye  — forge API (discovery + security audit)
   //   rugcheck — security report (audit only)
   //   geckoterminal — trending/new pools discovery
-  // gmgn/fomo have live adapters (credential/flag-gated in the registry);
-  // photon is still blocked server-side (browser-session / Cloudflare) and
-  // stays a disabled stub so pages/APIs can enumerate it.
+  // gmgn/fomo are credential/flag-gated in the registry; photon remains
+  // a disabled stub so pages/APIs can enumerate the platform.
   //   nansen — smart-money screener (MOBY_NANSEN_API_KEY gated)
   //   axiom  — contract risk audit (AXIOM_API_KEY gated)
   'birdeye',
@@ -70,6 +68,21 @@ export interface MemeAlphaToken {
   /** Optional buy/sell transaction counts (24h — from GeckoTerminal etc.). */
   buyCount24h?: number
   sellCount24h?: number
+  /**
+   * Provenance of the discovery row. Optional — absent on rows created
+   * before this field existed. `provider` mirrors `platform`.
+   */
+  provenance?: {
+    /** 'public-api' = documented public API; 'reverse-engineered' = RE'd from a web app. */
+    sourceType: 'public-api' | 'reverse-engineered'
+    provider: MemePlatform
+    /** True when the source is not a stable, documented public API. */
+    experimental?: boolean
+    /** Free-text note on source / verification status. */
+    note?: string
+  }
+  /** False when discovery carried no real risk assessment (riskLevel is a placeholder). */
+  riskKnown?: boolean
 }
 
 export interface MemeDiscoveryResponse {

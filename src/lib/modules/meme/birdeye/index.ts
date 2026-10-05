@@ -24,13 +24,28 @@ const BIRDEYE_PREFIX = '/forge/solana'
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/147.0.0.0 Safari/537.36'
 
 // ── HTTP/2 transport ──────────────────────────────────────────
-// Cloudflare blocks Node.js fetch (undici) and native https.request
+// Cloudflare blocks Node.js fetch (undici) native https.request
 // with a 403 TLS fingerprint challenge. Node's http2 client passes.
+const REQUEST_TIMEOUT_MS = 10_000
+const MAX_RESPONSE_BYTES = 1_048_576
 
 function h2<T>(method: string, path: string, payload?: string): Promise<T> {
   const { promise, resolve, reject } = Promise.withResolvers<T>()
-  const client = connect(BIRDEYE_BASE, { timeout: 10_000 })
-  client.on('error', reject)
+  const controller = new AbortController()
+  let settled = false
+  const client = connect(BIRDEYE_BASE, { timeout: REQUEST_TIMEOUT_MS })
+  const finish = (fn: () => void) => {
+    if (settled) return
+    settled = true
+    clearTimeout(timeout)
+    client.close()
+    fn()
+  }
+  const timeout = setTimeout(() => {
+    controller.abort()
+    finish(() => reject(new Error(`Birdeye request timeout: ${path}`)))
+  }, REQUEST_TIMEOUT_MS)
+  client.on('error', (error) => finish(() => reject(error)))
   client.on('connect', () => {
     const headers: Record<string, string> = {
       ':method': method,
@@ -40,20 +55,28 @@ function h2<T>(method: string, path: string, payload?: string): Promise<T> {
       accept: 'application/json',
     }
     if (payload) headers['content-type'] = 'application/json'
-    const req = client.request(headers)
+    const req = client.request(headers, { signal: controller.signal })
     let data = ''
+    let bytes = 0
     req.on('response', (h) => {
-      req.on('data', (c) => (data += c))
-      req.on('end', () => {
-        client.close()
+      req.on('data', (chunk) => {
+        bytes += Buffer.byteLength(chunk)
+        if (bytes > MAX_RESPONSE_BYTES) {
+          req.close()
+          finish(() => reject(new Error(`Birdeye response too large: ${path}`)))
+          return
+        }
+        data += chunk
+      })
+      req.on('end', () => finish(() => {
         const status = h[':status']
         if (status && status >= 400) reject(new Error(`Birdeye ${status}: ${path}`))
         else {
           try { resolve(JSON.parse(data) as T) } catch { reject(new Error(`Birdeye parse error: ${path}`)) }
         }
-      })
+      }))
     })
-    req.on('error', (e) => { client.close(); reject(e) })
+    req.on('error', (error) => finish(() => reject(error)))
     if (payload) req.end(payload)
     else req.end()
   })
@@ -193,6 +216,14 @@ export async function discoverBirdeyeTokens(limitPerChain = 25): Promise<MemeAlp
       top10HolderPercent: toNum(g.top10HolderPercent),
       social,
       audited: !!g.birdeyeStrict,
+      provenance: {
+        sourceType: 'reverse-engineered',
+        provider: 'birdeye',
+        experimental: true,
+        note: 'Forge API RE-ed from birdeye.so frontend; not public-api.birdeye.so',
+      },
+      // Discovery heuristic (holder concentration + strict flags), not an audit.
+      riskKnown: false,
     })
   }
   return out

@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // GET /api/v1/meme/leaderboard
-// Meme / memecoin discovery leaderboard across platforms (bitget + gate).
+// Meme / memecoin discovery leaderboard across registered platforms.
 // Per-platform error isolation: one platform failing never 502s the whole
 // request — meta.platformsStatus carries each platform's status.
 //

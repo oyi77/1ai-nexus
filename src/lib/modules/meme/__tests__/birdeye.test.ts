@@ -8,7 +8,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { discoverBirdeyeTokens, auditBirdeyeToken, getBirdeyeTotalHolders } from '../birdeye'
 
 type Listener = (...args: unknown[]) => void
-interface MockResponse { status: number; body: string }
+interface MockResponse { status: number; body: string; hang?: boolean }
 
 // hoisted state so the vi.mock factory (hoisted above imports) can read it
 const h = vi.hoisted(() => {
@@ -32,9 +32,11 @@ const h = vi.hoisted(() => {
           end() {
             const next = responses.shift() ?? { status: 200, body: '{"data":{}}' }
             ;(reqListeners['response'] ?? []).forEach((cb) => cb({ ':status': next.status }))
+            if (next.hang) return // never delivers data/end — exercises timeout path
             ;(reqListeners['data'] ?? []).forEach((cb) => cb(Buffer.from(next.body)))
             ;(reqListeners['end'] ?? []).forEach((cb) => cb())
           },
+          close() {}, // adapter calls req.close() to abort oversized responses
         }
         return req
       },
@@ -59,6 +61,7 @@ function mockHttp2(responses: MockResponse[]) {
 
 afterEach(() => {
   h.responses.length = 0
+  vi.useRealTimers()
 })
 
 const GEM = {
@@ -99,6 +102,14 @@ describe('discoverBirdeyeTokens', () => {
     expect(t.top10HolderPercent).toBe(0.4)
     expect(t.social.twitter).toBe('https://x.com/test')
     expect(t.social.site).toBe('https://test.xyz')
+    expect(t.provenance).toEqual({
+      sourceType: 'reverse-engineered',
+      provider: 'birdeye',
+      experimental: true,
+      note: 'Forge API RE-ed from birdeye.so frontend; not public-api.birdeye.so',
+    })
+    expect(t.riskKnown).toBe(false)
+    expect(t.audited).toBe(false)
   })
 
   it('throws on upstream error (per-source isolation)', async () => {
@@ -110,6 +121,20 @@ describe('discoverBirdeyeTokens', () => {
     mockHttp2([{ status: 200, body: JSON.stringify({ success: true, data: { items: [GEM, GEM] } }) }])
     const tokens = await discoverBirdeyeTokens(25)
     expect(tokens).toHaveLength(1)
+  })
+
+  it('rejects on oversized response (bounded memory)', async () => {
+    mockHttp2([{ status: 200, body: 'x'.repeat(1_048_577) }])
+    await expect(discoverBirdeyeTokens()).rejects.toThrow('too large')
+  })
+
+  it('rejects with timeout error when upstream hangs', async () => {
+    vi.useFakeTimers()
+    mockHttp2([{ status: 200, body: '', hang: true }])
+    const pending = discoverBirdeyeTokens()
+    const assertion = expect(pending).rejects.toThrow('Birdeye request timeout')
+    await vi.advanceTimersByTimeAsync(10_000)
+    await assertion
   })
 })
 

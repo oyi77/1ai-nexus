@@ -303,7 +303,7 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     displayName: 'Axiom Security',
     auditModule: axiomAudit,
     ttlMs: MEME_TTL,
-    enabled: true,
+    enabled: !!process.env.AXIOM_API_KEY,
   },
   geckoterminal: {
     platform: 'geckoterminal',

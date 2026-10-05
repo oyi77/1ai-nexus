@@ -2,7 +2,7 @@
 // GET /api/v1/meme/risk
 // Per-platform meme-token honeypot / rug risk audit.
 //
-//   ?platform=all|bitget|gate|moby&chain=<chainId>&contract=<address>
+//   ?platform=all|<registered-platform>&chain=<chainId>&contract=<address>
 //
 // The audit modules are obtained via `getAuditModule(platform)` from the
 // meme registry. For `platform: 'all'` we iterate the enabled platforms and

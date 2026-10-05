@@ -12,7 +12,7 @@ const CARDS: MemeCard[] = [
   {
     title: "Launch Alpha",
     href: "/meme/launch-alpha",
-    desc: "Recently launched meme tokens across Bitget Wallet, Gate.io DEX, BotX, and DEX Screener, sorted by listing time.",
+    desc: "Recently launched meme tokens across configured discovery platforms, sorted by listing time.",
   },
   {
     title: "Leaderboard",
@@ -31,7 +31,7 @@ export function MemeIndexPageContent() {
     <div className="space-y-4">
       <Panel
         title="Meme Alpha"
-        subtitle="Meme-token discovery & risk audit across Bitget Wallet and Gate.io DEX."
+        subtitle="Meme-token discovery and risk audit across configured platforms."
       >
         <p className="text-sm text-text-secondary">
           Real-time alpha for newly launched and trending meme tokens, plus a

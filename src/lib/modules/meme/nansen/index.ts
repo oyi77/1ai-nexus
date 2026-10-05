@@ -22,7 +22,6 @@ function getNansenApiKey(): string | undefined {
   return process.env.MOBY_NANSEN_API_KEY
 }
 const NANSEN_BASE_URL = 'https://api.nansen.ai/v1'
-const NANSEN_RATE_LIMIT_PER_MIN = 60 // conservative default
 const NANSEN_RETRY_ATTEMPTS = 5
 const NANSEN_RETRY_BASE_MS = 500
 
@@ -330,7 +329,7 @@ export async function auditToken(
           riskData = result as NansenContractAnalyticsResponse
           break
         }
-      } catch (e) {
+      } catch {
         // Endpoint not available at this tier; try next
         logger.debug(`nansen audit endpoint ${endpoint.split('/').slice(-3).join('/')} not found`, 'meme-nansen', {
           chain,

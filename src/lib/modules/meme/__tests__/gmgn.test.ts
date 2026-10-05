@@ -234,6 +234,13 @@ describe('discoverGmgnTokens', () => {
       expect(solToken.createdAt).toBe(1600000000000)
       expect(solToken.riskLevel).toBe(1)
       expect(solToken.audited).toBe(false)
+      expect(solToken.provenance).toEqual({
+        sourceType: 'public-api',
+        provider: 'gmgn',
+        experimental: true,
+        note: 'GMGN public rank endpoint; discovery feed, not a security audit',
+      })
+      expect(solToken.riskKnown).toBe(false)
     }
   })
 

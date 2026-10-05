@@ -15,6 +15,8 @@ export const MEME_PLATFORMS = [
   "gmgn",
   "fomo",
   "photon",
+  "nansen",
+  "axiom",
 ] as const;
 export type MemePlatformFilter = (typeof MEME_PLATFORMS)[number];
 
@@ -139,15 +141,24 @@ export const memeColumns: Column<MemeAlphaToken>[] = [
     key: "riskLevel",
     header: "Risk",
     width: 80,
-    render: (r) => (
-      <span
-        className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${riskClass(
-          r.riskLevel
-        )}`}
-      >
-        L{r.riskLevel}
-      </span>
-    ),
+    render: (r) =>
+      // Discovery feeds carry no audit — show n/a rather than a fabricated badge.
+      r.riskKnown === false ? (
+        <span
+          className="text-xs font-mono text-text-muted"
+          title="No risk audit available from this discovery source"
+        >
+          n/a
+        </span>
+      ) : (
+        <span
+          className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${riskClass(
+            r.riskLevel
+          )}`}
+        >
+          L{r.riskLevel}
+        </span>
+      ),
   },
   {
     key: "top10HolderPercent",

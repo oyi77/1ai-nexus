@@ -120,6 +120,14 @@ describe('discoverFomoTokens', () => {
     
     expect(result[1].id).toBe('solana:EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')
     expect(result[2].id).toBe('eth:0xa1b2c3d4e5f6789012345678901234567890abcd')
+
+    expect(result[0].provenance).toEqual({
+      sourceType: 'reverse-engineered',
+      provider: 'fomo',
+      experimental: true,
+      note: 'Feed endpoint RE-ed from fomofun.xyz web app; unverified stability',
+    })
+    expect(result[0].riskKnown).toBe(false)
   })
 
   it('respects limit param when fewer tokens available', async () => {

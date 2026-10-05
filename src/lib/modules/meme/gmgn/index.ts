@@ -1,7 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // Module: GMGN.ai — Meme Alpha (discovery + risk audit)
-// endpoint: https://gmgn.ai/defi/quotation/v1 (public REST, Cloudflare-protected)
-// usage: set GMGN_SESSION_COOKIE if Cloudflare challenges appear
+// sourceType: public-api
+// endpoint: https://gmgn.ai/defi/quotation/v1 (public REST; Cloudflare-protected)
+// note: public rank/detail endpoints. No stealth headers, cookie scraping,
+//   or challenge bypass — header-minimal requests may see 403 and degrade
+//   gracefully. GMGN_SESSION_COOKIE is an optional operator-supplied hint.
 // ─────────────────────────────────────────────────────────────
 
 import { MemeAlphaToken, MemeRiskAudit } from '../types'
@@ -17,7 +20,6 @@ const CHAIN_CONFIG: Record<string, { path: string; chainId: string }> = {
   blastr: { path: 'blastr', chainId: 'blast' },
 }
 
-const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36'
 
 interface GmgnTrendingResponse {
   data?: { list?: Array<{
@@ -85,21 +87,15 @@ async function retryWithBackoff<T>(
       return await fn()
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
-
       const isCloudflare = lastError.message.includes('403') || lastError.message.includes('Cloudflare')
-
       if (isCloudflare && attempt < maxAttempts) {
         logger.warn(`GMGN Cloudflare challenge detected (attempt ${attempt}/${maxAttempts})`, 'gmgn', {
           error: lastError.message,
         })
       }
-
       if (attempt < maxAttempts) {
-        const delay = baseDelay * Math.pow(2, attempt - 1) * (0.5 + Math.random())
-        logger.debug(`GMGN retry in ${Math.round(delay)}ms (attempt ${attempt}/${maxAttempts})`, 'gmgn')
-        const { promise, resolve } = Promise.withResolvers<void>()
-        setTimeout(resolve, delay)
-        await promise
+        const wait = Math.min(baseDelay * 2 ** (attempt - 1), 2_000)
+        await new Promise((resolve) => setTimeout(resolve, wait))
       }
     }
   }
@@ -107,40 +103,32 @@ async function retryWithBackoff<T>(
   const cookieHint = process.env.GMGN_SESSION_COOKIE
     ? ''
     : '\n\nTip: Set GMGN_SESSION_COOKIE environment variable for better Cloudflare handling.'
-  throw new Error(
-    `GMGN request failed after ${maxAttempts} attempts.${cookieHint}`,
-  )
+  throw new Error(`GMGN request failed after ${maxAttempts} attempts.${cookieHint}`)
 }
 
-// ── HTTP helper ----
+const REQUEST_TIMEOUT_MS = 10_000
 
 async function gmgnFetch<T>(endpoint: string, signal?: AbortSignal): Promise<T> {
   await RATE_LIMITER.acquire()
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const onAbort = () => controller.abort()
+  signal?.addEventListener('abort', onAbort, { once: true })
 
-  const url = `${GMGN_BASE}${endpoint}`
-  const headers: Record<string, string> = {
-    accept: 'application/json',
-    'user-agent': USER_AGENT,
-    referer: 'https://gmgn.ai',
-  }
-
-  if (process.env.GMGN_SESSION_COOKIE) {
-    headers.cookie = process.env.GMGN_SESSION_COOKIE
-  }
-
-  const res = await fetch(url, {
-    headers,
-    signal,
-  })
-
-  if (!res.ok) {
-    if (res.status === 403) {
-      throw new Error(`GMGN 403 Forbidden: Cloudflare challenge at ${endpoint}`)
+  try {
+    const res = await fetch(`${GMGN_BASE}${endpoint}`, {
+      headers: { accept: 'application/json' },
+      signal: controller.signal,
+    })
+    if (!res.ok) {
+      const reason = res.status === 403 ? 'Cloudflare challenge' : `HTTP ${res.status}`
+      throw new Error(`GMGN ${reason}: ${endpoint}`)
     }
-    throw new Error(`GMGN ${res.status}: ${endpoint}`)
+    return await res.json() as T
+  } finally {
+    clearTimeout(timeout)
+    signal?.removeEventListener('abort', onAbort)
   }
-
-  return res.json() as Promise<T>
 }
 
 // ── Discovery ----
@@ -189,6 +177,14 @@ export async function discoverGmgnTokens(limitPerChain = 20): Promise<MemeAlphaT
           top10HolderPercent: 0,
           social: {},
           audited: false,
+          provenance: {
+            sourceType: 'public-api',
+            provider: 'gmgn',
+            experimental: true,
+            note: 'GMGN public rank endpoint; discovery feed, not a security audit',
+          },
+          // Discovery rows carry no audit — riskLevel 1 is a placeholder.
+          riskKnown: false,
         }
 
         allTokens.push(token)

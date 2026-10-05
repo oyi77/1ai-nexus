@@ -478,6 +478,27 @@ Birdeye/GeckoTerminal.
 | DefiLlama | `api.llama.fi/overview/tokens` | 500 |
 | GMGN | `gmgn.ai/api/v1/*` (13 paths) | 403 Cloudflare challenge on token data; only aggregation works server-side |
 
+
+## 8.1 TokenSniffer & De.Fi — official API exists, NOT integrated (2026 assessment)
+
+Both vendors publish an **official, documented** API. Neither is integrated,
+because both are credential-gated and no zero-key path is documented:
+
+| Source | Official docs | Contract | Access model | Why not integrated now |
+|---|---|---|---|---|
+| TokenSniffer (Solidus Labs) | `tokensniffer.readme.io` (OpenAPI 3.1, `llms.txt` index) | `GET https://tokensniffer.com/api/v2/tokens/{chain}/{address}` (token score, smell test, scam status); `/pairs/latest` (Enterprise) | API key as `apikey` query param. Paid only: Sniffer Pack Pro $99/mo or Enterprise (contact sales). Key issued after purchase; 5 req/s, max 5 concurrent "pending" Get Token scans | Requires paid subscription + key provisioning. No documented free tier. |
+| De.Fi | `docs.de.fi/api/api` (GraphQL, `X-Api-Key` header) | `public-api.de.fi` GraphQL: scanner, audit/Rekt DB queries, balances, chains | Key only via email request to `info@de.fi`, then credit purchase. Credit-metered per endpoint | Requires manual provisioning + paid credits. No documented keyless path. |
+
+**Decision:** NO adapter implementation. The documented contracts are safe to
+integrate *once* keys are provisioned (provisioning is a business step, not an
+engineering one). Reverse-engineering the token-sniffer.com or de.fi web apps
+was considered and rejected: it would mean bypassing bot controls / undocumented
+endpoints, which violates this repo's data-source policy (see GMGN/Fomo
+constraints in the registry: no stealth headers, no cookie scraping, no
+Cloudflare bypass). If/when a key is provisioned, add a `tokensniffer` /
+`defi` platform adapter behind the existing `MemePlatform` union +
+`MEME_REGISTRY` pattern with `provenance.sourceType: 'public-api'`.
+
 ---
 
 ## 9. Existing Repo Meme Modules (REFERENCE)
