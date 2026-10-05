@@ -191,7 +191,10 @@ async function mobyGet<T>(path: string, params?: Record<string, string>): Promis
     // Token died mid-window (clock skew / server-side revoke) — rotate once and retry.
     res = await call(await resolveMobyAccessToken(true))
   }
-  if (!res.ok) throw new Error(`Moby ${res.status}: ${path}`)
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`Moby ${res.status}: ${path} — ${body.slice(0, 200)}`)
+  }
   return res.json() as Promise<T>
 }
 
@@ -232,6 +235,14 @@ function toToken(e: MobyEntry): MemeAlphaToken | null {
     top10HolderPercent: 0,
     social: {},
     audited: false,
+    provenance: {
+      sourceType: 'reverse-engineered',
+      provider: 'moby',
+      experimental: true,
+      note: 'RE web-api screener feed (Privy JWT); coarse safety_tier, not a security audit',
+    },
+    // Discovery/screener rows are heuristics; safety_tier is not an audit.
+    riskKnown: false,
   }
 }
 

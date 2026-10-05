@@ -85,6 +85,18 @@ describe('discoverMobyTokens', () => {
     expect(t.liquidity).toBe(243522)
     expect(t.riskLevel).toBe(0) // green
     expect(t.audited).toBe(false)
+    expect(t.riskKnown).toBe(false)
+    expect(t.provenance).toEqual({
+      sourceType: 'reverse-engineered',
+      provider: 'moby',
+      experimental: true,
+      note: 'RE web-api screener feed (Privy JWT); coarse safety_tier, not a security audit',
+    })
+  })
+
+  it('includes error status, path and body snippet when upstream fails', async () => {
+    mockFetchSequence([{ status: 503, body: 'upstream exploded badly' }])
+    await expect(discoverMobyTokens(25)).rejects.toThrow('Moby 503: /tokens/screener/leaderboard/ — "upstream exploded badly"')
   })
 
   it('throws descriptive error without MOBY_API_KEY', async () => {
