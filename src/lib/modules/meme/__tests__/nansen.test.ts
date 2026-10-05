@@ -291,7 +291,7 @@ describe('discoverTokens', () => {
     const [, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit]
     const payload = JSON.parse(String(init.body))
     expect(init.method).toBe('POST')
-    expect(payload.chains).toEqual(['ethereum', 'solana', 'base', 'arb', 'bnb'])
+    expect(payload.chains).toEqual(['ethereum', 'solana', 'base', 'arbitrum', 'bnb'])
     expect(payload.timeframe).toBe('24h')
     expect(payload.filters.nof_traders).toEqual({ min: 10 })
     expect(payload.filters.volume).toEqual({ min: 50000 })

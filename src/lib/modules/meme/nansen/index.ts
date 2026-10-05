@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // Module: Nansen (nansen.ai) — Meme Alpha Smart Money Screener
 // upstreamProduct: Nansen — blockchain intelligence & smart money tracking
-// endpoint: https://api.nansen.ai/v1
+// endpoint: https://api.nansen.ai/api/v1 (docs.nansen.ai; /v1/* is 404)
 // auth: Bearer API key via `apikey` header
 // discoveredVia: public API documentation
 // lastVerified: 2026-10-04
@@ -21,7 +21,7 @@ import type { MemeAlphaToken, MemeRiskAudit } from '../types'
 function getNansenApiKey(): string | undefined {
   return process.env.MOBY_NANSEN_API_KEY
 }
-const NANSEN_BASE_URL = 'https://api.nansen.ai/v1'
+const NANSEN_BASE_URL = 'https://api.nansen.ai' // endpoint path carries /api/v1 (verified live: /v1/* 404s)
 const NANSEN_TIMEOUT_MS = 15_000
 const NANSEN_RETRY_ATTEMPTS = 5
 const NANSEN_RETRY_BASE_MS = 500
@@ -204,7 +204,7 @@ export async function discoverTokens(limit: number = 20): Promise<MemeAlphaToken
   try {
     // Smart Money filter with 24h timeframe
     const payload = {
-      chains: ['ethereum', 'solana', 'base', 'arb', 'bnb'] as const,
+      chains: ['ethereum', 'solana', 'base', 'arbitrum', 'bnb'] as const,
       timeframe: '24h',
       filters: {
         trader_type: 'sm',
@@ -288,8 +288,8 @@ export async function discoverTokens(limit: number = 20): Promise<MemeAlphaToken
   }
 }
 
-// ───────────────────── AUDIT ENDPOINT ─────────────────────────
 
+// ───────────────────── AUDIT ENDPOINT ─────────────────────────
 /**
  * Audit a token contract for risk factors using Nansen analytics.
  * Note: Specific contract risk endpoints depend on subscription tier.
