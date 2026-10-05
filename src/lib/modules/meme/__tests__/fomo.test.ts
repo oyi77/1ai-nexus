@@ -5,7 +5,10 @@
 // ─────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { discoverFomoTokens, auditFomoToken } from '../fomo'
+import { discoverFomoTokens, auditFomoToken, __resetFomoCookieForTests } from '../fomo'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 function mockFetchSequence(bodies: Array<{ status: number; body: unknown }>) {
   const queue = [...bodies]
@@ -29,6 +32,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  __resetFomoCookieForTests()
+  delete process.env.FOMO_SESSION_PATH
 })
 
 // ── Realistic Fomo-shaped fixtures ───────────────────────────
@@ -296,5 +301,70 @@ describe('discoverFomoTokens rate limit handling', () => {
 
     const result = await discoverFomoTokens(5)
     expect(result).toEqual([])
+  })
+})
+
+
+// ── Session-file cookie support ──────────────────────────────
+
+describe('fomo session file', () => {
+  it('attaches cookie header from data/fomo-session.json (FOMO_SESSION_PATH override)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fomo-sess-'))
+    const path = join(dir, 'fomo-session.json')
+    writeFileSync(path, JSON.stringify({ cookie: 'fomo_session=abc123; other=1' }))
+    process.env.FOMO_SESSION_PATH = path
+
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
+      new Response(JSON.stringify({ entries: [SOLANA_TOKEN_1] }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await discoverFomoTokens(5)
+    expect(fetchMock).toHaveBeenCalled()
+    const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>
+    expect(headers.cookie).toBe('fomo_session=abc123; other=1')
+
+    delete process.env.FOMO_SESSION_PATH
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('falls back to no cookie when session file absent', async () => {
+    process.env.FOMO_SESSION_PATH = join(tmpdir(), 'fomo-nonexistent', 'fomo-session.json')
+
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
+      new Response(JSON.stringify({ entries: [SOLANA_TOKEN_1] }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await discoverFomoTokens(5)
+    const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>
+    expect(headers.cookie).toBeUndefined()
+
+    delete process.env.FOMO_SESSION_PATH
+  })
+
+  it('caches resolution until reset (file removed mid-flight keeps cookie)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'fomo-sess-'))
+    const path = join(dir, 'fomo-session.json')
+    writeFileSync(path, JSON.stringify({ cookie: 'cached=1' }))
+    process.env.FOMO_SESSION_PATH = path
+    __resetFomoCookieForTests()
+
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
+      new Response(JSON.stringify({ entries: [SOLANA_TOKEN_1] }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await discoverFomoTokens(5)
+    let headers = fetchMock.mock.calls[0][1].headers as Record<string, string>
+    expect(headers.cookie).toBe('cached=1')
+
+    rmSync(path)
+    await discoverFomoTokens(5)
+    headers = fetchMock.mock.calls[1][1].headers as Record<string, string>
+    expect(headers.cookie).toBe('cached=1') // cached
+
+    delete process.env.FOMO_SESSION_PATH
+    rmSync(dir, { recursive: true, force: true })
   })
 })

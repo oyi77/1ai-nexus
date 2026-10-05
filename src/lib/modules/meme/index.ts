@@ -315,14 +315,20 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
   // Verification-gated live adapters: gmgn needs a Cloudflare session
   // cookie (its public rank API returns 403 to header-minimal requests);
   // fomo is a public feed but rate-limited (~30 req/min), so it stays
-  // opt-in behind FOMO_API_ENABLED until load-tested server-side.
+  // opt-in behind FOMO_API_ENABLED or a session file until load-tested
+  // server-side. Both adapters also accept a file-based session:
+  // data/gmgn-session.json ({ "cookie": "..." }) and
+  // data/fomo-session.json ({ "cookie": "..." }) — paths overridable via
+  // GMGN_SESSION_PATH / FOMO_SESSION_PATH (mirrors moby-session pattern).
   gmgn: {
     platform: 'gmgn',
     displayName: 'GMGN',
     discoveryModule: gmgnDiscovery,
     auditModule: gmgnAudit,
     ttlMs: MEME_TTL,
-    enabled: !!process.env.GMGN_SESSION_COOKIE,
+    enabled:
+      !!process.env.GMGN_SESSION_COOKIE ||
+      existsSync(process.env.GMGN_SESSION_PATH || join(process.cwd(), 'data', 'gmgn-session.json')),
   },
   fomo: {
     platform: 'fomo',
@@ -330,7 +336,9 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     discoveryModule: fomoDiscovery,
     auditModule: fomoAudit,
     ttlMs: MEME_TTL,
-    enabled: process.env.FOMO_API_ENABLED === 'true',
+    enabled:
+      process.env.FOMO_API_ENABLED === 'true' ||
+      existsSync(process.env.FOMO_SESSION_PATH || join(process.cwd(), 'data', 'fomo-session.json')),
   },
   // Blocked server-side (browser-session / Cloudflare) — disabled stub:
   photon: {

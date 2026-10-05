@@ -17,8 +17,7 @@ import path from 'path';
        alias: {
          '@': path.resolve(__dirname, 'src'),
        },
-       conditions: ['node'],
-       mainFields: ['module', 'main'],
+      mainFields: ['module', 'main'],
      },
    },
  ]);

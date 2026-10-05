@@ -5,10 +5,15 @@
 // ─────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   discoverGmgnTokens,
   auditGmgnToken,
   __resetGmgnRateLimiterForTests,
+  __resetGmgnCookieForTests,
+  __gmgnSessionCookieForTests,
 } from '../gmgn'
 
 // Helper to mock fetch with a sequence of responses
@@ -35,8 +40,9 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  __resetGmgnCookieForTests()
+  delete process.env.GMGN_SESSION_PATH
 })
-
 // ── FIXTURES ──
 
 const SOL_TRENDING_FIXTURE = {
@@ -473,5 +479,136 @@ describe('auditGmgnToken', () => {
     expect(audit!.riskLabel).toBe('middle')
     expect(audit!.buyTax).toBeCloseTo(0.15)
     expect(audit!.sellTax).toBeCloseTo(0.20)
+  })
+})
+
+
+// ── Session-file cookie support ──────────────────────────────
+
+describe('gmgn session cookie resolution', () => {
+  it('prefers file cookie over env (GMGN_SESSION_PATH override)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gmgn-sess-'))
+    const path = join(dir, 'gmgn-session.json')
+    writeFileSync(path, JSON.stringify({ cookie: 'cf_clearance=filevalue' }))
+    process.env.GMGN_SESSION_PATH = path
+    process.env.GMGN_SESSION_COOKIE = 'envvalue'
+
+    __resetGmgnCookieForTests()
+    expect(__gmgnSessionCookieForTests()).toBe('cf_clearance=filevalue')
+
+    delete process.env.GMGN_SESSION_PATH
+    delete process.env.GMGN_SESSION_COOKIE
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('falls back to env cookie when file absent', () => {
+    process.env.GMGN_SESSION_PATH = join(tmpdir(), 'gmgn-nonexistent', 'gmgn-session.json')
+    process.env.GMGN_SESSION_COOKIE = 'envvalue'
+
+    __resetGmgnCookieForTests()
+    expect(__gmgnSessionCookieForTests()).toBe('envvalue')
+
+    delete process.env.GMGN_SESSION_PATH
+    delete process.env.GMGN_SESSION_COOKIE
+  })
+
+  it('returns null when neither file nor env present', () => {
+    process.env.GMGN_SESSION_PATH = join(tmpdir(), 'gmgn-nonexistent', 'gmgn-session.json')
+    delete process.env.GMGN_SESSION_COOKIE
+
+    __resetGmgnCookieForTests()
+    expect(__gmgnSessionCookieForTests()).toBeNull()
+
+    delete process.env.GMGN_SESSION_PATH
+  })
+
+  it('attaches file cookie as request header', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'gmgn-sess-'))
+    const path = join(dir, 'gmgn-session.json')
+    writeFileSync(path, JSON.stringify({ cookie: 'cf_clearance=hdrtest' }))
+    process.env.GMGN_SESSION_PATH = path
+    __resetGmgnCookieForTests()
+
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
+      new Response(JSON.stringify({ data: { list: [] } }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await discoverGmgnTokens(1)
+    expect(fetchMock).toHaveBeenCalled()
+    const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>
+    expect(headers.cookie).toBe('cf_clearance=hdrtest')
+    expect(headers.accept).toBe('application/json')
+
+    delete process.env.GMGN_SESSION_PATH
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('omits cookie header when no session source', async () => {
+    process.env.GMGN_SESSION_PATH = join(tmpdir(), 'gmgn-nonexistent', 'gmgn-session.json')
+    delete process.env.GMGN_SESSION_COOKIE
+    __resetGmgnCookieForTests()
+
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
+      new Response(JSON.stringify({ data: { list: [] } }), { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await discoverGmgnTokens(1)
+    const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>
+    expect(headers.cookie).toBeUndefined()
+
+    delete process.env.GMGN_SESSION_PATH
+  })
+})
+
+
+// ── Registry session-file gating ─────────────────────────────
+
+describe('MEME_REGISTRY session-file gating', () => {
+  it('enables gmgn when GMGN session file exists', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'reg-gate-'))
+    const path = join(dir, 'gmgn-session.json')
+    writeFileSync(path, JSON.stringify({ cookie: 'x' }))
+    process.env.GMGN_SESSION_PATH = path
+    delete process.env.GMGN_SESSION_COOKIE
+
+    vi.resetModules()
+    const { MEME_REGISTRY } = (await import('../index')) as unknown as { MEME_REGISTRY: Record<string, { enabled: boolean }> }
+    expect(MEME_REGISTRY.gmgn.enabled).toBe(true)
+    expect(MEME_REGISTRY.fomo.enabled).toBe(false)
+
+    delete process.env.GMGN_SESSION_PATH
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('enables fomo when FOMO session file exists (without FOMO_API_ENABLED)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'reg-gate-'))
+    const path = join(dir, 'fomo-session.json')
+    writeFileSync(path, JSON.stringify({ cookie: 'x' }))
+    process.env.FOMO_SESSION_PATH = path
+    delete process.env.FOMO_API_ENABLED
+
+    vi.resetModules()
+    const { MEME_REGISTRY } = (await import('../index')) as unknown as { MEME_REGISTRY: Record<string, { enabled: boolean }> }
+    expect(MEME_REGISTRY.fomo.enabled).toBe(true)
+
+    delete process.env.FOMO_SESSION_PATH
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('leaves both disabled when no env and no session files', async () => {
+    process.env.GMGN_SESSION_PATH = join(tmpdir(), 'reg-gate-none', 'gmgn-session.json')
+    process.env.FOMO_SESSION_PATH = join(tmpdir(), 'reg-gate-none', 'fomo-session.json')
+    delete process.env.GMGN_SESSION_COOKIE
+    delete process.env.FOMO_API_ENABLED
+
+    vi.resetModules()
+    const { MEME_REGISTRY } = (await import('../index')) as unknown as { MEME_REGISTRY: Record<string, { enabled: boolean }> }
+    expect(MEME_REGISTRY.gmgn.enabled).toBe(false)
+    expect(MEME_REGISTRY.fomo.enabled).toBe(false)
+
+    delete process.env.GMGN_SESSION_PATH
+    delete process.env.FOMO_SESSION_PATH
   })
 })

@@ -7,9 +7,22 @@
 // Uses node:sqlite (built into Node 22+) — no external deps.
 // ─────────────────────────────────────────────────────────────
 
-import { DatabaseSync } from 'node:sqlite'
+import type { DatabaseSync } from 'node:sqlite'
 import { randomBytes, createHash } from 'node:crypto'
 import { join } from 'node:path'
+
+// Lazy-import node:sqlite at first use: a top-level value import
+// breaks vite-node/vitest externalization (rewrites node:sqlite →
+// bare sqlite, which never resolves). ponytail: move back to a
+// top-level import when vitest fixes the node:sqlite rewrite.
+let DatabaseSyncCtor: (typeof import("node:sqlite"))["DatabaseSync"] | null = null
+function openDb(path: string): DatabaseSync {
+  if (!DatabaseSyncCtor) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    DatabaseSyncCtor = require("node:sqlite").DatabaseSync
+  }
+  return new DatabaseSyncCtor!(path) // definite assignment via guard above
+}
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -134,7 +147,7 @@ export class CredentialManager {
 
   constructor(dbPath?: string) {
     const path = dbPath ?? join(process.cwd(), 'data', 'botx-keys.sqlite')
-    this.db = new DatabaseSync(path)
+    this.db = openDb(path)
     this.initDb()
     this.loadKeys()
   }

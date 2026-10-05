@@ -9,8 +9,36 @@
 
 import { MemeAlphaToken, MemeRiskAudit } from '../types'
 import { logger } from '../../../logger'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 const GMGN_BASE = 'https://gmgn.ai/defi/quotation/v1'
+// ── Operator-supplied session cookie (Cloudflare hint) ──
+// Sources: env GMGN_SESSION_COOKIE, or file data/gmgn-session.json
+// ({ "cookie": "..." }) — file wins. GMGN_SESSION_PATH overrides the file path.
+let cachedCookie: string | null | undefined
+
+export function __resetGmgnCookieForTests(): void {
+  cachedCookie = undefined
+}
+
+function gmgnSessionCookie(): string | null {
+  if (cachedCookie !== undefined) return cachedCookie
+  const path = process.env.GMGN_SESSION_PATH || join(process.cwd(), 'data', 'gmgn-session.json')
+  if (existsSync(path)) {
+    try {
+      const raw = JSON.parse(readFileSync(path, 'utf8')) as { cookie?: string }
+      if (raw.cookie) {
+        cachedCookie = raw.cookie
+        return cachedCookie
+      }
+    } catch (err) {
+      logger.warn(`GMGN session file unreadable: ${err instanceof Error ? err.message : String(err)}`, 'gmgn')
+    }
+  }
+  cachedCookie = process.env.GMGN_SESSION_COOKIE || null
+  return cachedCookie
+}
 
 const CHAIN_CONFIG: Record<string, { path: string; chainId: string }> = {
   sol: { path: 'sol', chainId: 'solana' },
@@ -100,9 +128,10 @@ async function retryWithBackoff<T>(
     }
   }
 
-  const cookieHint = process.env.GMGN_SESSION_COOKIE
+  const hasCookie = !!gmgnSessionCookie()
+  const cookieHint = hasCookie
     ? ''
-    : '\n\nTip: Set GMGN_SESSION_COOKIE environment variable for better Cloudflare handling.'
+    : '\n\nTip: Set GMGN_SESSION_COOKIE (env) or data/gmgn-session.json for better Cloudflare handling.'
   throw new Error(`GMGN request failed after ${maxAttempts} attempts.${cookieHint}`)
 }
 
@@ -113,11 +142,14 @@ async function gmgnFetch<T>(endpoint: string, signal?: AbortSignal): Promise<T> 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
   const onAbort = () => controller.abort()
-  signal?.addEventListener('abort', onAbort, { once: true })
+  const cookie = gmgnSessionCookie()
 
   try {
     const res = await fetch(`${GMGN_BASE}${endpoint}`, {
-      headers: { accept: 'application/json' },
+      headers: {
+        accept: 'application/json',
+        ...(cookie ? { cookie } : {}),
+      },
       signal: controller.signal,
     })
     if (!res.ok) {
@@ -283,4 +315,9 @@ export async function auditGmgnToken(
 /** @internal Clear rate limiter state for tests */
 export function __resetGmgnRateLimiterForTests(): void {
   // Currently no persistent state to reset
+}
+
+/** @internal Exposed for tests */
+export function __gmgnSessionCookieForTests(): string | null {
+  return gmgnSessionCookie()
 }

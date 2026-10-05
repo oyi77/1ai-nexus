@@ -13,6 +13,8 @@
 
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
 import { logger } from '@/lib/logger'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 // ── Constants ────────────────────────────────────────────────
 
@@ -22,7 +24,33 @@ const MAX_RETRIES = 5
 const BASE_RETRY_MS = 500
 const MAX_WAIT_MS = 8000
 
-// ── Rate Limiting Token Bucket ───────────────────────────────
+// ── Optional operator-supplied session file ──
+// data/fomo-session.json ({ "cookie": "..." }) — if present, its cookie is
+// attached to requests and the module is enabled. FOMO_SESSION_PATH overrides
+// the path. Env FOMO_API_ENABLED=true remains an alternative opt-in.
+let cachedCookie: string | null | undefined
+
+export function __resetFomoCookieForTests(): void {
+  cachedCookie = undefined
+}
+
+function fomoSessionCookie(): string | null {
+  if (cachedCookie !== undefined) return cachedCookie
+  const path = process.env.FOMO_SESSION_PATH || join(process.cwd(), 'data', 'fomo-session.json')
+  if (existsSync(path)) {
+    try {
+      const raw = JSON.parse(readFileSync(path, 'utf8')) as { cookie?: string }
+      if (raw.cookie) {
+        cachedCookie = raw.cookie
+        return cachedCookie
+      }
+    } catch (err) {
+      logger.warn(`Fomo session file unreadable: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+  cachedCookie = null
+  return cachedCookie
+}
 
 class TokenBucket {
   private tokens: number
@@ -121,11 +149,11 @@ async function fetchWithRetry<T>(
   signal?: AbortSignal,
 ): Promise<T | null> {
   let lastError: Error | null = null
-
   for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
     try {
-      const res = await fetch(url, { signal, headers: { Accept: 'application/json' } })
-      
+      const cookie = fomoSessionCookie()
+      const res = await fetch(url, { signal, headers: { Accept: 'application/json', ...(cookie ? { cookie } : {}) } })
+
       if (res.status === 429) {
         // Rate limited — wait and retry
         const wait = Math.min(
