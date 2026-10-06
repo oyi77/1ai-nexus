@@ -2,7 +2,8 @@
 // Module: Nansen (nansen.ai) — Meme Alpha Smart Money Screener
 // upstreamProduct: Nansen — blockchain intelligence & smart money tracking
 // endpoint: https://api.nansen.ai/api/v1 (docs.nansen.ai; /v1/* is 404)
-// auth: Bearer API key via `apikey` header
+// auth: Bearer API key via `apikey` header; optional operator-staged Bearer
+//   session token fallback (data/nansen-session.json, ephemeral)
 // discoveredVia: public API documentation
 // lastVerified: 2026-10-04
 //
@@ -13,6 +14,8 @@
 // ─────────────────────────────────────────────────────────────
 
 import { z } from 'zod'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { logger } from '@/lib/logger'
 import type { MemeAlphaToken, MemeRiskAudit } from '../types'
 
@@ -20,6 +23,30 @@ import type { MemeAlphaToken, MemeRiskAudit } from '../types'
 
 function getNansenApiKey(): string | undefined {
   return process.env.MOBY_NANSEN_API_KEY
+}
+
+// ── Operator-supplied Bearer session token (optional fallback) ──
+// Source: file {"token": "..."} at process.env.NANSEN_SESSION_PATH or
+// data/nansen-session.json. Ephemeral — operator re-stages on expiry.
+let cachedSessionToken: string | null | undefined
+
+export function __resetNansenSessionForTests(): void {
+  cachedSessionToken = undefined
+}
+
+function nansenSessionToken(): string | null {
+  if (cachedSessionToken !== undefined) return cachedSessionToken
+  const path = process.env.NANSEN_SESSION_PATH || join(process.cwd(), 'data', 'nansen-session.json')
+  cachedSessionToken = null
+  if (existsSync(path)) {
+    try {
+      const raw = JSON.parse(readFileSync(path, 'utf8')) as { token?: string }
+      if (raw.token) cachedSessionToken = raw.token
+    } catch (err) {
+      logger.warn(`Nansen session file unreadable: ${err instanceof Error ? err.message : String(err)}`, 'meme-nansen')
+    }
+  }
+  return cachedSessionToken
 }
 const NANSEN_BASE_URL = 'https://api.nansen.ai' // endpoint path carries /api/v1 (verified live: /v1/* 404s)
 const NANSEN_TIMEOUT_MS = 15_000
@@ -137,7 +164,8 @@ async function sleepWithBackoff(attempt: number): Promise<void> {
 /** Make authenticated request to Nansen with retry logic */
 async function fetchNansen<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const apiKey = getNansenApiKey()
-  if (!apiKey) {
+  const sessionToken = apiKey ? null : nansenSessionToken()
+  if (!apiKey && !sessionToken) {
     throw new Error('MOBY_NANSEN_API_KEY not configured')
   }
 
@@ -151,7 +179,8 @@ async function fetchNansen<T>(endpoint: string, options: RequestInit = {}): Prom
         signal,
         headers: {
           'Content-Type': 'application/json',
-          apikey: apiKey,
+          // apikey wins; Bearer session token is the fallback — never both.
+          ...(apiKey ? { apikey: apiKey } : { Authorization: `Bearer ${sessionToken}` }),
           ...options.headers,
         },
       })
@@ -196,8 +225,8 @@ async function fetchNansen<T>(endpoint: string, options: RequestInit = {}): Prom
 export async function discoverTokens(limit: number = 20): Promise<MemeAlphaToken[]> {
   logger.info(`nansen discovering tokens (limit=${limit})`, 'meme-nansen')
 
-  if (!getNansenApiKey()) {
-    logger.warn('nansen discovery skipped: MOBY_NANSEN_API_KEY not configured', 'meme-nansen')
+  if (!getNansenApiKey() && !nansenSessionToken()) {
+    logger.warn('nansen discovery skipped: no MOBY_NANSEN_API_KEY and no session token (data/nansen-session.json)', 'meme-nansen')
     return []
   }
 
@@ -305,8 +334,8 @@ export async function auditToken(
 ): Promise<MemeRiskAudit | null> {
   logger.info(`nansen auditing token ${contract} on ${chain}`, 'meme-nansen')
 
-  if (!getNansenApiKey()) {
-    logger.warn('nansen audit skipped: MOBY_NANSEN_API_KEY not configured', 'meme-nansen')
+  if (!getNansenApiKey() && !nansenSessionToken()) {
+    logger.warn('nansen audit skipped: no MOBY_NANSEN_API_KEY and no session token (data/nansen-session.json)', 'meme-nansen')
     return null
   }
 

@@ -5,7 +5,10 @@
 // ─────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { discoverTokens, auditToken } from '../nansen'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { discoverTokens, auditToken, __resetNansenSessionForTests } from '../nansen'
 
 function mockFetchSequence(bodies: Array<{ status: number; body: unknown }>) {
   const queue = [...bodies]
@@ -20,10 +23,14 @@ function mockFetchSequence(bodies: Array<{ status: number; body: unknown }>) {
 
 beforeEach(() => {
   process.env.MOBY_NANSEN_API_KEY = 'test-nansen-api-key'
+  delete process.env.NANSEN_SESSION_PATH
+  __resetNansenSessionForTests()
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  delete process.env.NANSEN_SESSION_PATH
+  __resetNansenSessionForTests()
 })
 
 // ── Fixtures shaped to the adapter's zod schemas ──────────────
@@ -438,5 +445,106 @@ describe('auditToken', () => {
     const url = vi.mocked(fetch).mock.calls[0]?.[0] as string
     expect(url).toContain('address=0xMyContract1111111111111111111111111111')
     expect(url).toContain('chain=base')
+  })
+})
+
+// ── Bearer session-token fallback (NANSEN_SESSION_PATH) ────────
+
+describe('nansen session-token fallback', () => {
+  const SESSION_TOKEN = 'test-session-bearer-token'
+
+  it('sends Authorization Bearer from session file when no apikey', async () => {
+    delete process.env.MOBY_NANSEN_API_KEY
+    const dir = mkdtempSync(join(tmpdir(), 'nansen-sess-'))
+    const path = join(dir, 'nansen-session.json')
+    writeFileSync(path, JSON.stringify({ token: SESSION_TOKEN }))
+    process.env.NANSEN_SESSION_PATH = path
+    __resetNansenSessionForTests()
+
+    mockFetchSequence([{ status: 200, body: screenerResponse([screenerEntry()]) }])
+    const tokens = await discoverTokens(1)
+    expect(tokens).toHaveLength(1)
+    const [, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit]
+    const headers = init.headers as Record<string, string>
+    expect(headers.Authorization).toBe(`Bearer ${SESSION_TOKEN}`)
+    expect(headers.apikey).toBeUndefined()
+
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('apikey wins over session file (never sends both)', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'nansen-sess-'))
+    const path = join(dir, 'nansen-session.json')
+    writeFileSync(path, JSON.stringify({ token: SESSION_TOKEN }))
+    process.env.NANSEN_SESSION_PATH = path
+    __resetNansenSessionForTests()
+
+    mockFetchSequence([{ status: 200, body: screenerResponse([]) }])
+    await discoverTokens(1)
+    const [, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit]
+    const headers = init.headers as Record<string, string>
+    expect(headers.apikey).toBe('test-nansen-api-key')
+    expect(headers.Authorization).toBeUndefined()
+
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('returns [] and null without apikey and without session file', async () => {
+    delete process.env.MOBY_NANSEN_API_KEY
+    process.env.NANSEN_SESSION_PATH = join(tmpdir(), 'nansen-nonexistent', 'nansen-session.json')
+    __resetNansenSessionForTests()
+    vi.stubGlobal('fetch', vi.fn())
+
+    expect(await discoverTokens(1)).toEqual([])
+    expect(await auditToken('ethereum', '0xDEAD')).toBeNull()
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled()
+  })
+
+  it('treats missing token field and invalid JSON as no session', async () => {
+    delete process.env.MOBY_NANSEN_API_KEY
+    const dir = mkdtempSync(join(tmpdir(), 'nansen-sess-'))
+    const path = join(dir, 'nansen-session.json')
+    process.env.NANSEN_SESSION_PATH = path
+
+    writeFileSync(path, JSON.stringify({ other: 1 }))
+    __resetNansenSessionForTests()
+    expect(await discoverTokens(1)).toEqual([])
+
+    writeFileSync(path, '{{{not json')
+    __resetNansenSessionForTests()
+    expect(await auditToken('ethereum', '0xDEAD')).toBeNull()
+
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('caches resolution until __resetNansenSessionForTests', async () => {
+    delete process.env.MOBY_NANSEN_API_KEY
+    const dir = mkdtempSync(join(tmpdir(), 'nansen-sess-'))
+    const path = join(dir, 'nansen-session.json')
+    writeFileSync(path, JSON.stringify({ token: 'cached-bearer-1' }))
+    process.env.NANSEN_SESSION_PATH = path
+    __resetNansenSessionForTests()
+
+    const spy = vi.fn(
+      async (_url: string, _init: RequestInit) =>
+        new Response(JSON.stringify(screenerResponse([])), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    )
+    vi.stubGlobal('fetch', spy)
+
+    await discoverTokens(1)
+    let headers = spy.mock.calls[0][1].headers as Record<string, string>
+    expect(headers.Authorization).toBe('Bearer cached-bearer-1')
+
+    // File removed mid-flight: cached token still used until reset
+    rmSync(dir, { recursive: true, force: true })
+    await discoverTokens(1)
+    headers = spy.mock.calls[1][1].headers as Record<string, string>
+    expect(headers.Authorization).toBe('Bearer cached-bearer-1')
+
+    __resetNansenSessionForTests()
+    expect(await discoverTokens(1)).toEqual([])
   })
 })

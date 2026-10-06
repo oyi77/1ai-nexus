@@ -81,6 +81,7 @@ data/*.sqlite
 data/moby-session.json
 data/gmgn-session.json
 data/fomo-session.json
+data/nansen-session.json
 data/stockbit-session.json
 
 # gamification rollback snapshot (large prod pg_dump — must NOT be committed)

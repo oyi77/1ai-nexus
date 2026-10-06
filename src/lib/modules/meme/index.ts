@@ -355,7 +355,7 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     discoveryModule: nansenDiscovery,
     auditModule: nansenAudit,
     ttlMs: MEME_TTL,
-    enabled: !!process.env.MOBY_NANSEN_API_KEY,
+    enabled: !!process.env.MOBY_NANSEN_API_KEY || existsSync(process.env.NANSEN_SESSION_PATH || join(process.cwd(), 'data', 'nansen-session.json')),
   },
 }
 
