@@ -2,8 +2,10 @@
 // Module: Nansen (nansen.ai) — Meme Alpha Smart Money Screener
 // upstreamProduct: Nansen — blockchain intelligence & smart money tracking
 // endpoint: https://api.nansen.ai/api/v1 (docs.nansen.ai; /v1/* is 404)
-// auth: Bearer API key via `apikey` header; optional operator-staged Bearer
-//   session token fallback (data/nansen-session.json, ephemeral)
+// auth: API key via `apikey` header (documented: docs.nansen.ai/getting-started/authentication).
+//   Optional operator-staged Bearer session token fallback (data/nansen-session.json,
+//   ephemeral) is an UNPROVEN hypothesis: synthetic tokens observed only as 401s;
+//   no live test with a real browser privy-token has passed — viability unproven.
 // discoveredVia: public API documentation
 // lastVerified: 2026-10-04
 //
@@ -25,9 +27,10 @@ function getNansenApiKey(): string | undefined {
   return process.env.MOBY_NANSEN_API_KEY
 }
 
-// ── Operator-supplied Bearer session token (optional fallback) ──
+// ── Operator-supplied Bearer session token (optional fallback, UNPROVEN) ──
 // Source: file {"token": "..."} at process.env.NANSEN_SESSION_PATH or
-// data/nansen-session.json. Ephemeral — operator re-stages on expiry.
+// data/nansen-session.json. Ephemeral (~1h) — operator re-stages on expiry.
+// Viability unproven: only synthetic tokens tested (401); real privy-token live test pending.
 let cachedSessionToken: string | null | undefined
 
 export function __resetNansenSessionForTests(): void {
@@ -48,7 +51,7 @@ function nansenSessionToken(): string | null {
   }
   return cachedSessionToken
 }
-const NANSEN_BASE_URL = 'https://api.nansen.ai' // endpoint path carries /api/v1 (verified live: /v1/* 404s)
+const NANSEN_BASE_URL = 'https://api.nansen.ai' // endpoint path carries /api/v1 (verified live: /v1/* 404s vs /api/v1/* 401s without key — base-URL shape only, not auth)
 const NANSEN_TIMEOUT_MS = 15_000
 const NANSEN_RETRY_ATTEMPTS = 5
 const NANSEN_RETRY_BASE_MS = 500

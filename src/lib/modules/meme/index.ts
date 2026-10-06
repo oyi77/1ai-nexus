@@ -349,6 +349,8 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     enabled: false,
   },
   // Nansen Smart Money screener — credential-gated on MOBY_NANSEN_API_KEY.
+  // NOTE: key OR session file present only enables the route; data may still
+  // not flow (402 x402 paywall per unauthenticated probes; Bearer fallback unproven).
   nansen: {
     platform: 'nansen',
     displayName: 'Nansen',
