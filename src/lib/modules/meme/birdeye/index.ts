@@ -5,81 +5,118 @@
 //   birdeye.so frontend (discovered via browser RE / devtools-network-tab)
 // endpoint: https://birdeye.so/forge/solana  (POST /v3/gems, GET /token/*, /overview/*)
 // discoveredVia: devtools-network-tab
-// lastVerified: 2026-08-30
+// lastVerified: 2026-10-07
 // UNOFFICIAL: this calls birdeye.so's internal frontend API, not their
 //   public-api.birdeye.so (which requires an x-api-key). It may break
 //   without notice if they change their dashboard.
 //   fallbackFn: none (route-level per-source error isolation handles gaps)
 // Auth: NONE. Requires standard User-Agent + Referer headers.
-// Transport: node:http2 (Cloudflare blocks Node.js fetch/undici with TLS
-//   fingerprint 403, but Node http2 client passes — verified 7 endpoints).
+// Transport: curl child (Cloudflare now fingerprints ALL Node TLS stacks —
+//   undici fetch, https, AND node:http2 return a 403 challenge since ~2026-10.
+//   System curl passes with identical URL/headers/body — verified 2026-10-07).
 // Chain: solana only (forge API is Solana-specific).
 // ─────────────────────────────────────────────────────────────
-
 import type { MemeAlphaToken, MemeRiskAudit } from '../types'
-import { connect } from 'node:http2'
+import { execFileSync } from 'node:child_process'
 
 const BIRDEYE_BASE = 'https://birdeye.so'
 const BIRDEYE_PREFIX = '/forge/solana'
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/147.0.0.0 Safari/537.36'
-
-// ── HTTP/2 transport ──────────────────────────────────────────
-// Cloudflare blocks Node.js fetch (undici) native https.request
-// with a 403 TLS fingerprint challenge. Node's http2 client passes.
+// ── curl-child transport ────────────────────────────────────────
+// Cloudflare blocks every Node TLS stack (undici, https, node:http2)
+// with a 403 TLS fingerprint challenge. System curl passes with the
+// identical URL/headers/body. Mirrors the ajaib rscGet pattern.
 const REQUEST_TIMEOUT_MS = 10_000
 const MAX_RESPONSE_BYTES = 1_048_576
 
-function h2<T>(method: string, path: string, payload?: string): Promise<T> {
-  const { promise, resolve, reject } = Promise.withResolvers<T>()
-  const controller = new AbortController()
-  let settled = false
-  const client = connect(BIRDEYE_BASE, { timeout: REQUEST_TIMEOUT_MS })
-  const finish = (fn: () => void) => {
-    if (settled) return
-    settled = true
-    clearTimeout(timeout)
-    client.close()
-    fn()
+/** Env copy with every *proxy* var removed (case-insensitive). */
+function directEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env }
+  for (const k of Object.keys(env)) {
+    if (k.toLowerCase().includes('proxy')) delete env[k]
   }
-  const timeout = setTimeout(() => {
-    controller.abort()
-    finish(() => reject(new Error(`Birdeye request timeout: ${path}`)))
-  }, REQUEST_TIMEOUT_MS)
-  client.on('error', (error) => finish(() => reject(error)))
-  client.on('connect', () => {
-    const headers: Record<string, string> = {
-      ':method': method,
-      ':path': `${BIRDEYE_PREFIX}${path}`,
-      'user-agent': UA,
-      referer: 'https://birdeye.so/',
-      accept: 'application/json',
+  return env
+}
+
+// Injectable seam for tests (defaults to execFileSync). Keep module-local:
+// tests must not fight other suites over a global child_process mock.
+// ponytail: sync execFileSync blocks the event loop ~RTT; switch to execFile
+// async when Birdeye latency dominates route p95 — error contract unchanged.
+let runCurl: (args: string[]) => string = (args) =>
+  execFileSync('curl', args, {
+    env: directEnv(),
+    encoding: 'utf8',
+    maxBuffer: MAX_RESPONSE_BYTES + 64,
+    timeout: REQUEST_TIMEOUT_MS + 2_000,
+  }) as string
+
+export function __setBirdeyeCurlForTests(fn: typeof runCurl | null): void {
+  runCurl =
+    fn ??
+    ((args) =>
+      execFileSync('curl', args, {
+        env: directEnv(),
+        encoding: 'utf8',
+        maxBuffer: MAX_RESPONSE_BYTES + 64,
+        timeout: REQUEST_TIMEOUT_MS + 2_000,
+      }) as string)
+}
+
+function curlReq<T>(method: string, path: string, payload?: string): Promise<T> {
+  const { promise, resolve, reject } = Promise.withResolvers<T>()
+  const url = `${BIRDEYE_BASE}${BIRDEYE_PREFIX}${path}`
+  const args = [
+    '-sS',
+    '-L',
+    '--http2',
+    '--max-time',
+    String(Math.ceil(REQUEST_TIMEOUT_MS / 1000)),
+    '-X',
+    method,
+    '-H',
+    `User-Agent: ${UA}`,
+    '-H',
+    'Referer: https://birdeye.so/',
+    '-H',
+    'Accept: application/json',
+  ]
+  if (payload) {
+    args.push('-H', 'Content-Type: application/json', '--data', payload)
+  }
+  args.push('-w', '\nCURL_STATUS:%{http_code}', url)
+  let out: string
+  try {
+    out = runCurl(args)
+  } catch (e) {
+    const isRecord = typeof e === 'object' && e !== null
+    const code = isRecord && 'code' in e ? String(e.code) : ''
+    if (isRecord && (('killed' in e && e.killed === true) || code === 'ETIMEDOUT')) {
+      reject(new Error(`Birdeye request timeout: ${path}`))
+      return promise
     }
-    if (payload) headers['content-type'] = 'application/json'
-    const req = client.request(headers, { signal: controller.signal })
-    let data = ''
-    let bytes = 0
-    req.on('response', (h) => {
-      req.on('data', (chunk) => {
-        bytes += Buffer.byteLength(chunk)
-        if (bytes > MAX_RESPONSE_BYTES) {
-          req.close()
-          finish(() => reject(new Error(`Birdeye response too large: ${path}`)))
-          return
-        }
-        data += chunk
-      })
-      req.on('end', () => finish(() => {
-        const status = h[':status']
-        if (status && status >= 400) reject(new Error(`Birdeye ${status}: ${path}`))
-        else {
-          try { resolve(JSON.parse(data) as T) } catch { reject(new Error(`Birdeye parse error: ${path}`)) }
-        }
-      }))
-    })
-    req.on('error', (error) => finish(() => reject(error)))
-    if (payload) req.end(payload)
-    else req.end()
-  })
+    if (code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
+      reject(new Error(`Birdeye response too large: ${path}`))
+      return promise
+    }
+    reject(e instanceof Error ? e : new Error(String(e)))
+    return promise
+  }
+  const m = /\nCURL_STATUS:(\d{3})\s*$/.exec(out)
+  const status = m ? Number(m[1]) : 0
+  const body = m ? out.slice(0, m.index) : out
+  if (status >= 400 || status === 0) {
+    reject(new Error(`Birdeye ${status}: ${path}`))
+    return promise
+  }
+  if (Buffer.byteLength(body) > MAX_RESPONSE_BYTES) {
+    reject(new Error(`Birdeye response too large: ${path}`))
+    return promise
+  }
+  try {
+    resolve(JSON.parse(body))
+  } catch {
+    reject(new Error(`Birdeye parse error: ${path}`))
+  }
   return promise
 }
 
@@ -183,7 +220,7 @@ export async function discoverBirdeyeTokens(limitPerChain = 25): Promise<MemeAlp
     shown_time_frame: '24h',
   })
 
-  const res = await h2<BirdeyeGemsResponse>('POST', '/v3/gems', body)
+  const res = await curlReq<BirdeyeGemsResponse>('POST', '/v3/gems', body)
   const items = res.data?.items ?? []
   const out: MemeAlphaToken[] = []
   const seen = new Set<string>()
@@ -256,7 +293,7 @@ function severityToCounts(groups: NonNullable<BirdeyeSecurityDetails['data']>['g
 
 export async function auditBirdeyeToken(chain: string, contract: string): Promise<MemeRiskAudit | null> {
   try {
-    const security = await h2<BirdeyeSecurityDetails>(
+    const security = await curlReq<BirdeyeSecurityDetails>(
       'GET',
       `/token/security_details?token=${encodeURIComponent(contract)}&group_by=severity`,
     )
@@ -264,7 +301,7 @@ export async function auditBirdeyeToken(chain: string, contract: string): Promis
 
     let top10HolderPercent = 0
     try {
-      const audit = await h2<BirdeyeAudit>(
+      const audit = await curlReq<BirdeyeAudit>(
         'GET', `/overview/audit?address=${encodeURIComponent(contract)}`,
       )
       const pct = toNum(audit.data?.top10Holders?.percentage)
@@ -302,7 +339,7 @@ export async function auditBirdeyeToken(chain: string, contract: string): Promis
 
 export async function getBirdeyeTotalHolders(contract: string): Promise<number> {
   try {
-    const res = await h2<{ data?: { total?: number }; success?: boolean }>(
+    const res = await curlReq<{ data?: { total?: number }; success?: boolean }>(
       'GET', `/token/total_holder?address=${encodeURIComponent(contract)}`,
     )
     return toNum(res.data?.total)
@@ -313,7 +350,7 @@ export async function getBirdeyeTotalHolders(contract: string): Promise<number> 
 
 export async function getBirdeyeTokenOverview(contract: string): Promise<Record<string, unknown> | null> {
   try {
-    const res = await h2<{ data?: Record<string, unknown>; success?: boolean }>(
+    const res = await curlReq<{ data?: Record<string, unknown>; success?: boolean }>(
       'GET', `/overview/token?address=${encodeURIComponent(contract)}`,
     )
     return res.data ?? null

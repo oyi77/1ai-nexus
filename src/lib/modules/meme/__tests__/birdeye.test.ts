@@ -1,66 +1,35 @@
 // ─────────────────────────────────────────────────────────────
 // Birdeye Forge adapter unit tests (fixture-backed, no network).
-// The adapter uses node:http2 (Cloudflare blocks undici fetch), so
-// this mocks the http2 connect() client — asserts normalization + errors.
+// The adapter shells to system curl (Cloudflare blocks all Node TLS
+// stacks), so this stubs the __setBirdeyeCurlForTests seam — asserts
+// normalization + error contract.
 // ─────────────────────────────────────────────────────────────
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { discoverBirdeyeTokens, auditBirdeyeToken, getBirdeyeTotalHolders } from '../birdeye'
+import {
+  discoverBirdeyeTokens,
+  auditBirdeyeToken,
+  getBirdeyeTotalHolders,
+  __setBirdeyeCurlForTests,
+} from '../birdeye'
 
-type Listener = (...args: unknown[]) => void
 interface MockResponse { status: number; body: string; hang?: boolean }
 
-// hoisted state so the vi.mock factory (hoisted above imports) can read it
-const h = vi.hoisted(() => {
-  const responses: MockResponse[] = []
-  function makeFakeClient() {
-    const listeners: Record<string, Listener[]> = {}
-    const client = {
-      on(event: string, cb: Listener) {
-        listeners[event] = listeners[event] ?? []
-        listeners[event].push(cb)
-        return client
-      },
-      request() {
-        const reqListeners: Record<string, Listener[]> = {}
-        const req = {
-          on(event: string, cb: Listener) {
-            reqListeners[event] = reqListeners[event] ?? []
-            reqListeners[event].push(cb)
-            return req
-          },
-          end() {
-            const next = responses.shift() ?? { status: 200, body: '{"data":{}}' }
-            ;(reqListeners['response'] ?? []).forEach((cb) => cb({ ':status': next.status }))
-            if (next.hang) return // never delivers data/end — exercises timeout path
-            ;(reqListeners['data'] ?? []).forEach((cb) => cb(Buffer.from(next.body)))
-            ;(reqListeners['end'] ?? []).forEach((cb) => cb())
-          },
-          close() {}, // adapter calls req.close() to abort oversized responses
-        }
-        return req
-      },
-      close() {},
+function mockCurl(responses: MockResponse[]) {
+  const queue = [...responses]
+  __setBirdeyeCurlForTests(() => {
+    const next = queue.shift() ?? { status: 200, body: '{"data":{}}' }
+    if (next.hang) {
+      const err = new Error('curl timeout') as Error & { killed: boolean }
+      err.killed = true
+      throw err
     }
-    queueMicrotask(() => {
-      ;(listeners['connect'] ?? []).forEach((cb) => cb())
-    })
-    return client
-  }
-  return { responses, makeFakeClient }
-})
-
-vi.mock('node:http2', () => ({
-  connect: () => h.makeFakeClient(),
-}))
-
-function mockHttp2(responses: MockResponse[]) {
-  h.responses.length = 0
-  h.responses.push(...responses)
+    return `${next.body}\nCURL_STATUS:${next.status}`
+  })
 }
 
 afterEach(() => {
-  h.responses.length = 0
+  __setBirdeyeCurlForTests(null)
   vi.useRealTimers()
 })
 
@@ -84,7 +53,7 @@ const GEM = {
 
 describe('discoverBirdeyeTokens', () => {
   it('normalizes gems to MemeAlphaToken shape', async () => {
-    mockHttp2([{ status: 200, body: JSON.stringify({ success: true, data: { items: [GEM] } }) }])
+    mockCurl([{ status: 200, body: JSON.stringify({ success: true, data: { items: [GEM] } }) }])
     const tokens = await discoverBirdeyeTokens(25)
     expect(tokens).toHaveLength(1)
     const t = tokens[0]
@@ -113,28 +82,29 @@ describe('discoverBirdeyeTokens', () => {
   })
 
   it('throws on upstream error (per-source isolation)', async () => {
-    mockHttp2([{ status: 500, body: '{}' }])
-    await expect(discoverBirdeyeTokens()).rejects.toThrow()
+    mockCurl([{ status: 500, body: '{}' }])
+    await expect(discoverBirdeyeTokens()).rejects.toThrow('Birdeye 500: /v3/gems')
+  })
+
+  it('surfaces non-2xx as `Birdeye ${status}: ${path}` through curl transport', async () => {
+    mockCurl([{ status: 403, body: '<html>challenge</html>' }])
+    await expect(discoverBirdeyeTokens()).rejects.toThrow('Birdeye 403: /v3/gems')
   })
 
   it('dedupes identical contracts', async () => {
-    mockHttp2([{ status: 200, body: JSON.stringify({ success: true, data: { items: [GEM, GEM] } }) }])
+    mockCurl([{ status: 200, body: JSON.stringify({ success: true, data: { items: [GEM, GEM] } }) }])
     const tokens = await discoverBirdeyeTokens(25)
     expect(tokens).toHaveLength(1)
   })
 
   it('rejects on oversized response (bounded memory)', async () => {
-    mockHttp2([{ status: 200, body: 'x'.repeat(1_048_577) }])
+    mockCurl([{ status: 200, body: 'x'.repeat(1_048_577) }])
     await expect(discoverBirdeyeTokens()).rejects.toThrow('too large')
   })
 
-  it('rejects with timeout error when upstream hangs', async () => {
-    vi.useFakeTimers()
-    mockHttp2([{ status: 200, body: '', hang: true }])
-    const pending = discoverBirdeyeTokens()
-    const assertion = expect(pending).rejects.toThrow('Birdeye request timeout')
-    await vi.advanceTimersByTimeAsync(10_000)
-    await assertion
+  it('rejects with timeout error when curl is killed', async () => {
+    mockCurl([{ status: 200, body: '', hang: true }])
+    await expect(discoverBirdeyeTokens()).rejects.toThrow('Birdeye request timeout')
   })
 })
 
@@ -151,7 +121,7 @@ describe('auditBirdeyeToken', () => {
       },
     }
     const auditRes = { success: true, data: { top10Holders: { percentage: 0.35, wallets: 10 } } }
-    mockHttp2([
+    mockCurl([
       { status: 200, body: JSON.stringify(security) },
       { status: 200, body: JSON.stringify(auditRes) },
     ])
@@ -166,19 +136,19 @@ describe('auditBirdeyeToken', () => {
   })
 
   it('returns null when security endpoint fails', async () => {
-    mockHttp2([{ status: 500, body: '{}' }])
+    mockCurl([{ status: 500, body: '{}' }])
     expect(await auditBirdeyeToken('solana', 'TestMint')).toBeNull()
   })
 })
 
 describe('getBirdeyeTotalHolders', () => {
   it('returns holder count from upstream', async () => {
-    mockHttp2([{ status: 200, body: JSON.stringify({ success: true, data: { total: 8102218 } }) }])
+    mockCurl([{ status: 200, body: JSON.stringify({ success: true, data: { total: 8102218 } }) }])
     expect(await getBirdeyeTotalHolders('addr')).toBe(8102218)
   })
 
   it('returns 0 on failure', async () => {
-    mockHttp2([{ status: 500, body: '{}' }])
+    mockCurl([{ status: 500, body: '{}' }])
     expect(await getBirdeyeTotalHolders('addr')).toBe(0)
   })
 })
