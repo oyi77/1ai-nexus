@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { MemeAlphaToken, MemeRiskAudit } from '../types'
+import { normalizeTimestamp } from '../normalize'
 
 const GECKO_BASE = 'https://api.geckoterminal.com/api/v2/networks/solana'
 
@@ -30,7 +31,7 @@ interface GeckoPoolAttrs {
   fdv_usd?: string
   market_cap_usd?: string
   price_change_percentage?: Record<string, string>
-  volume_usd?: string
+  volume_usd?: string | { h24?: string; h6?: string; h1?: string }
   reserve_in_usd?: string
   transactions?: Record<string, { buys?: number; sells?: number; buyers?: number; sellers?: number }>
 }
@@ -90,11 +91,12 @@ function poolToToken(pool: GeckoPool): MemeAlphaToken | null {
     name: symbol,
     price: toNum(attrs.base_token_price_usd),
     change24h: changePct / 100,
-    volume24h: toNum(attrs.volume_usd),
+    volume24h: toNum(typeof attrs.volume_usd === 'object' ? attrs.volume_usd?.h24 : attrs.volume_usd),
     marketCap: toNum(attrs.market_cap_usd),
     liquidity: toNum(attrs.reserve_in_usd),
-    createdAt: attrs.pool_created_at ? new Date(attrs.pool_created_at).getTime() : null,
+    createdAt: normalizeTimestamp(attrs.pool_created_at),
     riskLevel: 0,
+    // Pool payload exposes no holder counts (confirmed-absent 2026-10-07).
     holders: 0,
     top10HolderPercent: 0,
     social: {},

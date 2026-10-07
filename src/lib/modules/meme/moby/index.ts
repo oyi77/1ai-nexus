@@ -33,6 +33,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
+import { normalizeChainId, normalizeTimestamp } from '../normalize'
 
 const MOBY_BASE = 'https://web-api.mobyscreener.com/web/api_v2'
 const PRIVY_APP_ID = 'cmg5m1dgg025kl20cusn1cypb'
@@ -215,7 +216,7 @@ function timeframe24h(v: Record<string, number> | number | undefined): number {
 function toToken(e: MobyEntry): MemeAlphaToken | null {
   const contract = e.token_address ?? ''
   if (!contract) return null
-  const chain = e.network ?? 'solana'
+  const chain = normalizeChainId(e.network ?? 'solana')
   const change24h = toNum(e.price_change_percent?.h24) / 100
   return {
     id: `${chain}:${contract}`,
@@ -229,7 +230,7 @@ function toToken(e: MobyEntry): MemeAlphaToken | null {
     volume24h: timeframe24h(e.volume_usd),
     marketCap: toNum(e.market_cap_usd),
     liquidity: toNum(e.liquidity_usd),
-    createdAt: e.token_created ? Date.parse(e.token_created) || null : null,
+    createdAt: e.token_created ? normalizeTimestamp(Date.parse(e.token_created) || null) : null,
     riskLevel: safetyRisk(e.safety_tier),
     holders: 0, // leaderboard rows carry no holder count; audit fills it
     top10HolderPercent: 0,

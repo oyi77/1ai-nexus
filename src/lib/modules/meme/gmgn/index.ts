@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { MemeAlphaToken, MemeRiskAudit } from '../types'
+import { normalizeChainId, normalizeTimestamp } from '../normalize'
 import { logger } from '../../../logger'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -187,14 +188,15 @@ export async function discoverGmgnTokens(limitPerChain = 20): Promise<MemeAlphaT
         const info = item.tokenInfo
         if (!info?.address) continue
 
-        const id = `${chainId}:${info.address.toLowerCase()}`
+        const normChain = normalizeChainId(chainId)
+        const id = `${normChain}:${info.address.toLowerCase()}`
         if (seen.has(id)) continue
         seen.add(id)
 
         const token: MemeAlphaToken = {
           id,
           platform: 'gmgn',
-          chain: chainId,
+          chain: normChain,
           contract: info.address.toLowerCase(),
           symbol: info.symbol || '',
           name: info.name || '',
@@ -203,7 +205,7 @@ export async function discoverGmgnTokens(limitPerChain = 20): Promise<MemeAlphaT
           volume24h: info.volume24h || 0,
           marketCap: info.marketCap || 0,
           liquidity: info.liquidity || 0,
-          createdAt: info.createdAt || null,
+          createdAt: info.createdAt ? normalizeTimestamp(info.createdAt) : null,
           riskLevel: 1,
           holders: info.holders || 0,
           top10HolderPercent: 0,

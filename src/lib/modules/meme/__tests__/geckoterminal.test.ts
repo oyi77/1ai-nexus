@@ -55,6 +55,23 @@ describe('discoverGeckoTerminalTokens', () => {
     expect(t.sellCount24h).toBe(40)
   })
 
+  it('reads nested volume_usd.h24 (upstream object shape)', async () => {
+    const nested = {
+      ...POOL,
+      attributes: { ...POOL.attributes, volume_usd: { h24: '777000', h6: '1', h1: '0' } },
+    }
+    mockFetchOnce(200, { data: [nested] })
+    const tokens = await discoverGeckoTerminalTokens(25)
+    expect(tokens).toHaveLength(1)
+    expect(tokens[0].volume24h).toBe(777000)
+  })
+
+  it('falls back to flat volume_usd strings (legacy shape)', async () => {
+    mockFetchOnce(200, { data: [POOL] })
+    const tokens = await discoverGeckoTerminalTokens(25)
+    expect(tokens[0].volume24h).toBe(125000)
+  })
+
   it('returns empty array on upstream failure', async () => {
     mockFetchOnce(500, {})
     const tokens = await discoverGeckoTerminalTokens(25)

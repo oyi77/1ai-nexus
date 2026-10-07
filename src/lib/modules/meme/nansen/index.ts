@@ -20,6 +20,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { logger } from '@/lib/logger'
 import type { MemeAlphaToken, MemeRiskAudit } from '../types'
+import { normalizeChainId, normalizeTimestamp } from '../normalize'
 
 // ───────────────────── ENV & CONFIG ────────────────────────
 
@@ -275,9 +276,9 @@ export async function discoverTokens(limit: number = 20): Promise<MemeAlphaToken
       const riskLevel = token.netflow && token.netflow > 0 ? 1 : 0
       
       return {
-        id: `${token.chain}:${token.token_address}`,
+        id: `${normalizeChainId(token.chain)}:${token.token_address}`,
         platform: 'nansen',
-        chain: token.chain,
+        chain: normalizeChainId(token.chain),
         contract: token.token_address,
         symbol: token.token_symbol.toUpperCase(),
         name: token.token_symbol.toUpperCase(), // Fall back to symbol
@@ -287,10 +288,22 @@ export async function discoverTokens(limit: number = 20): Promise<MemeAlphaToken
         marketCap: token.market_cap_usd ?? 0,
         liquidity: token.liquidity ?? 0,
         createdAt: token.token_deployment_date
-          ? new Date(token.token_deployment_date).getTime()
+          ? normalizeTimestamp(new Date(token.token_deployment_date).getTime())
           : null,
-        holders: token.nof_traders ?? 0,
+        // ponytail: screener exposes no holder-count field; nof_traders is smart-money
+        // trader count, not holders — keep holders 0 until a real holder field exists.
+        holders: 0,
         top10HolderPercent: 0, // Not available in standard screener response
+        smartMoney: {
+          traderCount: token.nof_traders,
+          buyVolumeUsd: token.buy_volume,
+          sellVolumeUsd: token.sell_volume,
+          netflowUsd: token.netflow,
+          inflowFdvRatio: token.inflow_fdv_ratio,
+          outflowFdvRatio: token.outflow_fdv_ratio,
+          // trader_type=sm filter applied upstream — rows are sm-labeled by construction.
+          labeled: true,
+        },
         social: {},
         audited: false, // audit must be called separately
         buyCount24h: undefined,

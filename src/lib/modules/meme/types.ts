@@ -69,6 +69,19 @@ export interface MemeAlphaToken {
   buyCount24h?: number
   sellCount24h?: number
   /**
+   * Optional smart-money flow (Nansen sm-filtered screener). All subfields
+   * optional, undefined-by-default so other adapters are untouched.
+   */
+  smartMoney?: {
+    traderCount?: number
+    buyVolumeUsd?: number
+    sellVolumeUsd?: number
+    netflowUsd?: number
+    inflowFdvRatio?: number
+    outflowFdvRatio?: number
+    labeled?: boolean
+  }
+  /**
    * Provenance of the discovery row. Optional — absent on rows created
    * before this field existed. `provider` mirrors `platform`.
    */

@@ -17,6 +17,7 @@
 import crypto from 'node:crypto'
 
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
+import { normalizeChainId, normalizeTimestamp } from '../normalize'
 
 
 const GATE_HOST = 'https://openapi.gateweb3.cc'
@@ -147,19 +148,23 @@ export async function discoverGateTokens(limitPerChain = 25): Promise<MemeAlphaT
     const list = raw.data?.tokens ?? []
     for (const t of list) {
       if (!t.address) continue
+      const chain = normalizeChainId(t.chain ?? chainId)
       out.push({
-        id: `${t.chain ?? chainId}:${t.address}`,
+        id: `${chain}:${t.address}`,
         platform: 'gate' as MemePlatform,
-        chain: t.chain ?? String(chainId),
+        chain,
         contract: t.address,
         symbol: t.symbol ?? '',
         name: t.name ?? '',
+        // trend_info carries price_change_24h/volume_24h only — verifier
+        // dump 2026-10-07 shows no spot price or market-cap field on this
+        // endpoint, so price/marketCap stay 0 (confirmed-absent, not mis-mapped).
         price: 0, // discovery response exposes no spot price
         change24h: toNum(t.trend_info?.price_change_24h), // ratio, not percentage
         volume24h: toNum(t.trend_info?.volume_24h),
         marketCap: 0, // discovery response exposes no market cap
         liquidity: toNum(t.liquidity),
-        createdAt: t.created_at ? Date.parse(t.created_at) || null : null,
+        createdAt: normalizeTimestamp(t.created_at ? Date.parse(t.created_at) || null : null),
         riskLevel: 0, // discovery response exposes no per-token risk level
         holders: toNum(t.holder_count),
         top10HolderPercent: 0,
@@ -233,12 +238,10 @@ export async function auditGateToken(chainId: string, address: string): Promise<
     return raw.includes("%") ? val / 100 : val
   }
 
-
-
   return {
-    id: `${chainId}:${address}`,
+    id: `${normalizeChainId(chainId)}:${address}`,
     platform: 'gate',
-    chain: chainId,
+    chain: normalizeChainId(chainId),
     contract: address,
     symbol: '',
     name: '',

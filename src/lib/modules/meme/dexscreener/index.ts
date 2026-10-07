@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
+import { normalizeChainId, normalizeTimestamp } from '../normalize'
 
 const DEXSCREENER_BASE = 'https://api.dexscreener.com'
 
@@ -75,7 +76,7 @@ export async function discoverDexScreenerTokens(limitPerChain = 25): Promise<Mem
         out.push({
           id,
           platform: 'dexscreener' as MemePlatform,
-          chain: p.chainId,
+          chain: normalizeChainId(p.chainId),
           contract: p.baseToken.address,
           symbol: p.baseToken.symbol ?? '',
           name: p.baseToken.name ?? '',
@@ -84,8 +85,9 @@ export async function discoverDexScreenerTokens(limitPerChain = 25): Promise<Mem
           volume24h: toNum(p.volume?.h24),
           marketCap: toNum(p.marketCap),
           liquidity: toNum(p.liquidity?.usd),
-          createdAt: p.pairCreatedAt ?? null,
+          createdAt: p.pairCreatedAt != null ? normalizeTimestamp(p.pairCreatedAt) : null,
           riskLevel: 0,
+          // Pair payload exposes no holder counts (confirmed-absent 2026-10-07).
           holders: 0,
           top10HolderPercent: 0,
           social: {},

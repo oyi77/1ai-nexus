@@ -12,6 +12,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
+import { normalizeChainId, normalizeTimestamp } from '../normalize'
 import { logger } from '@/lib/logger'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -193,7 +194,7 @@ function normalizeToken(entry: FomoFeedEntry): MemeAlphaToken | null {
   const contract = safeString(entry.contract)
   if (!contract) return null
 
-  const chain = entry.chain && entry.chain.length > 0 ? entry.chain : 'solana'
+  const chain = normalizeChainId(entry.chain && entry.chain.length > 0 ? entry.chain : 'solana')
   const change24h = num(entry.priceChangePct?.['24h'] ?? entry.priceChangePct?.h24 ?? 0) / 100
   const id = `${chain}:${contract}`
 
@@ -209,7 +210,7 @@ function normalizeToken(entry: FomoFeedEntry): MemeAlphaToken | null {
     volume24h: num(entry.volumeUsd),
     marketCap: num(entry.marketCapUsd),
     liquidity: num(entry.liquidityUsd),
-    createdAt: entry.createdAt ? Date.parse(entry.createdAt) || null : null,
+    createdAt: entry.createdAt ? normalizeTimestamp(Date.parse(entry.createdAt) || null) : null,
     riskLevel: 2, // unknown for discovery-only platform
     holders: num(entry.holderCount24h),
     top10HolderPercent: 0, // not available from public feed

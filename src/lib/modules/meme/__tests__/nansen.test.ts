@@ -110,7 +110,16 @@ describe('discoverTokens', () => {
     expect(t.volume24h).toBe(3_750_000)
     expect(t.marketCap).toBe(15_400_000)
     expect(t.liquidity).toBe(480_000)
-    expect(t.holders).toBe(1834)
+    expect(t.holders).toBe(0) // screener has no holder count; nof_traders is trader count, not holders
+    expect(t.smartMoney).toEqual({
+      traderCount: 1834,
+      buyVolumeUsd: 2_100_000,
+      sellVolumeUsd: 1_650_000,
+      netflowUsd: -125_000,
+      inflowFdvRatio: 0.02,
+      outflowFdvRatio: 0.03,
+      labeled: true,
+    })
     expect(t.createdAt).toBe(new Date('2026-08-23T10:00:00Z').getTime())
     expect(t.top10HolderPercent).toBe(0) // not in screener response
     expect(t.social).toEqual({})
@@ -126,6 +135,36 @@ describe('discoverTokens', () => {
     expect(t.sellCount24h).toBeUndefined()
     // netflow negative → smart money inflow → riskLevel 0
     expect(t.riskLevel).toBe(0)
+  })
+
+  it('leaves smartMoney subfields undefined when upstream fields are absent', async () => {
+    mockFetchSequence([
+      {
+        status: 200,
+        body: screenerResponse([
+          screenerEntry({
+            nof_traders: undefined,
+            buy_volume: undefined,
+            sell_volume: undefined,
+            netflow: undefined,
+            inflow_fdv_ratio: undefined,
+            outflow_fdv_ratio: undefined,
+          }),
+        ]),
+      },
+    ])
+    const tokens = await discoverTokens()
+    expect(tokens).toHaveLength(1)
+    expect(tokens[0].smartMoney).toEqual({
+      traderCount: undefined,
+      buyVolumeUsd: undefined,
+      sellVolumeUsd: undefined,
+      netflowUsd: undefined,
+      inflowFdvRatio: undefined,
+      outflowFdvRatio: undefined,
+      labeled: true,
+    })
+    expect(tokens[0].holders).toBe(0)
   })
 
   it('maps positive netflow to riskLevel 1', async () => {

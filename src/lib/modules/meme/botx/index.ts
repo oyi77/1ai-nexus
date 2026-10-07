@@ -4,6 +4,7 @@
 // Falls back to BOTX_API_KEY env var if no keys in store.
 
 import type { MemeAlphaToken, MemeRiskAudit } from '../types'
+import { normalizeChainId } from '../normalize'
 import { getCredentialManager } from '../_auth/credential-manager'
 
 const BOTX_HOST = 'https://api-data-v1.dbotx.com'
@@ -181,19 +182,22 @@ export async function discoverBotXTokens(limitPerChain = 25): Promise<MemeAlphaT
 
       for (const row of data.res) {
         if (!row.mint || !row.symbol) continue
-        const id = `${chain}:${row.mint}`
+        const id = `${normalizeChainId(chain)}:${row.mint}`
         if (seen.has(id)) continue
         seen.add(id)
 
+        const normChain = normalizeChainId(chain)
         out.push({
-          id,
+          id: `${normChain}:${row.mint}`,
           platform: 'botx',
-          chain,
+          chain: normChain,
           contract: row.id,  // Use pair address for audit (BotX requires pair, not mint)
           symbol: row.symbol,
           name: row.name || row.symbol,
           price: toNum(row.tokenPriceUsd),
           change24h: toNum(row.priceChange24h),
+          // Upstream exposes 1h volume only (buyAndSellVolume1h); no 24h
+          // window exists (confirmed-absent 2026-10-07). Passed through raw.
           volume24h: toNum(row.buyAndSellVolume1h),
           marketCap: toNum(row.marketCap),
           liquidity: toNum(row.tokenReserve),

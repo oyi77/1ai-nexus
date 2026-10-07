@@ -88,7 +88,7 @@ const BITGET_TOKEN = {
   change_24h: '0.08',
   volume_24h: '9876',
   market_cap: '500000',
-  issue_date: 1788000000000,
+  issue_date: 1788000000, // seconds (upstream unit varies per row)
   holders: 42,
   top10_holder_percent: '0.31',
   risk_level: 'low',
@@ -106,6 +106,8 @@ describe('discoverBitgetTokens', () => {
     const tokens = await discoverBitgetTokens(1)
     expect(tokens).toHaveLength(1)
     expect(tokens[0].platform).toBe('bitget')
+    // Measured defect 2026-10-07: bitget emits SOL/BSC/ETH/BASE short labels.
+    expect(tokens[0].chain).toBe('binance-smart-chain')
     expect(tokens[0].provenance).toEqual({
       sourceType: 'public-api',
       provider: 'bitget',

@@ -49,6 +49,8 @@ describe('discoverGateTokens', () => {
     const tokens = await discoverGateTokens(1)
     expect(tokens).toHaveLength(1)
     expect(tokens[0].platform).toBe('gate')
+    // Measured defect 2026-10-07: gate emits bare chain ids, normalized here.
+    expect(tokens[0].chain).toBe('binance-smart-chain')
     expect(tokens[0].provenance).toEqual({
       sourceType: 'public-api',
       provider: 'gate',

@@ -16,6 +16,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { MemeAlphaToken, MemeRiskAudit } from '../types'
+import { normalizeChainId, normalizeTimestamp } from '../normalize'
 import { logger } from '../../../logger'
 
 const BASE = 'https://api.axiom.xyz/v1'
@@ -201,14 +202,15 @@ export async function discoverTokens(limit?: number): Promise<MemeAlphaToken[]> 
       if (typeof te.address !== 'string' || te.address.length === 0) continue
       if (typeof te.chain !== 'string' || te.chain.length === 0) continue
       if (typeof te.symbol !== 'string' || te.symbol.length === 0) continue
-      const id = `${t.chain}:${t.address}`
+      const normChain = normalizeChainId(t.chain)
+      const id = `${normChain}:${t.address}`
       if (seen.has(id)) continue
       seen.add(id)
 
       tokens.push({
         id,
         platform: 'axiom' as MemeAlphaToken['platform'],
-        chain: t.chain ?? '',
+        chain: normChain,
         contract: t.address ?? '',
         symbol: t.symbol ?? '',
         name: t.name ?? t.symbol ?? '',
@@ -217,7 +219,7 @@ export async function discoverTokens(limit?: number): Promise<MemeAlphaToken[]> 
         volume24h: 0,
         marketCap: 0,
         liquidity: 0,
-        createdAt: t.createdAt ? Date.parse(t.createdAt) : null,
+        createdAt: t.createdAt ? normalizeTimestamp(Date.parse(t.createdAt)) : null,
         riskLevel: levelOf(num(t.riskScore ?? 50)),
         holders: 0,
         top10HolderPercent: 0,

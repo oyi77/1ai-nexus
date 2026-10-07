@@ -119,7 +119,7 @@ describe('discoverTokens', () => {
     expect(t2.riskLevel).toBe(1) // score 45 in [25,50) → level 1
 
     const t3 = tokens[2]
-    expect(t3.chain).toBe('bsc')
+    expect(t3.chain).toBe('binance-smart-chain') // `bsc` normalized 2026-10-07
     expect(t3.symbol).toBe('SHIB')
     expect(t3.riskLevel).toBe(3) // score 80 >= 75 → level 3
   })
@@ -192,7 +192,7 @@ describe('discoverTokens', () => {
     mockFetchSequence([{ status: 200, body: duplicates }])
     const tokens = await discoverTokens()
     expect(tokens).toHaveLength(2)
-    expect(tokens.map((t) => t.id)).toEqual(['eth:0xSame', 'eth:0xDiff'])
+    expect(tokens.map((t) => t.id)).toEqual(['ethereum:0xSame', 'ethereum:0xDiff'])
   })
 
   it('sets correct risk labels based on score levels', async () => {

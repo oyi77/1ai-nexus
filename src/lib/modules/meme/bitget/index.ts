@@ -16,6 +16,7 @@
 import https from 'node:https'
 import crypto from 'node:crypto'
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
+import { normalizeChainId, normalizeTimestamp } from '../normalize'
 
 const BITGET_HOST = 'copenapi.bgwapi.io'
 const BITGET_TIMEOUT_MS = 10_000
@@ -172,7 +173,7 @@ export async function discoverBitgetTokens(limitPerChain = 25): Promise<MemeAlph
     const list = raw.data?.list ?? []
     for (const item of list) {
       if (!item.contract) continue
-      const cChain = item.chain ?? chain
+      const cChain = normalizeChainId(item.chain ?? chain)
       const contract = item.contract
       out.push({
         id: `${cChain}:${contract}`,
@@ -186,7 +187,7 @@ export async function discoverBitgetTokens(limitPerChain = 25): Promise<MemeAlph
         volume24h: toNum(item.volume_24h),
         marketCap: toNum(item.market_cap),
         liquidity: 0,
-        createdAt: item.issue_date ? toNum(item.issue_date) : null,
+        createdAt: normalizeTimestamp(item.issue_date),
         riskLevel: bitgetRiskLevelToNumber(item.risk_level ?? ''),
         holders: toNum(item.holders),
         top10HolderPercent: toNum(item.top10_holder_percent),
@@ -278,11 +279,12 @@ export async function getBitgetBaseInfo(
   const list = raw.data?.list
   if (!list || list.length === 0) return null
   const d = list[0]
-  const id = `${chain}:${contract}`
+  const normChain = normalizeChainId(chain)
+  const id = `${normChain}:${contract}`
   return {
     id,
     platform: 'bitget' as MemePlatform,
-    chain,
+    chain: normChain,
     contract,
     symbol: d.symbol ?? '',
     name: d.name ?? '',
@@ -291,7 +293,7 @@ export async function getBitgetBaseInfo(
     volume24h: 0,
     marketCap: 0,
     liquidity: toNum(d.liquidity),
-    createdAt: d.issue_date ? toNum(d.issue_date) : null,
+    createdAt: normalizeTimestamp(d.issue_date),
     riskLevel: 0,
     holders: toNum(d.holders),
     top10HolderPercent: toNum(d.top10_holder_percent, toNum(d.insider_holder_percent)),

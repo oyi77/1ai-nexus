@@ -17,6 +17,7 @@
 // Chain: solana only (forge API is Solana-specific).
 // ─────────────────────────────────────────────────────────────
 import type { MemeAlphaToken, MemeRiskAudit } from '../types'
+import { normalizeChainId, normalizeTimestamp } from '../normalize'
 import { execFileSync } from 'node:child_process'
 
 const BIRDEYE_BASE = 'https://birdeye.so'
@@ -228,7 +229,7 @@ export async function discoverBirdeyeTokens(limitPerChain = 25): Promise<MemeAlp
     const contract = g.address ?? ''
     if (!contract || seen.has(contract)) continue
     seen.add(contract)
-    const chain = g.network ?? 'solana'
+    const chain = normalizeChainId(g.network ?? 'solana')
     const tf = g.tf24h ?? {}
     const e = g.extensions ?? {}
     const social: MemeAlphaToken['social'] = {}
@@ -247,7 +248,7 @@ export async function discoverBirdeyeTokens(limitPerChain = 25): Promise<MemeAlp
       volume24h: toNum(tf.volumeUSD),
       marketCap: toNum(g.mc),
       liquidity: toNum(g.liquidity),
-      createdAt: typeof g.createdAt === 'number' ? g.createdAt : null,
+      createdAt: typeof g.createdAt === 'number' ? normalizeTimestamp(g.createdAt) : null,
       riskLevel: deriveDiscoveryRisk(g),
       holders: toNum(g.holderCount),
       top10HolderPercent: toNum(g.top10HolderPercent),
