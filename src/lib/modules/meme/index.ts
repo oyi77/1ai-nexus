@@ -56,7 +56,7 @@ export interface MemePlatformEntry {
 function makeDiscoveryModule(
   id: string,
   name: string,
-  discover: () => Promise<unknown[]>,
+  discover: (limit?: number) => Promise<unknown[]>,
 ): DataModule {
   return {
     id,
@@ -85,8 +85,12 @@ function makeDiscoveryModule(
         }
       }
     },
-    async fetch<T>(_params: FetchParams): Promise<ModuleResult<T>> {
-      const tokens = await discover()
+    async fetch<T>(params: FetchParams): Promise<ModuleResult<T>> {
+      const raw = params.limit
+      const lim =
+        typeof raw === 'number' && Number.isFinite(raw) ? Math.min(Math.max(Math.floor(raw), 1), 200) : undefined
+      const all = await discover(lim)
+      const tokens = lim === undefined ? all : all.slice(0, lim)
       return {
         data: { tokens, total: tokens.length } as unknown as T,
         source: id,
@@ -168,17 +172,17 @@ const gateAudit = makeAuditModule('gate-meme-risk', 'Gate.io DEX Meme Risk Audit
   auditGateToken(c, k),
 )
 
-const bitgetDiscovery = makeDiscoveryModule('bitget-meme', 'Bitget Wallet Meme Alpha', () =>
-  discoverBitgetTokens(),
+const bitgetDiscovery = makeDiscoveryModule('bitget-meme', 'Bitget Wallet Meme Alpha', (limit) =>
+  discoverBitgetTokens(limit),
 )
-const gateDiscovery = makeDiscoveryModule('gate-meme', 'Gate.io DEX Meme Alpha', () =>
-  discoverGateTokens(),
+const gateDiscovery = makeDiscoveryModule('gate-meme', 'Gate.io DEX Meme Alpha', (limit) =>
+  discoverGateTokens(limit),
 )
-const botxDiscovery = makeDiscoveryModule('botx-meme', 'BotX Meme Alpha', () =>
-  discoverBotXTokens(),
+const botxDiscovery = makeDiscoveryModule('botx-meme', 'BotX Meme Alpha', (limit) =>
+  discoverBotXTokens(limit),
 )
-const dexscreenerDiscovery = makeDiscoveryModule('dexscreener-meme', 'DEX Screener Meme Alpha', () =>
-  discoverDexScreenerTokens(),
+const dexscreenerDiscovery = makeDiscoveryModule('dexscreener-meme', 'DEX Screener Meme Alpha', (limit) =>
+  discoverDexScreenerTokens(limit),
 )
 const birdeyeAudit = makeAuditModule('birdeye-meme-risk', 'Birdeye Forge Meme Risk Audit', (c, k) =>
   auditBirdeyeToken(c, k),
@@ -193,32 +197,32 @@ const axiomAudit = makeAuditModule(
 )
 
 
-const birdeyeDiscovery = makeDiscoveryModule('birdeye-meme', 'Birdeye Forge Meme Alpha', () =>
-  discoverBirdeyeTokens(),
+const birdeyeDiscovery = makeDiscoveryModule('birdeye-meme', 'Birdeye Forge Meme Alpha', (limit) =>
+  discoverBirdeyeTokens(limit),
 )
-const geckoterminalDiscovery = makeDiscoveryModule('geckoterminal-meme', 'GeckoTerminal Meme Alpha', () =>
-  discoverGeckoTerminalTokens(),
+const geckoterminalDiscovery = makeDiscoveryModule('geckoterminal-meme', 'GeckoTerminal Meme Alpha', (limit) =>
+  discoverGeckoTerminalTokens(limit),
 )
-const mobyDiscovery = makeDiscoveryModule('moby-meme', 'Moby Meme Alpha', () =>
-  discoverMobyTokens(),
+const mobyDiscovery = makeDiscoveryModule('moby-meme', 'Moby Meme Alpha', (limit) =>
+  discoverMobyTokens(limit),
 )
 const mobyAudit = makeAuditModule('moby-meme-risk', 'Moby Meme Risk Audit', (c, k) =>
   auditMobyToken(c, k),
 )
-const gmgnDiscovery = makeDiscoveryModule('gmgn-meme', 'GMGN Meme Alpha', () =>
-  discoverGmgnTokens(),
+const gmgnDiscovery = makeDiscoveryModule('gmgn-meme', 'GMGN Meme Alpha', (limit) =>
+  discoverGmgnTokens(limit),
 )
 const gmgnAudit = makeAuditModule('gmgn-meme-risk', 'GMGN Meme Risk Audit', (c, k) =>
   auditGmgnToken(c, k),
 )
-const fomoDiscovery = makeDiscoveryModule('fomo-meme', 'Fomo Meme Alpha', () =>
-  discoverFomoTokens(),
+const fomoDiscovery = makeDiscoveryModule('fomo-meme', 'Fomo Meme Alpha', (limit) =>
+  discoverFomoTokens(limit),
 )
 const fomoAudit = makeAuditModule('fomo-meme-risk', 'Fomo Meme Risk Audit', (c, k) =>
   auditFomoToken(c, k),
 )
-const nansenDiscovery = makeDiscoveryModule('nansen-meme', 'Nansen Smart Money Alpha', () =>
-  discoverNansenTokens(),
+const nansenDiscovery = makeDiscoveryModule('nansen-meme', 'Nansen Smart Money Alpha', (limit) =>
+  discoverNansenTokens(limit),
 )
 const nansenAudit = makeAuditModule('nansen-meme-risk', 'Nansen Meme Risk Audit', (c, k) =>
   auditNansenToken(c, k),
