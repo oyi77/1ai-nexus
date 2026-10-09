@@ -84,11 +84,28 @@ const ALPH_SEO_ROW = {
   aiNarrativeParagraph: '$HeeHaw is a Solana meme coin based on an incident',
 }
 
+const SEO_OK = { status: 200, body: { code: '200', msg: 'suc', data: ALPH_SEO_ROW } }
+const STATS_EMPTY = { status: 200, body: { code: '200', msg: 'suc' } } // no data -> SEO fallback
+const HOLDERS_EMPTY = { status: 200, body: { code: '200', msg: 'suc', data: [] } }
+
 function mockFetchSequence(responses: Array<{ status: number; body: unknown }>) {
   const queue = [...responses]
   vi.stubGlobal(
     'fetch',
     vi.fn(async (input: string, init?: RequestInit) => {
+      // Audit fetches seo+stats+holders in parallel — route by URL so queued
+      // discovery responses aren't consumed by audit calls and vice versa.
+      if (input.includes('/holders/stats')) {
+        const q = queue.find((r) =>
+          JSON.stringify(r.body).includes('developerPercent') || JSON.stringify(r.body).includes('top10Percent'),
+        )
+        const next = q ?? STATS_EMPTY
+        queue.splice(queue.indexOf(next), 1)
+        return new Response(JSON.stringify(next.body), { status: next.status })
+      }
+      if (input.includes('/coin/detail/holders')) {
+        return new Response(JSON.stringify(HOLDERS_EMPTY.body), { status: 200 })
+      }
       const next = queue.shift() ?? { status: 200, body: { code: '200', msg: 'suc', data: { list: [] } } }
       // Keep the signal in the mock so the timeout test exercises the adapter's
       // AbortSignal wiring rather than merely rejecting an arbitrary promise.
@@ -224,15 +241,38 @@ describe('discoverAlphTokens', () => {
 })
 
 describe('auditAlphToken', () => {
+  const STATS_CLEAN = {
+    status: 200,
+    body: {
+      code: '200',
+      msg: 'suc',
+      data: {
+        totalHolders: '6557',
+        top10Percent: 0.2182,
+        developerPercent: 0,
+        sniperPercent: 0,
+        insiderTradingPercent: 0,
+        bundleWalletPercent: 0.003,
+      },
+    },
+  }
+
   it('maps the SEO gateway detail to a risk audit', async () => {
-    mockFetchSequence([{ status: 200, body: { code: '200', msg: 'suc', data: ALPH_SEO_ROW } }])
+    mockFetchSequence([SEO_OK, STATS_CLEAN])
 
     const audit = await auditAlphToken('solana', ALPH_SEO_ROW.tokenAddress)
     expect(audit).not.toBeNull()
     expect(audit!.platform).toBe('alph')
     expect(audit!.chain).toBe('solana')
     expect(audit!.symbol).toBe('HeeHaw')
-    expect(audit!.top10HolderPercent).toBeCloseTo(0.2182051594, 6)
+    // stats top10 wins over SEO top10
+    expect(audit!.top10HolderPercent).toBeCloseTo(0.2182, 4)
+    expect(audit!.distribution).toEqual({
+      devPercent: 0,
+      sniperPercent: 0,
+      bundlerPercent: 0.003,
+      insiderPercent: 0,
+    })
     expect(audit!.lpLockedPercent).toBe(-1)
     expect(audit!.riskLevel).toBe(1)
     expect(audit!.riskLabel).toBe('low')
@@ -253,6 +293,31 @@ describe('auditAlphToken', () => {
     const audit = await auditAlphToken('solana', ALPH_SEO_ROW.tokenAddress)
     expect(audit!.riskLevel).toBe(3)
     expect(audit!.riskLabel).toBe('high')
+  })
+
+  it('flags dev/sniper/insider concentration as high risk', async () => {
+    mockFetchSequence([
+      SEO_OK,
+      {
+        status: 200,
+        body: {
+          code: '200',
+          msg: 'suc',
+          data: {
+            totalHolders: '900',
+            top10Percent: 0.3,
+            developerPercent: 0.05,
+            sniperPercent: 0,
+            insiderTradingPercent: 0,
+            bundleWalletPercent: 0.01,
+          },
+        },
+      },
+    ])
+
+    const audit = await auditAlphToken('solana', ALPH_SEO_ROW.tokenAddress)
+    expect(audit!.riskLevel).toBe(3)
+    expect(audit!.distribution!.devPercent).toBeCloseTo(0.05, 4)
   })
 
   it('returns null for empty detail payloads', async () => {

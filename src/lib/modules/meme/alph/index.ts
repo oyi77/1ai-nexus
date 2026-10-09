@@ -9,6 +9,11 @@
 //     GET https://b.alph.ai/smart-web-gateway/trade/snipe/graduatedList
 //   audit/detail:
 //     GET https://b.alph.ai/seo-web-gateway/token/token-seo?chain={...}&token={addr}
+//     GET {BASE}/coin/detail/holders/stats?chain={short}&token={addr}
+//       -> {top10Percent, dev=developerPercent, sniper=sniperPercent,
+//           insider=insiderTradingPercent, bundler=bundleWalletPercent}
+//     GET {BASE}/coin/detail/holders?chain={short}&token={addr} (list[100]
+//       wallet rows: walletAddress + holdingsRate fraction -> topWallets)
 // probe evidence 2026-10-09:
 //   - bare header-minimal GET (no Origin/Referer/UA) returns 200; Node fetch
 //     reaches b.alph.ai clean (200) — no curl-child transport needed.
@@ -169,6 +174,33 @@ interface AlphTokenSeoResponse {
     aiNarrativeSentence?: string
     aiNarrativeParagraph?: string
   }
+}
+
+interface AlphHoldersStatsResponse {
+  code: string
+  msg: string
+  data?: {
+    totalHolders?: string
+    top10Percent?: number
+    top100Percent?: number
+    developerPercent?: number
+    sniperPercent?: number
+    insiderTradingPercent?: number
+    bundleWalletPercent?: number
+    phishingPercent?: number
+    trackerTotal?: number
+  }
+}
+
+interface AlphHolderRow {
+  walletAddress?: string
+  holdingsRate?: string
+}
+
+interface AlphHoldersResponse {
+  code: string
+  msg: string
+  data?: AlphHolderRow[]
 }
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -365,10 +397,15 @@ export async function discoverAlphTokens(limit: number = 50): Promise<MemeAlphaT
 // ── Risk Audit ──────────────────────────────────────────────
 
 /**
- * Per-token detail from the keyless Alph.ai SEO gateway
- * (priceUsdt, chg24h percentage, marketCap, poolLiquidity, vol24h,
- * top10 fraction, holdersNum). No tax/freeze/mint/honeypot signals —
- * riskLevel is a top10-concentration + holder-count heuristic.
+ * Per-token audit from three keyless Alph.ai feeds (all short-chain-id):
+ *   token-seo     — priceUsdt, marketCap, vol24h, top10, holdersNum
+ *   holders/stats — top10Percent, developerPercent, sniperPercent,
+ *                   insiderTradingPercent, bundleWalletPercent
+ *   holders       — top-100 wallet rows (walletAddress + holdingsRate)
+ * Feeds degrade independently: stats/list failures keep the SEO-only audit.
+ * riskLevel: 3 when dev>2% / sniper>6% / insider>5% / bundler>30% / top10>80%
+ * (sniper hard-filter ceilings, live 2026-10-09); 2 when top10>50% or sparse;
+ * 1 only on measured-low concentration.
  */
 export async function auditAlphToken(
   chain: string,
@@ -379,55 +416,81 @@ export async function auditAlphToken(
   // live 2026-10-09: chain=sol returns full data, chain=solana returns
   // {"code":"200"} with no data field — hence this reverse map, not normalizeChainId.
   const upstreamChain = ALPH_UPSTREAM_CHAIN[normalizeChainId(chain) || chain.toLowerCase()]
-  if (!upstreamChain) return null
-  const url = `${SEO_BASE}/token/token-seo?chain=${upstreamChain}&token=${trimmed(contract)}`
-  try {
-    const res = await fetchWithRetry<AlphTokenSeoResponse>(url)
-    if (!res || res.code !== '200' || !res.data) {
-      logger.warn(CONTEXT, `Audit empty for ${upstreamChain}:${contract}: ${res?.code} ${res?.msg}`)
-      return null
-    }
+  if (!upstreamChain || !trimmed(contract)) return null
 
-    const d = res.data
-    // token-seo rows OMIT fields on quiet tokens (no marketCap/top10/
-    // holdersNum — live 2026-10-09). Sparse rows cannot justify safety:
-    // default middle, escalate only on measured concentration.
-    let riskLevel = 2
-    if (num(d.top10) > 0) {
-      if (num(d.top10) > 0.8) riskLevel = 3
-      else if (num(d.top10) > 0.5) riskLevel = 2
-      else riskLevel = 1
-    } else if (num(d.holdersNum) > 0 && num(d.holdersNum) < 50) {
-      riskLevel = 2
-    }
-
-    const label: MemeRiskAudit['riskLabel'] =
-      riskLevel >= 3 ? 'high' : riskLevel === 2 ? 'middle' : riskLevel === 1 ? 'low' : 'safe'
-
-    const outChain = normalizeChainId(chain)
-    return {
-      id: `${outChain}:${contract}`,
-      platform: 'alph',
-      chain: outChain,
-      contract,
-      symbol: trimmed(d.code),
-      name: trimmed(d.fullName),
-      riskLevel,
-      riskLabel: label,
-      buyTax: 0, // not reported by this source
-      sellTax: 0, // not reported by this source
-      top10HolderPercent: num(d.top10),
-      lpLockedPercent: -1, // unknown
-      canFreeze: false, // not reported by this source
-      canMint: false, // not reported by this source
-      isHoneypot: false, // not reported by this source
-      riskCounts: { high: 0, middle: 0, low: 0 },
-      auditedAt: Date.now(),
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    logger.error(CONTEXT, `Audit failed for ${upstreamChain}:${contract}: ${message}`)
+  const [seo, stats, holders] = await Promise.all([
+    fetchWithRetry<AlphTokenSeoResponse>(
+      `${SEO_BASE}/token/token-seo?chain=${upstreamChain}&token=${contract}`,
+    ).catch(() => null),
+    fetchWithRetry<AlphHoldersStatsResponse>(
+      `${BASE}/coin/detail/holders/stats?chain=${upstreamChain}&token=${contract}`,
+    ).catch(() => null),
+    fetchWithRetry<AlphHoldersResponse>(
+      `${BASE}/coin/detail/holders?chain=${upstreamChain}&token=${contract}`,
+    ).catch(() => null),
+  ])
+  if (!seo || seo.code !== '200' || !seo.data) {
+    logger.warn(CONTEXT, `Audit empty for ${upstreamChain}:${contract}: ${seo?.code} ${seo?.msg}`)
     return null
+  }
+
+  const d = seo.data
+  const st = stats?.code === '200' ? stats.data : undefined
+  const top10 = st?.top10Percent != null ? num(st.top10Percent) : num(d.top10)
+  const dev = num(st?.developerPercent)
+  const sniper = num(st?.sniperPercent)
+  const insider = num(st?.insiderTradingPercent)
+  const bundler = num(st?.bundleWalletPercent)
+
+  let riskLevel = 2 // sparse rows cannot justify safety
+  const hot = dev > 0.02 || sniper > 0.06 || insider > 0.05 || bundler > 0.3 || top10 > 0.8
+  if (hot) riskLevel = 3
+  else if (top10 > 0 && top10 <= 0.5 && dev === 0 && sniper === 0 && insider === 0 && bundler <= 0.1) {
+    riskLevel = 1
+  }
+
+  // topWallets from the holders list (holdingsRate fraction, capped 10)
+  const topWallets: Array<{ address: string; percent: number }> = []
+  if (Array.isArray(holders?.data)) {
+    for (const row of holders.data.slice(0, 10)) {
+      const addr = trimmed(row.walletAddress)
+      const pct = num(row.holdingsRate)
+      if (addr && pct > 0) topWallets.push({ address: addr, percent: pct })
+    }
+  }
+
+  const label: MemeRiskAudit['riskLabel'] =
+    riskLevel >= 3 ? 'high' : riskLevel === 2 ? 'middle' : riskLevel === 1 ? 'low' : 'safe'
+
+  const outChain = normalizeChainId(chain)
+  return {
+    id: `${outChain}:${contract}`,
+    platform: 'alph',
+    chain: outChain,
+    contract,
+    symbol: trimmed(d.code),
+    name: trimmed(d.fullName),
+    riskLevel,
+    riskLabel: label,
+    buyTax: 0, // not reported by this source
+    sellTax: 0, // not reported by this source
+    top10HolderPercent: top10,
+    lpLockedPercent: -1, // unknown
+    canFreeze: false, // not reported by this source
+    canMint: false, // not reported by this source
+    isHoneypot: false, // not reported by this source
+    riskCounts: { high: hot ? 1 : 0, middle: riskLevel === 2 ? 1 : 0, low: 0 },
+    // Absent stats = unproven, never claimed as measured-zero.
+    distribution: st
+      ? {
+          devPercent: dev,
+          sniperPercent: sniper,
+          bundlerPercent: bundler,
+          insiderPercent: insider,
+        }
+      : undefined,
+    topWallets: topWallets.length ? topWallets : undefined,
+    auditedAt: Date.now(),
   }
 }
 
