@@ -16,6 +16,7 @@
 
 import 'dotenv/config'
 import { runSniperScan } from '@/lib/modules/derived/sniper-scan'
+import { appendSniperScan } from '@/lib/modules/derived/sniper-log'
 
 const LIMIT = Number(process.env.SNIPER_SCAN_LIMIT) || 5
 const DELIVER = process.env.SNIPER_DELIVER !== 'false'
@@ -23,6 +24,7 @@ const DELIVER = process.env.SNIPER_DELIVER !== 'false'
 async function main() {
   console.log(`[sniper] scan start (limit=${LIMIT}, deliver=${DELIVER})`)
   const res = await runSniperScan({ limit: LIMIT, deliver: DELIVER })
+  appendSniperScan(res)
 
   console.log(
     `[sniper] scanned=${res.scanned} execute=${res.executed} watchlist=${res.watchlisted} ` +

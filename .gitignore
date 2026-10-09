@@ -83,6 +83,7 @@ data/gmgn-session.json
 data/fomo-session.json
 data/nansen-session.json
 data/stockbit-session.json
+data/alphio-session.json
 
 # gamification rollback snapshot (large prod pg_dump — must NOT be committed)
 /backup_before_gamification.sql
@@ -96,6 +97,7 @@ data/feed-health-prev.json
 data/idx-blocked-until.txt
 data/sniper-circuit.json
 data/sniper-seen.json
+data/sniper-log.json
 
 # nightly DB dumps (large, regenerated — never commit)
 backups/

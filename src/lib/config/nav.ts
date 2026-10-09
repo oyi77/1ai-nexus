@@ -134,6 +134,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: 'Moby Screener', href: '/moby', icon: Target, description: 'Moby smart-money groups, launchpads, charts and PnL.' },
       { label: 'Leaderboard', href: '/meme/leaderboard', icon: Flame, description: 'Ranked meme-token discovery feed.' },
       { label: 'Risk Audit', href: '/meme/risk', icon: Shield, description: 'Honeypot / rug-pull risk audit.' },
+      { label: 'Sniper', href: '/meme/sniper', icon: Target, description: 'Live snipe decisions, rejection reasons and the daily stop circuit.' },
       { label: 'Launch Alpha', href: '/meme/launch-alpha', icon: Flame, description: 'Recently launched meme tokens.' },
     ],
   },
