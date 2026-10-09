@@ -141,7 +141,11 @@ describe('meme-sniper hard filters', () => {
       const d = evaluateSniper(clean({
         distribution: {
           ...clean().distribution,
-          topWallets: [{ address: 'Bad1111111111111111111111111111111111111111', percent: 9, kind }],
+          topWallets: [
+            { address: 'Bad1111111111111111111111111111111111111111', percent: 9, kind },
+            { address: 'H21111111111111111111111111111111111111111', percent: 2, kind: 'holder' },
+            { address: 'H31111111111111111111111111111111111111111', percent: 1, kind: 'holder' },
+          ],
         },
       }))
       expect(d.status, `kind ${kind}`).toBe('REJECT')
@@ -168,11 +172,67 @@ describe('meme-sniper hard filters', () => {
     const d = evaluateSniper(clean({
       distribution: {
         devPercent: null, sniperPercent: null, bundlerPercent: null,
-        insiderPercent: null, top10Percent: null,
+        insiderPercent: null, top10Percent: null, clusterPercent: null,
+        topWallets: [],
       },
     }), { executeEnabled: true })
     expect(d.status).toBe('REJECT')
-    expect(d.rejections.length).toBe(5)
+    // UNKNOWN must never collapse to 0 / pass: dev, sniper, bundler,
+    // insider, top10, cluster, top1-3 = 7 independent UNKNOWN rejections.
+    expect(d.rejections.length).toBe(7)
+    expect(d.rejections.join(' ')).toContain('Linked cluster unproven')
+    expect(d.rejections.join(' ')).toContain('Top 1-3 holder identities unproven')
+  })
+
+  it('rejects an unproven honeypot instead of passing it', () => {
+    const d = evaluateSniper(clean({
+      security: { ...clean().security, honeypot: null },
+    }), { executeEnabled: true })
+    expect(d.status).toBe('REJECT')
+    expect(d.rejections.join(' ')).toContain('Honeypot status unproven')
+  })
+
+  it('treats an undefined cluster as unproven, not as 0', () => {
+    const d = evaluateSniper(clean({
+      distribution: { ...clean().distribution, clusterPercent: undefined },
+    }), { executeEnabled: true })
+    expect(d.status).toBe('REJECT')
+    expect(d.rejections.join(' ')).toContain('Linked cluster unproven')
+  })
+
+  it('passes cluster at the ceiling but rejects one point above', () => {
+    const at = evaluateSniper(clean({
+      distribution: { ...clean().distribution, clusterPercent: 5 },
+    }), { executeEnabled: true })
+    expect(at.rejections.join(' ')).not.toContain('cluster')
+    const over = evaluateSniper(clean({
+      distribution: { ...clean().distribution, clusterPercent: 5.1 },
+    }), { executeEnabled: true })
+    expect(over.status).toBe('REJECT')
+    expect(over.rejections.join(' ')).toContain('Linked cluster')
+  })
+
+  it('keeps a locked-100% LP safe when the burn leg is unproven', () => {
+    const d = evaluateSniper(clean({
+      security: { ...clean().security, lpLockedPercent: 100, lpBurnedPercent: null },
+    }), { executeEnabled: true })
+    expect(d.rejections.join(' ')).not.toContain('LP')
+  })
+
+  it('rejects an unproven LP (neither burn nor lock reported)', () => {
+    const d = evaluateSniper(clean({
+      security: { ...clean().security, lpLockedPercent: null, lpBurnedPercent: null },
+    }), { executeEnabled: true })
+    expect(d.status).toBe('REJECT')
+    expect(d.rejections.join(' ')).toContain('LP burn/lock unproven')
+  })
+
+  it('rejects a partially-locked LP with an unproven burn leg', () => {
+    const d = evaluateSniper(clean({
+      security: { ...clean().security, lpLockedPercent: 60, lpBurnedPercent: null },
+    }), { executeEnabled: true })
+    expect(d.status).toBe('REJECT')
+    expect(d.rejections.join(' ')).toContain('burn unproven')
   })
 })
 

@@ -1,0 +1,408 @@
+[
+ {
+  "name": "Al4n",
+  "emoji": "4\ufe0f\u20e3",
+  "alertsOn": false,
+  "address": "2AtFkEamLgK9ByuFX5XmG7WHZ9CVLFC6pxhWpfYkL1KZ",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "moneymaykah",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "2CXbN6nuTTb4vCrtYM89SfQHMMKGPAW4mvFe6Ht4Yo6z",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Al4n",
+  "emoji": "4\ufe0f\u20e3",
+  "alertsOn": false,
+  "address": "2YJbcB9G8wePrpVBcT31o8JEed6L3abgyCjt5qkJMymV",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Jidn",
+  "emoji": "\ud83e\udd7a",
+  "alertsOn": false,
+  "address": "3h65MmPZksoKKyEpEjnWU2Yk2iYT5oZDNitGy5cTaxoE",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Bastille",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "3kebnKw7cPdSkLRfiMEALyZJGZ4wdiSRvmoN4rD1yPzV",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Kai",
+  "emoji": "\ud83e\udd98",
+  "alertsOn": false,
+  "address": "3pkY4S76Jw1UDS8Qgz4wD3DxrTxz7QfyC8yTbXJoZcMT",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Staqi",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "3rSZJHysEk2ueFVovRLtZ8LGnQBMZGg96H2Q4jErspAF",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Nach",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "4aDdi3EiDPMbeZ3e5BvbFMt4vfJaoahaHxZuwKQRtFc1",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "JIJO",
+  "emoji": "\ud83d\udc68\u200d\ud83c\udf93",
+  "alertsOn": true,
+  "address": "4BdKaxN8G6ka4GYtQQWk4G4dZRUTX2vQH9GcXdBREFUk",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "mitch (idrawline)",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "4Be9CvxqHW6BYiRAxW9Q3xu1ycTMWaL5z8NX4HR3ha7t",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "ShockedJS",
+  "emoji": "\ud83d\udd35",
+  "alertsOn": false,
+  "address": "4Bq5yvgoiZDsukGERb7aM52jDmbVPCpoihbztscZ5PeM",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Nick",
+  "emoji": "\ud83c\udf1f",
+  "alertsOn": false,
+  "address": "4mNSHeknNwJ7cfjKwarqt6aNvj5yf8mzfLEKEJjroXpJ",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Joji",
+  "emoji": "\ud83d\udc15\ufe0f",
+  "alertsOn": false,
+  "address": "525LueqAyZJueCoiisfWy6nyh4MTvmF4X9jSqi6efXJT",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Staqi",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "636N7frU8bUwYfyUAtvMQQsXhTFRuSWjxnEZihr5axGV",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "assasin.eth",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "6LChaYRYtEYjLEHhzo4HdEmgNwu2aia8CM8VhR9wn6n7",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Waddles",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "73LnJ7G9ffBDjEBGgJDdgvLUhD5APLonKrNiHsKDCw5B",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "LEENS",
+  "emoji": "\ud83d\ude3a",
+  "alertsOn": false,
+  "address": "7Dt5oUpxHWuKH8bCTXDLz2j3JyxA7jEmtzqCG6pnh96X",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Insentos",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "7SDs3PjT2mswKQ7Zo4FTucn9gJdtuW4jaacPA65BseHS",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "meechie",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "831qmkeGhfL8YpcXuhrug6nHj1YdK3aXMDQUCo85Auh1",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Cooker",
+  "emoji": "\ud83d\udc68\u200d\ud83c\udf73",
+  "alertsOn": false,
+  "address": "8deJ9xeUvXSJwicYptA9mHsU2rN2pDx37KWzkDkEXhU6",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "daumen.eth",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "8MaVa9kdt3NW4Q5HyNAm1X5LbR8PQRVDc1W8NMVK88D5",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Casino616 (TOP 2 DAILY)",
+  "emoji": "\ud83d\ude05",
+  "alertsOn": false,
+  "address": "8rvAsDKeAcEjEkiZMug9k8v1y8mW6gQQiMobd89Uy7qR",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "POW",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "8zFZHuSRuDpuAR7J6FzwyF3vKNx4CVW3DFHJerQhc7Zd",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Orange",
+  "emoji": "\ud83d\udfe0",
+  "alertsOn": false,
+  "address": "96sErVjEN7LNJ6Uvj63bdRWZxNuBngj56fnT9biHLKBf",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Zrool",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "99i9uVA7Q56bY22ajKKUfTZTgTeP5yCtVGsrG9J4pDYQ",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "NACH",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "9jyqFiLnruggwNn4EQwBNFXwpbLM9hrA4hV59ytyAVVz",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "FaZe Lacy",
+  "emoji": "\ud83d\udc8a",
+  "alertsOn": false,
+  "address": "9nJ72hhtwyGHoUbEN3xfGuiLnrX3SnLYX52hkoahn2YH",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Barsik",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "9UWZFoiCHeYRLmzmDJhdMrP7wgrTw7DMSpPiT2eHgJHe",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "UNION",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "AJ6MGExeK7FXmeKkKPmALjcdXVStXYokYNv9uVfDRtvo",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "S (TOP 3 DAILY)",
+  "emoji": "\ud83d\ude45\u200d\u2642\ufe0f",
+  "alertsOn": false,
+  "address": "ApRnQN2HkbCn7W2WWiT2FEKvuKJp9LugRyAE1a9Hdz1",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Ansem",
+  "emoji": "\ud83c\udc04\ufe0f",
+  "alertsOn": false,
+  "address": "AVAZvHLR2PcWpDf8BXY4rVxNHYRBytycHkcB5z5QNXYm",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "DV (TOP 1 DAILY)",
+  "emoji": "\ud83e\uddb5",
+  "alertsOn": false,
+  "address": "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "KREO",
+  "emoji": "\ud83d\udc6e",
+  "alertsOn": true,
+  "address": "BCnqsPEtA1TkgednYEebRpkmwFRJDCjMQcKZMMtEdArc",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "GH0STEE",
+  "emoji": "\ud83d\udc7b",
+  "alertsOn": false,
+  "address": "BD7oWkEQsUwE8sj4UT7jtrGjHC8Gq1iRqXY7U6DTbJpf",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Orangie",
+  "emoji": "\ud83c\udf4a",
+  "alertsOn": false,
+  "address": "BiqkWhrJ4dfpE6TeNY34tA4GssG23SBH8CU8mqB7xZ6t",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Insyider",
+  "emoji": "\ud83c\udfc4\u200d\u2642\ufe0f",
+  "alertsOn": true,
+  "address": "c3XGUoDSBaJDA8qaJ5pUkCnamMERwZLJBVjxdkNepGo",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "FaZe Banks",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "CkxVhktjqYuhsVfNQzqEZkwQ2gMU1wEFPM3FSSVXGjM9",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Teige",
+  "emoji": "\ud83e\udd0e",
+  "alertsOn": false,
+  "address": "CmgPfZHXQ1j3HUTcr6ByoqbfMF19VqFbym34AawHDoTL",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Frankdegod",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "CRVidEDtEUTYZisCxBZkpELzhQc9eauMLR3FWg74tReL",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Cented",
+  "emoji": "\ud83d\udc46",
+  "alertsOn": false,
+  "address": "CyaE1VxvBrahnPWkqm5VsdCvyS2QmNht2UFrKJHga54o",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Dior",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "D2wBctC1K2mEtA17i8ZfdEubkiksiAH2j8F7ri3ec71V",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Euris",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "DfMxre4cKmvogbLrPigxmibVTTQDuzjdXojWzjCXXhzj",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Gake",
+  "emoji": "\ud83e\udd8e",
+  "alertsOn": false,
+  "address": "DNfuF1L62WWyW3pNakVkyGGFzVVhj4Yr52jSmdTyeBHm",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "TRAX",
+  "emoji": "\ud83e\udd50",
+  "alertsOn": false,
+  "address": "EABXkKHLdH8Cb8YjJ2Zcj4ybnY4xUDbXELs9cy6rMQi8",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "qt",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "EhRp3PVPqCe2ms3Cjgxg9LSXygxCkJfehPZnVPGienpg",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Jalen",
+  "emoji": "\ud83c\udfca\ufe0f",
+  "alertsOn": false,
+  "address": "F72vY99ihQsYwqEDCfz7igKXA5me6vN2zqVsVUTpw6qL",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Terp",
+  "emoji": "\ud83d\udc68",
+  "alertsOn": false,
+  "address": "G2VzymsKt3zNAn4CKBndYcS67w6Kny5sDEp7Y2W1aTf6",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "profit",
+  "emoji": "\ud83d\udcb2",
+  "alertsOn": false,
+  "address": "G5nxEXuFMfV74DSnsrSatqCW32F34XUnBeq3PfDS7w5E",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Spuno",
+  "emoji": "\ud83e\udd44",
+  "alertsOn": false,
+  "address": "GfXQesPe3Zuwg8JhAt6Cg8euJDTVx751enp9EQQmhzPH",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Polar",
+  "emoji": "\u2744\ufe0f",
+  "alertsOn": false,
+  "address": "GTvBQnRvAPweU2qmYg8MDLND2PAAyYFKe35aKQGMRDaL",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Bugha",
+  "emoji": "\ud83c\udde7\ud83c\udde7",
+  "alertsOn": false,
+  "address": "HABhDh9zrzf8mA4SBo1yro8M6AirH2hZdLNPpuvMH6iA",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Admiral",
+  "emoji": "\ud83c\udd70\ufe0f",
+  "alertsOn": false,
+  "address": "HD5fsofvcEaSimExUkPQxYPec3nT8g2tP2tw8oGPrpBT",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Terp",
+  "emoji": "\ud83d\udc68",
+  "alertsOn": false,
+  "address": "HkFt55P3PhRWHXoTFeuvkKEE4ab26xZ1bk6UmXV88Pwz",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Orangie",
+  "emoji": "\ud83c\udf4a",
+  "alertsOn": false,
+  "address": "HmBmSYwYEgEZuBUYuDs9xofyqBAkw4ywugB1d7R7sTGh",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Kev",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "JDd3hy3gQn2V982mi1zqhNqUw1GfV2UL6g76STojCJPN",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "SolShotta",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": false,
+  "address": "NFJKkZ7yeoAvfHLWNiqAw6CYKWnVAVAQu5PE3AC3qYt",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Cupsey",
+  "emoji": "\ud83e\udd64",
+  "alertsOn": false,
+  "address": "suqh5sHtr8HyJ7q8scBimULPkPpA557prMG47xCHQfK",
+  "sourceFile": "wallet_2.json"
+ },
+ {
+  "name": "Cented",
+  "emoji": "\ud83c\udf6c",
+  "alertsOn": false,
+  "address": "XDgpjPubjN5soLAFmAMjD2uVR1XZxUKgNpMU6Eo97H7",
+  "sourceFile": "wallet_2.json"
+ }
+]

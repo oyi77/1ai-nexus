@@ -68,9 +68,10 @@ export interface SniperPayload {
     topWallets?: SniperTopWallet[]
   }
   momentum: {
-    marketCap: number
-    /** 5-minute volume in USD. */
-    volume5m: number
+    /** Market cap in USD. Null when the source never proved it. */
+    marketCap: number | null
+    /** 5-minute volume in USD. Null when the source never proved it. */
+    volume5m: number | null
     /** Average unrealized PnL across the top-5 holders, in percent. */
     top5AvgPnlPercent?: number | null
     narrative?: string
@@ -145,12 +146,12 @@ export const MAX_CONSECUTIVE_STOP_LOSSES = 3
 
 const L = SNIPER_LIMITS
 
-function fmtPct(v: number | null | undefined): string {
-  return v === null || v === undefined ? 'n/a' : `${Math.round(v * 10) / 10}`
+function fmtPct(v: unknown): string {
+  return isPct(v) ? `${Math.round(v * 10) / 10}` : 'n/a'
 }
 
-function fmtUsd(n: number): string {
-  return `$${Math.round(n).toLocaleString('en-US')}`
+function fmtUsd(n: unknown): string {
+  return isPct(n) ? `$${Math.round(n).toLocaleString('en-US')}` : '$n/a'
 }
 
 /**
@@ -183,11 +184,37 @@ function assessPnl(avg: number | null | undefined): PnlAssessment {
   return 'neutral'
 }
 
+// ── Input shape guard ───────────────────────────────────────────
+// The evaluator must treat a malformed value the same as a missing one.
+// Upstream JSON (and ad-hoc callers) can hand us a string ('none'), NaN, or
+// an error object where a number was expected — JS comparisons then behave
+// unpredictably ('none' > 5 is false ⇒ a breach silently passes). A gate is
+// only asked to judge a finite number; everything else is UNKNOWN.
+
+/** Finite-number check: null, undefined, NaN, strings and objects all fail. */
+function isPct(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v)
+}
+
+function pctOrNull(v: unknown): number | null {
+  return isPct(v) ? v : null
+}
+
 // ── Hard gates ────────────────────────────────────────────────
 
 function securityBreaches(p: SniperPayload): string[] {
   const out: string[] = []
-  const s = p.security
+  const raw = p.security
+  // Normalize once: any malformed fact becomes its unproven twin, so the
+  // gates below only ever see boolean | null and finite number | null.
+  const s = {
+    mintable: raw.mintable === false ? false : raw.mintable === true ? true : null,
+    freezeAuthority:
+      raw.freezeAuthority === false ? false : raw.freezeAuthority === true ? true : null,
+    honeypot: raw.honeypot === true ? true : raw.honeypot === false ? false : null,
+    lpBurnedPercent: pctOrNull(raw.lpBurnedPercent),
+    lpLockedPercent: pctOrNull(raw.lpLockedPercent),
+  }
 
   if (s.mintable !== false) {
     out.push(
@@ -203,28 +230,60 @@ function securityBreaches(p: SniperPayload): string[] {
         : 'Freeze authority ENABLED — holders can be frozen',
     )
   }
+  // UNKNOWN is not safe: a honeypot whose status was never proven must not
+  // pass a gate the operator treats as a hard sell-side guarantee.
   if (s.honeypot === true) out.push('Honeypot: sells are blocked')
+  else if (s.honeypot !== false) {
+    out.push('Honeypot status unproven (sell-side safety unknown)')
+  }
 
-  // Burnt+locked together must cover ~100% of LP. Either leg may be
-  // unproven as long as the OTHER leg proves full coverage: 100% locked
-  // is exit-safe even with burn unproven, and 100% burnt needs no lock
-  // claim. Fully unproven stays a breach.
+  // LP legs are distinct facts — lock, burn, and "unavailable" are NOT the
+  // same. A null leg means that leg was never proven; it must never be read
+  // as 0 nor silently skipped. The rule: burn+lock must cover ~100%, and if
+  // the burn leg is unproven while the lock leg is proven 100%, that is
+  // exit-safe (a locked LP cannot be pulled). Any other unproven leg is a
+  // breach, because the operator's method (materi 07) requires MINT/FREEZE
+  // off + LP fully burned or locked before entry.
+  const burnedKnown = s.lpBurnedPercent != null
+  const lockedKnown = s.lpLockedPercent != null
   const burned = s.lpBurnedPercent ?? 0
   const locked = s.lpLockedPercent ?? 0
-  const lpKnown = s.lpBurnedPercent != null || s.lpLockedPercent != null
-  if (!lpKnown) {
+  if (!burnedKnown && !lockedKnown) {
     out.push('LP burn/lock unproven (must be 100% burnt or locked)')
+  } else if (!burnedKnown && locked >= 99.5) {
+    // Locked 100% proves exit safety without the burn leg.
+  } else if (!burnedKnown) {
+    out.push(
+      `LP lock only ${fmtPct(locked)}% and burn unproven — exit liquidity exposed`,
+    )
+  } else if (!lockedKnown) {
+    out.push(
+      `LP burn only ${fmtPct(burned)}% and lock unproven — exit liquidity exposed`,
+    )
   } else if (burned + locked < 99.5) {
     out.push(`LP only ${fmtPct(burned + locked)}% burnt+locked — exit liquidity exposed`)
   }
   return out
 }
 
+// ── Distribution gates ────────────────────────────────────────
+
 function distributionBreaches(p: SniperPayload): string[] {
   const out: string[] = []
-  const d = p.distribution
+  // Malformed facts become UNKNOWN (null); comparisons below stay numeric.
+  const rawD = p.distribution
+  const d = {
+    devPercent: pctOrNull(rawD.devPercent),
+    sniperPercent: pctOrNull(rawD.sniperPercent),
+    bundlerPercent: pctOrNull(rawD.bundlerPercent),
+    bundlerSoldPercent: pctOrNull(rawD.bundlerSoldPercent),
+    insiderPercent: pctOrNull(rawD.insiderPercent),
+    top10Percent: pctOrNull(rawD.top10Percent),
+    clusterPercent: pctOrNull(rawD.clusterPercent),
+    topWallets: Array.isArray(rawD.topWallets) ? rawD.topWallets : undefined,
+  }
 
-  if (d.devPercent === null || d.devPercent === undefined) out.push('Dev holding unproven (must be 0%)')
+  if (d.devPercent === null) out.push('Dev holding unproven (must be 0%)')
   else if (d.devPercent > L.devPercent) {
     out.push(
       d.devPercent < L.devHardCeilingPercent
@@ -233,12 +292,12 @@ function distributionBreaches(p: SniperPayload): string[] {
     )
   }
 
-  if (d.sniperPercent === null || d.sniperPercent === undefined) out.push('Sniper share unproven')
+  if (d.sniperPercent === null) out.push('Sniper share unproven')
   else if (d.sniperPercent >= L.sniperPercent) {
     out.push(`Snipers hold ${fmtPct(d.sniperPercent)}% (ceiling ${L.sniperPercent}%)`)
   }
 
-  if (d.bundlerPercent === null || d.bundlerPercent === undefined) out.push('Bundler share unproven')
+  if (d.bundlerPercent === null) out.push('Bundler share unproven')
   else if (d.bundlerPercent >= L.bundlerToleratedPercent) {
     out.push(`Bundlers hold ${fmtPct(d.bundlerPercent)}% — above tolerated max ${L.bundlerToleratedPercent}%`)
   } else if (d.bundlerPercent >= L.bundlerPercent && (d.bundlerSoldPercent ?? 0) < 100) {
@@ -247,29 +306,61 @@ function distributionBreaches(p: SniperPayload): string[] {
     )
   }
 
-  if (d.insiderPercent === null || d.insiderPercent === undefined) out.push('Insider share unproven')
+  if (d.insiderPercent === null) out.push('Insider share unproven')
   else if (d.insiderPercent >= L.insiderPercent) {
     out.push(`Insiders hold ${fmtPct(d.insiderPercent)}% (ceiling ${L.insiderPercent}%)`)
   }
 
-  if (d.top10Percent === null || d.top10Percent === undefined) out.push('Top-10 concentration unproven')
+  if (d.top10Percent === null) out.push('Top-10 concentration unproven')
   else if (d.top10Percent >= L.top10Percent) {
     out.push(`Top 10 hold ${fmtPct(d.top10Percent)}% (ceiling ${L.top10Percent}%)`)
   }
 
-  const cluster = d.clusterPercent ?? 0
-  if (cluster > L.clusterPercent) {
-    out.push(`Linked cluster holds ${fmtPct(cluster)}% (ceiling ${L.clusterPercent}%)`)
+  // Cluster is a real fact when a Bubblemap-style source reports it, and
+  // UNKNOWN when it does not. `?? 0` would launder an unreported cluster
+  // into a proven-zero (best possible) value — UNKNOWN is not a zero.
+  if (d.clusterPercent === null) {
+    out.push('Linked cluster unproven — cannot rule out coordinated wallets')
+  } else if (d.clusterPercent > L.clusterPercent) {
+    out.push(`Linked cluster holds ${fmtPct(d.clusterPercent)}% (ceiling ${L.clusterPercent}%)`)
   }
 
-  // Top 1-3 wallets must be broad holders — never fresh/sniper/dev distribution.
+  // Top 1-3 wallets must be broad holders — never fresh/sniper/dev
+  // distribution. The kind is only known when a source labels holders; a
+  // bare address list proves nothing about taint, so a missing/short list is
+  // UNKNOWN, not a pass. No source-supported number is ever invented here.
   const tainted: WalletKind[] = ['fresh', 'sniper', 'dev', 'bundler', 'insider']
-  const top3 = (d.topWallets ?? []).slice(0, 3)
-  const bad = top3.find((w) => tainted.includes(w.kind))
-  if (bad) {
-    out.push(
-      `Top wallet ${bad.address.slice(0, 6)}… is a ${bad.kind} wallet (${fmtPct(bad.percent)}%) — not a clean holder`,
+  const knownKinds = new Set<string>(['fresh', 'sniper', 'dev', 'bundler', 'insider', 'holder', 'unknown'])
+  const clean3 = (d.topWallets ?? [])
+    .filter(
+      (w): w is NonNullable<typeof w> =>
+        !!w && typeof w.address === 'string' && w.address.length > 0,
     )
+    .map((w) => ({
+      address: w.address,
+      percent: pctOrNull((w as { percent?: unknown }).percent),
+      kind: knownKinds.has((w as { kind?: unknown }).kind as string)
+        ? ((w as { kind?: unknown }).kind as WalletKind)
+        : 'unknown',
+    }))
+    .filter((w) => w.percent !== null)
+    .map((w) => ({ address: w.address, percent: w.percent as number, kind: w.kind }))
+  const top3 = clean3.slice(0, 3)
+  if (top3.length < 3) {
+    out.push(
+      `Top 1-3 holder identities unproven (${top3.length} of 3 known) — concentration unverifiable`,
+    )
+  } else if (top3.some((w) => w.kind === 'unknown')) {
+    // Addresses known but the source gave no classification: treat as
+    // UNKNOWN — a wallet that could be a sniper/dev must not clear the gate.
+    out.push('Top 1-3 holder classification unproven — cannot rule out taint')
+  } else {
+    const bad = top3.find((w) => tainted.includes(w.kind))
+    if (bad) {
+      out.push(
+        `Top wallet ${bad.address.slice(0, 6)}… is a ${bad.kind} wallet (${fmtPct(bad.percent)}%) — not a clean holder`,
+      )
+    }
   }
   return out
 }
@@ -277,8 +368,12 @@ function distributionBreaches(p: SniperPayload): string[] {
 function momentumBreaches(p: SniperPayload, stage: SniperStage): { breaches: string[]; ratio: number } {
   const required = stage === 'new-pair' ? L.newPairVolMcRatio : L.postBondingVolMcRatio
   const mc = p.momentum.marketCap
-  if (!(mc > 0)) return { breaches: ['Market cap is zero/unknown — ratio uncomputable'], ratio: 0 }
-  const ratio = p.momentum.volume5m / mc
+  const vol = p.momentum.volume5m
+  if (!isPct(mc) || mc <= 0) return { breaches: ['Market cap is zero/unknown — ratio uncomputable'], ratio: 0 }
+  if (!isPct(vol) || vol < 0) {
+    return { breaches: ['Volume is unknown — momentum uncomputable'], ratio: 0 }
+  }
+  const ratio = vol / mc
   const breaches: string[] = []
   if (ratio < required) {
     breaches.push(`Dead momentum: 5m vol/mcap ${ratio.toFixed(2)}x < required ${required}x`)
@@ -399,7 +494,42 @@ export interface EvaluateOptions {
   extraWarnings?: string[]
 }
 
-export function evaluateSniper(payload: SniperPayload, opts: EvaluateOptions = {}): SniperDecision {
+export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions = {}): SniperDecision {
+  // Normalize once at the boundary: every downstream consumer (breach fns,
+  // metrics, the Telegram formatter) reads only this object, so a malformed
+  // string/NaN/error-object can never reach a comparison or a `.toFixed`.
+  // A malformed fact becomes its unproven twin — the safest reading.
+  const sec = rawPayload.security
+  const dst = rawPayload.distribution
+  const mom = rawPayload.momentum
+  const payload: SniperPayload = {
+    ...rawPayload,
+    security: {
+      mintable: sec.mintable === false ? false : sec.mintable === true ? true : null,
+      freezeAuthority:
+        sec.freezeAuthority === false ? false : sec.freezeAuthority === true ? true : null,
+      honeypot: sec.honeypot === true ? true : sec.honeypot === false ? false : null,
+      lpBurnedPercent: pctOrNull(sec.lpBurnedPercent),
+      lpLockedPercent: pctOrNull(sec.lpLockedPercent),
+    },
+    distribution: {
+      devPercent: pctOrNull(dst.devPercent),
+      sniperPercent: pctOrNull(dst.sniperPercent),
+      bundlerPercent: pctOrNull(dst.bundlerPercent),
+      bundlerSoldPercent: pctOrNull(dst.bundlerSoldPercent),
+      insiderPercent: pctOrNull(dst.insiderPercent),
+      top10Percent: pctOrNull(dst.top10Percent),
+      clusterPercent: pctOrNull(dst.clusterPercent),
+      topWallets: Array.isArray(dst.topWallets) ? dst.topWallets : undefined,
+    },
+    momentum: {
+      marketCap: pctOrNull(mom.marketCap),
+      volume5m: pctOrNull(mom.volume5m),
+      top5AvgPnlPercent: pctOrNull(mom.top5AvgPnlPercent),
+      narrative: typeof mom.narrative === 'string' ? mom.narrative : undefined,
+    },
+  }
+
   const stage = deriveStage(payload)
   const pnlAssessment = assessPnl(payload.momentum.top5AvgPnlPercent)
 

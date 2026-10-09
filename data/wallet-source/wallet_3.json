@@ -1,0 +1,1164 @@
+[
+ {
+  "name": "OGAntD",
+  "emoji": "\ud83d\ude1e",
+  "alertsOn": false,
+  "address": "215nhcAHjQQGgwpQSJQ7zR26etbjjtVdW74NLzwEgQjP",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "number 1",
+  "emoji": "\ud83d\udcaf",
+  "alertsOn": false,
+  "address": "286CHN57Km41GsAnDv866WKd6YB6HPSjFgF4rGDJTRLf",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Issa",
+  "emoji": "\ud83d\udca5",
+  "alertsOn": false,
+  "address": "2BU3NAzgRA2gg2MpzwwXpA8X4CCRaLgrf6TY1FKfJPX2",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "MoneyMaykah",
+  "emoji": "\u2652",
+  "alertsOn": false,
+  "address": "2CXbN6nuTTb4vCrtYM89SfQHMMKGPAW4mvFe6Ht4Yo6z",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "berly",
+  "emoji": "\ud83d\ude36\u200d\ud83c\udf2b\ufe0f",
+  "alertsOn": false,
+  "address": "2deZptH4YoP7A6FCoM5g3N7BGAcizTYwSdHgEqwFLCs8",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Gh0stee",
+  "emoji": "\u2764\ufe0f",
+  "alertsOn": false,
+  "address": "2kv8X2a9bxnBM8NKLc6BBTX2z13GFNRL4oRotMUJRva9",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Idontpaytaxes",
+  "emoji": "\ud83c\udf4d",
+  "alertsOn": false,
+  "address": "2T5NgDDidkvhJQg8AHDi74uCFwgp25pYFMRZXBaCUNBH",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Kang Rug Part 1",
+  "emoji": "\ud83d\ude36\u200d\ud83c\udf2b\ufe0f",
+  "alertsOn": true,
+  "address": "2Y6SMa8BcAMrBPLqZZDjyBY2P8ash6975wWtQH8nUfhV",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Al4n",
+  "emoji": "\ud83d\ude3f",
+  "alertsOn": false,
+  "address": "2YJbcB9G8wePrpVBcT31o8JEed6L3abgyCjt5qkJMymV",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Groovy",
+  "emoji": "\ud83d\udc1b",
+  "alertsOn": false,
+  "address": "34ZEH778zL8ctkLwxxERLX5ZnUu6MuFyX9CWrs8kucMw",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "whou",
+  "emoji": "\ud83e\udd11",
+  "alertsOn": false,
+  "address": "385DNm5Ja42tPajVmDdKPahKJiy2dnYDHSxfT3tiRivF",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "kang hajar",
+  "emoji": "\ud83d\ude09",
+  "alertsOn": false,
+  "address": "38krzmPuQ87Fs61Q9kovFigRg5iFNwR6cyvcrav4NwCt",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Sachs",
+  "emoji": "\ud83d\ude09",
+  "alertsOn": false,
+  "address": "3FDci33mzMKNdNxzSS9D13XyNZQAdfmpvtDZLWPbZiAU",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Jidn",
+  "emoji": "\ud83d\ude1c",
+  "alertsOn": false,
+  "address": "3h65MmPZksoKKyEpEjnWU2Yk2iYT5oZDNitGy5cTaxoE",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Nu",
+  "emoji": "\ud83e\udd11",
+  "alertsOn": true,
+  "address": "3i9EzzZPS7UZbskM7bKfbhR7oyD6HKpFGFVMgiJvEnnu",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Bastille",
+  "emoji": "\ud83e\udd9f",
+  "alertsOn": false,
+  "address": "3kebnKw7cPdSkLRfiMEALyZJGZ4wdiSRvmoN4rD1yPzV",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "kang rug 4",
+  "emoji": "\ud83d\udc7b",
+  "alertsOn": true,
+  "address": "3kR9S6EH3ApjVkNN2xh1BgUcbCDgcYcz5bXNyzjFhbm3",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Carti The Menace",
+  "emoji": "\ud83d\ude39",
+  "alertsOn": false,
+  "address": "3mPypxb7ViYEdLv4siFmESvY5w5ZKknwgmB4TPcZ77qe",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Value & Time",
+  "emoji": "\ud83d\ude2c",
+  "alertsOn": false,
+  "address": "3nvC8cSrEBqFEXZjUpKfwZMPk7xYdqcnoxmFBjXiizVX",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Kadenox",
+  "emoji": "\ud83e\udd2b",
+  "alertsOn": false,
+  "address": "3pZ59YENxDAcjaKa3sahZJBcgER4rGYi4v6BpPurmsGj",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Izzy",
+  "emoji": "\ud83d\udd25",
+  "alertsOn": false,
+  "address": "42nsEk51owYM3uciuRvFerqK77yhXZyjBLRgkDzJPV2g",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "BagCalls",
+  "emoji": "\ud83e\udd65",
+  "alertsOn": false,
+  "address": "4AHgEkTsGqY77qtde4UJn9yZCrbGcM7UM3vjT3qM4G5H",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Jijo",
+  "emoji": "\ud83d\udc34",
+  "alertsOn": false,
+  "address": "4BdKaxN8G6ka4GYtQQWk4G4dZRUTX2vQH9GcXdBREFUk",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Mitch",
+  "emoji": "\ud83d\udc2d",
+  "alertsOn": false,
+  "address": "4Be9CvxqHW6BYiRAxW9Q3xu1ycTMWaL5z8NX4HR3ha7t",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "WaiterG",
+  "emoji": "\ud83d\ude44",
+  "alertsOn": false,
+  "address": "4cXnf2z85UiZ5cyKsPMEULq1yufAtpkatmX4j4DBZqj2",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Mr. Frog",
+  "emoji": "\ud83d\ude1d",
+  "alertsOn": false,
+  "address": "4DdrfiDHpmx55i4SPssxVzS9ZaKLb8qr45NKY9Er9nNh",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Lunix",
+  "emoji": "\ud83c\udfc9",
+  "alertsOn": false,
+  "address": "4F2AHuw55m9ojKpFfsofmhAwB979ECVRFVurEam4phqU",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Merk",
+  "emoji": "\ud83d\ude18",
+  "alertsOn": false,
+  "address": "4jFPYSoUTRaFbFDJp9QpA1J5pXJmMJYoWhiFTpoLPq6X",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Polar",
+  "emoji": "\ud83d\ude07",
+  "alertsOn": false,
+  "address": "4S9U8HckRngscHWrW418cG6Suw62dhEZzmyrT2hxSye5",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Decu",
+  "emoji": "\ud83e\udd29",
+  "alertsOn": false,
+  "address": "4vw54BmAogeRV3vPKWyFet5yf8DTLcREzdSzx4rw9Ud9",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Oura",
+  "emoji": "\ud83d\udc22",
+  "alertsOn": false,
+  "address": "4WPTQA7BB4iRdrPhgNpJihGcxKh8T43gLjMn5PbEVfQw",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Joji",
+  "emoji": "\ud83e\udd28",
+  "alertsOn": false,
+  "address": "525LueqAyZJueCoiisfWy6nyh4MTvmF4X9jSqi6efXJT",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Bolivian",
+  "emoji": "\ud83d\udc30",
+  "alertsOn": false,
+  "address": "5AyJw1VNDgTho2chipbVmuGqTuX1fCvVkLneChQkQrw8",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Yenni",
+  "emoji": "\ud83e\udd23",
+  "alertsOn": false,
+  "address": "5B52w1ZW9tuwUduueP5J7HXz5AcGfruGoX6YoAudvyxG",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Kang Rug GG",
+  "emoji": "\ud83d\ude36\u200d\ud83c\udf2b\ufe0f",
+  "alertsOn": true,
+  "address": "5dttVJFqiWC8UWYrZEqQamxnwfVJEFrLAKZAHSDZ2qZZ",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "sipe",
+  "emoji": "\ud83d\ude3f",
+  "alertsOn": false,
+  "address": "5mgEm1nT6zBoG84SkNmP3wFkHu1y1Ssih9mUtazZ3Bve",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Dave Portnoy",
+  "emoji": "\ud83d\udc37",
+  "alertsOn": false,
+  "address": "5rkPDK4JnVAumgzeV2Zu8vjggMTtHdDtrsd5o9dhGZHD",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Smokez",
+  "emoji": "\ud83d\ude15",
+  "alertsOn": false,
+  "address": "5t9xBNuDdGTGpjaPTx6hKd7sdRJbvtKS8Mhq6qVbo8Qz",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Rev",
+  "emoji": "\ud83d\ude30",
+  "alertsOn": false,
+  "address": "5TuiERc4X7EgZTxNmj8PHgzUAfNHZRLYHKp4DuiWevXv",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Dolo",
+  "emoji": "\ud83e\udd14",
+  "alertsOn": false,
+  "address": "5wcc13mXoyqe6qh2iHH5GFknojoJ7y13ZPx9K4NXTuo3",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Tahi",
+  "emoji": "\ud83d\udc2e",
+  "alertsOn": false,
+  "address": "5x8tfrJSn4Pt5gjQEMWDnoLvAzZ8rgJVTXiTpcwhbxmN",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Assasin.eth",
+  "emoji": "\u2639\ufe0f",
+  "alertsOn": false,
+  "address": "6LChaYRYtEYjLEHhzo4HdEmgNwu2aia8CM8VhR9wn6n7",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "ShockedJS",
+  "emoji": "\ud83e\udd27",
+  "alertsOn": false,
+  "address": "6m5sW6EAPAHncxnzapi1ZVJNRb9RZHQ3Bj7FD84X9rAF",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "tukang rug cpt",
+  "emoji": "\ud83d\ude03",
+  "alertsOn": false,
+  "address": "6n3qTWyYfrLAMRGcwLJ1Lxcrc7H4C9Hq5fgATDRh4Eyc",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Chefin",
+  "emoji": "\ud83c\udfaf",
+  "alertsOn": false,
+  "address": "6Qs6joB349h7zu1z9xRgPgMSmpBYLDQb2wtAecY4LysH",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "tukang rug cpt 2",
+  "emoji": "\ud83e\udd12",
+  "alertsOn": false,
+  "address": "6SBQy75UKCEjGMMeMu12iDPuHXhqFYs5yXWcrDtgL4yu",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Fashr",
+  "emoji": "\ud83d\ude29",
+  "alertsOn": false,
+  "address": "719sfKUjiMThumTt2u39VMGn612BZyCcwbM5Pe8SqFYz",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "sp",
+  "emoji": "\u264e",
+  "alertsOn": false,
+  "address": "722tXm5uB5uuG2tC43uKHXQ7Pbyz75pTokEAJv9x5VTx",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Red",
+  "emoji": "\ud83d\ude3c",
+  "alertsOn": false,
+  "address": "7ABz8qEFZTHPkovMDsmQkm64DZWN5wRtU7LEtD2ShkQ6",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "good game",
+  "emoji": "\ud83d\ude2c",
+  "alertsOn": false,
+  "address": "7AGh9sVq9EsTrLRggUoQZa9o8QNunAxh4YFUF4hKgbsx",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Tukang Ngerug",
+  "emoji": "\ud83e\udd11",
+  "alertsOn": true,
+  "address": "7CV49Bm2kGsjPHFTzSuKnjFazEFvJ5NWdhxfSHxzVaoW",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "ChartFu",
+  "emoji": "\ud83c\udf47",
+  "alertsOn": false,
+  "address": "7i7vHEv87bs135DuoJVKe9c7abentawA5ydfWcWc8iY2",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Leens",
+  "emoji": "\ud83d\udc9c",
+  "alertsOn": false,
+  "address": "7iabBMwmSvS4CFPcjW2XYZY53bUCHzXjCFEFhxeYP4CY",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Insentos",
+  "emoji": "\u26ce",
+  "alertsOn": false,
+  "address": "7SDs3PjT2mswKQ7Zo4FTucn9gJdtuW4jaacPA65BseHS",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Mero",
+  "emoji": "\ud83e\udd84",
+  "alertsOn": false,
+  "address": "7SvvTJSwcpNQCDGEt14zuoPFoSsaveGd7UWgiJGQLAHN",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Files",
+  "emoji": "\ud83d\ude21",
+  "alertsOn": false,
+  "address": "7sWQeQLuNcbQas2Y4EoDn1hZ2Ks2sKKGeyrWjffWVJSW",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Qtdegen",
+  "emoji": "\u2b50",
+  "alertsOn": false,
+  "address": "7tiRXPM4wwBMRMYzmywRAE6jveS3gDbNyxgRrEoU6RLA",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Brox",
+  "emoji": "\ud83d\ude1f",
+  "alertsOn": false,
+  "address": "7VBTpiiEjkwRbRGHJFUz6o5fWuhPFtAmy8JGhNqwHNnn",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "gegoo",
+  "emoji": "\ud83d\ude36\u200d\ud83c\udf2b\ufe0f",
+  "alertsOn": false,
+  "address": "7ZyYVXE2aUZNc7u2A11RskiHZTc973X87QKfUb6VBb7i",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Meechie",
+  "emoji": "\ud83d\udda4",
+  "alertsOn": false,
+  "address": "831qmkeGhfL8YpcXuhrug6nHj1YdK3aXMDQUCo85Auh1",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Trey",
+  "emoji": "\ud83d\ude04",
+  "alertsOn": false,
+  "address": "831yhv67QpKqLBJjbmw2xoDUeeFHGUx8RnuRj9imeoEs",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Publix",
+  "emoji": "\ud83e\udd82",
+  "alertsOn": false,
+  "address": "86AEJExyjeNNgcp7GrAvCXTDicf5aGWgoERbXFiG1EdD",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Nyhrox",
+  "emoji": "\ud83e\udd51",
+  "alertsOn": false,
+  "address": "87MZqjjJgpuFvaU8GyQJKbZGnCFFhX82qAjBGLRXPfcn",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Cooker",
+  "emoji": "\ud83e\udee4",
+  "alertsOn": false,
+  "address": "8deJ9xeUvXSJwicYptA9mHsU2rN2pDx37KWzkDkEXhU6",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Daumen",
+  "emoji": "\u26bd",
+  "alertsOn": false,
+  "address": "8MaVa9kdt3NW4Q5HyNAm1X5LbR8PQRVDc1W8NMVK88D5",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "buy back",
+  "emoji": "\ud83e\udd2a",
+  "alertsOn": false,
+  "address": "8Ntm9F8Umyvm4GrP8JQ8jT2211NpdgmwESeTsfvseojY",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Casino616",
+  "emoji": "\ud83d\ude36\u200d\ud83c\udf2b\ufe0f",
+  "alertsOn": true,
+  "address": "8rvAsDKeAcEjEkiZMug9k8v1y8mW6gQQiMobd89Uy7qR",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "mec",
+  "emoji": "\ud83d\ude31",
+  "alertsOn": true,
+  "address": "8w1rwxKHtw8WgxAvKpRMFoxBFwUS58CoCRzM8Azy7A49",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Michi",
+  "emoji": "\ud83d\ude32",
+  "alertsOn": false,
+  "address": "8YYDiCbPd4nM8TxrQEVdPA4aG8jys8R7Z1kKsgPL4pwh",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Pow",
+  "emoji": "\ud83c\udf49",
+  "alertsOn": false,
+  "address": "8zFZHuSRuDpuAR7J6FzwyF3vKNx4CVW3DFHJerQhc7Zd",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Orange",
+  "emoji": "\ud83e\udd66",
+  "alertsOn": false,
+  "address": "96sErVjEN7LNJ6Uvj63bdRWZxNuBngj56fnT9biHLKBf",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "kang ruger",
+  "emoji": "\ud83d\ude0d",
+  "alertsOn": true,
+  "address": "9C7ZCjLCQPeJqzgEG7JeqwvYLgUhWvA2xdnxB3tv8Xb1",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Danny",
+  "emoji": "\u2649",
+  "alertsOn": false,
+  "address": "9FNz4MjPUmnJqTf6yEDbL1D4SsHVh7uA8zRHhR5K138r",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Nach",
+  "emoji": "\ud83d\ude3d",
+  "alertsOn": false,
+  "address": "9jyqFiLnruggwNn4EQwBNFXwpbLM9hrA4hV59ytyAVVz",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Sabby",
+  "emoji": "\ud83c\udf50",
+  "alertsOn": false,
+  "address": "9K18MstUaXmSFSBoa9qDTqWTnYhTZqdgEhuKRTVRgh6g",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "wallet bagus",
+  "emoji": "\ud83d\udc7b",
+  "alertsOn": false,
+  "address": "9My2Vh1DeK7emFkT5GgsNwzjBpZHsj7Ny6tc628Pfb3V",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Gratis",
+  "emoji": "\ud83d\ude1d",
+  "alertsOn": true,
+  "address": "9UCvwkYXzv9gAfAkCXmZASqBPNM9r4LXYNHKSSvbGwRk",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Xelf",
+  "emoji": "\ud83d\udc14",
+  "alertsOn": false,
+  "address": "9Vk7pkBZ9KFJmzaPzNYjGedyz8qoKMQtnYyYi2AehNMT",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Dutch",
+  "emoji": "\ud83d\ude0f",
+  "alertsOn": false,
+  "address": "9vWutdTBs66hWkeCmxaLFpkKy4q5RSe8DsFjfdxj5yFA",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Loopierr",
+  "emoji": "\u264a",
+  "alertsOn": false,
+  "address": "9yYya3F5EJoLnBNKW6z4bZvyQytMXzDcpU5D6yYr4jqL",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "404Flipped",
+  "emoji": "\ud83d\ude34",
+  "alertsOn": false,
+  "address": "AbcX4XBm7DJ3i9p29i6sU8WLmiW4FWY5tiwB9D6UBbcE",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "regnz",
+  "emoji": "\ud83e\udd72",
+  "alertsOn": false,
+  "address": "AdMrV5J9RVXnpNrfb2D89xQ5w1tGtW9e2vrf5vkDabss",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Roxo",
+  "emoji": "\ud83d\udc38",
+  "alertsOn": false,
+  "address": "AE3tJDEyUdwBM8ZoUb3iCo563gMbq26JtckfvjcVZbSa",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Aroa",
+  "emoji": "\ud83e\udd4f",
+  "alertsOn": false,
+  "address": "Aen6LKc7sGVPTyjMd5cu9B9XVjL7m9pnvAiP2ZNJC4GZ",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Angi",
+  "emoji": "\ud83e\udd5d",
+  "alertsOn": false,
+  "address": "AGnd5WTHMUbyK3kjjQPdQFM3TbWcuPTtkwBFWVUwiCLu",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Tim",
+  "emoji": "\ud83d\ude26",
+  "alertsOn": false,
+  "address": "AJ6MGExeK7FXmeKkKPmALjcdXVStXYokYNv9uVfDRtvo",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "S",
+  "emoji": "\ud83e\udd21",
+  "alertsOn": false,
+  "address": "ApRnQN2HkbCn7W2WWiT2FEKvuKJp9LugRyAE1a9Hdz1",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Otta",
+  "emoji": "\ud83d\udc31",
+  "alertsOn": false,
+  "address": "As7HjL7dzzvbRbaD3WCun47robib2kmAKRXMvjHkSMB5",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "hunwal",
+  "emoji": "\ud83d\ude19",
+  "alertsOn": false,
+  "address": "AtGH9dhciyvB3dhkg498JbCcDJ1MvsXK1QKFMP6XMc7V",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "dayumbro",
+  "emoji": "\ud83d\udc79",
+  "alertsOn": false,
+  "address": "AtTjQKXo1CYTa2MuxPARtr382ZyhPU5YX4wMMpvaa1oy",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Heyitsyolo",
+  "emoji": "\ud83d\ude3b",
+  "alertsOn": false,
+  "address": "Av3xWHJ5EsoLZag6pr7LKbrGgLRTaykXomDD5kBhL9YQ",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Ansem",
+  "emoji": "\ud83e\udd16",
+  "alertsOn": false,
+  "address": "AVAZvHLR2PcWpDf8BXY4rVxNHYRBytycHkcB5z5QNXYm",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "CC2",
+  "emoji": "\ud83e\udd71",
+  "alertsOn": false,
+  "address": "B3beyovNKBo4wF1uFrfGfpVeyEHjFyJPmEBciz7kpnoS",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Lucas",
+  "emoji": "\ud83d\udc7b",
+  "alertsOn": false,
+  "address": "B7FDzJnb7DLYH1A37tKEFss1RRSz5C7MYgTRRMaWzBqa",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Wallet insider 2",
+  "emoji": "\ud83e\udee1",
+  "alertsOn": true,
+  "address": "B8rrsQAWgDUCCmFU7zoTUtPpkwxfjrTNZbYmvxgcckUG",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Kang Ngerug juga",
+  "emoji": "\ud83d\ude00",
+  "alertsOn": true,
+  "address": "BbyTuTinYUmGFj5cSeu9W5MMHSj8GQNtgdx9wYxzrXpy",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "DV",
+  "emoji": "\ud83d\udc7b",
+  "alertsOn": true,
+  "address": "BCagckXeMChUKrHEd6fKFA1uiWDtcmCXMsqaheLiUPJd",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Kreo",
+  "emoji": "\ud83d\ude0e",
+  "alertsOn": false,
+  "address": "BCnqsPEtA1TkgednYEebRpkmwFRJDCjMQcKZMMtEdArc",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Orangie",
+  "emoji": "\ud83e\udde1",
+  "alertsOn": false,
+  "address": "BiqkWhrJ4dfpE6TeNY34tA4GssG23SBH8CU8mqB7xZ6t",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Betman",
+  "emoji": "\ud83c\udf45",
+  "alertsOn": false,
+  "address": "BoYHJoKntk3pjkaV8qFojEonSPWmWMfQocZTwDd1bcGG",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Rizz",
+  "emoji": "\ud83e\udd6c",
+  "alertsOn": false,
+  "address": "BPWsae36tY6oFz7f5MjsfTGqzi3ttM1AsAtjMvUb91tT",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Ruairi",
+  "emoji": "\ud83d\udc93",
+  "alertsOn": true,
+  "address": "BQnwRM9eWeZhm2Ufg2FBHP7wigxWCRZChfDz3jwrMLct",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "keyos",
+  "emoji": "\ud83d\ude12",
+  "alertsOn": false,
+  "address": "BsyVQo4VLHE96dNHbFZaWrkFNXKJGTWg7FVX5rhKVpQY",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Kev",
+  "emoji": "\ud83e\udd25",
+  "alertsOn": false,
+  "address": "BTf4A2exGK9BCVDNzy65b9dUzXgMqB4weVkvTMFQsadd",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Letterbomb",
+  "emoji": "\ud83e\udee0",
+  "alertsOn": false,
+  "address": "BtMBMPkoNbnLF9Xn552guQq528KKXcsNBNNBre3oaQtr",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Absol",
+  "emoji": "\ud83d\ude2d",
+  "alertsOn": false,
+  "address": "BXNiM7pqt9Ld3b2Hc8iT3mA5bSwoe9CRrtkSUs15SLWN",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Insyder",
+  "emoji": "\ud83d\udc7b",
+  "alertsOn": true,
+  "address": "c3XGUoDSBaJDA8qaJ5pUkCnamMERwZLJBVjxdkNepGo",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Obijai",
+  "emoji": "\ud83d\ude28",
+  "alertsOn": false,
+  "address": "C4BWYccLsbeHgZzVupFZJGvJK2nQpn8em9WtzURH4gZW",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Profitier",
+  "emoji": "\ud83e\udd86",
+  "alertsOn": false,
+  "address": "CJ36MNajzqsE3akRf8edJhnoNhzWhBDBRyviv5FMrpsH",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Jaden",
+  "emoji": "\ud83d\ude16",
+  "alertsOn": false,
+  "address": "CqQKv6XdrMWrz3YuSwqTTcVoQK5eu4zNo3hps3M1Q3yo",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "gennd",
+  "emoji": "\ud83e\udd10",
+  "alertsOn": false,
+  "address": "CSErccgmwYvKjG5QXr59SnYa7Zyrjcj6X6A8qcjn2oNL",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Cented",
+  "emoji": "\ud83d\ude17",
+  "alertsOn": false,
+  "address": "CyaE1VxvBrahnPWkqm5VsdCvyS2QmNht2UFrKJHga54o",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Dior",
+  "emoji": "\u2653",
+  "alertsOn": false,
+  "address": "D2wBctC1K2mEtA17i8ZfdEubkiksiAH2j8F7ri3ec71V",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "shiny",
+  "emoji": "\ud83e\udee5",
+  "alertsOn": false,
+  "address": "dATMod1UTXYzvaXji4mBsvXTeAUAC73TNJQAejKS54X",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Bobby",
+  "emoji": "\ud83e\udd8a",
+  "alertsOn": false,
+  "address": "DBmRHNbSsVX8F6NyVaaaiuGdwo1aYGawiy3jfNcvXYSC",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Euris",
+  "emoji": "\ud83d\udc7b",
+  "alertsOn": true,
+  "address": "DfMxre4cKmvogbLrPigxmibVTTQDuzjdXojWzjCXXhzj",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Gake",
+  "emoji": "\ud83c\udf4e",
+  "alertsOn": false,
+  "address": "DNfuF1L62WWyW3pNakVkyGGFzVVhj4Yr52jSmdTyeBHm",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Gorilla Capital",
+  "emoji": "\ud83e\udd15",
+  "alertsOn": false,
+  "address": "DpNVrtA3ERfKzX4F8Pi2CVykdJJjoNxyY5QgoytAwD26",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "clean",
+  "emoji": "\ud83e\udd17",
+  "alertsOn": false,
+  "address": "DprHJcBVyyKpbJy9smfjLB93jfTJ6AddobN7Nkh9Q5Px",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Tukang Ngerug 3",
+  "emoji": "\ud83e\udd23",
+  "alertsOn": true,
+  "address": "DR7ghPiRVBJ3YeP3FUJRuSa4XaWq4Pkw8ZM4JYs1PyJ9",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Lynk",
+  "emoji": "\ud83e\uddd0",
+  "alertsOn": false,
+  "address": "DrHszsqMAMuBrgRJ3XG7ZutDfEETHFW6W7vxA1vSQ2Ub",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Jazz",
+  "emoji": "\ud83e\udd74",
+  "alertsOn": false,
+  "address": "Ds8mcuP5r2phg596mLui3ti3PJtVvFRw19Eo9UFdJ5Bc",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Classic",
+  "emoji": "\ud83d\ude38",
+  "alertsOn": false,
+  "address": "DsqRyTUh1R37asYcVf1KdX4CNnz5DKEFmnXvgT4NfTPE",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "The Doc",
+  "emoji": "\ud83e\udd97",
+  "alertsOn": false,
+  "address": "DYAn4XpAkN5mhiXkRB7dGq4Jadnx6XYgu8L5b3WGhbrt",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Jordan",
+  "emoji": "\ud83d\udc3c",
+  "alertsOn": false,
+  "address": "EAnB5151L8ejp3SM6haLgyv3snk6oqc8acKgWEg9T5J",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Sully",
+  "emoji": "\ud83d\ude31",
+  "alertsOn": false,
+  "address": "Ebk5ATdfrCuKi27dHZaw5YYsfREEzvvU8xeBhMxQoex6",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Mezoteric",
+  "emoji": "\ud83e\udd70",
+  "alertsOn": false,
+  "address": "EdDCRfDDeiiDXdntrP59abH4DXHFNU48zpMPYisDMjA7",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "TIL",
+  "emoji": "\ud83d\ude2f",
+  "alertsOn": false,
+  "address": "EHg5YkU2SZBTvuT87rUsvxArGp3HLeye1fXaSDfuMyaf",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Collectible",
+  "emoji": "\ud83d\ude43",
+  "alertsOn": false,
+  "address": "Ehqd8q5rAN8V7Y7EGxYm3Tp4KPQMTVWQtzjSSPP3Upg3",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "TheDefiApe",
+  "emoji": "\ud83e\udd76",
+  "alertsOn": false,
+  "address": "ExKCuoAzJCgCVjU3CvNoL8vVrdESTWkx3ubj6rQXwQM4",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Earl",
+  "emoji": "\ud83c\udfc0",
+  "alertsOn": false,
+  "address": "F2SuErm4MviWJ2HzKXk2nuzBC6xe883CFWUDCPz6cyWm",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "gg bang",
+  "emoji": "\ud83d\ude05",
+  "alertsOn": false,
+  "address": "F5jWYuiDLTiaLYa54D88YbpXgEsA6NKHzWy4SN4bMYjt",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Zyaf",
+  "emoji": "\ud83d\ude19",
+  "alertsOn": false,
+  "address": "F5TjPySiUJMdvqMZHnPP85Rc1vErDGV5FR5P2vdVm429",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Jalen",
+  "emoji": "\ud83d\ude42",
+  "alertsOn": false,
+  "address": "F72vY99ihQsYwqEDCfz7igKXA5me6vN2zqVsVUTpw6qL",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "walder",
+  "emoji": "\ud83d\udc79",
+  "alertsOn": true,
+  "address": "Fd4YEMdvVKuhwZMAYDgK8PyEYEm93Gx3NN1VioGxJFbV",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Early",
+  "emoji": "\ud83e\udd29",
+  "alertsOn": true,
+  "address": "FkD1DUKppZV9jtHUhSCkdByEwEJPYv7oUoAxgK8GNTjg",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Henn100x",
+  "emoji": "\ud83d\ude49",
+  "alertsOn": false,
+  "address": "FRbUNvGxYNC1eFngpn7AD3f14aKKTJVC6zSMtvj2dyCS",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "kita farming",
+  "emoji": "\ud83d\ude04",
+  "alertsOn": false,
+  "address": "FyNrn5ELHtimjCscVqRK11Q59VaH3knzahtcaPpcmSro",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Insyder Crypto",
+  "emoji": "\ud83d\ude36\u200d\ud83c\udf2b\ufe0f",
+  "alertsOn": true,
+  "address": "G3g1CKqKWSVEVURZDNMazDBv7YAhMNTjhJBVRTiKZygk",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "kang hajar 1",
+  "emoji": "\ud83d\ude2c",
+  "alertsOn": false,
+  "address": "GcgfsFFgd8vjCiavNSdEdzdMfeqXjvFNWBYFdZgWvrxR",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Winrate 86%",
+  "emoji": "\ud83d\udc7b",
+  "alertsOn": true,
+  "address": "GfqQkmJZ8h8Th7epmpyJgBXBtm7JA11L8KbnPxisDeHc",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Green Apples",
+  "emoji": "\ud83d\udc9a",
+  "alertsOn": false,
+  "address": "GHPCChGqtKf4sFaN1wPPCapcweKXBBngB3hF7D6nT29e",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Latuche",
+  "emoji": "\ud83d\udc80",
+  "alertsOn": false,
+  "address": "GJA1HEbxGnqBhBifH9uQauzXSB53to5rhDrzmKxhSU65",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Beaver",
+  "emoji": "\ud83d\ude05",
+  "alertsOn": false,
+  "address": "GM7Hrz2bDq33ezMtL6KGidSWZXMWgZ6qBuugkb5H8NvN",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Solstice",
+  "emoji": "\ud83c\udfbe",
+  "alertsOn": false,
+  "address": "GrD2umbfEBjQKFPDQvmmYNQ5eyRL9SAdWJj9FFMyeaDN",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Robo",
+  "emoji": "\ud83e\udda0",
+  "alertsOn": false,
+  "address": "Gv7CnRo2L2SJ583XEfoKHKbmWK3wNoBDxVoJqMKJR4Nu",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Levis",
+  "emoji": "\u2604\ufe0f",
+  "alertsOn": false,
+  "address": "GwoFJFjUTUSWq2EwTz4P2Sznoq9XYLrf8t4q5kbTgZ1R",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Monarky",
+  "emoji": "\ud83e\udee1",
+  "alertsOn": false,
+  "address": "H9h6UV9cwWWogcTZ5gbzQ6Z3dYDNaiJ3mUWw3aGnE3Mc",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Pain",
+  "emoji": "\ud83c\udf4c",
+  "alertsOn": false,
+  "address": "HAN61KQbgzjDBC4RpZJ1ET8v32S4zdKAjoD7EApJ96q6",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Rektober",
+  "emoji": "\ud83d\udc99",
+  "alertsOn": false,
+  "address": "HCQb4Qrtk4qCfChDH8XvM5onymmCSmRj9bddV6QCPdRe",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Jerry",
+  "emoji": "\ud83c\udf19",
+  "alertsOn": false,
+  "address": "HKjuMsz7JMuiQhkZsAwqogPf1KwhwACZGMcTmmtesoWv",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Lyxe",
+  "emoji": "\ud83d\udc2f",
+  "alertsOn": false,
+  "address": "HLv6yCEpgjQV9PcKsvJpem8ESyULTyh9HjHn9CtqSek1",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Orangie",
+  "emoji": "\ud83d\udfe0",
+  "alertsOn": false,
+  "address": "HmBmSYwYEgEZuBUYuDs9xofyqBAkw4ywugB1d7R7sTGh",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "smart bro",
+  "emoji": "\ud83d\udc7b",
+  "alertsOn": false,
+  "address": "HQ7sAtQieMBLZzHkiyYJF8QmS9AkLpq3f9RZr1EwkJHE",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "0xWinged",
+  "emoji": "\ud83d\udc35",
+  "alertsOn": false,
+  "address": "HrCPnDvDgbpbFxKxer6Pw3qEcfAQQNNjb6aJNFWgTEng",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Hustler",
+  "emoji": "\ud83e\udd4e",
+  "alertsOn": false,
+  "address": "HUS9ErdrDqpqQePbmfgJUTnDTE6eZ8ES62a25RihSK9U",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Jay",
+  "emoji": "\ud83c\udf51",
+  "alertsOn": false,
+  "address": "HwRnKq7RPtKHvX9wyHsc1zvfHtGjPQa5tyZtGtbvfXE",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Scooter",
+  "emoji": "\ud83d\udca9",
+  "alertsOn": false,
+  "address": "iWinRYGEWcaFFqWfgjh28jnqWL72XUMmUfhADpTQaRL",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Bandz",
+  "emoji": "\ud83d\ude36\u200d\ud83c\udf2b\ufe0f",
+  "alertsOn": true,
+  "address": "j1oeQoPeuEDmjvyMwBmCWexzCQup77kbKKxV59CnYbd",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Dan176",
+  "emoji": "\ud83d\ude1a",
+  "alertsOn": false,
+  "address": "J2B5fnm2DAAUAGa4EaegwQFoYaN6B5FerGA5sjtQoaGM",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "West",
+  "emoji": "\ud83c\udf08",
+  "alertsOn": false,
+  "address": "JDd3hy3gQn2V982mi1zqhNqUw1GfV2UL6g76STojCJPN",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "The Kripto King",
+  "emoji": "\ud83d\udc7b",
+  "alertsOn": true,
+  "address": "kQdJVZvix2BPCz2i46ErUPk2a74Uf37QZL5jsRdAD8y",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Ferb",
+  "emoji": "\ud83d\ude0a",
+  "alertsOn": false,
+  "address": "m7Kaas3Kd8FHLnCioSjCoSuVDReZ6FDNBVM6HTNYuF7",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Dex",
+  "emoji": "\ud83d\udc3b",
+  "alertsOn": false,
+  "address": "mW4PZB45isHmnjGkLpJvjKBzVS5NXzTJ8UDyug4gTsM",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "kang banting",
+  "emoji": "\ud83d\udcaf",
+  "alertsOn": false,
+  "address": "sZbb9YBwhXaZcYs9Sh3Y4WQWP4fsLrEHsqA4H2aVGeA",
+  "sourceFile": "wallet_3.json"
+ },
+ {
+  "name": "Master Rug",
+  "emoji": "\ud83d\udc7b",
+  "alertsOn": true,
+  "address": "XPNukQAZLpDJtTC5qsQv7k9ijz5A5AGacFAceH2S8tX",
+  "sourceFile": "wallet_3.json"
+ }
+]

@@ -67,6 +67,20 @@ model Wallet {
   relationshipsFrom WalletRelationship[] @relation("WalletRelationshipFrom")
   relationshipsTo   WalletRelationship[] @relation("WalletRelationshipTo")
   createdAt    DateTime @default(now())
+  // ── Phase 2 wallet foundation (backward-compatible: all nullable/defaulted) ──
+  // Operator alias from wallet watch lists (e.g. "Kang Rug"). A lead, not a metric.
+  alias        String?
+  // Operator-assigned emoji tag from the watch list.
+  emoji        String?
+  // Whether the operator enabled alerts for this wallet in the source file.
+  alertsOn     Boolean  @default(false)
+  // Source file the record was imported from (e.g. wallet_2.json).
+  sourceFile   String?
+  // Non-empty when the same address carried conflicting labels/alerts across
+  // files — preserved for review, never silently merged.
+  conflictNote String?
+  // When the wallet entered operator watch; unknown for pre-existing rows.
+  discoveredAt DateTime?
 
   @@index([chain])
   @@index([entityId])

@@ -68,8 +68,19 @@ const CLEAN: MemeRiskAudit = {
   riskCounts: { high: 0, middle: 0, low: 0 },
   // All distribution legs proven clean (fractions 0..1) — unknown would
   // be unproven and the evaluator would (correctly) REJECT.
-  distribution: { devPercent: 0, sniperPercent: 0.005, bundlerPercent: 0.02, insiderPercent: 0.01 },
-  topWallets: [{ address: 'H1', percent: 0.04 }],
+  distribution: {
+    devPercent: 0,
+    sniperPercent: 0.005,
+    bundlerPercent: 0.02,
+    insiderPercent: 0.01,
+    clusterPercent: 0.01,
+  },
+  topWallets: [
+    { address: 'H1', percent: 0.04 },
+    { address: 'H2', percent: 0.03 },
+    { address: 'H3', percent: 0.02 },
+  ],
+  top5AvgPnlPercent: 20,
   auditedAt: Date.now(),
 }
 
@@ -132,7 +143,11 @@ describe('runSniperScan', () => {
         discover: async () => [tok('GOOD'), tok('BOOM'), tok('RUG')],
         audit: async (_chain, contract) => {
           if (contract === 'BOOM') throw new Error('audit 500')
-          return [contract === 'GOOD' ? CLEAN : RUGGED]
+          return [
+            contract === 'GOOD'
+              ? { ...CLEAN, contract }
+              : { ...RUGGED, contract },
+          ]
         },
       }),
     )
