@@ -176,6 +176,29 @@ describe('discoverAlphTokens', () => {
 
     await expect(discoverAlphTokens(1)).rejects.toThrow('Alph 503:')
   })
+
+  it('reverse-maps canonical chain labels to upstream short ids', async () => {
+    const seen: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        seen.push(url)
+        return new Response(JSON.stringify({ code: '200', msg: 'suc', data: ALPH_SEO_ROW }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }),
+    )
+
+    const audit = await auditAlphToken('solana', ALPH_SEO_ROW.tokenAddress)
+    expect(audit).not.toBeNull()
+    // Probed live 2026-10-09: chain=sol returns data; chain=solana returns
+    // {"code":"200"} with no data field.
+    expect(seen[0]).toContain('chain=sol&')
+    expect(seen[0]).not.toContain('chain=solana')
+    // Output keeps the canonical label the route passed in.
+    expect(audit!.chain).toBe('solana')
+  })
   it('rejects when the upstream request is aborted by the timeout signal', async () => {
     vi.useFakeTimers()
     vi.stubGlobal(

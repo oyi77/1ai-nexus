@@ -26,6 +26,17 @@
 //     skipped); smart/tags returns [] (empty, skipped).
 // headers: Origin=https://alph.ai, Referer=https://alph.ai/, Accept=application/json
 // lastVerified: 2026-10-09
+// Canonical label → upstream short chain id. Discovery feeds already emit
+// short ids (passed through normalize.ts lowercase); the audit path must
+// reverse-map canonical route params back for the SEO gateway.
+const ALPH_UPSTREAM_CHAIN: Record<string, string> = {
+  solana: 'sol',
+  ethereum: 'eth',
+  'binance-smart-chain': 'bsc',
+  base: 'base',
+  robinhood: 'robinhood',
+}
+
 // ─────────────────────────────────────────────────────────────
 
 import type { MemeAlphaToken, MemePlatform, MemeRiskAudit } from '../types'
@@ -145,16 +156,18 @@ interface AlphTokenSeoResponse {
     tokenAddress: string
     code: string
     fullName: string
-    price: number
-    priceUsdt: number
-    chg24h: number
-    marketCap: number
-    poolLiquidity: number
-    vol24h: number
-    top10: number
-    holdersNum: number
-    aiNarrativeSentence: string
-    aiNarrativeParagraph: string
+    // Quiet-token rows omit these (live 2026-10-09: QI row has priceUsdt +
+    // narratives only) — all optional, defaulted through num() at read time.
+    price?: number
+    priceUsdt?: number
+    chg24h?: number
+    marketCap?: number
+    poolLiquidity?: number
+    vol24h?: number
+    top10?: number
+    holdersNum?: number
+    aiNarrativeSentence?: string
+    aiNarrativeParagraph?: string
   }
 }
 
@@ -361,31 +374,41 @@ export async function auditAlphToken(
   chain: string,
   contract: string,
 ): Promise<MemeRiskAudit | null> {
-  const normChain = normalizeChainId(chain)
-  if (!normChain || !trimmed(contract)) return null
-
-  const url = `${SEO_BASE}/token/token-seo?chain=${normChain}&token=${contract}`
-
+  // Upstream wants SHORT chain ids (sol/bsc/base/eth/robinhood), but the
+  // route hands us canonical labels (solana/binance-smart-chain/...). Probed
+  // live 2026-10-09: chain=sol returns full data, chain=solana returns
+  // {"code":"200"} with no data field — hence this reverse map, not normalizeChainId.
+  const upstreamChain = ALPH_UPSTREAM_CHAIN[normalizeChainId(chain) || chain.toLowerCase()]
+  if (!upstreamChain) return null
+  const url = `${SEO_BASE}/token/token-seo?chain=${upstreamChain}&token=${trimmed(contract)}`
   try {
     const res = await fetchWithRetry<AlphTokenSeoResponse>(url)
     if (!res || res.code !== '200' || !res.data) {
-      logger.warn(CONTEXT, `Audit empty for ${normChain}:${contract}: ${res?.code} ${res?.msg}`)
+      logger.warn(CONTEXT, `Audit empty for ${upstreamChain}:${contract}: ${res?.code} ${res?.msg}`)
       return null
     }
 
     const d = res.data
-    let riskLevel = 1
-    if (num(d.top10) > 0.8) riskLevel = 3
-    else if (num(d.top10) > 0.5) riskLevel = 2
-    else if (num(d.holdersNum) < 50) riskLevel = 2
+    // token-seo rows OMIT fields on quiet tokens (no marketCap/top10/
+    // holdersNum — live 2026-10-09). Sparse rows cannot justify safety:
+    // default middle, escalate only on measured concentration.
+    let riskLevel = 2
+    if (num(d.top10) > 0) {
+      if (num(d.top10) > 0.8) riskLevel = 3
+      else if (num(d.top10) > 0.5) riskLevel = 2
+      else riskLevel = 1
+    } else if (num(d.holdersNum) > 0 && num(d.holdersNum) < 50) {
+      riskLevel = 2
+    }
 
     const label: MemeRiskAudit['riskLabel'] =
       riskLevel >= 3 ? 'high' : riskLevel === 2 ? 'middle' : riskLevel === 1 ? 'low' : 'safe'
 
+    const outChain = normalizeChainId(chain)
     return {
-      id: `${normChain}:${contract}`,
+      id: `${outChain}:${contract}`,
       platform: 'alph',
-      chain: normChain,
+      chain: outChain,
       contract,
       symbol: trimmed(d.code),
       name: trimmed(d.fullName),
@@ -403,7 +426,7 @@ export async function auditAlphToken(
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    logger.error(CONTEXT, `Audit failed for ${normChain}:${contract}: ${message}`)
+    logger.error(CONTEXT, `Audit failed for ${upstreamChain}:${contract}: ${message}`)
     return null
   }
 }
