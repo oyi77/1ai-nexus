@@ -10,6 +10,7 @@
 import { MemeAlphaToken, MemeRiskAudit } from '../types'
 import { normalizeChainId, normalizeTimestamp } from '../normalize'
 import { logger } from '../../../logger'
+import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -136,33 +137,96 @@ async function retryWithBackoff<T>(
   throw new Error(`GMGN request failed after ${maxAttempts} attempts.${cookieHint}`)
 }
 
+// (REQUEST_TIMEOUT_MS is declared with the curl-child block below.)
+
+// Proven live 2026-10-09: even with browser UA + page referer + session
+// cookie, Node fetch still gets the 403 challenge — the blocker is TLS
+// fingerprinting, so the transport below (system curl) is required.
+const GMGN_UA =
+  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/147.0.0.0 Safari/537.36'
+
+// ── curl-child transport ──────────────────────────────────────
+// Cloudflare TLS-fingerprints every Node stack (undici fetch → 403
+// challenge) while system curl with identical URL+headers+cookie passes
+// 200 (proven live 2026-10-09). Mirrors the birdeye/ajaib pattern:
+// proxy-stripped env, status capture, module-local test seam.
 const REQUEST_TIMEOUT_MS = 10_000
+const MAX_RESPONSE_BYTES = 1_048_576
 
-async function gmgnFetch<T>(endpoint: string, signal?: AbortSignal): Promise<T> {
+/** Env copy with every *proxy* var removed (case-insensitive). */
+function directEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env }
+  for (const k of Object.keys(env)) {
+    if (k.toLowerCase().includes('proxy')) delete env[k]
+  }
+  return env
+}
+
+// Injectable seam for tests (defaults to execFileSync). Module-local so
+// tests never fight other suites over a global child_process mock.
+let runCurl: (args: string[]) => string = (args) =>
+  execFileSync('curl', args, {
+    env: directEnv(),
+    encoding: 'utf8',
+    maxBuffer: MAX_RESPONSE_BYTES + 64,
+    timeout: REQUEST_TIMEOUT_MS + 2_000,
+  }) as string
+
+export function __setGmgnCurlForTests(fn: typeof runCurl | null): void {
+  runCurl =
+    fn ??
+    ((args) =>
+      execFileSync('curl', args, {
+        env: directEnv(),
+        encoding: 'utf8',
+        maxBuffer: MAX_RESPONSE_BYTES + 64,
+        timeout: REQUEST_TIMEOUT_MS + 2_000,
+      }) as string)
+}
+
+async function gmgnFetch<T>(endpoint: string, _signal?: AbortSignal): Promise<T> {
   await RATE_LIMITER.acquire()
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
-  const onAbort = () => controller.abort()
   const cookie = gmgnSessionCookie()
-
+  const url = `${GMGN_BASE}${endpoint}`
+  const args = [
+    '-sS', '-L', '--http2',
+    '--max-time', String(Math.ceil(REQUEST_TIMEOUT_MS / 1000)),
+    '-H', `User-Agent: ${GMGN_UA}`,
+    '-H', 'Referer: https://gmgn.ai/',
+    '-H', 'Accept: application/json',
+    ...(cookie ? ['-H', `Cookie: ${cookie}`] : []),
+    '-w', '\nCURL_STATUS:%{http_code}', url,
+  ]
+  let out: string
   try {
-    const res = await fetch(`${GMGN_BASE}${endpoint}`, {
-      headers: {
-        accept: 'application/json',
-        ...(cookie ? { cookie } : {}),
-      },
-      signal: controller.signal,
-    })
-    if (!res.ok) {
-      const reason = res.status === 403 ? 'Cloudflare challenge' : `HTTP ${res.status}`
-      throw new Error(`GMGN ${reason}: ${endpoint}`)
+    out = runCurl(args)
+  } catch (e) {
+    const isRecord = typeof e === 'object' && e !== null
+    const code = isRecord && 'code' in e ? String(e.code) : ''
+    if (isRecord && (('killed' in e && e.killed === true) || code === 'ETIMEDOUT')) {
+      throw new Error(`GMGN request timeout: ${endpoint}`)
     }
-    return await res.json() as T
-  } finally {
-    clearTimeout(timeout)
-    signal?.removeEventListener('abort', onAbort)
+    if (code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
+      throw new Error(`GMGN response too large: ${endpoint}`)
+    }
+    throw e instanceof Error ? e : new Error(String(e))
+  }
+  const m = /\nCURL_STATUS:(\d{3})\s*$/.exec(out)
+  const status = m ? Number(m[1]) : 0
+  const body = m ? out.slice(0, m.index) : out
+  if (status === 403) throw new Error(`GMGN Cloudflare challenge: ${endpoint}`)
+  if (status >= 400 || status === 0) throw new Error(`GMGN HTTP ${status}: ${endpoint}`)
+  if (Buffer.byteLength(body) > MAX_RESPONSE_BYTES) {
+    throw new Error(`GMGN response too large: ${endpoint}`)
+  }
+  try {
+    return JSON.parse(body) as T
+  } catch {
+    throw new Error(`GMGN parse error: ${endpoint}`)
   }
 }
+
+// ── Discovery ----
 
 // ── Discovery ----
 

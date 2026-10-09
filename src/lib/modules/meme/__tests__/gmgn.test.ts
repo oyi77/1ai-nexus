@@ -14,22 +14,18 @@ import {
   __resetGmgnRateLimiterForTests,
   __resetGmgnCookieForTests,
   __gmgnSessionCookieForTests,
+  __setGmgnCurlForTests,
 } from '../gmgn'
 
-// Helper to mock fetch with a sequence of responses
+// Helper to mock the curl-child seam with a sequence of responses.
 function mockFetchSequence(bodies: Array<{ status: number; body: unknown }>) {
   const queue = [...bodies]
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => {
-      const next = queue.shift() ?? { status: 500, body: {} }
-      return new Response(JSON.stringify(next.body), {
-        status: next.status,
-        headers: { 'Content-Type': 'application/json' },
-      })
-    }),
-  )
+  __setGmgnCurlForTests(() => {
+    const next = queue.shift() ?? { status: 500, body: {} }
+    return `${JSON.stringify(next.body)}\nCURL_STATUS:${next.status}`
+  })
 }
+
 
 beforeEach(() => {
   // Ensure clean state - no real session cookie
@@ -41,6 +37,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals()
   __resetGmgnCookieForTests()
+  __setGmgnCurlForTests(null)
   delete process.env.GMGN_SESSION_PATH
 })
 // ── FIXTURES ──
@@ -391,15 +388,11 @@ describe('discoverGmgnTokens', () => {
 
   it('degrades gracefully on Cloudflare 403 challenge after 5 attempts', async () => {
     // Every request hits the Cloudflare challenge — no real network involved.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async () =>
-        new Response(JSON.stringify({ error: { msg: 'Cloudflare challenge' } }), {
-          status: 403,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      ),
-    )
+    let calls = 0
+    __setGmgnCurlForTests(() => {
+      calls++
+      return `${JSON.stringify({ error: { msg: 'Cloudflare challenge' } })}\nCURL_STATUS:403`
+    })
     vi.useFakeTimers()
     const run = discoverGmgnTokens().then((tokens) => {
       vi.useRealTimers()
@@ -414,7 +407,7 @@ describe('discoverGmgnTokens', () => {
     // Module catches per-chain errors and returns [] (graceful degradation)
     expect(tokens).toEqual([])
     // All 25 attempts (5 chains × 5) hit the challenge
-    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(25)
+    expect(calls).toBe(25)
   })
 })
 
@@ -529,16 +522,16 @@ describe('gmgn session cookie resolution', () => {
     process.env.GMGN_SESSION_PATH = path
     __resetGmgnCookieForTests()
 
-    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
-      new Response(JSON.stringify({ data: { list: [] } }), { status: 200 }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
+    let seen: string[] = []
+    __setGmgnCurlForTests((args) => {
+      seen = args
+      return `${JSON.stringify({ data: { list: [] } })}\nCURL_STATUS:200`
+    })
 
     await discoverGmgnTokens(1)
-    expect(fetchMock).toHaveBeenCalled()
-    const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>
-    expect(headers.cookie).toBe('cf_clearance=hdrtest')
-    expect(headers.accept).toBe('application/json')
+    expect(seen.length).toBeGreaterThan(0)
+    const cookieIdx = seen.findIndex((a) => a === 'Cookie: cf_clearance=hdrtest')
+    expect(cookieIdx).toBeGreaterThan(-1)
 
     delete process.env.GMGN_SESSION_PATH
     rmSync(dir, { recursive: true, force: true })
@@ -549,14 +542,14 @@ describe('gmgn session cookie resolution', () => {
     delete process.env.GMGN_SESSION_COOKIE
     __resetGmgnCookieForTests()
 
-    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) =>
-      new Response(JSON.stringify({ data: { list: [] } }), { status: 200 }),
-    )
-    vi.stubGlobal('fetch', fetchMock)
+    let seen: string[] = []
+    __setGmgnCurlForTests((args) => {
+      seen = args
+      return `${JSON.stringify({ data: { list: [] } })}\nCURL_STATUS:200`
+    })
 
     await discoverGmgnTokens(1)
-    const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>
-    expect(headers.cookie).toBeUndefined()
+    expect(seen.some((a) => a.startsWith('Cookie:'))).toBe(false)
 
     delete process.env.GMGN_SESSION_PATH
   })
