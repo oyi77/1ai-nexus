@@ -17,6 +17,7 @@ export const MEME_PLATFORMS = [
   "photon",
   "nansen",
   "axiom",
+  "alph",
 ] as const;
 export type MemePlatformFilter = (typeof MEME_PLATFORMS)[number];
 

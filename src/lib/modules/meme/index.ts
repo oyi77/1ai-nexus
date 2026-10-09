@@ -35,6 +35,7 @@ import { discoverTokens as discoverNansenTokens, auditToken as auditNansenToken 
 import { discoverGmgnTokens, auditGmgnToken } from './gmgn'
 import { discoverFomoTokens, auditFomoToken } from './fomo'
 import { auditToken as auditAxiomToken } from './axiom'
+import { discoverAlphTokens, auditAlphToken } from './alph'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -227,6 +228,12 @@ const nansenDiscovery = makeDiscoveryModule('nansen-meme', 'Nansen Smart Money A
 const nansenAudit = makeAuditModule('nansen-meme-risk', 'Nansen Meme Risk Audit', (c, k) =>
   auditNansenToken(c, k),
 )
+const alphDiscovery = makeDiscoveryModule('alph-meme', 'Alph Meme Alpha', (limit) =>
+  discoverAlphTokens(limit),
+)
+const alphAudit = makeAuditModule('alph-meme-risk', 'Alph Meme Risk Audit', (c, k) =>
+  auditAlphToken(c, k),
+)
 
 // Blocked server-side (browser-session / Cloudflare) — disabled stubs so
 // pages/APIs can enumerate them without a live module.
@@ -362,6 +369,17 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     auditModule: nansenAudit,
     ttlMs: MEME_TTL,
     enabled: !!process.env.MOBY_NANSEN_API_KEY || existsSync(process.env.NANSEN_SESSION_PATH || join(process.cwd(), 'data', 'nansen-session.json')),
+  },
+  // Alph.ai — keyless public discovery (volume/gainer/graduated) + SEO-gateway
+  // token audit. Generous rate limits, no auth. Opt-in via ALPH_API_ENABLED
+  // until load-tested server-side (mirrors fomo gating pattern).
+  alph: {
+    platform: 'alph',
+    displayName: 'Alph',
+    discoveryModule: alphDiscovery,
+    auditModule: alphAudit,
+    ttlMs: MEME_TTL,
+    enabled: process.env.ALPH_API_ENABLED === 'true',
   },
 }
 

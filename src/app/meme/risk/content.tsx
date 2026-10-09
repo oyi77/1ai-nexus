@@ -9,7 +9,7 @@ import { riskColumns } from "../_shared";
 import type { MemeRiskAudit } from "@/lib/modules/meme/types";
 
 // Platforms with an audit module (leaderboard-only sources are excluded).
-const RISK_PLATFORMS = ["all", "bitget", "gate", "botx", "birdeye", "rugcheck", "moby", "gmgn", "fomo", "nansen", "axiom"] as const;
+const RISK_PLATFORMS = ["all", "bitget", "gate", "botx", "birdeye", "rugcheck", "moby", "gmgn", "fomo", "nansen", "axiom", "alph"] as const;
 type RiskPlatform = (typeof RISK_PLATFORMS)[number];
 
 type Meta = {

@@ -6,7 +6,7 @@
 //   2. Honeypot / rug audit  (risk scoring before you ape in)
 // ─────────────────────────────────────────────────────────────
 
-export type MemePlatform = 'bitget' | 'gate' | 'moby' | 'botx' | 'dexscreener' | 'birdeye' | 'rugcheck' | 'geckoterminal' | 'gmgn' | 'fomo' | 'photon' | 'nansen' | 'axiom'
+export type MemePlatform = 'bitget' | 'gate' | 'moby' | 'botx' | 'dexscreener' | 'birdeye' | 'rugcheck' | 'geckoterminal' | 'gmgn' | 'fomo' | 'photon' | 'nansen' | 'axiom' | 'alph'
 
 export const MEME_PLATFORMS: MemePlatform[] = [
   'bitget',
@@ -32,6 +32,7 @@ export const MEME_PLATFORMS: MemePlatform[] = [
   'photon',
   'nansen',
   'axiom',
+  'alph',
 ]
 
 /** Normalized new-token discovery row — shared across platforms. */
@@ -140,6 +141,25 @@ export interface MemeRiskAudit {
   isHoneypot: boolean
   /** Raw upstream risk counters (platform-specific). */
   riskCounts: { high: number; middle: number; low: number }
+  /**
+   * Optional holder-distribution breakdown (fraction 0..1), when the source
+   * exposes it — Birdeye audit groups (`dev`/`snipper`/`bundler`/`insider`)
+   * and RugCheck dev/insider legs. Absent means "not reported", which the
+   * sniper treats as unproven, never as safe.
+   */
+  distribution?: {
+    devPercent?: number
+    sniperPercent?: number
+    bundlerPercent?: number
+    bundlerSoldPercent?: number
+    insiderPercent?: number
+    clusterPercent?: number
+  }
+  /**
+   * Optional top-holder addresses + percents (GMGN `topHolderList`), for the
+   * sniper's top-1-3 taint gate. Percents are 0..1 fractions.
+   */
+  topWallets?: Array<{ address: string; percent: number }>
   auditedAt: number
 }
 

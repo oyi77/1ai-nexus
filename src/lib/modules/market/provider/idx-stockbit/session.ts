@@ -147,7 +147,7 @@ export async function refreshStockbitSession(refreshToken: string): Promise<Stoc
   const res = await fetch(`${EXODUS}/login/refresh`, {
     method: 'POST',
     signal: AbortSignal.timeout(20_000),
-    headers: { authorization: `Bearer ${refreshToken}`, accept: 'application/json' },
+    headers: { authorization: `Bearer ${refreshToken}`, accept: 'application/json', 'User-Agent': 'curl/8.5.0' },
   })
   const text = await res.text()
   if (!res.ok) {
