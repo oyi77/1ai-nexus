@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // GET /api/v1/prediction-markets — Aggregated prediction markets
-// Sources: Polymarket, Manifold, Metaculus (zero API keys)
+// Sources: Polymarket, Manifold, Metaculus, Alphio (zero API keys)
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'

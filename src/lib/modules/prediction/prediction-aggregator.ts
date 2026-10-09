@@ -12,7 +12,7 @@ import { getCached } from '@/lib/api/server-cache'
 export interface NormalizedMarket {
   id: string
   question: string
-  source: 'polymarket' | 'manifold' | 'metaculus'
+  source: 'polymarket' | 'manifold' | 'metaculus' | 'alphio'
   probability: number        // 0–1, YES probability
   volume24h: number          // USD volume last 24h
   totalVolume: number        // lifetime USD volume
@@ -32,6 +32,7 @@ export interface AggregatedResult {
     polymarket: { count: number; status: 'ok' | 'error'; latencyMs: number }
     manifold: { count: number; status: 'ok' | 'error'; latencyMs: number }
     metaculus: { count: number; status: 'ok' | 'error'; latencyMs: number }
+    alphio: { count: number; status: 'ok' | 'error'; latencyMs: number }
   }
   totalMarkets: number
   timestamp: number
@@ -244,7 +245,161 @@ async function fetchMetaculusMarkets(limit: number): Promise<{ markets: Normaliz
   return { markets, latencyMs: Date.now() - start }
 }
 
-// ─── Aggregator ─────────────────────────────────────────────
+// ─── Alphio (keyless POST) ────────────────────────────────────
+// RE 2026-10-09 from app.alphio.ai Vite bundle (App-*.js MEME_PATHS +
+// GET_TRENDING_MARKETS constants): api.alphio.ai Bearer-walled with
+// {ret:10023,"msg":"user not login"} EXCEPT the prediction read family,
+// which returns {ret:0} keyless on plain POST Content-Type: application/json.
+// Proven live: trending-markets + events + event-detail + event/quotes +
+// event/probability-trend + event/activity. Auth-walled (skipped):
+// crypto/meme/*, stock/screener-*, prediction/trade/*, ai-comment.
+// NOTE: event rows carry NO top-level volume/liquidity — only quotes rows
+// do (best_bid/best_ask). volume24h/liquidity stay 0 (confirmed-absent).
+
+const ALPHIO_BASE = 'https://api.alphio.ai'
+const ALPHIO_TIMEOUT_MS = 10_000
+
+interface AlphioQuote {
+  outcome?: string
+  market_id?: string
+  best_bid?: string
+  best_ask?: string
+  last_price?: string
+}
+
+interface AlphioMarket {
+  market_id?: string
+  event_id?: string
+  question?: string
+  title?: string
+  event_slug?: string
+  slug?: string
+  current_price?: string
+  volume_num?: string
+  end_time?: string
+  tag?: string
+  icon?: string
+  options?: Array<{ name?: string; value?: string; token_id?: string }>
+  markets?: Array<{
+    market_id?: string
+    event_id?: string
+    question?: string
+    icon?: string
+    event_slug?: string
+    volume_num?: string
+    end_time?: string
+    options?: Array<{ name?: string; value?: string; token_id?: string }>
+  }>
+}
+
+interface AlphioListResponse {
+  ret?: number
+  msg?: string
+  data?: { list?: AlphioMarket[]; next_cursor?: string }
+}
+
+interface AlphioQuotesResponse {
+  ret?: number
+  msg?: string
+  data?: { list?: AlphioQuote[] }
+}
+
+// end_time arrives as epoch SECONDS string ("1791634800"); NormalizedMarket
+// endDate is ISO. Returns null on garbage so consumers can skip safely.
+function alphioEndIso(v: unknown): string | null {
+  const n = Number(v)
+  if (!Number.isFinite(n) || n <= 0) return null
+  const ms = n < 1e12 ? n * 1000 : n
+  const d = new Date(ms)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}
+
+async function alphioPost<T>(path: string, body: unknown): Promise<T | null> {
+  try {
+    const res = await fetch(`${ALPHIO_BASE}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(ALPHIO_TIMEOUT_MS),
+    })
+    if (!res.ok) return null
+    return (await res.json()) as T
+  } catch {
+    return null
+  }
+}
+
+async function fetchAlphioMarkets(limit: number): Promise<{ markets: NormalizedMarket[]; latencyMs: number }> {
+  const start = Date.now()
+  const markets: NormalizedMarket[] = []
+
+  const [trending, events] = await Promise.all([
+    alphioPost<AlphioListResponse>('/v1/prediction/trending-markets', { cursor: '', limit }),
+    alphioPost<AlphioListResponse>('/v1/prediction/events', { cursor: '', limit }),
+  ])
+
+  const seen = new Set<string>()
+  for (const row of [...(trending?.data?.list ?? []), ...(events?.data?.list ?? [])]) {
+    // events rows nest markets[]; trending rows are flat market rows
+    const nested = row.markets?.length ? row.markets : [row]
+    for (const m of nested) {
+      const slug = m.event_slug ?? (row as AlphioMarket).event_slug ?? (row as AlphioMarket).slug ?? ''
+      const eventId = m.event_id ?? row.event_id ?? m.market_id ?? ''
+      if (!eventId || seen.has(`alphio:${eventId}`)) continue
+      seen.add(`alphio:${eventId}`)
+      // options carry outcome percentages as strings ("50.5"); Yes/No-style
+      // rows carry no options — quotes (below) supply the probability.
+      let opts = m.options ?? []
+      const yesOpt = opts.find((o) => (o.name ?? '').toLowerCase() === 'yes')
+      const first = opts[0]
+      const rawProb = yesOpt?.value ?? first?.value ?? null
+      const parsed = rawProb == null ? NaN : Number(rawProb)
+      let probability = Number.isFinite(parsed)
+        ? Math.max(0, Math.min(1, parsed > 1 ? parsed / 100 : parsed))
+        : NaN
+      // One quotes call per event (10 rows max, keyless): Yes-midpoint is the
+      // real-money probability; midpoint = (bid+ask)/2. Quotes rows also
+      // supply outcomes for Yes/No-less rows (Up/Down etc.).
+      // quotes REQUIRES the event-level id — sending a market_id returns
+      // {ret:0,list:[]} (probed live 2026-10-09).
+      try {
+        const qEventId = String(m.event_id ?? row.event_id ?? '')
+        const q = qEventId
+          ? await alphioPost<AlphioQuotesResponse>('/v1/prediction/event/quotes', { event_id: qEventId })
+          : null
+        const qRows = q?.data?.list ?? []
+        const yesQ = qRows.find((x) => (x.outcome ?? '').toLowerCase() === 'yes')
+        const bid = Number(yesQ?.best_bid)
+        const ask = Number(yesQ?.best_ask)
+        if (Number.isFinite(bid) && Number.isFinite(ask)) probability = (bid + ask) / 2
+        const qNames = [...new Set(qRows.map((x) => x.outcome ?? '').filter(Boolean))]
+        if (qNames.length) opts = qNames.map((name) => ({ name }))
+      } catch { /* keep options-derived probability */ }
+      if (!Number.isFinite(probability)) probability = 0.5
+      const question = m.question ?? row.question ?? row.title ?? 'Unknown'
+      markets.push({
+        id: `alphio:${eventId}`,
+        question,
+        source: 'alphio',
+        probability,
+        volume24h: 0, // event rows expose no top-level volume
+        totalVolume: Number((m as AlphioMarket).volume_num ?? (row as AlphioMarket).volume_num ?? 0) || 0,
+        liquidity: 0, // quotes carry bid/ask but no depth
+        category: categorizeQuestion(question),
+        url: slug ? `https://app.alphio.ai/prediction/event/${slug}` : 'https://app.alphio.ai/prediction',
+        active: true,
+        endDate: alphioEndIso((m as AlphioMarket).end_time ?? (row as AlphioMarket).end_time),
+        traderCount: 0,
+        outcomes: opts.map((o) => o.name ?? 'Unknown').filter(Boolean),
+        createdAt: null,
+      })
+      if (markets.length >= limit) break
+    }
+    if (markets.length >= limit) break
+  }
+
+  return { markets, latencyMs: Date.now() - start }
+}
 
 const CACHE_KEY = 'prediction-markets:aggregated'
 const CACHE_TTL = 120_000 // 2 minutes
@@ -263,17 +418,19 @@ export async function getAggregatedMarkets(opts: {
     CACHE_TTL,
     async () => {
       // Fetch from all sources in parallel
-      const [pm, mf, mc] = await Promise.allSettled([
+      const [pm, mf, mc, al] = await Promise.allSettled([
         fetchPolymarketMarkets(limit),
         fetchManifoldMarkets(limit),
         fetchMetaculusMarkets(limit),
+        fetchAlphioMarkets(limit),
       ])
 
       const pmResult = pm.status === 'fulfilled' ? pm.value : { markets: [] as NormalizedMarket[], latencyMs: 0 }
       const mfResult = mf.status === 'fulfilled' ? mf.value : { markets: [] as NormalizedMarket[], latencyMs: 0 }
       const mcResult = mc.status === 'fulfilled' ? mc.value : { markets: [] as NormalizedMarket[], latencyMs: 0 }
+      const alResult = al.status === 'fulfilled' ? al.value : { markets: [] as NormalizedMarket[], latencyMs: 0 }
 
-      const all = [...pmResult.markets, ...mfResult.markets, ...mcResult.markets]
+      const all = [...pmResult.markets, ...mfResult.markets, ...mcResult.markets, ...alResult.markets]
 
       return {
         markets: all,
@@ -292,6 +449,11 @@ export async function getAggregatedMarkets(opts: {
             count: mcResult.markets.length,
             status: mc.status === 'fulfilled' ? 'ok' : 'error',
             latencyMs: mcResult.latencyMs,
+          },
+          alphio: {
+            count: alResult.markets.length,
+            status: al.status === 'fulfilled' ? 'ok' : 'error',
+            latencyMs: alResult.latencyMs,
           },
         },
         totalMarkets: all.length,

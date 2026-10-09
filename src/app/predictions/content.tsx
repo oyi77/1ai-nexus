@@ -32,7 +32,7 @@ interface AggregatedData {
   timestamp: number
 }
 
-const SOURCES = ["all", "polymarket", "manifold", "metaculus"] as const
+const SOURCES = ["all", "polymarket", "manifold", "metaculus", "alphio"] as const
 const CATEGORIES = ["all", "crypto", "politics", "economics", "technology", "geopolitics", "sports", "entertainment", "science", "general"] as const
 const SORT_OPTIONS = [
   { value: "volume24h", label: "Volume (24h)" },
@@ -236,6 +236,7 @@ const SOURCE_COLORS: Record<string, string> = {
   polymarket: "bg-blue-500/20 text-blue-400",
   manifold: "bg-purple-500/20 text-purple-400",
   metaculus: "bg-emerald-500/20 text-emerald-400",
+  alphio: "bg-amber-500/20 text-amber-400",
 }
 
 function formatNum(n: number): string {
