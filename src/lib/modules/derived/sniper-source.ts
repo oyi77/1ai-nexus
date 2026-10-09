@@ -41,6 +41,62 @@ function asPct01(v: number | null | undefined): number | null {
   return Math.min(1, frac) * 100 // sniper payload is percent 0..100
 }
 
+/**
+ * Provenance of an audit set: which rows were usable, which were dropped
+ * because they described a different token, and which symbol disagreements
+ * the caller should surface. Pure.
+ */
+export interface AuditIdentityCheck {
+  /** Rows whose contract matches the discovery token. */
+  accepted: MemeRiskAudit[]
+  /** Human-readable reasons rows were dropped (contract mismatch) or flagged (symbol mismatch). */
+  warnings: string[]
+}
+
+/**
+ * Bind audits to the token they claim to describe.
+ *
+ * An audit whose `contract` differs from the discovery row is a different
+ * token — merging it would let one source's safety facts (or its clean
+ * distribution) launder another token's EV. Dropping is the only safe move:
+ * the evaluator already treats a missing fact as unproven, so a dropped row
+ * can never make a token look safer than it is.
+ *
+ * `contract` is the identity; `symbol` is display-only. A symbol-only
+ * disagreement (same mint, different label) is flagged but the row is kept —
+ * the canonical ticker always comes from the discovery source.
+ */
+export function checkAuditIdentity(
+  token: SniperEnrichedToken,
+  audits: MemeRiskAudit[],
+): AuditIdentityCheck {
+  const accepted: MemeRiskAudit[] = []
+  const warnings: string[] = []
+  const wantContract = token.contract.trim().toLowerCase()
+  const wantSymbol = (token.symbol || token.name || '').trim().toLowerCase()
+
+  for (const a of audits) {
+    const got = (a.contract ?? '').trim().toLowerCase()
+    // An audit with no contract cannot be attributed at all — drop it rather
+    // than guess (a missing identity is not an identity match).
+    if (!got || got !== wantContract) {
+      warnings.push(
+        `${a.platform}: contract mismatch (${a.contract || 'none'} ≠ ${token.contract}) — audit discarded`,
+      )
+      continue
+    }
+    const gotSymbol = (a.symbol ?? '').trim().toLowerCase()
+    if (wantSymbol && gotSymbol && gotSymbol !== wantSymbol) {
+      warnings.push(
+        `${a.platform}: symbol mismatch (${a.symbol} ≠ ${wantSymbol}) on the same mint — keeping audit row, canonical ticker from discovery`,
+      )
+    }
+    accepted.push(a)
+  }
+
+  return { accepted, warnings }
+}
+
 function mergeAudits(audits: MemeRiskAudit[]): {
   mintable: boolean | null
   freezeAuthority: boolean | null
@@ -165,18 +221,25 @@ function mergeAudits(audits: MemeRiskAudit[]): {
 /**
  * Build an evaluator-ready SniperPayload from a live discovery row and the
  * audits already collected for the same contract. Pure — zero I/O.
+ *
+ * Audits are identity-checked against the discovery row first: a row that
+ * describes a different mint is discarded (see `checkAuditIdentity`). The
+ * warnings come back to the caller so the operator can see when a source
+ * answered off-target instead of silently trusting its numbers.
  */
 export function toSniperPayload(
   token: SniperEnrichedToken,
   audits: MemeRiskAudit[],
-): SniperPayload {
-  const sec = mergeAudits(audits)
+): { payload: SniperPayload; warnings: string[]; auditsAccepted: MemeRiskAudit[] } {
+  const identity = checkAuditIdentity(token, audits)
+  const sec = mergeAudits(identity.accepted)
   const ageMinutes =
     token.createdAt != null && token.createdAt > 0
       ? Math.max(0, (Date.now() - token.createdAt) / 60_000)
       : Number.POSITIVE_INFINITY // unknown age → post-bonding gates (stricter)
 
-  return {
+  const payload: SniperPayload = {
+
     ticker: token.symbol || token.name || token.contract.slice(0, 8),
     contract: token.contract,
     chain: token.chain,
@@ -205,4 +268,6 @@ export function toSniperPayload(
       narrative: token.narrative ?? undefined,
     },
   }
+
+  return { payload, warnings: identity.warnings, auditsAccepted: identity.accepted }
 }

@@ -14,9 +14,13 @@ let dir = ''
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'sniper-seen-'))
   process.env.SNIPER_SEEN_PATH = join(dir, 'seen.json')
+  // These tests exercise the scan pipeline (discover → audit → deliver), not
+  // the execution gate, so open the gate and let the pipeline run.
+  process.env.SNIPER_EXECUTE_ENABLED = 'true'
 })
 
 afterEach(() => {
+  delete process.env.SNIPER_EXECUTE_ENABLED
   delete process.env.SNIPER_SEEN_PATH
   rmSync(dir, { recursive: true, force: true })
 })
@@ -74,7 +78,11 @@ const RUGGED: MemeRiskAudit = { ...CLEAN, canMint: true, lpLockedPercent: 0.3 }
 function deps(over: Partial<SniperScanDeps> = {}): SniperScanDeps {
   return {
     discover: async () => [tok('GOOD'), tok('BAD')],
-    audit: async (_chain, contract) => [contract === 'GOOD' ? CLEAN : RUGGED],
+    // Audits echo the queried contract back — an audit describing a
+    // different mint is a foreign row and is discarded by the identity gate.
+    audit: async (_chain, contract) => [
+      contract === 'GOOD' ? { ...CLEAN, contract } : { ...RUGGED, contract },
+    ],
     deliver: vi.fn(async () => true),
     ...over,
   }
@@ -140,5 +148,23 @@ describe('runSniperScan', () => {
     expect(deliver).not.toHaveBeenCalled()
     expect(res.delivered).toBe(0)
     expect(res.executed).toBe(1) // still evaluated
+  })
+
+  it('surfaces a foreign-contract audit as a warning on the decision, not as trust', async () => {
+    const res = await runSniperScan(
+      {},
+      deps({
+        discover: async () => [tok('GOOD')],
+        // GOOD's audit set carries an off-target row (a different mint's
+        // clean facts) — the identity gate must drop it and say so.
+        audit: async (_chain, contract) => [
+          { ...CLEAN, contract },
+          { ...CLEAN, contract: 'SOMETHING_ELSE', platform: 'birdeye' },
+        ],
+      }),
+    )
+    const [d] = res.decisions
+    expect(d.auditsUsed).toEqual(['rugcheck'])
+    expect(d.warnings.some((w) => w.includes('contract mismatch') && w.includes('birdeye'))).toBe(true)
   })
 })

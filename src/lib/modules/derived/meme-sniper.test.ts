@@ -29,7 +29,7 @@ function clean(over: Partial<SniperPayload> = {}): SniperPayload {
 
 describe('meme-sniper hard filters', () => {
   it('passes a clean payload as EXECUTE and renders every audited field', () => {
-    const d = evaluateSniper(clean())
+    const d = evaluateSniper(clean(), { executeEnabled: true })
     expect(d.status).toBe('EXECUTE')
     expect(d.rejections).toEqual([])
     expect(d.alert).toContain('VILONA MEME SNIPER')
@@ -59,12 +59,12 @@ describe('meme-sniper hard filters', () => {
   })
 
   it('accepts LP that is split between burnt and locked to 100%', () => {
-    const d = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: 70, lpLockedPercent: 30 } }))
+    const d = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: 70, lpLockedPercent: 30 } }), { executeEnabled: true })
     expect(d.status).toBe('EXECUTE')
   })
 
   it('accepts 100% locked with burn unproven, and rejects fully-unproven LP', () => {
-    const lockedOnly = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: 100 } }))
+    const lockedOnly = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: 100 } }), { executeEnabled: true })
     expect(lockedOnly.status).toBe('EXECUTE')
     const neither = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: null } }))
     expect(neither.status).toBe('REJECT')
@@ -106,7 +106,7 @@ describe('meme-sniper hard filters', () => {
   it('tolerates bundlers up to 30% only when 100% sold', () => {
     const sold = evaluateSniper(clean({
       distribution: { ...clean().distribution, bundlerPercent: 25, bundlerSoldPercent: 100 },
-    }))
+    }), { executeEnabled: true })
     expect(sold.status).toBe('EXECUTE')
     const unsold = evaluateSniper(clean({
       distribution: { ...clean().distribution, bundlerPercent: 25, bundlerSoldPercent: 99 },
@@ -160,7 +160,7 @@ describe('meme-sniper hard filters', () => {
           { address: 'S41111111111111111111111111111111111111111', percent: 6, kind: 'sniper' },
         ],
       },
-    }))
+    }), { executeEnabled: true })
     expect(d.status).toBe('EXECUTE')
   })
 
@@ -170,7 +170,7 @@ describe('meme-sniper hard filters', () => {
         devPercent: null, sniperPercent: null, bundlerPercent: null,
         insiderPercent: null, top10Percent: null,
       },
-    }))
+    }), { executeEnabled: true })
     expect(d.status).toBe('REJECT')
     expect(d.rejections.length).toBe(5)
   })
@@ -178,26 +178,26 @@ describe('meme-sniper hard filters', () => {
 
 describe('meme-sniper momentum gates', () => {
   it('requires 2x vol/mcap for a new pair (<2h)', () => {
-    const below = evaluateSniper(clean({ ageMinutes: 30, momentum: { marketCap: 1e6, volume5m: 1.5e6 } }))
+    const below = evaluateSniper(clean({ ageMinutes: 30, momentum: { marketCap: 1e6, volume5m: 1.5e6 } }), { executeEnabled: true })
     expect(below.status).toBe('REJECT')
     expect(below.rejections.join(' ')).toContain('required 2x')
-    expect(evaluateSniper(clean({ ageMinutes: 30, momentum: { marketCap: 1e6, volume5m: 2e6 } })).status).toBe('EXECUTE')
+    expect(evaluateSniper(clean({ ageMinutes: 30, momentum: { marketCap: 1e6, volume5m: 2e6 } }), { executeEnabled: true }).status).toBe('EXECUTE')
   })
 
   it('requires 4x vol/mcap after bonding (>=2h)', () => {
-    const below = evaluateSniper(clean({ ageMinutes: 180, momentum: { marketCap: 1e6, volume5m: 3e6 } }))
+    const below = evaluateSniper(clean({ ageMinutes: 180, momentum: { marketCap: 1e6, volume5m: 3e6 } }), { executeEnabled: true })
     expect(below.status).toBe('REJECT')
     expect(below.rejections.join(' ')).toContain('required 4x')
-    expect(evaluateSniper(clean({ ageMinutes: 180, momentum: { marketCap: 1e6, volume5m: 4e6 } })).status).toBe('EXECUTE')
+    expect(evaluateSniper(clean({ ageMinutes: 180, momentum: { marketCap: 1e6, volume5m: 4e6 } }), { executeEnabled: true }).status).toBe('EXECUTE')
   })
 
   it('honors an explicit stage over the age heuristic', () => {
-    const d = evaluateSniper(clean({ ageMinutes: 30, stage: 'post-bonding', momentum: { marketCap: 1e6, volume5m: 3e6 } }))
+    const d = evaluateSniper(clean({ ageMinutes: 30, stage: 'post-bonding', momentum: { marketCap: 1e6, volume5m: 3e6 } }), { executeEnabled: true })
     expect(d.status).toBe('REJECT')
   })
 
   it('rejects a zero market cap instead of dividing by zero', () => {
-    const d = evaluateSniper(clean({ momentum: { marketCap: 0, volume5m: 5e6 } }))
+    const d = evaluateSniper(clean({ momentum: { marketCap: 0, volume5m: 5e6 } }), { executeEnabled: true })
     expect(d.status).toBe('REJECT')
     expect(Number.isFinite(d.metrics.volMcRatio)).toBe(true)
   })
@@ -205,14 +205,14 @@ describe('meme-sniper momentum gates', () => {
 
 describe('meme-sniper decision protocol', () => {
   it('flags top-holder PnL > +150% as dump risk and downgrades to WATCHLIST', () => {
-    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6, top5AvgPnlPercent: 260 } }))
+    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6, top5AvgPnlPercent: 260 } }), { executeEnabled: true })
     expect(d.status).toBe('WATCHLIST')
     expect(d.metrics.pnlAssessment).toBe('dump-risk')
     expect(d.rationale).toContain('wait for the flush')
   })
 
   it('labels < +50% top-holder PnL as accumulation', () => {
-    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6, top5AvgPnlPercent: 12 } }))
+    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6, top5AvgPnlPercent: 12 } }), { executeEnabled: true })
     expect(d.status).toBe('EXECUTE')
     expect(d.metrics.pnlAssessment).toBe('accumulation')
     expect(d.rationale).toContain('accumulating')
@@ -227,7 +227,7 @@ describe('meme-sniper decision protocol', () => {
   })
 
   it('a locked daily circuit blocks an otherwise clean snipe', () => {
-    const d = evaluateSniper(clean(), { circuitLocked: true })
+    const d = evaluateSniper(clean(), { executeEnabled: true, circuitLocked: true })
     expect(d.status).toBe('REJECT')
     expect(d.rejections).toEqual([])
     expect(d.rationale).toContain('circuit')
@@ -236,16 +236,16 @@ describe('meme-sniper decision protocol', () => {
 
 describe('meme-sniper risk plan', () => {
   it('uses the fixed degen band and exactly -70% / +100% / +400%', () => {
-    const d = evaluateSniper(clean(), { positionSizeUsd: 20 })
+    const d = evaluateSniper(clean(), { executeEnabled: true, positionSizeUsd: 20 })
     expect(d.plan).toEqual({ sizeUsd: 20, stopLossPct: 70, slAmountUsd: 14, tp1Pct: 100, tp2Pct: 400 })
     expect(d.alert).toContain('Stop Loss: -70% (-$14.00)')
     expect(d.alert).toContain('TP1: +100% ($40.00)')
   })
 
   it('clamps an out-of-band requested size into 5..20', () => {
-    expect(evaluateSniper(clean(), { positionSizeUsd: 500 }).plan.sizeUsd).toBe(SNIPER_LIMITS.maxSizeUsd)
-    expect(evaluateSniper(clean(), { positionSizeUsd: 1 }).plan.sizeUsd).toBe(SNIPER_LIMITS.minSizeUsd)
-    expect(evaluateSniper(clean()).plan.sizeUsd).toBe(SNIPER_LIMITS.defaultSizeUsd)
+    expect(evaluateSniper(clean(), { executeEnabled: true, positionSizeUsd: 500 }).plan.sizeUsd).toBe(SNIPER_LIMITS.maxSizeUsd)
+    expect(evaluateSniper(clean(), { executeEnabled: true, positionSizeUsd: 1 }).plan.sizeUsd).toBe(SNIPER_LIMITS.minSizeUsd)
+    expect(evaluateSniper(clean(), { executeEnabled: true }).plan.sizeUsd).toBe(SNIPER_LIMITS.defaultSizeUsd)
   })
 })
 
@@ -259,14 +259,43 @@ describe('meme-sniper alert safety', () => {
     const d = evaluateSniper(clean({
       ticker: 'EVIL_*[x]',
       momentum: { marketCap: 1e6, volume5m: 3e6, narrative: 'a_b*c[d]' },
-    }))
+    }), { executeEnabled: true })
     // Every dynamic control char is escaped, so the message stays parseable.
     expect(d.alert).toContain('EVIL\\_\\*\\[x]')
     expect(d.alert).toContain('a\\_b\\*c\\[d]')
   })
 
   it('states an explicit fallback when no narrative is supplied', () => {
-    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6 } }))
+    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6 } }), { executeEnabled: true })
     expect(d.alert).toContain('No catalyst data provided')
+  })
+  it('downgrades a clean setup to WATCHLIST when execution is not enabled', () => {
+    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6, top5AvgPnlPercent: 12 } }), {
+      executeEnabled: false,
+    })
+    expect(d.status).toBe('WATCHLIST')
+    expect(d.rationale).toContain('execution is gated')
+    // A gate is not a veto: nothing about the setup itself is rejected.
+    expect(d.rejections).toEqual([])
+  })
+
+  it('defaults to WATCHLIST-only when SNIPER_EXECUTE_ENABLED is unset', () => {
+    const prev = process.env.SNIPER_EXECUTE_ENABLED
+    delete process.env.SNIPER_EXECUTE_ENABLED
+    try {
+      expect(evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6 } })).status).toBe('WATCHLIST')
+      process.env.SNIPER_EXECUTE_ENABLED = 'true'
+      expect(evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6 } })).status).toBe('EXECUTE')
+    } finally {
+      if (prev === undefined) delete process.env.SNIPER_EXECUTE_ENABLED
+      else process.env.SNIPER_EXECUTE_ENABLED = prev
+    }
+  })
+
+  it('surfaces extra provenance warnings from the caller', () => {
+    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6 } }), {
+      extraWarnings: ['birdeye: contract mismatch (BONK ≠ AAA) — audit discarded'],
+    })
+    expect(d.warnings.some((w) => w.includes('contract mismatch'))).toBe(true)
   })
 })

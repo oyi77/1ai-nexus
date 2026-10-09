@@ -54,7 +54,7 @@ function audit(over: Partial<MemeRiskAudit> = {}): MemeRiskAudit {
 
 describe('sniper-source mapping', () => {
   it('maps a clean rugcheck+rugged-proof audit to a passable payload', () => {
-    const p = toSniperPayload(
+    const { payload: p } = toSniperPayload(
       token(),
       [audit({ lpLockedPercent: 1, topWallets: [{ address: 'A', percent: 0.05 }] })],
     )
@@ -69,7 +69,7 @@ describe('sniper-source mapping', () => {
   it('ignores birdeye mint/freeze falses (static catalog, unknowable)', () => {
     // Birdeye returns static-check flags that prove nothing — they must not
     // launder a rugcheck-proven mint into "mintable: false".
-    const p = toSniperPayload(token(), [
+    const { payload: p } = toSniperPayload(token(), [
       audit({ platform: 'birdeye', canMint: false, canFreeze: false, isHoneypot: false, top10HolderPercent: 0, lpLockedPercent: -1 }),
       audit({ canMint: true, canFreeze: false, isHoneypot: false }),
     ])
@@ -78,7 +78,7 @@ describe('sniper-source mapping', () => {
   })
 
   it('treats a fully-untrusted audit set as unproven, never safe', () => {
-    const p = toSniperPayload(token(), [
+    const { payload: p } = toSniperPayload(token(), [
       audit({ platform: 'birdeye', canMint: false, canFreeze: false, isHoneypot: false, top10HolderPercent: 0, lpLockedPercent: -1 }),
     ])
     expect(p.security.mintable).toBeNull()
@@ -87,7 +87,7 @@ describe('sniper-source mapping', () => {
   })
 
   it('merges disjunctively: any bad fact from any source wins', () => {
-    const p = toSniperPayload(token(), [
+    const { payload: p } = toSniperPayload(token(), [
       audit({ canMint: false, canFreeze: false, isHoneypot: false }),
       audit({
         platform: 'rugcheck',
@@ -107,7 +107,7 @@ describe('sniper-source mapping', () => {
   })
 
   it('takes the worst concentration and the best LP lock', () => {
-    const p = toSniperPayload(token(), [
+    const { payload: p } = toSniperPayload(token(), [
       audit({ top10HolderPercent: 0.2, lpLockedPercent: 0.6 }),
       audit({ platform: 'gmgn', top10HolderPercent: 0.35, lpLockedPercent: 0.9 }),
     ])
@@ -116,7 +116,7 @@ describe('sniper-source mapping', () => {
   })
 
   it('treats absent fields as unproven null, never safe', () => {
-    const p = toSniperPayload(token(), [])
+    const { payload: p } = toSniperPayload(token(), [])
     expect(p.security.mintable).toBeNull()
     expect(p.security.lpLockedPercent).toBeNull()
     expect(p.distribution.devPercent).toBeNull()
@@ -124,7 +124,7 @@ describe('sniper-source mapping', () => {
   })
 
   it('passes through GMGN top-holder addresses with kind holder', () => {
-    const p = toSniperPayload(
+    const { payload: p } = toSniperPayload(
       token(),
       [audit({ topWallets: [{ address: 'Dev1', percent: 0.09 }, { address: 'H2', percent: 0.04 }] })],
     )
@@ -135,7 +135,7 @@ describe('sniper-source mapping', () => {
   })
 
   it('merges GMGN exit proof (bundlerSoldPercent), best observation wins', () => {
-    const p = toSniperPayload(token(), [
+    const { payload: p } = toSniperPayload(token(), [
       audit({ platform: 'gmgn', distribution: { bundlerSoldPercent: 75, sniperPercent: 0.0125 } }),
       audit({ platform: 'gmgn', distribution: { bundlerSoldPercent: 100 } }),
     ])
@@ -144,14 +144,48 @@ describe('sniper-source mapping', () => {
   })
 
   it('leaves bundlerSoldPercent null when no source reports exit proof', () => {
-    const p = toSniperPayload(token(), [audit({ distribution: { bundlerPercent: 25 } })])
+    const { payload: p } = toSniperPayload(token(), [audit({ distribution: { bundlerPercent: 25 } })])
     expect(p.distribution.bundlerSoldPercent).toBeNull()
     // No exit proof → bundler gate stays strict (100%-sold tolerance needs proof).
     expect(p.distribution.bundlerPercent).toBeCloseTo(25, 5)
   })
 
   it('routes unknown age to post-bonding gates (strict), never new-pair', () => {
-    const young = toSniperPayload(token({ createdAt: null }), [])
+    const { payload: young } = toSniperPayload(token({ createdAt: null }), [])
     expect(young.ageMinutes).toBeGreaterThan(10_000 - 1)
+  })
+
+  it('discards an audit whose contract is a different mint (identity gate)', () => {
+    // The alert that motivated this gate: symbol from one source, safety
+    // facts from another token. A foreign audit must never launder EV.
+    const { payload, warnings, auditsAccepted } = toSniperPayload(token(), [
+      audit({ contract: 'AAA', lpLockedPercent: -1 }),
+      audit({ platform: 'birdeye', contract: 'BONK', canMint: false, canFreeze: false, lpLockedPercent: 1, top10HolderPercent: 0 }),
+    ])
+    expect(auditsAccepted.map((a) => a.contract)).toEqual(['AAA'])
+    expect(warnings.some((w) => w.includes('contract mismatch') && w.includes('birdeye'))).toBe(true)
+    // The foreign row's "clean" LP must not leak in; rugcheck reports unknown.
+    expect(payload.security.lpLockedPercent).toBeNull()
+  })
+
+  it('drops an audit with no contract at all rather than guessing its identity', () => {
+    const { auditsAccepted, warnings } = toSniperPayload(token(), [
+      audit({ contract: '', canMint: true }),
+    ])
+    expect(auditsAccepted).toHaveLength(0)
+    // The proven-bad fact is gone with the row, so the payload stays unproven
+    // rather than inheriting an unattributable claim.
+    expect(warnings.some((w) => w.includes('contract mismatch'))).toBe(true)
+  })
+
+  it('keeps a same-mint audit and flags a symbol disagreement without adopting the foreign ticker', () => {
+    const { payload, warnings, auditsAccepted } = toSniperPayload(token(), [
+      audit({ contract: 'AAA', symbol: 'BONK', lpLockedPercent: 0.9 }),
+    ])
+    expect(auditsAccepted).toHaveLength(1)
+    expect(warnings.some((w) => w.includes('symbol mismatch'))).toBe(true)
+    // Canonical ticker always comes from the discovery source.
+    expect(payload.ticker).toBe('AAA')
+    expect(payload.security.lpLockedPercent).toBeCloseTo(90, 5)
   })
 })

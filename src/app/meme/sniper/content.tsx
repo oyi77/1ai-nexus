@@ -50,6 +50,8 @@ type Payload = {
   lastScan: { at: string; scanned: number; executed: number; watchlisted: number; rejected: number; delivered: number; errors: string[] } | null;
   counts: Record<Status | "total", number>;
   circuit: Circuit;
+  /** False = the evaluator can never emit EXECUTE (WATCHLIST-only mode). */
+  executeEnabled: boolean;
 };
 
 const statusClass: Record<Status, string> = {
@@ -158,6 +160,11 @@ const columns: Column<Entry>[] = [
             {r.rejections.join("; ")}
           </div>
         )}
+        {r.warnings.some((w) => w.includes('mismatch')) && (
+          <div className="text-[10px] text-amber-400 truncate" title={r.warnings.join("; ")}>
+            ⚠ {r.warnings.find((w) => w.includes('mismatch'))}
+          </div>
+        )}
       </div>
     ),
   },
@@ -247,6 +254,19 @@ export function MemeSniperPageContent() {
             </span>
             <span className="text-text-secondary">losses {circuit?.consecutiveLosses ?? 0}/3</span>
             <span className="text-text-secondary">wins {circuit?.wins ?? 0}</span>
+          </div>
+        </Panel>
+
+        <Panel title="Execution Gate" subtitle="SNIPER_EXECUTE_ENABLED" className="min-w-[240px]">
+          <div className="px-3 py-2 text-xs font-mono">
+            <span className={payload?.executeEnabled ? "text-data-bull" : "text-amber-400"}>
+              {payload?.executeEnabled ? "OPEN — EXECUTE allowed" : "GATED — WATCHLIST only"}
+            </span>
+            {!payload?.executeEnabled && payload !== null && (
+              <div className="text-[11px] text-text-muted mt-1">
+                Hard filters can still be reported; nothing enters on EXECUTE until the gate opens.
+              </div>
+            )}
           </div>
         </Panel>
 

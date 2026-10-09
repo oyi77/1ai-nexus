@@ -310,8 +310,8 @@ export async function runSniperScan(
   for (const token of candidates) {
     try {
       const audits = await deps.audit(token.chain, token.contract)
-      const payload = toSniperPayload(token, audits)
-      const decision = evaluateSniper(payload, { circuitLocked })
+      const { payload, warnings: identityWarnings, auditsAccepted } = toSniperPayload(token, audits)
+      const decision = evaluateSniper(payload, { circuitLocked, extraWarnings: identityWarnings })
       const deduped = seen[token.contract] !== undefined
       let wasDelivered = false
       // Only push actionable legs, and never re-push a seen contract.
@@ -326,7 +326,7 @@ export async function runSniperScan(
         ticker: payload.ticker,
         deduped,
         delivered: wasDelivered,
-        auditsUsed: audits.map((a) => a.platform),
+        auditsUsed: auditsAccepted.map((a) => a.platform),
       })
     } catch (err) {
       errors.push(`${token.contract.slice(0, 8)}: ${err instanceof Error ? err.message : String(err)}`)

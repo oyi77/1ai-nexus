@@ -42,6 +42,10 @@ export async function GET() {
     lastScan: log.lastScan,
     counts: sniperLogCounts(log),
     circuit: { ...readSniperCircuit(), locked: isSniperCircuitLocked() },
+    // Whether the evaluator is allowed to emit EXECUTE at all. While false
+    // (the default), a setup that passes every hard filter is reported as
+    // WATCHLIST — the UI must say so, or an empty EXECUTE column reads as a bug.
+    executeEnabled: process.env.SNIPER_EXECUTE_ENABLED === 'true',
   })
 }
 

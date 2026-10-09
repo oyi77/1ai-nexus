@@ -389,6 +389,14 @@ export interface EvaluateOptions {
   circuitLocked?: boolean
   /** Requested position size; clamped to the fixed degen band. */
   positionSizeUsd?: number
+  /**
+   * Snipe execution gate. Defaults to SNIPER_EXECUTE_ENABLED === 'true', so
+   * an unset env means WATCHLIST-only: screening must be operator-verified
+   * before the evaluator is allowed to say EXECUTE again.
+   */
+  executeEnabled?: boolean
+  /** Extra provenance warnings (audit identity) surfaced to the operator. */
+  extraWarnings?: string[]
 }
 
 export function evaluateSniper(payload: SniperPayload, opts: EvaluateOptions = {}): SniperDecision {
@@ -403,6 +411,10 @@ export function evaluateSniper(payload: SniperPayload, opts: EvaluateOptions = {
   ]
 
   const warnings: string[] = []
+  if (opts.extraWarnings?.length) warnings.push(...opts.extraWarnings)
+
+  const executeEnabled = opts.executeEnabled ?? process.env.SNIPER_EXECUTE_ENABLED === 'true'
+
   if (pnlAssessment === 'dump-risk') {
     warnings.push(
       `Top holders average +${fmtPct(payload.momentum.top5AvgPnlPercent)}% unrealized — exit-liquidity risk, wait for a correction`,
@@ -453,12 +465,18 @@ export function evaluateSniper(payload: SniperPayload, opts: EvaluateOptions = {
   } else if (pnlAssessment === 'dump-risk') {
     status = 'WATCHLIST'
     rationale = `Setup is clean and volume is live (${metrics.volMcRatio.toFixed(2)}x), but top holders sit on +${fmtPct(payload.momentum.top5AvgPnlPercent)}% — wait for the flush before entry`
-  } else {
+  } else if (executeEnabled) {
     status = 'EXECUTE'
     rationale =
       pnlAssessment === 'accumulation'
         ? `Clean distribution with top holders still accumulating (+${fmtPct(payload.momentum.top5AvgPnlPercent)}% avg PnL) and ${metrics.volMcRatio.toFixed(2)}x volume — asymmetry favors early entry`
         : `All hard filters passed with live ${metrics.volMcRatio.toFixed(2)}x volume and no concentrated exits — clean asymmetric entry`
+  } else {
+    status = 'WATCHLIST'
+    rationale =
+      pnlAssessment === 'accumulation'
+        ? `Screening passed but execution is gated (SNIPER_EXECUTE_ENABLED ≠ 'true'): asymmetry favors early entry once the operator verifies the screen — top holders accumulating (+${fmtPct(payload.momentum.top5AvgPnlPercent)}% avg PnL), volume ${metrics.volMcRatio.toFixed(2)}x`
+        : `Screening passed but execution is gated (SNIPER_EXECUTE_ENABLED ≠ 'true'): hard filters clean, volume ${metrics.volMcRatio.toFixed(2)}x — operator must verify before entry`
   }
 
   return {
