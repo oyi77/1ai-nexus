@@ -60,12 +60,58 @@ interface GmgnTrendingResponse {
   }> }; error?: { msg?: string }
 }
 
-interface GmgnTokenDetailResponse {
-  data?: { basicInfo?: { address?: string; symbol?: string; name?: string; chain?: string
-    isHoneypot?: boolean; isMintable?: boolean; freezeAuthorityAddress?: string | null
-  }; assetInfo?: { buyTax?: number; sellTax?: number; liquidity?: number; holderCount?: number
-  }; topHolderList?: Array<{ address?: string; percent?: number }> }; error?: { msg?: string }
+// Proven live 2026-10-09: /tokens/{chain}/{addr} returns
+// {"code":40000300,"invalid argument"} for every token — the detail path
+// that actually works is /tokens/top_buyers/{chain}/{addr} (code:0 with
+// holder tags, exit statuses, and the top-70 sniper concentration).
+interface GmgnHolderEntry {
+  status?: string // hold | bought_more | sold_part | sold | transfered
+  wallet_address?: string
+  tags?: string[] | null
+  maker_token_tags?: string[] | null
 }
+
+interface GmgnTopBuyersResponse {
+  code?: number
+  msg?: string
+  data?: {
+    holders?: {
+      holder_count?: number
+      top70_sniper_hold_rate?: string | number
+      statusNow?: {
+        hold?: number; bought_more?: number; sold_part?: number; sold?: number
+        transfered?: number; bought_rate?: string | number; holding_rate?: string | number
+        top_10_holder_rate?: number
+      }
+      holderInfo?: GmgnHolderEntry[]
+    }
+  }
+}
+
+// Proven live 2026-10-09: /vas/api/v1/token_holders/{chain}/{addr} answers
+// code:0 with cookie-only auth and carries the per-holder PnL the evaluator
+// needs (avg_cost, unrealized_profit, realized_profit, is_suspicious, tags).
+interface GmgnTokenHoldersResponse {
+  code?: number
+  data?: {
+    next?: string | null
+    list?: Array<{
+      address?: string
+      amount_percentage?: number
+      avg_cost?: number | null
+      cost_cur?: number
+      usd_value?: number
+      unrealized_profit?: number
+      realized_profit?: number
+      profit?: number
+      is_suspicious?: boolean
+      tags?: string[] | null
+      maker_token_tags?: string[] | null
+      wallet_tag_v2?: string | null
+    }>
+  }
+}
+
 
 // ── Rate limiting: simple token bucket ----
 
@@ -187,7 +233,9 @@ export function __setGmgnCurlForTests(fn: typeof runCurl | null): void {
 async function gmgnFetch<T>(endpoint: string, _signal?: AbortSignal): Promise<T> {
   await RATE_LIMITER.acquire()
   const cookie = gmgnSessionCookie()
-  const url = `${GMGN_BASE}${endpoint}`
+  // Absolute URLs bypass the quotation base (the /vas/* holder endpoints
+  // live at the host root, not under /defi/quotation/v1).
+  const url = endpoint.startsWith('http') ? endpoint : `${GMGN_BASE}${endpoint}`
   const args = [
     '-sS', '-L', '--http2',
     '--max-time', String(Math.ceil(REQUEST_TIMEOUT_MS / 1000)),
@@ -303,7 +351,80 @@ export async function discoverGmgnTokens(limitPerChain = 20): Promise<MemeAlphaT
 
 // ── Risk audit ----
 
-/** Audit token security status */
+/**
+ * Per-holder PnL for the token's top holders (live-proven 2026-10-09).
+ * Returns null when the endpoint refuses or reports nothing, so callers
+ * keep "unproven" semantics instead of inventing zeros.
+ */
+async function fetchHolderPnl(
+  chainPath: string,
+  contract: string,
+): Promise<{ avgPnlPercent: number | null; topWallets: MemeRiskAudit['topWallets']; suspiciousCount: number } | null> {
+  try {
+    const res = await retryWithBackoff(() => gmgnFetch<GmgnTokenHoldersResponse>(`https://gmgn.ai/vas/api/v1/token_holders/${chainPath}/${contract}`))
+    const list = res.data?.list
+    if (!list || list.length === 0) return null
+
+    const top5 = list.slice(0, 5)
+    const pnls = top5
+      .map((h) => {
+        // GMGN reports cost + current USD value; PnL% = value/cost - 1.
+        const cost = h.cost_cur ?? 0
+        const value = h.usd_value ?? 0
+        if (cost > 0 && value > 0) return (value / cost - 1) * 100
+        if (typeof h.unrealized_profit === 'number' && cost > 0) return (h.unrealized_profit / cost) * 100
+        return null
+      })
+      .filter((v): v is number => v !== null && Number.isFinite(v))
+
+    const avgPnlPercent = pnls.length > 0 ? pnls.reduce((a, b) => a + b, 0) / pnls.length : null
+
+    const TaintTags = new Set(['sniper', 'fresh_wallet', 'bundler', 'insider', 'dev'])
+    const topWallets = top5.map((h) => ({
+      address: h.address ?? '',
+      percent: Math.min(1, Math.max(0, h.amount_percentage ?? 0)),
+      insider:
+        h.is_suspicious === true ||
+        (h.tags ?? []).some((t) => TaintTags.has(t)) ||
+        (h.maker_token_tags ?? []).some((t) => TaintTags.has(t)),
+    }))
+
+    return {
+      avgPnlPercent,
+      topWallets,
+      suspiciousCount: list.filter((h) => h.is_suspicious === true).length,
+    }
+  } catch (err) {
+    logger.warn(`GMGN holder PnL failed for ${contract}: ${err}`, 'gmgn', { contract, error: String(err) })
+    return null
+  }
+}
+
+/**
+ * Audit token status via the top_buyers endpoint (the only GMGN detail
+ * path proven to answer: code:0 for WIF + a fresh pump token 2026-10-09;
+ * /tokens/{chain}/{addr} answers 40000300 "invalid argument" for all).
+ *
+ * What this endpoint really reports (honest mapping, nothing invented):
+ *   - top_10_holder_rate       → top10HolderPercent (pool wallets excluded)
+ *   - top70_sniper_hold_rate   → distribution.sniperPercent
+ *   - statusNow.holding_rate   → bundlerSoldPercent = (1 - holding_rate)*100
+ *     (cohort = top buyers at launch, i.e. snipers/bundlers; pemp proved
+ *      1.02e-11 holding rate = 100% sold — the rug signature)
+ *   - holderInfo[].tags        → topWallets taint (fallback)
+ *
+ * A second cookie-only endpoint supplies the holder PnL leg:
+ *   - /vas/api/v1/token_holders/{chain}/{addr}
+ *       list[].cost_cur + usd_value → top5AvgPnlPercent (real PnL per holder)
+ *       list[].amount_percentage    → topWallets percent
+ *       list[].is_suspicious/tags   → topWallets insider taint
+ * Both calls are error-isolated: a PnL failure keeps the status-derived
+ * topWallets and leaves PnL null (unproven), never zero.
+ *
+ * Mint/freeze/honeypot/tax are NOT reported by either endpoint → booleans
+ * stay false (unreported) and the sniper merger excludes gmgn from
+ * authority trust.
+ */
 export async function auditGmgnToken(
   chain: string,
   contract: string,
@@ -315,40 +436,54 @@ export async function auditGmgnToken(
   }
 
   try {
-    const endpoint = `/tokens/${chainConfig.path}/${contract}`
-    const raw = await retryWithBackoff(() => gmgnFetch<GmgnTokenDetailResponse>(endpoint))
-    const data = raw.data
+    const endpoint = `/tokens/top_buyers/${chainConfig.path}/${contract}`
+    const raw = await retryWithBackoff(() => gmgnFetch<GmgnTopBuyersResponse>(endpoint))
+    const holders = raw.data?.holders
 
-    if (!data) {
-      logger.debug('GMGN no data for token', 'gmgn', { chain, contract })
+    if (!holders) {
+      logger.debug('GMGN no holders data for token', 'gmgn', { chain, contract })
       return null
     }
 
-    const basic = data.basicInfo || {}
-    const assets = data.assetInfo || {}
-    const topHolders = data.topHolderList ?? []
+    // Real payload nests this under statusNow (proven live 2026-10-09).
+    const top10HolderPercent = Math.min(1, Number(holders.statusNow?.top_10_holder_rate ?? 0))
+    const sniperPercent = Math.min(1, Number(holders.top70_sniper_hold_rate ?? 0))
+    const holdingRate = Math.min(1, Math.max(0, Number(holders.statusNow?.holding_rate ?? 1)))
+    const bundlerSoldPercent = Math.round((1 - holdingRate) * 100 * 10) / 10
 
-    const top10 = topHolders.slice(0, 10)
-    const top10Sum = top10.reduce((sum, h) => sum + (h.percent || 0), 0)
-    const top10HolderPercent = top10Sum > 100 ? top10Sum / 100 : top10Sum
+    // Per-holder PnL + taint from the holders endpoint (richer than the
+    // status list: real percents, avg cost, is_suspicious). Falls back to
+    // the top_buyers status list when that endpoint refuses.
+    const pnl = await fetchHolderPnl(chainConfig.path, contract)
 
-    const isHoneypot = basic.isHoneypot ?? false
-    // GMGN reports taxes as percentages (0-100); >10% = heavy tax → middle risk.
-    const heavyTax = (assets.buyTax ?? 0) > 10 || (assets.sellTax ?? 0) > 10
-    const riskLevel = isHoneypot ? 3 : heavyTax ? 2 : 1
-    const riskLabel = riskLevel === 3 ? 'high' : riskLevel === 2 ? 'middle' : riskLevel === 1 ? 'low' : 'safe'
-
-    const riskCounts = {
-      high: riskLevel >= 3 ? 1 : 0,
-      middle: riskLevel === 2 ? 1 : 0,
-      low: riskLevel === 1 ? 1 : 0,
+    let topWallets: MemeRiskAudit['topWallets']
+    if (pnl) {
+      topWallets = pnl.topWallets
+    } else {
+      const TaintTags = new Set(['sniper', 'fresh_wallet'])
+      topWallets = (holders.holderInfo ?? [])
+        .filter((h) => h.status !== 'sold' && h.status !== 'transfered')
+        .slice(0, 5)
+        .map((h) => ({
+          address: h.wallet_address ?? '',
+          percent: 0, // unknown on this endpoint; taint gate keys on kind
+          insider:
+            (h.tags ?? []).some((t) => TaintTags.has(t)) ||
+            (h.maker_token_tags ?? []).some((t) => TaintTags.has(t)),
+        }))
     }
+
+    const riskLevel = top10HolderPercent > 0.5 ? 3 : top10HolderPercent > 0.3 ? 2 : 1
+    const riskLabel = riskLevel === 3 ? 'high' : riskLevel === 2 ? 'middle' : 'low'
 
     logger.info(`GMGN audited token ${contract}`, 'gmgn', {
       chain,
       contract,
       riskLevel,
-      isHoneypot,
+      top10HolderPercent,
+      sniperPercent,
+      bundlerSoldPercent,
+      top5AvgPnlPercent: pnl?.avgPnlPercent ?? null,
     })
 
     return {
@@ -356,24 +491,34 @@ export async function auditGmgnToken(
       platform: 'gmgn',
       chain,
       contract: contract.toLowerCase(),
-      symbol: basic.symbol || '',
-      name: basic.name || '',
+      symbol: '',
+      name: '',
       riskLevel,
       riskLabel,
-      buyTax: (assets.buyTax ?? 0) / 100, // convert from percentage
-      sellTax: (assets.sellTax ?? 0) / 100,
+      // Tax/authority not reported by top_buyers — zeros are placeholders
+      // the evaluator never trusts (gmgn is outside TRUSTED_SECURITY).
+      buyTax: 0,
+      sellTax: 0,
       top10HolderPercent,
       lpLockedPercent: -1, // unknown from GMGN
-      // Top-holder addresses + percents feed the sniper's top-1-3 taint gate.
-      // Percents follow the same 0..100 / 0..1 heuristic as the top10 sum above.
-      topWallets: topHolders.slice(0, 5).map((h) => ({
-        address: h.address ?? '',
-        percent: (h.percent || 0) > 1 ? (h.percent || 0) / 100 : h.percent || 0,
-      })),
-      canFreeze: !!basic.freezeAuthorityAddress,
-      canMint: basic.isMintable ?? false,
-      isHoneypot,
-      riskCounts,
+      // Top-holder taint feeds the sniper's top-1-3 gate.
+      topWallets,
+      canFreeze: false, // unreported — never "proven off" (see TRUSTED_SECURITY)
+      canMint: false,
+      isHoneypot: false,
+      riskCounts: {
+        high: riskLevel >= 3 ? 1 : 0,
+        middle: riskLevel === 2 ? 1 : 0,
+        low: riskLevel === 1 ? 1 : 0,
+      },
+      distribution: {
+        sniperPercent,
+        bundlerSoldPercent,
+        // insider share not reported by this endpoint — stays absent
+        // (unproven), never zero.
+      },
+      /** Top-5 holder average unrealized PnL in percent (null = unproven). */
+      top5AvgPnlPercent: pnl?.avgPnlPercent ?? null,
       auditedAt: Date.now(),
     }
   } catch (err) {

@@ -160,6 +160,13 @@ export interface MemeRiskAudit {
    * sniper's top-1-3 taint gate. Percents are 0..1 fractions.
    */
   topWallets?: Array<{ address: string; percent: number; insider?: boolean }>
+  /**
+   * Average unrealized PnL (percent) across the top-5 current holders.
+   * Gated spec item: >+150% flags DUMP RISK, <+50% marks ACCUMULATION.
+   * Null = no PnL-capable source; the sniper maps it to "neutral", never
+   * to a fabricated value.
+   */
+  top5AvgPnlPercent?: number | null
   auditedAt: number
 }
 

@@ -6,6 +6,8 @@
 //   - a field is only set when an upstream source reports it; missing
 //     means null ("unproven"), which the evaluator treats as a breach —
 //     never as safe.
+//   - bundlerSoldPercent comes from GMGN's top-buyer cohort exit ratio
+//     (statusNow.holding_rate); no other source reports exit proof yet.
 //   - 5m volume comes from dexscreener `volume.m5` when the discovery row
 //     carries it (raw passthrough), else null (dead momentum → REJECT).
 //   - LP burn/lock: rugcheck USD-weighted locked fraction is a LOCKED
@@ -53,6 +55,7 @@ function mergeAudits(audits: MemeRiskAudit[]): {
   top10Percent: number | null
   clusterPercent: number | null
   topWallets: SniperPayload['distribution']['topWallets']
+  top5AvgPnlPercent: number | null
 } {
   let mintable: boolean | null = null
   let freeze: boolean | null = null
@@ -61,9 +64,11 @@ function mergeAudits(audits: MemeRiskAudit[]): {
   let dev: number | null = null
   let sniper: number | null = null
   let bundler: number | null = null
+  let bundlerSold: number | null = null
   let insider: number | null = null
   let top10: number | null = null
   let cluster: number | null = null
+  let top5AvgPnlPercent: number | null = null
   let topWallets: SniperPayload['distribution']['topWallets'] = undefined
 
   // Only these platforms read actual authority data — every other audit
@@ -113,6 +118,17 @@ function mergeAudits(audits: MemeRiskAudit[]): {
       bundler = take(bundler, d.bundlerPercent)
       insider = take(insider, d.insiderPercent)
       cluster = take(cluster, d.clusterPercent)
+      // Exit proof (0..100): HIGHER is safer (more of the cohort already
+      // out), so the best (max) observation wins.
+      if (d.bundlerSoldPercent !== undefined && d.bundlerSoldPercent !== null) {
+        const pct = Math.min(100, Math.max(0, d.bundlerSoldPercent))
+        bundlerSold = bundlerSold === null ? pct : Math.max(bundlerSold, pct)
+      }
+    }
+
+    // PnL: first non-null source wins (only GMGN holders reports it).
+    if (a.top5AvgPnlPercent !== undefined && a.top5AvgPnlPercent !== null && top5AvgPnlPercent === null) {
+      top5AvgPnlPercent = a.top5AvgPnlPercent
     }
 
     // Top wallets: prefer the longest list (GMGN passes 5 with addresses).
@@ -137,11 +153,12 @@ function mergeAudits(audits: MemeRiskAudit[]): {
     devPercent: dev,
     sniperPercent: sniper,
     bundlerPercent: bundler,
-    bundlerSoldPercent: null, // exit proof requires a bundler-position tracker
+    bundlerSoldPercent: bundlerSold, // GMGN top-buyer cohort exit ratio (0..100)
     insiderPercent: insider,
     top10Percent: top10,
     clusterPercent: cluster,
     topWallets,
+    top5AvgPnlPercent,
   }
 }
 
@@ -184,7 +201,7 @@ export function toSniperPayload(
     momentum: {
       marketCap: token.marketCap,
       volume5m: token.volume5m ?? 0,
-      top5AvgPnlPercent: null, // no holder-PnL source wired yet — neutral, never faked
+      top5AvgPnlPercent: sec.top5AvgPnlPercent, // GMGN holders endpoint (null = neutral, never faked)
       narrative: token.narrative ?? undefined,
     },
   }

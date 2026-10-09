@@ -134,6 +134,22 @@ describe('sniper-source mapping', () => {
     ])
   })
 
+  it('merges GMGN exit proof (bundlerSoldPercent), best observation wins', () => {
+    const p = toSniperPayload(token(), [
+      audit({ platform: 'gmgn', distribution: { bundlerSoldPercent: 75, sniperPercent: 0.0125 } }),
+      audit({ platform: 'gmgn', distribution: { bundlerSoldPercent: 100 } }),
+    ])
+    expect(p.distribution.bundlerSoldPercent).toBe(100)
+    expect(p.distribution.sniperPercent).toBeCloseTo(1.25, 4)
+  })
+
+  it('leaves bundlerSoldPercent null when no source reports exit proof', () => {
+    const p = toSniperPayload(token(), [audit({ distribution: { bundlerPercent: 25 } })])
+    expect(p.distribution.bundlerSoldPercent).toBeNull()
+    // No exit proof → bundler gate stays strict (100%-sold tolerance needs proof).
+    expect(p.distribution.bundlerPercent).toBeCloseTo(25, 5)
+  })
+
   it('routes unknown age to post-bonding gates (strict), never new-pair', () => {
     const young = toSniperPayload(token({ createdAt: null }), [])
     expect(young.ageMinutes).toBeGreaterThan(10_000 - 1)

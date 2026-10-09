@@ -128,84 +128,49 @@ const BASE_TRENDING_FIXTURE = {
 }
 
 const AUDIT_SUCCESS_FIXTURE = {
+  code: 0,
+  msg: 'success',
   data: {
-    basicInfo: {
-      address: 'So11111111111111111111111111111111111111112',
-      symbol: 'SOL',
-      name: 'Solana',
+    holders: {
       chain: 'sol',
-      isHoneypot: false,
-      isMintable: false,
-      freezeAuthorityAddress: null,
+      holder_count: 70,
+      top70_sniper_hold_rate: '0.0125',
+      statusNow: {
+        hold: 5, bought_more: 0, sold_part: 10, sold: 55, transfered: 0,
+        bought_rate: '0.9', holding_rate: '0.25',
+        top_10_holder_rate: 0.191,
+      },
+      holderInfo: [
+        { status: 'hold', wallet_address: 'W1', tags: ['bluechip_owner'], maker_token_tags: [] },
+        { status: 'sold', wallet_address: 'W2', tags: ['sniper'], maker_token_tags: [] },
+        { status: 'hold', wallet_address: 'W3', tags: ['fresh_wallet'], maker_token_tags: ['sniper'] },
+        { status: 'hold', wallet_address: 'W4', tags: [], maker_token_tags: [] },
+        { status: 'hold', wallet_address: 'W5', tags: null, maker_token_tags: null },
+        { status: 'hold', wallet_address: 'W6', tags: [], maker_token_tags: [] },
+      ],
     },
-    assetInfo: {
-      buyTax: 0,
-      sellTax: 0,
-      liquidity: 125000000,
-      holderCount: 250000,
-    },
-    topHolderList: [
-      { address: 'Addr1', percent: 5.2 },
-      { address: 'Addr2', percent: 3.8 },
-      { address: 'Addr3', percent: 2.1 },
-      { address: 'Addr4', percent: 1.9 },
-      { address: 'Addr5', percent: 1.5 },
-      { address: 'Addr6', percent: 1.2 },
-      { address: 'Addr7', percent: 1.0 },
-      { address: 'Addr8', percent: 0.9 },
-      { address: 'Addr9', percent: 0.8 },
-      { address: 'Addr10', percent: 0.7 },
+  },
+}
+
+const AUDIT_NO_DATA_FIXTURE = { code: 0, msg: 'success', data: {} }
+
+// /vas/api/v1/token_holders shape (live-proven 2026-10-09).
+const HOLDERS_FIXTURE = {
+  code: 0,
+  message: 'success',
+  data: {
+    list: [
+      // cost 100 → value 200 = +100%
+      { address: 'H1', amount_percentage: 0.137, cost_cur: 100, usd_value: 200, is_suspicious: false, tags: ['top_holder'], maker_token_tags: ['top_holder'] },
+      // cost 100 → value 150 = +50%
+      { address: 'H2', amount_percentage: 0.097, cost_cur: 100, usd_value: 150, is_suspicious: false, tags: [], maker_token_tags: [] },
+      // suspicious → insider taint
+      { address: 'H3', amount_percentage: 0.049, cost_cur: 100, usd_value: 110, is_suspicious: true, tags: [], maker_token_tags: [] },
+      // no cost → excluded from the average
+      { address: 'H4', amount_percentage: 0.037, cost_cur: 0, usd_value: 50, is_suspicious: false, tags: [], maker_token_tags: [] },
+      { address: 'H5', amount_percentage: 0.034, cost_cur: 100, usd_value: 100, is_suspicious: false, tags: [], maker_token_tags: [] },
     ],
   },
-}
-
-const AUDIT_HONEYPOT_FIXTURE = {
-  data: {
-    basicInfo: {
-      address: '0xRUGGED123456789012345678901234567890ab',
-      symbol: 'RUG',
-      name: 'RugPull Token',
-      chain: 'eth',
-      isHoneypot: true,
-      isMintable: true,
-      freezeAuthorityAddress: '0xFreeze123456789012345678901234567890ab',
-    },
-    assetInfo: {
-      buyTax: 99,
-      sellTax: 99,
-      liquidity: 50000,
-      holderCount: 1200,
-    },
-    topHolderList: [
-      { address: 'Dev1', percent: 45.5 },
-      { address: 'Dev2', percent: 35.2 },
-    ],
-  },
-}
-
-const AUDIT_HEAVY_TAX_FIXTURE = {
-  data: {
-    basicInfo: {
-      address: '0xTAXY1234567890123456789012345678901234ab',
-      symbol: 'TAXY',
-      name: 'Heavy Tax Token',
-      chain: 'eth',
-      isHoneypot: false,
-      isMintable: false,
-      freezeAuthorityAddress: null,
-    },
-    assetInfo: {
-      buyTax: 15,
-      sellTax: 20,
-      liquidity: 150000,
-      holderCount: 8500,
-    },
-    topHolderList: [],
-  },
-}
-
-const AUDIT_NO_DATA_FIXTURE = {
-  data: null,
 }
 
 describe('discoverGmgnTokens', () => {
@@ -411,70 +376,88 @@ describe('discoverGmgnTokens', () => {
   })
 })
 
-describe('auditGmgnToken', () => {
-  it('audits token successfully and returns MemeRiskAudit', async () => {
+describe('auditGmgnToken (top_buyers contract)', () => {
+  it('maps exit ratio, sniper rate, concentration and holder PnL', async () => {
     mockFetchSequence([
       { status: 200, body: AUDIT_SUCCESS_FIXTURE },
+      { status: 200, body: HOLDERS_FIXTURE },
     ])
 
     const audit = await auditGmgnToken('solana', 'So11111111111111111111111111111111111111112')
 
     expect(audit).not.toBeNull()
     expect(audit!.platform).toBe('gmgn')
-    expect(audit!.chain).toBe('solana')
-    expect(audit!.contract).toBe('so11111111111111111111111111111111111111112')
-    expect(audit!.symbol).toBe('SOL')
-    expect(audit!.name).toBe('Solana')
-    expect(audit!.riskLevel).toBe(1)
+    expect(audit!.top10HolderPercent).toBeCloseTo(0.191, 3)
+    expect(audit!.distribution?.sniperPercent).toBeCloseTo(0.0125, 4)
+    // holding_rate 0.25 → 75% of the launch-buyer cohort already exited.
+    expect(audit!.distribution?.bundlerSoldPercent).toBeCloseTo(75, 5)
+    // Top-5 PnL: +100%, +50%, +10%, (H4 has no cost → excluded), 0% → 40.
+    expect(audit!.top5AvgPnlPercent).toBeCloseTo(40, 5)
+    // Holders endpoint supplies real percents + is_suspicious taint.
+    expect(audit!.topWallets!.map((w) => w.address)).toEqual(['H1', 'H2', 'H3', 'H4', 'H5'])
+    expect(audit!.topWallets![0].percent).toBeCloseTo(0.137, 3)
+    expect(audit!.topWallets!.map((w) => w.insider)).toEqual([false, false, true, false, false])
     expect(audit!.riskLabel).toBe('low')
-    expect(audit!.buyTax).toBe(0)
-    expect(audit!.sellTax).toBe(0)
-    expect(audit!.top10HolderPercent).toBeCloseTo(19.1, 2)
-    expect(audit!.lpLockedPercent).toBe(-1)
-    expect(audit!.canFreeze).toBe(false)
-    expect(audit!.canMint).toBe(false)
-    expect(audit!.riskCounts).toEqual({ high: 0, middle: 0, low: 1 })
-    expect(typeof audit!.auditedAt).toBe('number')
-    expect(typeof audit!.auditedAt).toBe('number')
   })
 
-  it('returns null when no security data', async () => {
+  it('falls back to status-list taint and null PnL when holders refuses', async () => {
     mockFetchSequence([
-      { status: 200, body: AUDIT_NO_DATA_FIXTURE },
+      { status: 200, body: AUDIT_SUCCESS_FIXTURE },
+      { status: 500, body: {} }, // holders endpoint down for all retries
     ])
 
-    const audit = await auditGmgnToken('solana', 'UnknownContract12345678901234567890123456')
+    const audit = await auditGmgnToken('solana', 'So11111111111111111111111111111111111111112')
 
-    expect(audit).toBeNull()
+    expect(audit).not.toBeNull()
+    expect(audit!.top5AvgPnlPercent).toBeNull()
+    // Fallback path: sold wallets dropped, W3 sniper/fresh → insider.
+    expect(audit!.topWallets!.map((w) => w.address)).toEqual(['W1', 'W3', 'W4', 'W5', 'W6'])
+    expect(audit!.topWallets!.map((w) => w.insider)).toEqual([false, true, false, false, false])
+    // Exit/concentration data survives the PnL leg failing.
+    expect(audit!.distribution?.bundlerSoldPercent).toBeCloseTo(75, 5)
   })
 
-  it('identifies honeypot tokens as high risk', async () => {
-    mockFetchSequence([
-      { status: 200, body: AUDIT_HONEYPOT_FIXTURE },
-    ])
+  it('returns null when holders data is absent', async () => {
+    mockFetchSequence([{ status: 200, body: AUDIT_NO_DATA_FIXTURE }])
+    expect(await auditGmgnToken('solana', 'UnknownContract12345678901234567890123456')).toBeNull()
+  })
 
-    const audit = await auditGmgnToken('ethereum', '0xRUGGED123456789012345678901234567890ab')
-
+  it('reports concentration risk honestly at high top10 share', async () => {
+    mockFetchSequence([{
+      status: 200,
+      body: {
+        code: 0, data: {
+          holders: {
+            holder_count: 10, top70_sniper_hold_rate: '0',
+            statusNow: { holding_rate: '1', top_10_holder_rate: 0.62 },
+            holderInfo: [],
+          },
+        },
+      },
+    }, { status: 200, body: HOLDERS_FIXTURE }])
+    const audit = await auditGmgnToken('solana', 'Concentrated1111111111111111111111111111111111')
     expect(audit!.riskLevel).toBe(3)
     expect(audit!.riskLabel).toBe('high')
-    expect(audit!.isHoneypot).toBe(true)
-    expect(audit!.canFreeze).toBe(true)
+    expect(audit!.distribution?.bundlerSoldPercent).toBe(0)
   })
 
-  it('identifies heavy tax tokens as medium risk', async () => {
+  it('never claims authority/honeypot data it does not report', async () => {
     mockFetchSequence([
-      { status: 200, body: AUDIT_HEAVY_TAX_FIXTURE },
+      { status: 200, body: AUDIT_SUCCESS_FIXTURE },
+      { status: 200, body: HOLDERS_FIXTURE },
     ])
+    const audit = await auditGmgnToken('solana', 'So11111111111111111111111111111111111111112')
+    expect(audit!.canMint).toBe(false)
+    expect(audit!.canFreeze).toBe(false)
+    expect(audit!.isHoneypot).toBe(false)
+    expect(audit!.buyTax).toBe(0)
+    expect(audit!.sellTax).toBe(0)
+  })
 
-    const audit = await auditGmgnToken('ethereum', '0xTAXY1234567890123456789012345678901234ab')
-
-    expect(audit!.riskLevel).toBe(2)
-    expect(audit!.riskLabel).toBe('middle')
-    expect(audit!.buyTax).toBeCloseTo(0.15)
-    expect(audit!.sellTax).toBeCloseTo(0.20)
+  it('rejects an unknown chain', async () => {
+    expect(await auditGmgnToken('unknownchain', 'X')).toBeNull()
   })
 })
-
 
 // ── Session-file cookie support ──────────────────────────────
 
