@@ -201,8 +201,10 @@ async function fetchWithRetry<T>(
     return (await res.json()) as T
   } catch (err) {
     if (err instanceof AlphNonRetryableError) throw err
-    if (controller.signal.aborted) throw new Error('request aborted')
-    if (attempt < MAX_RETRIES && !signal?.aborted) {
+    // Deterministic abort: never retry a request whose caller already gave up —
+    // retry chains spawned after abort surface as post-test unhandled rejections.
+    if (controller.signal.aborted || signal?.aborted) throw new Error('request aborted')
+    if (attempt < MAX_RETRIES) {
       // Zero retry sleeps under test timers (skill: tracker-meme-adapter-wiring).
       if (process.env.VITEST === undefined && !process.env.JEST_WORKER_ID) {
         const { promise, resolve } = Promise.withResolvers<void>()

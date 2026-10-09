@@ -181,16 +181,22 @@ describe('discoverAlphTokens', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(
-        (_input: string, init?: RequestInit) =>
-          new Promise<never>((_resolve, reject) => {
+        (_input: string, init?: RequestInit) => {
+          // Faithful fetch semantics: already-aborted signal rejects immediately.
+          if (init?.signal?.aborted) return Promise.reject(new Error('request aborted'))
+          return new Promise<never>((_resolve, reject) => {
             init?.signal?.addEventListener('abort', () => reject(new Error('request aborted')))
-          }),
+          })
+        },
       ),
     )
-
     const pending = discoverAlphTokens(1)
+    // Attach the rejection handler BEFORE advancing timers: the matcher
+    // subscribes on call, so the abort rejection (fired mid-advance) always
+    // has a handler and never surfaces as an unhandled rejection.
+    const assertion = expect(pending).rejects.toThrow('request aborted')
     await vi.advanceTimersByTimeAsync(12_000)
-    await expect(pending).rejects.toThrow('request aborted')
+    await assertion
   })
 })
 
