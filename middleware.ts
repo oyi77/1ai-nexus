@@ -179,6 +179,7 @@ const PUBLIC_ROUTES = new Set([
   '/api/v1/saham/moonshot',
   '/api/v1/saham/ajaib',
   '/api/v1/saham/stockbit',
+  '/api/v1/saham/stockbit-orderbook',
   '/api/v1/saham/signals',
   '/api/v1/saham/intel',
   '/api/v1/saham/dual',
