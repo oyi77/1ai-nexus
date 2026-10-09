@@ -51,13 +51,39 @@ const CHAIN_CONFIG: Record<string, { path: string; chainId: string }> = {
 }
 
 
+// The rank endpoint's live shape (proven 2026-10-09): data.rank[] flat rows
+// with snake_case fields — the older data.list[].tokenInfo shape is kept as
+// a fallback since the adapter was originally written against it.
+interface GmgnRankRow {
+  address?: string
+  symbol?: string
+  name?: string
+  chain?: string
+  price?: number
+  price_change_percent?: number
+  volume?: number
+  market_cap?: number
+  liquidity?: number
+  holder_count?: number
+  open_timestamp?: number
+  /** Top-10 concentration as a fraction (rank rows report it directly). */
+  top_10_holder_rate?: number
+  twitter_username?: string
+  website?: string
+  telegram?: string
+}
+
 interface GmgnTrendingResponse {
-  data?: { list?: Array<{
-    tokenInfo?: { address?: string; symbol?: string; name?: string; chain?: string
-      priceUsd?: number; priceChange24h?: number; volume24h?: number; marketCap?: number
-      liquidity?: number; holders?: number; createdAt?: number
-    }; trendScore?: number
-  }> }; error?: { msg?: string }
+  data?: {
+    rank?: GmgnRankRow[]
+    list?: Array<{
+      tokenInfo?: { address?: string; symbol?: string; name?: string; chain?: string
+        priceUsd?: number; priceChange24h?: number; volume24h?: number; marketCap?: number
+        liquidity?: number; holders?: number; createdAt?: number
+      }; trendScore?: number
+    }>
+  }
+  error?: { msg?: string }
 }
 
 // Proven live 2026-10-09: /tokens/{chain}/{addr} returns
@@ -291,13 +317,14 @@ export async function discoverGmgnTokens(limitPerChain = 20): Promise<MemeAlphaT
 
     try {
       const raw = await retryWithBackoff(() => gmgnFetch<GmgnTrendingResponse>(endpoint))
-      const items = raw.data?.list ?? []
+      // Live rank rows first; the legacy list[].tokenInfo shape as fallback.
+      const rankRows = raw.data?.rank ?? []
+      const legacyRows = (raw.data?.list ?? []).map((item) => item.tokenInfo).filter((v): v is NonNullable<typeof v> => !!v)
+      const items: GmgnRankRow[] = rankRows.length > 0 ? rankRows : legacyRows
       let count = 0
 
-      for (const item of items) {
+      for (const info of items) {
         if (count >= limitPerChain) break
-
-        const info = item.tokenInfo
         if (!info?.address) continue
 
         const normChain = normalizeChainId(chainId)
@@ -312,16 +339,23 @@ export async function discoverGmgnTokens(limitPerChain = 20): Promise<MemeAlphaT
           contract: info.address.toLowerCase(),
           symbol: info.symbol || '',
           name: info.name || '',
-          price: info.priceUsd || 0,
-          change24h: info.priceChange24h || 0,
-          volume24h: info.volume24h || 0,
-          marketCap: info.marketCap || 0,
-          liquidity: info.liquidity || 0,
-          createdAt: info.createdAt ? normalizeTimestamp(info.createdAt) : null,
+          // Live rank rows use `price`; the legacy shape used `priceUsd`.
+          price: info.price ?? (info as { priceUsd?: number }).priceUsd ?? 0,
+          change24h: info.price_change_percent ?? (info as { priceChange24h?: number }).priceChange24h ?? 0,
+          volume24h: info.volume ?? (info as { volume24h?: number }).volume24h ?? 0,
+          marketCap: info.market_cap ?? (info as { marketCap?: number }).marketCap ?? 0,
+          liquidity: info.liquidity ?? 0,
+          createdAt: info.open_timestamp
+            ? normalizeTimestamp(info.open_timestamp)
+            : ((info as { createdAt?: number }).createdAt ? normalizeTimestamp((info as { createdAt?: number }).createdAt!) : null),
           riskLevel: 1,
-          holders: info.holders || 0,
-          top10HolderPercent: 0,
-          social: {},
+          holders: info.holder_count ?? (info as { holders?: number }).holders ?? 0,
+          top10HolderPercent: Math.min(1, Math.max(0, info.top_10_holder_rate ?? 0)),
+          social: {
+            twitter: info.twitter_username ? `https://x.com/${info.twitter_username}` : undefined,
+            telegram: info.telegram || undefined,
+            site: info.website || undefined,
+          },
           audited: false,
           provenance: {
             sourceType: 'public-api',

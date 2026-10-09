@@ -174,6 +174,27 @@ const HOLDERS_FIXTURE = {
 }
 
 describe('discoverGmgnTokens', () => {
+  it('parses the live rank shape (data.rank[] snake_case) over the legacy list', async () => {
+    mockFetchSequence([{ status: 200, body: { data: { rank: [
+      { address: 'RANK1addr', symbol: 'RNK', name: 'Rank One', chain: 'sol', price: 0.5,
+        price_change_percent: 12.5, volume: 900000, market_cap: 5000000, liquidity: 120000,
+        holder_count: 4200, open_timestamp: 1700000000, top_10_holder_rate: 0.42,
+        twitter_username: 'rankone' },
+    ] } } }])
+
+    const tokens = await discoverGmgnTokens(5)
+    const t = tokens.find((x) => x.symbol === 'RNK')
+    expect(t).toBeDefined()
+    expect(t!.contract).toBe('rank1addr')
+    expect(t!.price).toBeCloseTo(0.5, 6)
+    expect(t!.volume24h).toBe(900000)
+    expect(t!.marketCap).toBe(5000000)
+    expect(t!.holders).toBe(4200)
+    expect(t!.top10HolderPercent).toBeCloseTo(0.42, 4)
+    expect(t!.createdAt).toBe(1700000000000) // seconds → ms
+    expect(t!.social.twitter).toBe('https://x.com/rankone')
+  })
+
   it('discovers tokens on Solana chain and normalizes to MemeAlphaToken[]', async () => {
     mockFetchSequence([
       { status: 200, body: SOL_TRENDING_FIXTURE },
