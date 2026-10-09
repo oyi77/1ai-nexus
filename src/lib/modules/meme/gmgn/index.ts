@@ -300,6 +300,12 @@ export async function auditGmgnToken(
       sellTax: (assets.sellTax ?? 0) / 100,
       top10HolderPercent,
       lpLockedPercent: -1, // unknown from GMGN
+      // Top-holder addresses + percents feed the sniper's top-1-3 taint gate.
+      // Percents follow the same 0..100 / 0..1 heuristic as the top10 sum above.
+      topWallets: topHolders.slice(0, 5).map((h) => ({
+        address: h.address ?? '',
+        percent: (h.percent || 0) > 1 ? (h.percent || 0) / 100 : h.percent || 0,
+      })),
       canFreeze: !!basic.freezeAuthorityAddress,
       canMint: basic.isMintable ?? false,
       isHoneypot,

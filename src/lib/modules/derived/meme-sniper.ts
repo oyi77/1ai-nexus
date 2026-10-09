@@ -213,9 +213,14 @@ function securityBreaches(p: SniperPayload): string[] {
   }
   if (s.honeypot === true) out.push('Honeypot: sells are blocked')
 
-  const burned = s.lpBurnedPercent
-  const locked = s.lpLockedPercent
-  if (burned === null || burned === undefined || locked === null || locked === undefined) {
+  // Burnt+locked together must cover ~100% of LP. Either leg may be
+  // unproven as long as the OTHER leg proves full coverage: 100% locked
+  // is exit-safe even with burn unproven, and 100% burnt needs no lock
+  // claim. Fully unproven stays a breach.
+  const burned = s.lpBurnedPercent ?? 0
+  const locked = s.lpLockedPercent ?? 0
+  const lpKnown = s.lpBurnedPercent != null || s.lpLockedPercent != null
+  if (!lpKnown) {
     out.push('LP burn/lock unproven (must be 100% burnt or locked)')
   } else if (burned + locked < 99.5) {
     out.push(`LP only ${fmtPct(burned + locked)}% burnt+locked — exit liquidity exposed`)

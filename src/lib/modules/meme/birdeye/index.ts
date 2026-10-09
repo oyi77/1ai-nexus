@@ -301,14 +301,31 @@ export async function auditBirdeyeToken(chain: string, contract: string): Promis
     const sev = severityToCounts(security.data?.groups)
 
     let top10HolderPercent = 0
+    let distribution: MemeRiskAudit['distribution']
     try {
       const audit = await curlReq<BirdeyeAudit>(
         'GET', `/overview/audit?address=${encodeURIComponent(contract)}`,
       )
-      const pct = toNum(audit.data?.top10Holders?.percentage)
       // Birdeye percentage scale is inconsistent: 0..1 fraction for some
       // tokens, 0..100 percent for others. Normalize to a 0..1 fraction.
-      top10HolderPercent = pct > 1 ? pct / 100 : pct
+      const asFrac = (g?: BirdeyeAuditGroup): number | undefined => {
+        if (!g || g.percentage === undefined) return undefined
+        const pct = toNum(g.percentage)
+        return pct > 1 ? pct / 100 : pct
+      }
+      top10HolderPercent = asFrac(audit.data?.top10Holders) ?? 0
+      const dev = asFrac(audit.data?.dev)
+      const sniper = asFrac(audit.data?.snipper)
+      const bundler = asFrac(audit.data?.bundler)
+      const insider = asFrac(audit.data?.insider)
+      if (dev !== undefined || sniper !== undefined || bundler !== undefined || insider !== undefined) {
+        distribution = {
+          devPercent: dev,
+          sniperPercent: sniper,
+          bundlerPercent: bundler,
+          insiderPercent: insider,
+        }
+      }
     } catch { /* audit optional */ }
 
     const riskLabel = (['safe', 'low', 'middle', 'high'][sev.riskLevel] || 'unknown') as MemeRiskAudit['riskLabel']
@@ -329,6 +346,7 @@ export async function auditBirdeyeToken(chain: string, contract: string): Promis
       canMint: sev.canMint,
       isHoneypot: false, // not reported by this source
       riskCounts: sev.riskCounts,
+      distribution,
       auditedAt: Date.now(),
     }
   } catch {

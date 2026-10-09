@@ -132,6 +132,7 @@ const PUBLIC_ROUTES = new Set([
   '/api/v1/meme/risk',
   '/api/v1/meme/sniper',
   '/api/v1/meme/sniper/circuit',
+  '/api/v1/meme/sniper/scan',
   '/api/v1/copy-trade',
   '/api/v1/copy-trading/leaderboard',
   '/api/v1/copy-trading/performance',

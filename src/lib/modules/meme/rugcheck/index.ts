@@ -36,6 +36,23 @@ interface RugCheckTopHolder {
   owner?: string
 }
 
+interface RugCheckMarketLp {
+  lpLockedPct?: number
+  lpLockedUSD?: number
+  quoteUSD?: number
+  baseUSD?: number
+}
+
+interface RugCheckMarket {
+  lp?: RugCheckMarketLp | null
+}
+
+interface RugCheckInsiderNetwork {
+  size?: number
+  currentHolding?: number
+  tokenAmount?: number
+}
+
 interface RugCheckReport {
   mint?: string
   tokenMeta?: { name?: string; symbol?: string; mutable?: boolean; updateAuthority?: string | null }
@@ -49,6 +66,11 @@ interface RugCheckReport {
   totalStableLiquidity?: number
   rugged?: boolean
   graphInsidersDetected?: boolean
+  token?: { supply?: number; decimals?: number }
+  markets?: RugCheckMarket[]
+  insiderNetworks?: RugCheckInsiderNetwork[]
+  creator?: string | null
+  creatorBalance?: number
 }
 
 // ── Normalizers ───────────────────────────────────────────────
@@ -96,6 +118,50 @@ export async function auditRugcheckToken(chain: string, contract: string): Promi
     top10HolderPercent = Math.min(1, top10HolderPercent)
 
     const meta = report.tokenMeta ?? {}
+
+    // LP lock: USD-weighted fraction across all markets (a token with many
+    // pools must not pass on a single 100%-locked dust pool). 0..1 fraction.
+    // -1 when the report carries no LP data at all.
+    let lpLockedPercent = -1
+    let totUsd = 0
+    let lockedUsd = 0
+    for (const m of report.markets ?? []) {
+      const lp = m.lp
+      if (!lp) continue
+      totUsd += toNum(lp.quoteUSD) + toNum(lp.baseUSD)
+      lockedUsd += toNum(lp.lpLockedUSD)
+    }
+    if (totUsd > 0) lpLockedPercent = Math.min(1, lockedUsd / totUsd)
+
+    // Holder-distribution breakdown for the sniper (fractions 0..1).
+    // totalSupply comes from token.account-style `token.supply` (raw units);
+    // `creatorBalance` is raw units in the same base — ratio is unit-free.
+    let devPercent: number | undefined
+    const supply = toNum(report.token?.supply)
+    if (supply > 0 && report.creatorBalance !== undefined && report.creatorBalance !== null) {
+      devPercent = toNum(report.creatorBalance) / supply
+    }
+    // Insider networks: linked clusters holding the token. The largest
+    // cluster's currentHolding / supply is the linked-cluster share.
+    let clusterPercent: number | undefined
+    let insiderPercent = 0
+    if (supply > 0) {
+      let maxCluster = 0
+      for (const net of report.insiderNetworks ?? []) {
+        const holding = toNum(net.currentHolding)
+        maxCluster = Math.max(maxCluster, holding / supply)
+        insiderPercent += holding / supply
+      }
+      if ((report.insiderNetworks ?? []).length > 0) clusterPercent = Math.min(1, maxCluster)
+      insiderPercent = Math.min(1, insiderPercent)
+    }
+
+    // Top-holder addresses + percents feed the sniper's top-1-3 taint gate.
+    const topWallets = (report.topHolders ?? []).slice(0, 5).map((h) => ({
+      address: h.address ?? '',
+      percent: toNum(h.pct) / 100,
+    }))
+
     return {
       id: `${chain || 'solana'}:${contract}`,
       platform: 'rugcheck',
@@ -108,7 +174,12 @@ export async function auditRugcheckToken(chain: string, contract: string): Promi
       buyTax: 0,
       sellTax: 0,
       top10HolderPercent,
-      lpLockedPercent: -1,
+      lpLockedPercent,
+      distribution:
+        devPercent === undefined && insiderPercent === 0 && clusterPercent === undefined
+          ? undefined
+          : { devPercent, insiderPercent, clusterPercent },
+      topWallets,
       canFreeze: !!report.freezeAuthority,
       canMint: !!report.mintAuthority,
       isHoneypot: false, // not reported by this source

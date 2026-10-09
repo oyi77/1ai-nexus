@@ -63,6 +63,14 @@ describe('meme-sniper hard filters', () => {
     expect(d.status).toBe('EXECUTE')
   })
 
+  it('accepts 100% locked with burn unproven, and rejects fully-unproven LP', () => {
+    const lockedOnly = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: 100 } }))
+    expect(lockedOnly.status).toBe('EXECUTE')
+    const neither = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: null } }))
+    expect(neither.status).toBe('REJECT')
+    expect(neither.rejections.join(' ')).toContain('LP burn/lock unproven')
+  })
+
   it('rejects a honeypot outright', () => {
     const d = evaluateSniper(clean({ security: { ...clean().security, honeypot: true } }))
     expect(d.status).toBe('REJECT')
