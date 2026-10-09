@@ -159,7 +159,7 @@ export interface MemeRiskAudit {
    * Optional top-holder addresses + percents (GMGN `topHolderList`), for the
    * sniper's top-1-3 taint gate. Percents are 0..1 fractions.
    */
-  topWallets?: Array<{ address: string; percent: number }>
+  topWallets?: Array<{ address: string; percent: number; insider?: boolean }>
   auditedAt: number
 }
 

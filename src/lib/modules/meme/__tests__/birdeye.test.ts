@@ -131,7 +131,10 @@ describe('auditBirdeyeToken', () => {
     expect(result!.riskLevel).toBe(3)
     expect(result!.riskLabel).toBe('high')
     expect(result!.riskCounts).toEqual({ high: 2, middle: 1, low: 0 })
-    expect(result!.canMint).toBe(true)
+    // security_details rows are a STATIC check catalog (proven 2026-10-09:
+    // identical 61 rows for a renounced-mint token vs a fresh pump token) —
+    // row presence proves nothing, so authority flags stay false here.
+    expect(result!.canMint).toBe(false)
     expect(result!.top10HolderPercent).toBe(0.35)
   })
 

@@ -66,16 +66,25 @@ function mergeAudits(audits: MemeRiskAudit[]): {
   let cluster: number | null = null
   let topWallets: SniperPayload['distribution']['topWallets'] = undefined
 
+  // Only these platforms read actual authority data — every other audit
+  // emits canMint/canFreeze/isHoneypot=false for "not reported" (birdeye's
+  // security_details rows are a static 61-row catalog, proven identical for
+  // a renounced mint vs a fresh pump token 2026-10-09). Trusting those
+  // falses let one blind source launder a real authority into "proven off".
+  const TRUSTED_SECURITY = new Set(['rugcheck', 'gmgn', 'gate'])
   for (const a of audits) {
-    // Security is disjunctive: ANY source proving a bad fact wins.
-    // mint/freeze booleans from discovery mappers are conservative
-    // (rugcheck: !!authority → true when ANY authority string present).
+    // Security is disjunctive: ANY trusted source proving a bad fact wins.
+    // Untrusted falses are skipped, never counted as "proven off".
+    const trusted = TRUSTED_SECURITY.has(a.platform)
+    if (!trusted) continue
     if (a.canMint) mintable = true
     else if (mintable === null) mintable = false
     if (a.canFreeze) freeze = true
     else if (freeze === null) freeze = false
     if (a.isHoneypot) honeypot = true
     else if (honeypot === null) honeypot = false
+  }
+  for (const a of audits) {
 
     // LP locked: best reported fraction wins (rugcheck USD-weighted).
     // lpLockedPercent -1 means "unknown from this source".
@@ -111,7 +120,10 @@ function mergeAudits(audits: MemeRiskAudit[]): {
       topWallets = a.topWallets.map((w) => ({
         address: w.address,
         percent: (w.percent > 1 ? w.percent / 100 : w.percent) * 100,
-        kind: 'holder' as const,
+        // RugCheck flags insider/creator-linked wallets — preserve the taint
+        // so the top-1-3 gate actually fires instead of trusting every
+        // top holder as 'holder'.
+        kind: w.insider === true ? ('insider' as const) : ('holder' as const),
       }))
     }
   }

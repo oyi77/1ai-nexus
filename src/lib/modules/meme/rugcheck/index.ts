@@ -33,6 +33,7 @@ interface RugCheckTopHolder {
   address?: string
   pct?: number
   balance?: number
+  insider?: boolean
   owner?: string
 }
 
@@ -160,6 +161,7 @@ export async function auditRugcheckToken(chain: string, contract: string): Promi
     const topWallets = (report.topHolders ?? []).slice(0, 5).map((h) => ({
       address: h.address ?? '',
       percent: toNum(h.pct) / 100,
+      insider: h.insider === true || (report.creator != null && h.address === report.creator),
     }))
 
     return {

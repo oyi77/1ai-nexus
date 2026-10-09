@@ -269,6 +269,14 @@ export async function discoverBirdeyeTokens(limitPerChain = 25): Promise<MemeAlp
 
 // ── Risk audit ────────────────────────────────────────────────
 
+// NOTE (proven live 2026-10-09): /token/security_details rows are a STATIC
+// check catalog, not findings — WIF (mint renounced) and a fresh pump token
+// return byte-identical 61-row sets, both containing `mintable` and
+// `freeze_authority` rows. Presence of a row proves nothing. A previous
+// version mapped row presence to canMint/canFreeze=true, which REJECTed
+// every birdeye-audited token. These flags are therefore always false here
+// (unknowable from this endpoint) and the sniper merge ignores birdeye
+// booleans entirely — mint/freeze truth comes from rugcheck/gmgn.
 function severityToCounts(groups: NonNullable<BirdeyeSecurityDetails['data']>['groups']): {
   riskLevel: number
   riskCounts: { high: number; middle: number; low: number }
@@ -276,12 +284,8 @@ function severityToCounts(groups: NonNullable<BirdeyeSecurityDetails['data']>['g
   canMint: boolean
 } {
   let high = 0, middle = 0, low = 0
-  let canFreeze = false, canMint = false
   for (const g of groups ?? []) {
     for (const row of g.rows ?? []) {
-      const id = (row.id ?? '').toLowerCase()
-      if (id.includes('freeze')) canFreeze = true
-      if (id.includes('mint')) canMint = true
       const sev = toNum(row.severity)
       if (sev >= 4) high++
       else if (sev === 3) middle++
@@ -289,7 +293,7 @@ function severityToCounts(groups: NonNullable<BirdeyeSecurityDetails['data']>['g
     }
   }
   const riskLevel = high > 0 ? 3 : middle > 0 ? 2 : low > 0 ? 1 : 0
-  return { riskLevel, riskCounts: { high, middle, low }, canFreeze, canMint }
+  return { riskLevel, riskCounts: { high, middle, low }, canFreeze: false, canMint: false }
 }
 
 export async function auditBirdeyeToken(chain: string, contract: string): Promise<MemeRiskAudit | null> {

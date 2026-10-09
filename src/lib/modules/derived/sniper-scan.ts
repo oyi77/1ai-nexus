@@ -30,6 +30,36 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 const DEXS = 'https://api.dexscreener.com'
+const GECKO = 'https://api.geckoterminal.com'
+
+function toNum(v: unknown, fallback = 0): number {
+  if (v === null || v === undefined || v === '') return fallback
+  const n = Number(v)
+  return Number.isFinite(n) ? n : fallback
+}
+
+interface GeckoPool {
+  id?: string
+  attributes?: {
+    name?: string
+    pool_created_at?: string
+    base_token_price_usd?: string
+    market_cap_usd?: string | null
+    fdv_usd?: string
+    reserve_in_usd?: string
+    volume_usd?: Record<string, string>
+  }
+  relationships?: { base_token?: { data?: { id?: string } } }
+}
+
+async function geckoGet<T>(path: string): Promise<T> {
+  const res = await fetch(`${GECKO}${path}`, {
+    headers: { accept: 'application/json' },
+    signal: AbortSignal.timeout(12_000),
+  })
+  if (!res.ok) throw new Error(`geckoterminal ${res.status}: ${path}`)
+  return res.json() as Promise<T>
+}
 
 function seenTtlMs(): number {
   return Number(process.env.SNIPER_SEEN_TTL_MS) || 60 * 60_000
@@ -74,6 +104,66 @@ async function dexGet<T>(path: string): Promise<T> {
   const res = await fetch(`${DEXS}${path}`, { signal: AbortSignal.timeout(12_000) })
   if (!res.ok) throw new Error(`dexscreener ${res.status}: ${path}`)
   return res.json() as Promise<T>
+}
+
+/** GeckoTerminal new pools (solana, minute-old) → minute-age rows with live m5 flow. */
+async function discoverGeckoNewPools(limit: number): Promise<SniperEnrichedToken[]> {
+  const data = await geckoGet<{ data?: GeckoPool[] }>('/api/v2/networks/solana/new_pools?page=1')
+  const out: SniperEnrichedToken[] = []
+  for (const row of data.data ?? []) {
+    const a = row.attributes ?? {}
+    const baseId = row.relationships?.base_token?.data?.id ?? ''
+    // id shape: "solana_<mint>" — the mint is the sniper's contract.
+    const mint = baseId.includes('_') ? baseId.split('_').slice(1).join('_') : ''
+    if (!mint) continue
+    const createdMs = Date.parse(a.pool_created_at ?? '')
+    if (!Number.isFinite(createdMs)) continue
+    const ageMs = Date.now() - createdMs
+    if (ageMs <= 0 || ageMs > 6 * 60 * 60_000) continue // 6h scan horizon
+    const vol5m = toNum(a.volume_usd?.m5)
+    if (!(vol5m > 0)) continue // no live money → not snipeable
+    // market_cap is usually null on minute-old pools — fdv/reserve proxy keeps
+    // the evaluator's ratio computable; a missing cap is NOT treated as zero.
+    const mc = toNum(a.market_cap_usd ?? a.fdv_usd ?? a.reserve_in_usd)
+    if (!(mc > 0)) continue
+    const name = (a.name ?? '').split('/')[0].trim()
+    // One row per token: pump.fun curve + graduated AMM are two pools of the
+    // same mint — keep only the hottest (proven live: JEANPHIL appeared 2x).
+    const dupe = out.findIndex((t) => t.contract === mint)
+    if (dupe !== -1) {
+      if (vol5m <= (out[dupe].volume5m ?? 0)) continue
+      out.splice(dupe, 1)
+    }
+    out.push({
+      id: `solana:${mint}`,
+      platform: 'geckoterminal',
+      chain: 'solana',
+      contract: mint,
+      symbol: name,
+      name,
+      price: toNum(a.base_token_price_usd),
+      change24h: 0,
+      volume24h: toNum(a.volume_usd?.h24),
+      marketCap: mc,
+      liquidity: toNum(a.reserve_in_usd),
+      createdAt: createdMs,
+      riskLevel: 0,
+      holders: 0,
+      top10HolderPercent: 0,
+      social: {},
+      audited: false,
+      volume5m: vol5m,
+      provenance: {
+        sourceType: 'public-api',
+        provider: 'geckoterminal',
+        note: 'geckoterminal new_pools (minute-age, volume.m5, fdv fallback)',
+      },
+      riskKnown: false,
+    })
+  }
+  // Hottest first: most live 5m flow.
+  out.sort((x, y) => (y.volume5m ?? 0) - (x.volume5m ?? 0))
+  return out.slice(0, limit)
 }
 
 /** Boosted fresh tokens → filtered young pairs with live 5m volume. */
@@ -164,8 +254,16 @@ export interface SniperScanDeps {
   deliver: (text: string) => Promise<boolean>
 }
 
+async function discoverCombined(limit: number): Promise<SniperEnrichedToken[]> {
+  try {
+    const fresh = await discoverGeckoNewPools(limit)
+    if (fresh.length > 0) return fresh
+  } catch { /* fall through to boosts */ }
+  return discoverYoungPairs(limit)
+}
+
 const LIVE_DEPS: SniperScanDeps = {
-  discover: discoverYoungPairs,
+  discover: discoverCombined,
   audit: collectAudits,
   deliver: deliverSniperAlert,
 }

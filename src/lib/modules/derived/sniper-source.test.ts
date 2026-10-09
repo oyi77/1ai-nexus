@@ -66,12 +66,32 @@ describe('sniper-source mapping', () => {
     expect(p.momentum.top5AvgPnlPercent).toBeNull()
   })
 
+  it('ignores birdeye mint/freeze falses (static catalog, unknowable)', () => {
+    // Birdeye returns static-check flags that prove nothing — they must not
+    // launder a rugcheck-proven mint into "mintable: false".
+    const p = toSniperPayload(token(), [
+      audit({ platform: 'birdeye', canMint: false, canFreeze: false, isHoneypot: false, top10HolderPercent: 0, lpLockedPercent: -1 }),
+      audit({ canMint: true, canFreeze: false, isHoneypot: false }),
+    ])
+    expect(p.security.mintable).toBe(true)
+    expect(p.security.freezeAuthority).toBe(false)
+  })
+
+  it('treats a fully-untrusted audit set as unproven, never safe', () => {
+    const p = toSniperPayload(token(), [
+      audit({ platform: 'birdeye', canMint: false, canFreeze: false, isHoneypot: false, top10HolderPercent: 0, lpLockedPercent: -1 }),
+    ])
+    expect(p.security.mintable).toBeNull()
+    expect(p.security.freezeAuthority).toBeNull()
+    expect(p.security.honeypot).toBeNull()
+  })
+
   it('merges disjunctively: any bad fact from any source wins', () => {
     const p = toSniperPayload(token(), [
       audit({ canMint: false, canFreeze: false, isHoneypot: false }),
       audit({
-        platform: 'birdeye',
-        canMint: true, // one source proves mint
+        platform: 'rugcheck',
+        canMint: true, // one trusted source proves mint
         canFreeze: false,
         isHoneypot: false,
         top10HolderPercent: 0,
