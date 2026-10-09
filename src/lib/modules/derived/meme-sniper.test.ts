@@ -33,11 +33,11 @@ describe('meme-sniper hard filters', () => {
     expect(d.status).toBe('EXECUTE')
     expect(d.rejections).toEqual([])
     expect(d.alert).toContain('VILONA MEME SNIPER')
-    expect(d.alert).toContain('Dev Holding:* 0%')
-    expect(d.alert).toContain('Mint OFF ✅')
-    expect(d.alert).toContain('100% Burnt/Locked ✅')
-    expect(d.alert).toContain('*[EXECUTE]*')
-    expect(d.alert).toContain('Ratio:* 3.00x')
+    expect(d.alert).toContain('Dev Holding:* 0.00% ✅ (Dev Out)')
+    expect(d.alert).toContain('Mint OFF | Freeze OFF | LP')
+    expect(d.alert).toContain('100% Burnt ✅')
+    expect(d.alert).toContain('*[🟢 EXECUTE SNIPE]*')
+    expect(d.alert).toContain('*Ratio:* 3.00x')
   })
 
   it('rejects mint authority enabled AND unproven', () => {
@@ -238,8 +238,8 @@ describe('meme-sniper risk plan', () => {
   it('uses the fixed degen band and exactly -70% / +100% / +400%', () => {
     const d = evaluateSniper(clean(), { positionSizeUsd: 20 })
     expect(d.plan).toEqual({ sizeUsd: 20, stopLossPct: 70, slAmountUsd: 14, tp1Pct: 100, tp2Pct: 400 })
-    expect(d.alert).toContain('Stop Loss: -70% ($14.00)')
-    expect(d.alert).toContain('TP1: +100% (Free Ride)')
+    expect(d.alert).toContain('Stop Loss: -70% (-$14.00)')
+    expect(d.alert).toContain('TP1: +100% ($40.00)')
   })
 
   it('clamps an out-of-band requested size into 5..20', () => {

@@ -153,14 +153,6 @@ function fmtUsd(n: number): string {
   return `$${Math.round(n).toLocaleString('en-US')}`
 }
 
-/** Percent emoji: ideal → ✅, within tolerance → ⚠️, breach → 🔴. */
-function gradeEmoji(value: number | null | undefined, idealAtMost: number, ceiling: number): string {
-  if (value === null || value === undefined) return '🔴'
-  if (value <= idealAtMost) return '✅'
-  if (value < ceiling) return '⚠️'
-  return '🔴'
-}
-
 /**
  * Escape Telegram legacy-Markdown control characters in dynamic text.
  * Per the Bot API only `_ * ` ` `[` are special; unbalanced ones make the
@@ -178,10 +170,10 @@ function deriveStage(payload: SniperPayload): SniperStage {
 }
 
 function ageLabel(minutes: number): string {
-  if (minutes < 60) return `${Math.round(minutes)}m`
+  if (minutes < 60) return `${Math.round(minutes)} Menit`
   const h = Math.floor(minutes / 60)
   const m = Math.round(minutes % 60)
-  return m > 0 ? `${h}h ${m}m` : `${h}h`
+  return m > 0 ? `${h} Jam ${m} Menit` : `${h} Jam`
 }
 
 function assessPnl(avg: number | null | undefined): PnlAssessment {
@@ -304,37 +296,89 @@ function buildAlert(
   plan: SniperPlan,
 ): string {
   const s = p.security
-  const mintStatus = s.mintable === false ? 'OFF ✅' : 'ON 🔴'
-  const freezeStatus = s.freezeAuthority === false ? 'OFF ✅' : 'ON 🔴'
+  const mintStatus = s.mintable === false ? 'OFF' : 'ON 🔴'
+  const freezeStatus = s.freezeAuthority === false ? 'OFF' : 'ON 🔴'
   const lpTotal = (s.lpBurnedPercent ?? 0) + (s.lpLockedPercent ?? 0)
-  const lpStatus = lpTotal >= 99.5 ? '100% Burnt/Locked ✅' : `${fmtPct(lpTotal)}% 🔴`
+  // LP 100% burnt (raydium-style burn) vs 100% locked (streamflow-style
+  // locker) — the suffix names which was proven so the operator can verify.
+  const burned = s.lpBurnedPercent ?? 0
+  const locked = s.lpLockedPercent ?? 0
+  const lpStatus =
+    burned >= 99.5
+      ? '100% Burnt ✅'
+      : locked >= 99.5
+        ? '100% Locked ✅'
+        : `${fmtPct(lpTotal)}% 🔴`
 
-  const pnlText = m.avgPnlPercent === null ? 'n/a' : `${m.avgPnlPercent > 0 ? '+' : ''}${fmtPct(m.avgPnlPercent)}`
+  // 2-decimal percents like the reference template (0.00%, 1.8% → 1.80%).
+  const pct2 = (v: number | null | undefined): string =>
+    v === null || v === undefined ? 'n/a' : v.toFixed(2)
+
+  // Dev annotation: "(Dev Out)" when proven 0, "(Dev In)" when holding.
+  const devNote = m.devPercent === 0 ? ' (Dev Out)' : m.devPercent != null && m.devPercent > 0 ? ' (Dev In)' : ''
+  // PASS = within the hard ceiling (template shows a single trailing emoji
+  // per metric; notes carry no emoji of their own).
+  const passEmoji = (v: number | null | undefined, ceiling: number): string =>
+    v === null || v === undefined ? '🔴' : v < ceiling ? '✅' : '🔴'
+  // Bundlers: "(100% Sold)" only when the full exit is proven.
+  const soldPct = p.distribution.bundlerSoldPercent
+  const bundlerNote = soldPct === 100 ? ' (100% Sold)' : ''
+  // Cluster: "(Clean bubblemap)" below 1%.
+  const clusterNote =
+    m.clusterPercent != null && m.clusterPercent < 1 ? ' (Clean bubblemap)' : ''
+  // Volume fire: ratio >= 5x.
+  const volFire = m.volMcRatio >= 5 ? ' 🔥' : ''
+
+  // Stage suffix: Pump.fun graduated pairs read "(Pump.fun)".
+  const stageExtra =
+    p.chain === 'solana' && m.stage === 'post-bonding' ? ' (Pump.fun)' : ''
+  const pnlText =
+    m.avgPnlPercent === null
+      ? 'n/a'
+      : `${m.avgPnlPercent > 0 ? '+' : ''}${Math.round(m.avgPnlPercent)}`
+  // PnL phase labels (ID, matching the reference template).
+  const pnlPhase =
+    m.pnlAssessment === 'dump-risk'
+      ? '(Fase Distribusi)'
+      : m.pnlAssessment === 'accumulation'
+        ? '(Fase Akumulasi Sehat)'
+        : '(Netral)'
   const narrative = p.momentum.narrative?.trim() || 'No catalyst data provided'
+
+  const ticker = p.ticker.startsWith('$') ? p.ticker : `$${p.ticker}`
+  const STATUS_EMOJI: Record<SniperStatus, string> = {
+    EXECUTE: '🟢 EXECUTE SNIPE',
+    WATCHLIST: '🟡 WATCHLIST',
+    REJECT: '🔴 REJECT',
+  }
+
+  // Entry math on the fixed position: TP1 doubles the principal ($5→$10 at
+  // the default) and the stop is -70% of the entry.
+  const tp1Usd = plan.sizeUsd * (1 + plan.tp1Pct / 100)
 
   return [
     '🎯 *VILONA MEME SNIPER — ALPHA ALERT*',
     '━━━━━━━━━━━━━━━━━━━━',
-    `*Token:* ${escapeMd(p.ticker)} | \`${escapeMd(p.contract)}\``,
-    `*Stage:* ${m.stageLabel} | *Age:* ${m.ageLabel}`,
+    `*Token:* ${escapeMd(ticker)} | \`${escapeMd(p.contract)}\``,
+    `*Stage:* ${m.stageLabel}${stageExtra} | *Age:* ${m.ageLabel}`,
     '',
     '📊 *AUDIT & ON-CHAIN INTEGRITY*',
-    `• *Dev Holding:* ${fmtPct(m.devPercent)}% ${gradeEmoji(m.devPercent, 0, L.devHardCeilingPercent)}`,
-    `• *Snipers:* ${fmtPct(m.sniperPercent)}% | *Bundlers:* ${fmtPct(m.bundlerPercent)}%`,
-    `• *Insider:* ${fmtPct(m.insiderPercent)}% | *Top 10 Supply:* ${fmtPct(m.top10Percent)}%`,
-    `• *Cluster Status:* ${fmtPct(m.clusterPercent)}% ${gradeEmoji(m.clusterPercent, 0, L.clusterPercent)}`,
+    `• *Dev Holding:* ${pct2(m.devPercent)}% ${passEmoji(m.devPercent, L.devHardCeilingPercent)}${devNote}`,
+    `• *Snipers:* ${pct2(m.sniperPercent)}% ${passEmoji(m.sniperPercent, L.sniperPercent)} | *Bundlers:* ${pct2(m.bundlerPercent)}%${bundlerNote} ${passEmoji(m.bundlerPercent, L.bundlerPercent)}`,
+    `• *Insider:* ${pct2(m.insiderPercent)}% ${passEmoji(m.insiderPercent, L.insiderPercent)} | *Top 10 Supply:* ${pct2(m.top10Percent)}% ${passEmoji(m.top10Percent, L.top10Percent)}`,
+    `• *Cluster Status:* ${pct2(m.clusterPercent)}%${clusterNote} ${passEmoji(m.clusterPercent, L.clusterPercent)}`,
     `• *LP & Security:* Mint ${mintStatus} | Freeze ${freezeStatus} | LP ${lpStatus}`,
     '',
     '📈 *MARKET DYNAMICS*',
     `• *Market Cap:* ${fmtUsd(p.momentum.marketCap)}`,
-    `• *Volume:* ${fmtUsd(p.momentum.volume5m)} (*Ratio:* ${m.volMcRatio.toFixed(2)}x)`,
-    `• *Top Holder Avg PnL:* ${pnlText}% (${m.pnlAssessment})`,
+    `• *Volume:* ${fmtUsd(p.momentum.volume5m)} (*Ratio:* ${m.volMcRatio.toFixed(2)}x)${volFire}`,
+    `• *Top Holder Avg PnL:* ${pnlText}% ${pnlPhase}`,
     `• *Narrative / Catalyst:* ${escapeMd(narrative)}`,
     '',
     '━━━━━━━━━━━━━━━━━━━━',
-    `💡 *DECISION:* *[${status}]*`,
+    `💡 *DECISION:* *[${STATUS_EMOJI[status]}]*`,
     `*Rationale:* ${escapeMd(rationale)}`,
-    `*Setup:* Entry now | Stop Loss: -${plan.stopLossPct}% ($${plan.slAmountUsd.toFixed(2)}) | TP1: +${plan.tp1Pct}% (Free Ride)`,
+    `*Setup:* Entry $${plan.sizeUsd.toFixed(2)} | Stop Loss: -${plan.stopLossPct}% (-$${plan.slAmountUsd.toFixed(2)}) | TP1: +${plan.tp1Pct}% ($${tp1Usd.toFixed(2)})`,
   ].join('\n')
 }
 
@@ -432,14 +476,21 @@ export function evaluateSniper(payload: SniperPayload, opts: EvaluateOptions = {
 
 /**
  * Send an alert through the ecosystem's proven channel chain:
+ * Dedicated sniper bot first (SNIPER_TELEGRAM_BOT_TOKEN → its own
+ * SNIPER_TELEGRAM_CHAT_ID), then the ecosystem chain:
  * HUB_TELEGRAM_BOT_TOKEN → TELEGRAM_BOT_TOKEN, and
  * HUB_TELEGRAM_OWNER_CHAT_ID → TELEGRAM_ALERT_CHAT_ID → TELEGRAM_ADMIN_CHAT_ID.
  * Returns false (never throws) when unconfigured or the API rejects.
  */
 export async function deliverSniperAlert(text: string, chatId?: string): Promise<boolean> {
-  const token = process.env.HUB_TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || ''
+  const token =
+    process.env.SNIPER_TELEGRAM_BOT_TOKEN ||
+    process.env.HUB_TELEGRAM_BOT_TOKEN ||
+    process.env.TELEGRAM_BOT_TOKEN ||
+    ''
   const chat =
     chatId ||
+    process.env.SNIPER_TELEGRAM_CHAT_ID ||
     process.env.HUB_TELEGRAM_OWNER_CHAT_ID ||
     process.env.TELEGRAM_ALERT_CHAT_ID ||
     process.env.TELEGRAM_ADMIN_CHAT_ID ||

@@ -90,7 +90,7 @@ describe('runSniperScan', () => {
     expect(res.delivered).toBe(1)
     expect(deliver).toHaveBeenCalledTimes(1)
     const sent = deliver.mock.calls[0][0]
-    expect(sent).toContain('[EXECUTE]')
+    expect(sent).toContain('[🟢 EXECUTE SNIPE]')
     expect(sent).toContain('GOOD')
   })
 
