@@ -37,7 +37,8 @@
     "cron:zero-issue": "tsx src/scripts/zero-issue-cron.ts",
     "deploy": "bash scripts/deploy.sh",
     "seed:feeds": "tsx prisma/seed-feeds.ts",
-    "cron:sniper": "tsx src/scripts/sniper-cron.ts"
+    "cron:sniper": "tsx src/scripts/sniper-cron.ts",
+    "import:wallets": "tsx scripts/import-wallets.ts"
   },
   "dependencies": {
     "@1ai/payment": "file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",

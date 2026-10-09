@@ -196,6 +196,11 @@ model Alert {
   @@index([userId, isActive])
 }
 
+// BLOCKED (prompt §5): do NOT assign QUALIFIED_SMART_MONEY / WHALE /
+// WHALE_AND_SMART_MONEY on the basis of `category`/`score` alone.
+// Requires operator-agreed definitions first: PnL cost basis incl. fees,
+// win-rate denominator + minimum samples, whale USD exposure threshold.
+// Current rows: category+score only → statuses stay PENDING_DEFINITION.
 model SmartMoneyWallet {
   id       String   @id @default(cuid())
   walletId String   @unique
