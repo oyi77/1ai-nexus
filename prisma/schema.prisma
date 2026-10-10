@@ -209,8 +209,24 @@ model SmartMoneyWallet {
   score    Float
   addedAt  DateTime @default(now())
 
+  // ── Fase 3 wallet intelligence (classifier output) ──────────
+  // Status labels are the agreed §5 ladder; category/score above are the
+  // legacy heuristic and stay untouched (they feed SFC/cohort, not the gate).
+  status          String?  // QUALIFIED_SMART_MONEY | WHALE | WHALE_AND_SMART_MONEY | WATCHLIST | PROVISIONAL | DISQUALIFIED | UNKNOWN
+  pnl30d          Float?   // realized closed-episode PnL after fees
+  winRate         Float?   // winning closed episodes / closed episodes
+  sampleCount     Int      @default(0)  // closed episodes scored (post outlier-drop)
+  profitableTokens Int     @default(0)
+  confidence      String?  // high | medium | low
+  reasons         Json?
+  limitations     Json?
+  classifiedAt    DateTime?
+
   @@index([score(sort: Desc)])
   @@index([category])
+  @@index([status])
+  @@index([pnl30d(sort: Desc)])
+  @@index([classifiedAt(sort: Desc)])
 }
 
 model WalletRelationship {
