@@ -19,6 +19,7 @@ import { buildEpisodes, toTradeEpisodes } from '@/lib/modules/derived/wallet-epi
 import { classifyWallet } from '@/lib/modules/derived/wallet-intel'
 import {
   BULLISH_STATUSES,
+  TRACER_PNL_STATUS,
   type SmartMoneyEvidence,
   type WalletBuyer,
 } from '@/lib/modules/derived/smart-money-provider'
@@ -150,12 +151,14 @@ async function traceOnce(
   }
   if (chain !== 'solana') return empty
   try {
-    const holders = await fetchTopHolders(contract, Math.min(opts.maxHolders ?? 12, MAX_HOLDERS_PER_TRACE))
     const buyers: WalletBuyer[] = []
+    const holders = await fetchTopHolders(contract, Math.min(opts.maxHolders ?? 12, MAX_HOLDERS_PER_TRACE))
     // Fast path: GMGN holder rows already carry measured per-holder PnL
     // (cost_cur / usd_value / realized_profit). A holder with sustained
-    // realized profit counts as PROVISIONAL evidence — one token's worth of
-    // PnL is not a 15-episode track record, and the status says so.
+    // realized profit is recorded, but as TRACER_PNL — one token's worth of
+    // PnL is not a track record, and it must never read as a qualified
+    // classification. Classifier PROVISIONAL (n=10-14 episodes) stays in
+    // the slow path and keeps its own meaning.
     for (const h of holders) {
       const realized = h.realizedProfit ?? 0
       const cost = h.costCur > 0 ? h.costCur : null
@@ -165,7 +168,7 @@ async function traceOnce(
           walletId: h.owner,
           address: h.owner,
           alias: null,
-          status: 'PROVISIONAL',
+          status: TRACER_PNL_STATUS,
           pnl30d: pnlFrac,
           winRate: null,
           sampleCount: 1,

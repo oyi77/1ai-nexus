@@ -15,13 +15,15 @@
 
 import { prisma } from '@/lib/db'
 
-/** Statuses that cout as bullish evidence,n strongest first. */
+/** Statuses that count as bullish evidence, strongest first. */
 export const BULLISH_STATUSES = [
   'WHALE_AND_SMART_MONEY',
   'QUALIFIED_SMART_MONEY',
   'WHALE',
-  'PROVISIONAL',
 ] as const
+
+/** Tracer-only status — holder with positive PnL on this single token. */
+export const TRACER_PNL_STATUS = 'TRACER_PNL' as const
 
 export type BullishStatus = (typeof BULLISH_STATUSES)[number]
 
@@ -166,13 +168,22 @@ export interface SmartMoneyGate {
  * token (security failures do that). Pure.
  */
 export function evaluateSmartMoneyGate(ev: SmartMoneyEvidence): SmartMoneyGate {
-  const bullishCount = ev.buyers.length
-  if (bullishCount > 0) {
+  // Only classifier-confirmed statuses count. Tracer-only labels
+  // (TRACER_PNL: single-token holder PnL, sampleCount 1) are recorded for
+  // the operator but never confirm — one profitable token is not a track
+  // record. Counting raw buyers.length laundered them into a pass.
+  const bullish = ev.buyers.filter((b) =>
+    b.status != null && (BULLISH_STATUSES as readonly string[]).includes(b.status),
+  )
+  if (bullish.length > 0) {
+    const byStatus: Record<string, number> = {}
+    for (const b of bullish) byStatus[b.status as string] = (byStatus[b.status as string] ?? 0) + 1
+    const strongest = BULLISH_STATUSES.find((s) => (byStatus[s] ?? 0) > 0) ?? null
     return {
       verdict: 'pass',
-      reason: `${bullishCount} classified buyer(s); strongest=${ev.strongest}`,
-      strongest: ev.strongest,
-      bullishCount,
+      reason: `${bullish.length} classified buyer(s); strongest=${strongest}`,
+      strongest,
+      bullishCount: bullish.length,
     }
   }
   return {
