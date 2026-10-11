@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
-// GET  /api/v1/meme/sniper/history — persisted sniper decision log + the
-//                                   daily stop-circuit state + status counts.
+// GET  /api/v1/meme/sniper/history — persisted sniper decision log +
+//                                   status counts. Screening only.
 // POST /api/v1/meme/sniper/history — run one live scan pass on demand.
 //
 // Read access follows the meme-module convention: same-origin first-party
@@ -16,7 +16,6 @@ import { NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/jwt'
 import { apiJson, apiError } from '@/lib/api/response'
 import { readSniperLog, sniperLogCounts, appendSniperScan } from '@/lib/modules/derived/sniper-log'
-import { readSniperCircuit, isSniperCircuitLocked } from '@/lib/modules/derived/sniper-circuit'
 import { runSniperScan } from '@/lib/modules/derived/sniper-scan'
 
 export const runtime = 'nodejs'
@@ -41,11 +40,6 @@ export async function GET() {
     updatedAt: log.updatedAt,
     lastScan: log.lastScan,
     counts: sniperLogCounts(log),
-    circuit: { ...readSniperCircuit(), locked: isSniperCircuitLocked() },
-    // Whether the evaluator is allowed to emit EXECUTE at all. While false
-    // (the default), a setup that passes every hard filter is reported as
-    // WATCHLIST — the UI must say so, or an empty EXECUTE column reads as a bug.
-    executeEnabled: process.env.SNIPER_EXECUTE_ENABLED === 'true',
   })
 }
 
@@ -74,7 +68,7 @@ export async function POST(request: Request) {
   return NextResponse.json({
     data: {
       scanned: result.scanned,
-      executed: result.executed,
+      screened: result.screened,
       watchlisted: result.watchlisted,
       rejected: result.rejected,
       deduped: result.deduped,
@@ -82,8 +76,7 @@ export async function POST(request: Request) {
       errors: result.errors,
       entries: log.entries,
       counts: sniperLogCounts(log),
-      circuit: { ...readSniperCircuit(), locked: isSniperCircuitLocked() },
-    },
+      },
     error: null,
   })
 }

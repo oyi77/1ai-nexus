@@ -24,7 +24,13 @@ import type { MemeAlphaToken, MemeRiskAudit } from '@/lib/modules/meme/types'
 import type { SniperPayload } from '@/lib/modules/derived/meme-sniper'
 
 /** Raw passthrough for discovery rows that already carry 5m volume. */
-export interface SniperEnrichedToken extends MemeAlphaToken {
+export interface SniperEnrichedToken extends Omit<MemeAlphaToken, 'platform'> {
+  /**
+   * Discovery surface. MemeAlphaToken's MemePlatform union covers the
+   * adapter registry; 'call-feed' is the operator's call-channel harvest,
+   * which feeds the sniper scan without being a registry adapter.
+   */
+  platform: MemeAlphaToken['platform'] | 'call-feed'
   /** 5-minute volume in USD (dexscreener volume.m5 shape). */
   volume5m?: number | null
   /** Free-text catalyst when the source provides one. */

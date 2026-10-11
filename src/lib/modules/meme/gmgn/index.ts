@@ -385,6 +385,49 @@ export async function discoverGmgnTokens(limitPerChain = 20): Promise<MemeAlphaT
 
 // ── Risk audit ----
 
+/** One holder row as GMGN reports it, for wallet tracing. */
+export interface GmgnHolderRow {
+  address: string
+  amountPercentage: number
+  costCur: number
+  usdValue: number
+  unrealizedProfit: number | null
+  realizedProfit: number | null
+  suspicious: boolean
+  tags: string[]
+}
+
+/**
+ * Top holders with real per-holder PnL (cookie-only endpoint, proven live
+ * 2026-10-09). Returns [] when the endpoint refuses — never fabricated rows.
+ * This is the seed source for wallet tracing, since the public Solana RPC
+ * refuses getProgramAccounts/getTokenLargestAccounts (403/429).
+ */
+export async function listGmgnTokenHolders(chain: string, contract: string): Promise<GmgnHolderRow[]> {
+  const chainConfig = Object.values(CHAIN_CONFIG).find((c) => c.chainId === chain)
+  if (!chainConfig) return []
+  try {
+    const res = await retryWithBackoff(() =>
+      gmgnFetch<GmgnTokenHoldersResponse>(`https://gmgn.ai/vas/api/v1/token_holders/${chainConfig.path}/${contract}`),
+    )
+    return (res.data?.list ?? [])
+      .filter((h) => typeof h.address === 'string' && h.address.length > 0)
+      .map((h) => ({
+        address: h.address as string,
+        amountPercentage: h.amount_percentage ?? 0,
+        costCur: h.cost_cur ?? 0,
+        usdValue: h.usd_value ?? 0,
+        unrealizedProfit: typeof h.unrealized_profit === 'number' ? h.unrealized_profit : null,
+        realizedProfit: typeof h.realized_profit === 'number' ? h.realized_profit : null,
+        suspicious: h.is_suspicious === true,
+        tags: [...(h.tags ?? []), ...(h.maker_token_tags ?? [])],
+      }))
+  } catch (err) {
+    logger.warn(`GMGN holder list failed for ${contract}: ${err}`, 'gmgn', { contract, error: String(err) })
+    return []
+  }
+}
+
 /**
  * Per-holder PnL for the token's top holders (live-proven 2026-10-09).
  * Returns null when the endpoint refuses or reports nothing, so callers

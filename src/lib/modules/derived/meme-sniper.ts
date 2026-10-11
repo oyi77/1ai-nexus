@@ -78,7 +78,9 @@ export interface SniperPayload {
   }
 }
 
-export type SniperStatus = 'EXECUTE' | 'WATCHLIST' | 'REJECT'
+// Screening verdicts only. There is deliberately no EXECUTE member:
+// this repo screens, 1ai-trade-dex executes. A clean setup reads SIGNAL.
+export type SniperStatus = 'SIGNAL' | 'WATCHLIST' | 'REJECT'
 export type PnlAssessment = 'dump-risk' | 'accumulation' | 'neutral'
 
 export interface SniperMetrics {
@@ -98,15 +100,6 @@ export interface SniperMetrics {
   pnlAssessment: PnlAssessment
 }
 
-export interface SniperPlan {
-  /** Clamped to the fixed degen band 5..20 USD. */
-  sizeUsd: number
-  stopLossPct: number
-  slAmountUsd: number
-  tp1Pct: number
-  tp2Pct: number
-}
-
 export interface SniperDecision {
   status: SniperStatus
   rationale: string
@@ -115,7 +108,6 @@ export interface SniperDecision {
   /** Non-fatal observations (dump risk, marginal cluster). */
   warnings: string[]
   metrics: SniperMetrics
-  plan: SniperPlan
   /** Ready-to-send Telegram Markdown. */
   alert: string
 }
@@ -133,16 +125,7 @@ export const SNIPER_LIMITS = {
   postBondingVolMcRatio: 4,
   dumpRiskPnlPercent: 150,
   accumulationPnlPercent: 50,
-  stopLossPct: 70,
-  tp1Pct: 100,
-  tp2Pct: 400,
-  minSizeUsd: 5,
-  maxSizeUsd: 20,
-  defaultSizeUsd: 10,
 } as const
-
-/** Consecutive stop-losses in one day before trading locks. */
-export const MAX_CONSECUTIVE_STOP_LOSSES = 3
 
 const L = SNIPER_LIMITS
 
@@ -388,7 +371,6 @@ function buildAlert(
   status: SniperStatus,
   rationale: string,
   m: SniperMetrics,
-  plan: SniperPlan,
 ): string {
   const s = p.security
   const mintStatus = s.mintable === false ? 'OFF' : 'ON 🔴'
@@ -442,14 +424,10 @@ function buildAlert(
 
   const ticker = p.ticker.startsWith('$') ? p.ticker : `$${p.ticker}`
   const STATUS_EMOJI: Record<SniperStatus, string> = {
-    EXECUTE: '🟢 EXECUTE SNIPE',
+    SIGNAL: '🟢 SIGNAL',
     WATCHLIST: '🟡 WATCHLIST',
     REJECT: '🔴 REJECT',
   }
-
-  // Entry math on the fixed position: TP1 doubles the principal ($5→$10 at
-  // the default) and the stop is -70% of the entry.
-  const tp1Usd = plan.sizeUsd * (1 + plan.tp1Pct / 100)
 
   return [
     '🎯 *VILONA MEME SNIPER — ALPHA ALERT*',
@@ -473,25 +451,22 @@ function buildAlert(
     '━━━━━━━━━━━━━━━━━━━━',
     `💡 *DECISION:* *[${STATUS_EMOJI[status]}]*`,
     `*Rationale:* ${escapeMd(rationale)}`,
-    `*Setup:* Entry $${plan.sizeUsd.toFixed(2)} | Stop Loss: -${plan.stopLossPct}% (-$${plan.slAmountUsd.toFixed(2)}) | TP1: +${plan.tp1Pct}% ($${tp1Usd.toFixed(2)})`,
+    '',
+    '_Screening output only — position sizing and execution belong to 1ai-trade-dex._',
   ].join('\n')
 }
 
 // ── Evaluator ─────────────────────────────────────────────────
 
 export interface EvaluateOptions {
-  /** When true, no snipe may be issued — the daily stop circuit is armed. */
-  circuitLocked?: boolean
-  /** Requested position size; clamped to the fixed degen band. */
-  positionSizeUsd?: number
-  /**
-   * Snipe execution gate. Defaults to SNIPER_EXECUTE_ENABLED === 'true', so
-   * an unset env means WATCHLIST-only: screening must be operator-verified
-   * before the evaluator is allowed to say EXECUTE again.
-   */
-  executeEnabled?: boolean
   /** Extra provenance warnings (audit identity) surfaced to the operator. */
   extraWarnings?: string[]
+  /**
+   * Smart-money confirmation. Confirming evidence only: its absence caps
+   * the verdict at WATCHLIST, it never rejects on its own (security gates
+   * do that). Absent option == no wallet evidence == treated as unconfirmed.
+   */
+  smartMoney?: { verdict: 'pass' | 'warn'; reason: string; strongest: string | null }
 }
 
 export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions = {}): SniperDecision {
@@ -543,7 +518,9 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
   const warnings: string[] = []
   if (opts.extraWarnings?.length) warnings.push(...opts.extraWarnings)
 
-  const executeEnabled = opts.executeEnabled ?? process.env.SNIPER_EXECUTE_ENABLED === 'true'
+  // No execution inputs are read here on purpose: SNIPER_EXECUTE_ENABLED,
+  // positionSizeUsd and circuitLocked are trade-dex concerns and must not
+  // reappear. Screening answers "is it clean?" — nothing more.
 
   if (pnlAssessment === 'dump-risk') {
     warnings.push(
@@ -572,41 +549,38 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
     pnlAssessment,
   }
 
-  const requested = opts.positionSizeUsd ?? L.defaultSizeUsd
-  const sizeUsd = Math.min(L.maxSizeUsd, Math.max(L.minSizeUsd, requested))
-  const plan: SniperPlan = {
-    sizeUsd,
-    stopLossPct: L.stopLossPct,
-    slAmountUsd: Math.round(sizeUsd * (L.stopLossPct / 100) * 100) / 100,
-    tp1Pct: L.tp1Pct,
-    tp2Pct: L.tp2Pct,
-  }
-
   let status: SniperStatus
   let rationale: string
+
+  // Smart money is CONFIRMING evidence: it enriches the rationale and the
+  // warning list, but it never gates EXECUTE here — the delivery tier
+  // (signal-tier.ts) is what withholds a top-tier signal. Keeping the
+  // evaluator's verdict independent means an empty wallet DB cannot
+  // silently disable screening.
+  const smartMoneyConfirmed = opts.smartMoney?.verdict === 'pass'
+  if (opts.smartMoney?.verdict === 'warn') {
+    warnings.push(`No smart-money confirmation: ${opts.smartMoney.reason}`)
+  }
 
   if (rejections.length > 0) {
     status = 'REJECT'
     rationale =
       rejections.length === 1 ? rejections[0] : `${rejections.length} hard-rule breaches — ${rejections[0]}`
-  } else if (opts.circuitLocked) {
-    status = 'REJECT'
-    rationale = `Daily stop circuit armed (${MAX_CONSECUTIVE_STOP_LOSSES} consecutive stop-losses) — trading locked until reset`
   } else if (pnlAssessment === 'dump-risk') {
     status = 'WATCHLIST'
     rationale = `Setup is clean and volume is live (${metrics.volMcRatio.toFixed(2)}x), but top holders sit on +${fmtPct(payload.momentum.top5AvgPnlPercent)}% — wait for the flush before entry`
-  } else if (executeEnabled) {
-    status = 'EXECUTE'
+  } else if (smartMoneyConfirmed) {
+    status = 'SIGNAL'
     rationale =
       pnlAssessment === 'accumulation'
-        ? `Clean distribution with top holders still accumulating (+${fmtPct(payload.momentum.top5AvgPnlPercent)}% avg PnL) and ${metrics.volMcRatio.toFixed(2)}x volume — asymmetry favors early entry`
-        : `All hard filters passed with live ${metrics.volMcRatio.toFixed(2)}x volume and no concentrated exits — clean asymmetric entry`
+        ? `Clean distribution with top holders still accumulating (+${fmtPct(payload.momentum.top5AvgPnlPercent)}% avg PnL), ${metrics.volMcRatio.toFixed(2)}x volume, plus confirmed smart money (${opts.smartMoney?.strongest}) — candidate for the downstream executor`
+        : `All hard filters passed with live ${metrics.volMcRatio.toFixed(2)}x volume, no concentrated exits, plus confirmed smart money (${opts.smartMoney?.strongest}) — candidate for the downstream executor`
   } else {
     status = 'WATCHLIST'
     rationale =
       pnlAssessment === 'accumulation'
-        ? `Screening passed but execution is gated (SNIPER_EXECUTE_ENABLED ≠ 'true'): asymmetry favors early entry once the operator verifies the screen — top holders accumulating (+${fmtPct(payload.momentum.top5AvgPnlPercent)}% avg PnL), volume ${metrics.volMcRatio.toFixed(2)}x`
-        : `Screening passed but execution is gated (SNIPER_EXECUTE_ENABLED ≠ 'true'): hard filters clean, volume ${metrics.volMcRatio.toFixed(2)}x — operator must verify before entry`
+        ? `Screening passed but no verified smart-money buyer — hold for wallet confirmation before it becomes a signal (volume ${metrics.volMcRatio.toFixed(2)}x, accumulating)`
+        : `Hard filters clean, volume ${metrics.volMcRatio.toFixed(2)}x, but no verified smart-money buyer — hold for wallet confirmation`
   }
 
   return {
@@ -615,8 +589,7 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
     rejections,
     warnings,
     metrics,
-    plan,
-    alert: buildAlert(payload, status, rationale, metrics, plan),
+    alert: buildAlert(payload, status, rationale, metrics),
   }
 }
 
@@ -624,6 +597,10 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
 
 /**
  * Send an alert through the ecosystem's proven channel chain:
+ * SCREENING ONLY: this repo never executes. Execution belongs to
+ * 1ai-trade-dex; SNIPER_EXECUTE_ENABLED stays unset here, so the
+ * evaluator can only ever emit WATCHLIST (no order path exists).
+ *
  * Dedicated sniper bot first (SNIPER_TELEGRAM_BOT_TOKEN → its own
  * SNIPER_TELEGRAM_CHAT_ID), then the ecosystem chain:
  * HUB_TELEGRAM_BOT_TOKEN → TELEGRAM_BOT_TOKEN, and

@@ -6,7 +6,7 @@
 //   2. Honeypot / rug audit  (risk scoring before you ape in)
 // ─────────────────────────────────────────────────────────────
 
-export type MemePlatform = 'bitget' | 'gate' | 'moby' | 'botx' | 'dexscreener' | 'birdeye' | 'rugcheck' | 'geckoterminal' | 'gmgn' | 'fomo' | 'photon' | 'nansen' | 'axiom' | 'alph'
+export type MemePlatform = 'bitget' | 'gate' | 'moby' | 'botx' | 'dexscreener' | 'birdeye' | 'rugcheck' | 'geckoterminal' | 'gmgn' | 'fomo' | 'photon' | 'nansen' | 'axiom' | 'alph' | 'alphio'
 
 export const MEME_PLATFORMS: MemePlatform[] = [
   'bitget',
@@ -33,6 +33,9 @@ export const MEME_PLATFORMS: MemePlatform[] = [
   'nansen',
   'axiom',
   'alph',
+  // alphio — member API (api.alphio.ai, Bearer session); richer pre-computed
+  // concentration/score rows than the keyless `alph` gateway. Self-gates.
+  'alphio',
 ]
 
 /** Normalized new-token discovery row — shared across platforms. */
@@ -87,9 +90,13 @@ export interface MemeAlphaToken {
    * before this field existed. `provider` mirrors `platform`.
    */
   provenance?: {
-    /** 'public-api' = documented public API; 'reverse-engineered' = RE'd from a web app. */
-    sourceType: 'public-api' | 'reverse-engineered'
-    provider: MemePlatform
+    /**
+     * 'public-api' = documented public API; 'reverse-engineered' = RE'd
+     * from a web app; 'operator-feed' = the operator's own call-channel
+     * harvest (Telethon), scored by cross-channel confluence.
+     */
+    sourceType: 'public-api' | 'reverse-engineered' | 'operator-feed'
+    provider: MemePlatform | 'call-feed'
     /** True when the source is not a stable, documented public API. */
     experimental?: boolean
     /** Free-text note on source / verification status. */

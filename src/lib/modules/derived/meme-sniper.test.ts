@@ -1,7 +1,10 @@
 // Contract tests: meme sniper hard filters, decision protocol, risk plan,
 // and Telegram message safety. Pure evaluator — zero network, zero DB.
 import { describe, it, expect } from 'vitest'
-import { evaluateSniper, escapeMd, SNIPER_LIMITS, type SniperPayload } from './meme-sniper'
+import { evaluateSniper, escapeMd, type SniperPayload } from './meme-sniper'
+
+/** Verified buyer — the only path to SIGNAL now that execution is gone. */
+const CONFIRMED = { verdict: 'pass' as const, reason: 'verified buyer', strongest: 'QUALIFIED_SMART_MONEY' }
 
 function clean(over: Partial<SniperPayload> = {}): SniperPayload {
   return {
@@ -28,15 +31,15 @@ function clean(over: Partial<SniperPayload> = {}): SniperPayload {
 }
 
 describe('meme-sniper hard filters', () => {
-  it('passes a clean payload as EXECUTE and renders every audited field', () => {
-    const d = evaluateSniper(clean(), { executeEnabled: true })
-    expect(d.status).toBe('EXECUTE')
+  it('passes a clean payload as SIGNAL and renders every audited field', () => {
+    const d = evaluateSniper(clean(), { smartMoney: CONFIRMED })
+    expect(d.status).toBe('SIGNAL')
     expect(d.rejections).toEqual([])
     expect(d.alert).toContain('VILONA MEME SNIPER')
     expect(d.alert).toContain('Dev Holding:* 0.00% ✅ (Dev Out)')
     expect(d.alert).toContain('Mint OFF | Freeze OFF | LP')
     expect(d.alert).toContain('100% Burnt ✅')
-    expect(d.alert).toContain('*[🟢 EXECUTE SNIPE]*')
+    expect(d.alert).toContain('*[🟢 SIGNAL]*')
     expect(d.alert).toContain('*Ratio:* 3.00x')
   })
 
@@ -59,13 +62,13 @@ describe('meme-sniper hard filters', () => {
   })
 
   it('accepts LP that is split between burnt and locked to 100%', () => {
-    const d = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: 70, lpLockedPercent: 30 } }), { executeEnabled: true })
-    expect(d.status).toBe('EXECUTE')
+    const d = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: 70, lpLockedPercent: 30 } }), { smartMoney: CONFIRMED })
+    expect(d.status).toBe('SIGNAL')
   })
 
   it('accepts 100% locked with burn unproven, and rejects fully-unproven LP', () => {
-    const lockedOnly = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: 100 } }), { executeEnabled: true })
-    expect(lockedOnly.status).toBe('EXECUTE')
+    const lockedOnly = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: 100 } }), { smartMoney: CONFIRMED })
+    expect(lockedOnly.status).toBe('SIGNAL')
     const neither = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: null } }))
     expect(neither.status).toBe('REJECT')
     expect(neither.rejections.join(' ')).toContain('LP burn/lock unproven')
@@ -106,8 +109,8 @@ describe('meme-sniper hard filters', () => {
   it('tolerates bundlers up to 30% only when 100% sold', () => {
     const sold = evaluateSniper(clean({
       distribution: { ...clean().distribution, bundlerPercent: 25, bundlerSoldPercent: 100 },
-    }), { executeEnabled: true })
-    expect(sold.status).toBe('EXECUTE')
+    }), { smartMoney: CONFIRMED })
+    expect(sold.status).toBe('SIGNAL')
     const unsold = evaluateSniper(clean({
       distribution: { ...clean().distribution, bundlerPercent: 25, bundlerSoldPercent: 99 },
     }))
@@ -164,8 +167,8 @@ describe('meme-sniper hard filters', () => {
           { address: 'S41111111111111111111111111111111111111111', percent: 6, kind: 'sniper' },
         ],
       },
-    }), { executeEnabled: true })
-    expect(d.status).toBe('EXECUTE')
+    }), { smartMoney: CONFIRMED })
+    expect(d.status).toBe('SIGNAL')
   })
 
   it('treats unknown distribution fields as unproven, never safe', () => {
@@ -175,7 +178,7 @@ describe('meme-sniper hard filters', () => {
         insiderPercent: null, top10Percent: null, clusterPercent: null,
         topWallets: [],
       },
-    }), { executeEnabled: true })
+    }), { smartMoney: CONFIRMED })
     expect(d.status).toBe('REJECT')
     // UNKNOWN must never collapse to 0 / pass: dev, sniper, bundler,
     // insider, top10, cluster, top1-3 = 7 independent UNKNOWN rejections.
@@ -187,7 +190,7 @@ describe('meme-sniper hard filters', () => {
   it('rejects an unproven honeypot instead of passing it', () => {
     const d = evaluateSniper(clean({
       security: { ...clean().security, honeypot: null },
-    }), { executeEnabled: true })
+    }), { smartMoney: CONFIRMED })
     expect(d.status).toBe('REJECT')
     expect(d.rejections.join(' ')).toContain('Honeypot status unproven')
   })
@@ -195,7 +198,7 @@ describe('meme-sniper hard filters', () => {
   it('treats an undefined cluster as unproven, not as 0', () => {
     const d = evaluateSniper(clean({
       distribution: { ...clean().distribution, clusterPercent: undefined },
-    }), { executeEnabled: true })
+    }), { smartMoney: CONFIRMED })
     expect(d.status).toBe('REJECT')
     expect(d.rejections.join(' ')).toContain('Linked cluster unproven')
   })
@@ -203,11 +206,11 @@ describe('meme-sniper hard filters', () => {
   it('passes cluster at the ceiling but rejects one point above', () => {
     const at = evaluateSniper(clean({
       distribution: { ...clean().distribution, clusterPercent: 5 },
-    }), { executeEnabled: true })
+    }), { smartMoney: CONFIRMED })
     expect(at.rejections.join(' ')).not.toContain('cluster')
     const over = evaluateSniper(clean({
       distribution: { ...clean().distribution, clusterPercent: 5.1 },
-    }), { executeEnabled: true })
+    }), { smartMoney: CONFIRMED })
     expect(over.status).toBe('REJECT')
     expect(over.rejections.join(' ')).toContain('Linked cluster')
   })
@@ -215,14 +218,14 @@ describe('meme-sniper hard filters', () => {
   it('keeps a locked-100% LP safe when the burn leg is unproven', () => {
     const d = evaluateSniper(clean({
       security: { ...clean().security, lpLockedPercent: 100, lpBurnedPercent: null },
-    }), { executeEnabled: true })
+    }), { smartMoney: CONFIRMED })
     expect(d.rejections.join(' ')).not.toContain('LP')
   })
 
   it('rejects an unproven LP (neither burn nor lock reported)', () => {
     const d = evaluateSniper(clean({
       security: { ...clean().security, lpLockedPercent: null, lpBurnedPercent: null },
-    }), { executeEnabled: true })
+    }), { smartMoney: CONFIRMED })
     expect(d.status).toBe('REJECT')
     expect(d.rejections.join(' ')).toContain('LP burn/lock unproven')
   })
@@ -230,7 +233,7 @@ describe('meme-sniper hard filters', () => {
   it('rejects a partially-locked LP with an unproven burn leg', () => {
     const d = evaluateSniper(clean({
       security: { ...clean().security, lpLockedPercent: 60, lpBurnedPercent: null },
-    }), { executeEnabled: true })
+    }), { smartMoney: CONFIRMED })
     expect(d.status).toBe('REJECT')
     expect(d.rejections.join(' ')).toContain('burn unproven')
   })
@@ -238,26 +241,26 @@ describe('meme-sniper hard filters', () => {
 
 describe('meme-sniper momentum gates', () => {
   it('requires 2x vol/mcap for a new pair (<2h)', () => {
-    const below = evaluateSniper(clean({ ageMinutes: 30, momentum: { marketCap: 1e6, volume5m: 1.5e6 } }), { executeEnabled: true })
+    const below = evaluateSniper(clean({ ageMinutes: 30, momentum: { marketCap: 1e6, volume5m: 1.5e6 } }), { smartMoney: CONFIRMED })
     expect(below.status).toBe('REJECT')
     expect(below.rejections.join(' ')).toContain('required 2x')
-    expect(evaluateSniper(clean({ ageMinutes: 30, momentum: { marketCap: 1e6, volume5m: 2e6 } }), { executeEnabled: true }).status).toBe('EXECUTE')
+    expect(evaluateSniper(clean({ ageMinutes: 30, momentum: { marketCap: 1e6, volume5m: 2e6 } }), { smartMoney: CONFIRMED }).status).toBe('SIGNAL')
   })
 
   it('requires 4x vol/mcap after bonding (>=2h)', () => {
-    const below = evaluateSniper(clean({ ageMinutes: 180, momentum: { marketCap: 1e6, volume5m: 3e6 } }), { executeEnabled: true })
+    const below = evaluateSniper(clean({ ageMinutes: 180, momentum: { marketCap: 1e6, volume5m: 3e6 } }), { smartMoney: CONFIRMED })
     expect(below.status).toBe('REJECT')
     expect(below.rejections.join(' ')).toContain('required 4x')
-    expect(evaluateSniper(clean({ ageMinutes: 180, momentum: { marketCap: 1e6, volume5m: 4e6 } }), { executeEnabled: true }).status).toBe('EXECUTE')
+    expect(evaluateSniper(clean({ ageMinutes: 180, momentum: { marketCap: 1e6, volume5m: 4e6 } }), { smartMoney: CONFIRMED }).status).toBe('SIGNAL')
   })
 
   it('honors an explicit stage over the age heuristic', () => {
-    const d = evaluateSniper(clean({ ageMinutes: 30, stage: 'post-bonding', momentum: { marketCap: 1e6, volume5m: 3e6 } }), { executeEnabled: true })
+    const d = evaluateSniper(clean({ ageMinutes: 30, stage: 'post-bonding', momentum: { marketCap: 1e6, volume5m: 3e6 } }), { smartMoney: CONFIRMED })
     expect(d.status).toBe('REJECT')
   })
 
   it('rejects a zero market cap instead of dividing by zero', () => {
-    const d = evaluateSniper(clean({ momentum: { marketCap: 0, volume5m: 5e6 } }), { executeEnabled: true })
+    const d = evaluateSniper(clean({ momentum: { marketCap: 0, volume5m: 5e6 } }), { smartMoney: CONFIRMED })
     expect(d.status).toBe('REJECT')
     expect(Number.isFinite(d.metrics.volMcRatio)).toBe(true)
   })
@@ -265,15 +268,15 @@ describe('meme-sniper momentum gates', () => {
 
 describe('meme-sniper decision protocol', () => {
   it('flags top-holder PnL > +150% as dump risk and downgrades to WATCHLIST', () => {
-    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6, top5AvgPnlPercent: 260 } }), { executeEnabled: true })
+    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6, top5AvgPnlPercent: 260 } }), { smartMoney: CONFIRMED })
     expect(d.status).toBe('WATCHLIST')
     expect(d.metrics.pnlAssessment).toBe('dump-risk')
     expect(d.rationale).toContain('wait for the flush')
   })
 
   it('labels < +50% top-holder PnL as accumulation', () => {
-    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6, top5AvgPnlPercent: 12 } }), { executeEnabled: true })
-    expect(d.status).toBe('EXECUTE')
+    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6, top5AvgPnlPercent: 12 } }), { smartMoney: CONFIRMED })
+    expect(d.status).toBe('SIGNAL')
     expect(d.metrics.pnlAssessment).toBe('accumulation')
     expect(d.rationale).toContain('accumulating')
   })
@@ -286,27 +289,6 @@ describe('meme-sniper decision protocol', () => {
     expect(d.status).toBe('REJECT')
   })
 
-  it('a locked daily circuit blocks an otherwise clean snipe', () => {
-    const d = evaluateSniper(clean(), { executeEnabled: true, circuitLocked: true })
-    expect(d.status).toBe('REJECT')
-    expect(d.rejections).toEqual([])
-    expect(d.rationale).toContain('circuit')
-  })
-})
-
-describe('meme-sniper risk plan', () => {
-  it('uses the fixed degen band and exactly -70% / +100% / +400%', () => {
-    const d = evaluateSniper(clean(), { executeEnabled: true, positionSizeUsd: 20 })
-    expect(d.plan).toEqual({ sizeUsd: 20, stopLossPct: 70, slAmountUsd: 14, tp1Pct: 100, tp2Pct: 400 })
-    expect(d.alert).toContain('Stop Loss: -70% (-$14.00)')
-    expect(d.alert).toContain('TP1: +100% ($40.00)')
-  })
-
-  it('clamps an out-of-band requested size into 5..20', () => {
-    expect(evaluateSniper(clean(), { executeEnabled: true, positionSizeUsd: 500 }).plan.sizeUsd).toBe(SNIPER_LIMITS.maxSizeUsd)
-    expect(evaluateSniper(clean(), { executeEnabled: true, positionSizeUsd: 1 }).plan.sizeUsd).toBe(SNIPER_LIMITS.minSizeUsd)
-    expect(evaluateSniper(clean(), { executeEnabled: true }).plan.sizeUsd).toBe(SNIPER_LIMITS.defaultSizeUsd)
-  })
 })
 
 describe('meme-sniper alert safety', () => {
@@ -319,37 +301,33 @@ describe('meme-sniper alert safety', () => {
     const d = evaluateSniper(clean({
       ticker: 'EVIL_*[x]',
       momentum: { marketCap: 1e6, volume5m: 3e6, narrative: 'a_b*c[d]' },
-    }), { executeEnabled: true })
+    }), { smartMoney: CONFIRMED })
     // Every dynamic control char is escaped, so the message stays parseable.
     expect(d.alert).toContain('EVIL\\_\\*\\[x]')
     expect(d.alert).toContain('a\\_b\\*c\\[d]')
   })
 
   it('states an explicit fallback when no narrative is supplied', () => {
-    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6 } }), { executeEnabled: true })
+    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6 } }), { smartMoney: CONFIRMED })
     expect(d.alert).toContain('No catalyst data provided')
   })
-  it('downgrades a clean setup to WATCHLIST when execution is not enabled', () => {
-    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6, top5AvgPnlPercent: 12 } }), {
-      executeEnabled: false,
-    })
+  it('caps a clean setup at WATCHLIST when no wallet confirms it', () => {
+    const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6, top5AvgPnlPercent: 12 } }))
     expect(d.status).toBe('WATCHLIST')
-    expect(d.rationale).toContain('execution is gated')
-    // A gate is not a veto: nothing about the setup itself is rejected.
+    expect(d.rationale).toContain('no verified smart-money buyer')
+    // Missing confirmation is not a veto: nothing about the setup is rejected.
     expect(d.rejections).toEqual([])
   })
 
-  it('defaults to WATCHLIST-only when SNIPER_EXECUTE_ENABLED is unset', () => {
-    const prev = process.env.SNIPER_EXECUTE_ENABLED
-    delete process.env.SNIPER_EXECUTE_ENABLED
-    try {
-      expect(evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6 } })).status).toBe('WATCHLIST')
-      process.env.SNIPER_EXECUTE_ENABLED = 'true'
-      expect(evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6 } })).status).toBe('EXECUTE')
-    } finally {
-      if (prev === undefined) delete process.env.SNIPER_EXECUTE_ENABLED
-      else process.env.SNIPER_EXECUTE_ENABLED = prev
-    }
+  it('never emits an execution verdict — the status union has no EXECUTE', () => {
+    const d = evaluateSniper(clean(), { smartMoney: CONFIRMED })
+    expect(d.status).toBe('SIGNAL')
+    expect(d.alert).toContain('SIGNAL')
+    expect(d.alert).not.toContain('EXECUTE')
+    // No position sizing or exit levels anywhere in the decision or message.
+    expect(d).not.toHaveProperty('plan')
+    expect(d.alert).not.toContain('Stop Loss')
+    expect(d.alert).not.toContain('TP1')
   })
 
   it('surfaces extra provenance warnings from the caller', () => {

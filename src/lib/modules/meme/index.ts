@@ -36,6 +36,7 @@ import { discoverGmgnTokens, auditGmgnToken } from './gmgn'
 import { discoverFomoTokens, auditFomoToken } from './fomo'
 import { auditToken as auditAxiomToken } from './axiom'
 import { discoverAlphTokens, auditAlphToken } from './alph'
+import { discoverAlphioTokens, auditAlphioToken, hasAlphioAuth } from './alphio'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -234,6 +235,12 @@ const alphDiscovery = makeDiscoveryModule('alph-meme', 'Alph Meme Alpha', (limit
 const alphAudit = makeAuditModule('alph-meme-risk', 'Alph Meme Risk Audit', (c, k) =>
   auditAlphToken(c, k),
 )
+const alphioDiscovery = makeDiscoveryModule('alphio-meme', 'Alphio Meme Alpha', (limit) =>
+  discoverAlphioTokens(limit),
+)
+const alphioAudit = makeAuditModule('alphio-meme-risk', 'Alphio Meme Risk Audit', (c, k) =>
+  auditAlphioToken(c, k),
+)
 
 // Blocked server-side (browser-session / Cloudflare) — disabled stubs so
 // pages/APIs can enumerate them without a live module.
@@ -380,6 +387,17 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     auditModule: alphAudit,
     ttlMs: MEME_TTL,
     enabled: process.env.ALPH_API_ENABLED === 'true',
+  },
+  // Alphio — member API (api.alphio.ai). Credential-gated on a staged session
+  // (env ALPHIO_API_KEY or data/alphio-session.json); without one the module
+  // returns empty and the route error-isolates it, same as other keyed sources.
+  alphio: {
+    platform: 'alphio',
+    displayName: 'Alphio',
+    discoveryModule: alphioDiscovery,
+    auditModule: alphioAudit,
+    ttlMs: MEME_TTL,
+    enabled: hasAlphioAuth(),
   },
 }
 

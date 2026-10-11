@@ -29,7 +29,7 @@ export interface SniperLog {
   lastScan: {
     at: string
     scanned: number
-    executed: number
+    screened: number
     watchlisted: number
     rejected: number
     delivered: number
@@ -77,7 +77,7 @@ function write(log: SniperLog): void {
  * Never throws on a write failure — a full disk must not fail a scan.
  */
 export function appendSniperScan(
-  result: Pick<SniperScanResult, 'decisions' | 'scanned' | 'executed' | 'watchlisted' | 'rejected' | 'delivered' | 'errors'>,
+  result: Pick<SniperScanResult, 'decisions' | 'scanned' | 'screened' | 'watchlisted' | 'rejected' | 'delivered' | 'errors'>,
 ): SniperLog {
   const at = new Date().toISOString()
   const log = readSniperLog()
@@ -88,7 +88,7 @@ export function appendSniperScan(
     lastScan: {
       at,
       scanned: result.scanned,
-      executed: result.executed,
+      screened: result.screened,
       watchlisted: result.watchlisted,
       rejected: result.rejected,
       delivered: result.delivered,
@@ -110,7 +110,7 @@ export function appendSniperScan(
 /** Counts by status across the persisted log — for the UI summary strip. */
 export function sniperLogCounts(log: SniperLog): Record<SniperStatus | 'total', number> {
   const counts: Record<SniperStatus | 'total', number> = {
-    EXECUTE: 0,
+    SIGNAL: 0,
     WATCHLIST: 0,
     REJECT: 0,
     total: log.entries.length,

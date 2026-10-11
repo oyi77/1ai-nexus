@@ -20,8 +20,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  delete process.env.SNIPER_EXECUTE_ENABLED
-  delete process.env.SNIPER_SEEN_PATH
+    delete process.env.SNIPER_SEEN_PATH
   rmSync(dir, { recursive: true, force: true })
 })
 
@@ -95,6 +94,30 @@ function deps(over: Partial<SniperScanDeps> = {}): SniperScanDeps {
       contract === 'GOOD' ? { ...CLEAN, contract } : { ...RUGGED, contract },
     ],
     deliver: vi.fn(async () => true),
+    smartMoney: async (_chain, contract) => ({
+      contract,
+      chain: 'solana',
+      buyers: [
+        {
+          walletId: 'w1',
+          address: 'Buyer1',
+          alias: null,
+          status: 'QUALIFIED_SMART_MONEY',
+          pnl30d: 1.5,
+          winRate: 0.7,
+          sampleCount: 22,
+          classifiedAt: new Date(),
+          holdingUsd: 4000,
+          stale: false,
+        },
+      ],
+      walletsHolding: 1,
+      byStatus: { QUALIFIED_SMART_MONEY: 1 },
+      strongest: 'QUALIFIED_SMART_MONEY',
+      bullishHoldingUsd: 4000,
+      ttlMs: 1000,
+      source: 'fixture',
+    }),
     ...over,
   }
 }
@@ -104,13 +127,48 @@ describe('runSniperScan', () => {
     const deliver = vi.fn(async (_text: string) => true)
     const res = await runSniperScan({ deliver: true }, deps({ deliver }))
     expect(res.scanned).toBe(2)
-    expect(res.executed).toBe(1)
+    expect(res.screened).toBe(1)
     expect(res.rejected).toBe(1)
     expect(res.delivered).toBe(1)
     expect(deliver).toHaveBeenCalledTimes(1)
     const sent = deliver.mock.calls[0][0]
-    expect(sent).toContain('[🟢 EXECUTE SNIPE]')
+    // Policy E: delivered signal carries full evidence, not the short alert.
+    expect(sent).toContain('HIGH-CONVICTION')
     expect(sent).toContain('GOOD')
+    expect(sent).toContain('SIGNAL ONLY')
+  })
+
+  it('policy D: a clean screen WITHOUT smart-money confirmation is not delivered', async () => {
+    const deliver = vi.fn(async (_text: string) => true)
+    const d = deps({
+      deliver,
+      smartMoney: async (_chain, contract) => ({
+        contract,
+        chain: 'solana',
+        buyers: [],
+        walletsHolding: 0,
+        byStatus: {},
+        strongest: null,
+        bullishHoldingUsd: null,
+        ttlMs: 1000,
+        source: 'fixture',
+      }),
+    })
+    const res = await runSniperScan({ deliver: true }, d)
+    expect(res.screened).toBe(0) // evaluator caps at WATCHLIST without confirmation
+    expect(res.delivered).toBe(0) // ...and the tier gate agrees
+    expect(deliver).not.toHaveBeenCalled()
+    const good = res.decisions.find((x) => x.ticker === 'GOOD')
+    expect(good?.status).toBe('WATCHLIST')
+    expect(good?.tier).toBe('WATCHLIST')
+  })
+
+  it('policy D: a security failure is never delivered even with confirmation', async () => {
+    const deliver = vi.fn(async (_text: string) => true)
+    const res = await runSniperScan({ deliver: true }, deps({ deliver }))
+    const bad = res.decisions.find((x) => x.ticker === 'BAD')
+    expect(bad?.tier).toBe('REJECT')
+    expect(res.delivered).toBe(1) // only GOOD went out
   })
 
   it('dedupes a contract within the seen TTL — evaluated, not re-pushed', async () => {
@@ -154,7 +212,7 @@ describe('runSniperScan', () => {
     expect(res.scanned).toBe(3)
     expect(res.decisions).toHaveLength(2)
     expect(res.errors.join(' ')).toContain('audit 500')
-    expect(res.executed + res.rejected).toBe(2)
+    expect(res.screened + res.rejected).toBe(2)
   })
 
   it('never delivers when deliver is false', async () => {
@@ -162,7 +220,7 @@ describe('runSniperScan', () => {
     const res = await runSniperScan({ deliver: false }, deps({ deliver }))
     expect(deliver).not.toHaveBeenCalled()
     expect(res.delivered).toBe(0)
-    expect(res.executed).toBe(1) // still evaluated
+    expect(res.screened).toBe(1) // still evaluated
   })
 
   it('surfaces a foreign-contract audit as a warning on the decision, not as trust', async () => {

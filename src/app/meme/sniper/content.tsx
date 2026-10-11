@@ -6,7 +6,7 @@ import { DataTable, type Column } from "@/components/shell/DataTable";
 import { LiveDot } from "@/components/primitives/LiveDot";
 import { csrfFetch } from "@/lib/csrf";
 
-type Status = "EXECUTE" | "WATCHLIST" | "REJECT";
+type Status = "SIGNAL" | "WATCHLIST" | "REJECT";
 
 type Entry = {
   status: Status;
@@ -28,7 +28,6 @@ type Entry = {
     avgPnlPercent: number | null;
     pnlAssessment: string;
   };
-  plan: { sizeUsd: number; stopLossPct: number; tp1Pct: number; tp2Pct: number };
   contract: string;
   ticker: string;
   deduped: boolean;
@@ -36,26 +35,15 @@ type Entry = {
   auditsUsed: string[];
 };
 
-type Circuit = {
-  date: string;
-  consecutiveLosses: number;
-  wins: number;
-  locked: boolean;
-  updatedAt: string;
-};
-
 type Payload = {
   entries: Entry[];
   updatedAt: string | null;
-  lastScan: { at: string; scanned: number; executed: number; watchlisted: number; rejected: number; delivered: number; errors: string[] } | null;
+  lastScan: { at: string; scanned: number; screened: number; watchlisted: number; rejected: number; delivered: number; errors: string[] } | null;
   counts: Record<Status | "total", number>;
-  circuit: Circuit;
-  /** False = the evaluator can never emit EXECUTE (WATCHLIST-only mode). */
-  executeEnabled: boolean;
 };
 
 const statusClass: Record<Status, string> = {
-  EXECUTE: "bg-data-bull/15 text-data-bull",
+  SIGNAL: "bg-data-bull/15 text-data-bull",
   WATCHLIST: "bg-amber-500/15 text-amber-400",
   REJECT: "bg-data-bear/15 text-data-bear",
 };
@@ -223,9 +211,9 @@ export function MemeSniperPageContent() {
           setNotice(d.error ?? `Scan failed (HTTP ${res.status})`);
         } else if (d.data) {
           setPayload((prev) =>
-            prev ? { ...prev, entries: d.data!.entries, counts: d.data!.counts, circuit: d.data!.circuit } : prev,
+            prev ? { ...prev, entries: d.data!.entries, counts: d.data!.counts } : prev,
           );
-          setNotice(`Scanned ${d.data.scanned ?? 0} — execute ${d.data.counts.EXECUTE}, watch ${d.data.counts.WATCHLIST}, reject ${d.data.counts.REJECT}${deliver ? `, pushed ${"delivered" in d.data ? d.data.delivered : 0}` : ""}`);
+          setNotice(`Scanned ${d.data.scanned ?? 0} — signal ${d.data.counts.SIGNAL}, watch ${d.data.counts.WATCHLIST}, reject ${d.data.counts.REJECT}${deliver ? `, pushed ${"delivered" in d.data ? d.data.delivered : 0}` : ""}`);
         }
       } catch (e) {
         setNotice(e instanceof Error ? e.message : "Scan failed");
@@ -237,39 +225,10 @@ export function MemeSniperPageContent() {
   );
 
   const rows = payload ? (filter === "all" ? payload.entries : payload.entries.filter((e) => e.status === filter)) : [];
-  const circuit = payload?.circuit;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Panel
-          title="Daily Circuit"
-          subtitle={circuit ? circuit.date : undefined}
-          liveStatus={status}
-          className="min-w-[240px]"
-        >
-          <div className="px-3 py-2 flex items-center gap-4 text-xs font-mono">
-            <span className={circuit?.locked ? "text-data-bear" : "text-data-bull"}>
-              {circuit?.locked ? "LOCKED" : "OPEN"}
-            </span>
-            <span className="text-text-secondary">losses {circuit?.consecutiveLosses ?? 0}/3</span>
-            <span className="text-text-secondary">wins {circuit?.wins ?? 0}</span>
-          </div>
-        </Panel>
-
-        <Panel title="Execution Gate" subtitle="SNIPER_EXECUTE_ENABLED" className="min-w-[240px]">
-          <div className="px-3 py-2 text-xs font-mono">
-            <span className={payload?.executeEnabled ? "text-data-bull" : "text-amber-400"}>
-              {payload?.executeEnabled ? "OPEN — EXECUTE allowed" : "GATED — WATCHLIST only"}
-            </span>
-            {!payload?.executeEnabled && payload !== null && (
-              <div className="text-[11px] text-text-muted mt-1">
-                Hard filters can still be reported; nothing enters on EXECUTE until the gate opens.
-              </div>
-            )}
-          </div>
-        </Panel>
-
         <Panel title="Scan" subtitle={payload?.lastScan?.at ? new Date(payload.lastScan.at).toLocaleTimeString() : "never"} className="min-w-[280px]">
           <div className="px-3 py-2 flex items-center gap-2">
             <button
@@ -283,7 +242,7 @@ export function MemeSniperPageContent() {
               onClick={() => void runScan(true)}
               disabled={scanning}
               className="px-2 py-1 text-xs border border-bg-border hover:bg-bg-raised disabled:opacity-50 rounded"
-              title="Also push EXECUTE/WATCHLIST alerts to Telegram"
+              title="Also push SIGNAL/WATCHLIST alerts to Telegram"
             >
               Scan + push
             </button>
@@ -299,7 +258,7 @@ export function MemeSniperPageContent() {
 
         <Panel title="Decisions" subtitle={`${payload?.counts.total ?? 0} logged`} className="min-w-[240px]">
           <div className="px-3 py-2 flex items-center gap-3 text-xs font-mono">
-            {(["all", "EXECUTE", "WATCHLIST", "REJECT"] as const).map((k) => (
+            {(["all", "SIGNAL", "WATCHLIST", "REJECT"] as const).map((k) => (
               <button
                 key={k}
                 onClick={() => setFilter(k)}

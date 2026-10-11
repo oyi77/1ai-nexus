@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
-// POST /api/v1/meme/sniper   — evaluate one on-chain payload, optionally
+// POST /api/v1/meme/sniper   — screen one on-chain payload, optionally
 //                              push the alert to Telegram.
-// GET  /api/v1/meme/sniper   — daily stop-circuit status (locked? streak?)
+//                              SCREENING ONLY: never executes.
 //
 // Self-authenticating: NEXUS_API_KEYS / API_KEYS service keys or the
 // TELEGRAM_CRON_SECRET bearer (same contract as /telegram/personal-alerts).
@@ -9,13 +9,12 @@
 // internal caller before this handler can accept a service key.
 //
 // Body (POST):
-//   { payload: SniperPayload, deliver?: boolean, positionSizeUsd?: number }
+//   { payload: SniperPayload, deliver?: boolean }
 // The evaluator never trusts the caller's stage/status — it re-derives both.
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
 import { evaluateSniper, deliverSniperAlert, type SniperPayload } from '@/lib/modules/derived/meme-sniper'
-import { isSniperCircuitLocked, readSniperCircuit } from '@/lib/modules/derived/sniper-circuit'
 
 function parseServiceKeys(): Set<string> {
   const keys = new Set<string>()
@@ -61,11 +60,8 @@ export async function GET(request: Request) {
   if (!isInternalKey(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  const circuit = readSniperCircuit()
-  return NextResponse.json({
-    data: { ...circuit, locked: isSniperCircuitLocked() },
-    error: null,
-  })
+  // Screening-only surface: no circuit, no execution state to report.
+  return NextResponse.json({ data: { mode: 'screening' }, error: null })
 }
 
 export async function POST(request: Request) {
@@ -73,7 +69,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let body: { payload?: unknown; deliver?: boolean; positionSizeUsd?: number }
+  let body: { payload?: unknown; deliver?: boolean }
   try {
     body = (await request.json()) as typeof body
   } catch {
@@ -87,12 +83,9 @@ export async function POST(request: Request) {
     )
   }
 
-  const decision = evaluateSniper(body.payload, {
-    circuitLocked: isSniperCircuitLocked(),
-    positionSizeUsd: body.positionSizeUsd,
-  })
+  const decision = evaluateSniper(body.payload)
 
-  // Only EXECUTE alerts are worth a push; REJECT noise trains the operator
+  // Only actionable verdicts are worth a push; REJECT noise trains the operator
   // to ignore the channel. WATCHLIST still notifies (it is actionable).
   let delivered = false
   if (body.deliver === true && decision.status !== 'REJECT') {

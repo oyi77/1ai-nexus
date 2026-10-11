@@ -17,12 +17,25 @@ import {
   deliverSniperAlert,
   type SniperDecision,
 } from '@/lib/modules/derived/meme-sniper'
-import { isSniperCircuitLocked } from '@/lib/modules/derived/sniper-circuit'
 import {
   toSniperPayload,
   type SniperEnrichedToken,
 } from '@/lib/modules/derived/sniper-source'
 import type { MemeRiskAudit } from '@/lib/modules/meme/types'
+import { traceTokenBuyers } from '@/lib/modules/derived/wallet-tracer'
+import {
+  getSmartMoneyEvidence,
+  evaluateSmartMoneyGate,
+  type SmartMoneyEvidence,
+} from '@/lib/modules/derived/smart-money-provider'
+import {
+  classifySignalTier,
+  shouldDeliver,
+  formatTieredSignal,
+  DEFAULT_DELIVERY_POLICY,
+  type SignalTier,
+  type DeliveryPolicy,
+} from '@/lib/modules/derived/signal-tier'
 import { auditRugcheckToken } from '@/lib/modules/meme/rugcheck'
 import { auditBirdeyeToken } from '@/lib/modules/meme/birdeye'
 import { auditGmgnToken } from '@/lib/modules/meme/gmgn'
@@ -61,6 +74,9 @@ async function geckoGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+/** Minutes after which a candidate's data is too old to signal on. */
+const STALE_AFTER_MINUTES = Number(process.env.SNIPER_STALE_AFTER_MINUTES) || 120
+
 function seenTtlMs(): number {
   return Number(process.env.SNIPER_SEEN_TTL_MS) || 60 * 60_000
 }
@@ -95,6 +111,9 @@ interface DexPair {
   chainId?: string
   pairCreatedAt?: number
   marketCap?: number
+  fdv?: number
+  priceUsd?: string
+  priceChange?: Record<string, number>
   volume?: Record<string, number>
   baseToken?: { address?: string; symbol?: string; name?: string }
   liquidity?: { usd?: number }
@@ -235,6 +254,115 @@ async function discoverYoungPairs(limit: number): Promise<SniperEnrichedToken[]>
   return out.slice(0, limit)
 }
 
+/**
+ * Operator call-channel harvest (feed_hunter).
+ *
+ * Reads data/call-feed-latest.json — the JSON artifact produced by
+ * scripts/call-feed.py (Telethon harvest of the operator's 12 call
+ * channels, scored by cross-channel confluence). Prefetch mode only:
+ * a full live read of 12 channels costs minutes, so the freshness proof
+ * is asserted on (a) the artifact's generated_at timestamp and (b) a
+ * mandatory seed list of minimum token age. Stale artifact + empty
+ * young set ⇒ UNKNOWN-grade result, never a fabricated bullish row.
+ */
+interface CallFeedCandidate {
+  contract: string
+  chain: string
+  source_count: number
+  mentions: number
+  kinds: string[]
+  sources: string[]
+  first_seen: string
+  last_seen: string
+}
+
+interface CallFeedArtifact {
+  generated_at: string
+  window_min: number
+  candidates: CallFeedCandidate[]
+}
+
+async function discoverCallFeed(limit: number): Promise<SniperEnrichedToken[]> {
+  const rows = await readCallFeedArtifact()
+  const out: SniperEnrichedToken[] = []
+  for (const r of rows) {
+    if (out.length >= limit) break
+    if (!/^([1-9A-HJ-NP-Za-km-z]{32,44}pump|0x[0-9a-fA-F]{40})$/.test(r.contract)) continue
+    // The feed artifact carries attention only — no price/volume. Hydrate the
+    // row from dexscreener so the momentum gates have real numbers instead of
+    // rejecting every feed candidate on volume5m=0.
+    const live = await hydrateFromDexscreener(r.chain, r.contract)
+    if (!live) continue // unlisted/stale pair → not snipeable, never faked
+    out.push({
+      ...live,
+      id: `call-feed:${r.contract}`,
+      provenance: {
+        sourceType: 'operator-feed',
+        provider: 'call-feed',
+        note: `call-feed confluence: ${r.source_count} channels (${r.sources.join(',')})`,
+      },
+    })
+  }
+  // Highest confluence first — the cross-channel count is the rank signal.
+  out.sort((a, b) => {
+    const ra = rows.find((r) => r.contract === a.contract)
+    const rb = rows.find((r) => r.contract === b.contract)
+    return (rb?.source_count ?? 0) - (ra?.source_count ?? 0) || (rb?.mentions ?? 0) - (ra?.mentions ?? 0)
+  })
+  return out.slice(0, limit)
+}
+
+/**
+ * Live market row for one contract, or null when no pair is listed.
+ * Picks the deepest pair (most 5m flow) so thin fake pools never win.
+ */
+async function hydrateFromDexscreener(chain: string, contract: string): Promise<SniperEnrichedToken | null> {
+  try {
+    const raw = await dexGet<{ pairs?: DexPair[] }>(`/latest/dex/tokens/${contract}`)
+    const pairs = (raw.pairs ?? []).filter((p) => (p.chainId ?? '') === chain || !chain)
+    if (pairs.length === 0) return null
+    const best = pairs.reduce((a, b) => ((b.volume?.m5 ?? 0) > (a.volume?.m5 ?? 0) ? b : a))
+    return {
+      id: `dexscreener:${best.chainId ?? chain}:${contract}`,
+      platform: 'dexscreener',
+      chain: best.chainId ?? chain,
+      contract,
+      symbol: best.baseToken?.symbol ?? '',
+      name: best.baseToken?.name ?? '',
+      price: Number(best.priceUsd) || 0,
+      change24h: best.priceChange?.h24 ?? 0,
+      volume24h: best.volume?.h24 ?? 0,
+      marketCap: best.marketCap ?? best.fdv ?? 0,
+      liquidity: best.liquidity?.usd ?? 0,
+      createdAt: best.pairCreatedAt ?? Date.now(),
+      riskLevel: 0,
+      holders: 0,
+      top10HolderPercent: 0,
+      social: {},
+      audited: false,
+      volume5m: best.volume?.m5 ?? 0,
+      riskKnown: false,
+    }
+  } catch {
+    return null // network failure != a fabricated row
+  }
+}
+
+async function readCallFeedArtifact(): Promise<CallFeedCandidate[]> {
+  try {
+    const { readFile } = await import('node:fs/promises')
+    const { join } = await import('node:path')
+    const p = process.env.CALL_FEED_PATH || join(process.cwd(), 'data', 'call-feed-latest.json')
+    const raw = JSON.parse(await readFile(p, 'utf8')) as CallFeedArtifact
+    const ageMin = (Date.now() - Date.parse(raw.generated_at)) / 60_000
+    const maxAge = Number(process.env.CALL_FEED_MAX_AGE_MIN) || 180
+    if (!Number.isFinite(ageMin) || ageMin > maxAge) return [] // stale feed ≠ candidates
+    return (raw.candidates ?? []).filter((c) => c.source_count >= 1)
+  } catch {
+    return [] // artifact missing/unparseable → no feed candidates
+  }
+}
+
 /** Per-contract audit fan-out — every source isolated. */
 async function collectAudits(chain: string, contract: string): Promise<MemeRiskAudit[]> {
   const results = await Promise.allSettled([
@@ -252,9 +380,41 @@ export interface SniperScanDeps {
   discover: (limit: number) => Promise<SniperEnrichedToken[]>
   audit: (chain: string, contract: string) => Promise<MemeRiskAudit[]>
   deliver: (text: string) => Promise<boolean>
+  /**
+   * Wallet-DB smart-money evidence. Injectable so tests stay offline;
+   * when omitted the scan runs without wallet confirmation (verdicts cap
+   * at WATCHLIST via the evaluator's absent-evidence rule).
+   */
+  smartMoney?: (chain: string, contract: string) => Promise<SmartMoneyEvidence>
+}
+
+type DiscoverMode = 'auto' | 'api' | 'call-feed'
+
+function discoverMode(): DiscoverMode {
+  const v = (process.env.SNIPER_DISCOVER_MODE || 'auto').toLowerCase()
+  return v === 'api' || v === 'call-feed' ? v : 'auto'
 }
 
 async function discoverCombined(limit: number): Promise<SniperEnrichedToken[]> {
+  const mode = discoverMode()
+  // Operator call-feed is the fastest attention signal: a token called by
+  // 3+ independent channels is worth auditing before the API lists catch up.
+  if (mode === 'call-feed' || mode === 'auto') {
+    try {
+      const feed = await discoverCallFeed(limit)
+      if (feed.length > 0) {
+        if (mode === 'call-feed') return feed
+        // auto: union feed + API lists, feed-listed contracts first
+        const seenC = new Set(feed.map((t) => t.contract.toLowerCase()))
+        const rest = (await discoverApiOnly(limit)).filter((t) => !seenC.has(t.contract.toLowerCase()))
+        return [...feed, ...rest].slice(0, limit)
+      }
+    } catch { /* feed is opportunistic — API lists are the fallback */ }
+  }
+  return discoverApiOnly(limit)
+}
+
+async function discoverApiOnly(limit: number): Promise<SniperEnrichedToken[]> {
   try {
     const fresh = await discoverGeckoNewPools(limit)
     if (fresh.length > 0) return fresh
@@ -262,10 +422,48 @@ async function discoverCombined(limit: number): Promise<SniperEnrichedToken[]> {
   return discoverYoungPairs(limit)
 }
 
+/** No-wallet-evidence shape: empty, never a fabricated bullish row. */
+function EMPTY_SMART_MONEY(chain: string, contract: string): SmartMoneyEvidence {
+  return {
+    contract,
+    chain,
+    buyers: [],
+    walletsHolding: 0,
+    byStatus: {},
+    strongest: null,
+    bullishHoldingUsd: null,
+    ttlMs: 0,
+    source: 'none',
+  }
+}
+
+/**
+ * Wallet evidence for a candidate.
+ *
+ * The DB path (getSmartMoneyEvidence) only knows tokens already ingested —
+ * for a freshly-created mint that is almost always nothing, which caps
+ * every candidate at WATCHLIST. When the DB returns no evidence we trace
+ * the token's on-chain top holders instead (wallet-tracer), which is what
+ * turns "no wallets known" into real classification evidence.
+ *
+ * `SNIPER_TRACE_WALLETS=false` disables the on-chain trace (DB only).
+ */
+async function liveSmartMoney(chain: string, contract: string): Promise<SmartMoneyEvidence> {
+  const fromDb = await getSmartMoneyEvidence(contract, chain)
+  if (fromDb.buyers.length > 0) return fromDb
+  if ((process.env.SNIPER_TRACE_WALLETS ?? 'true') === 'false') return fromDb
+  try {
+    return await traceTokenBuyers(contract, chain)
+  } catch {
+    return fromDb
+  }
+}
+
 const LIVE_DEPS: SniperScanDeps = {
   discover: discoverCombined,
   audit: collectAudits,
   deliver: deliverSniperAlert,
+  smartMoney: liveSmartMoney,
 }
 
 export interface SniperScanDecision extends SniperDecision {
@@ -275,11 +473,19 @@ export interface SniperScanDecision extends SniperDecision {
   deduped: boolean
   delivered: boolean
   auditsUsed: string[]
+  /** Operator quality tier (policy D). Only HIGH_CONVICTION is a top signal. */
+  tier: SignalTier
+  tierReasons: string[]
+  tierMissing: string[]
+  /** Classified wallet buyers backing this token (evidence, with provenance). */
+  smartMoneyBuyers: number
+  smartMoneyStrongest: string | null
+  smartMoneySource: string
 }
 
 export interface SniperScanResult {
   scanned: number
-  executed: number
+  screened: number
   watchlisted: number
   rejected: number
   deduped: number
@@ -290,7 +496,7 @@ export interface SniperScanResult {
 
 /** One scan pass: discover → audit → evaluate → (optionally) deliver. */
 export async function runSniperScan(
-  opts: { limit?: number; deliver?: boolean } = {},
+  opts: { limit?: number; deliver?: boolean; deliveryPolicy?: DeliveryPolicy } = {},
   deps: SniperScanDeps = LIVE_DEPS,
 ): Promise<SniperScanResult> {
   const limit = Math.min(Math.max(opts.limit ?? 3, 1), 10)
@@ -303,7 +509,6 @@ export async function runSniperScan(
   }
 
   const seen = readSeenState()
-  const circuitLocked = isSniperCircuitLocked()
   const decisions: SniperScanDecision[] = []
   let delivered = 0
 
@@ -311,12 +516,42 @@ export async function runSniperScan(
     try {
       const audits = await deps.audit(token.chain, token.contract)
       const { payload, warnings: identityWarnings, auditsAccepted } = toSniperPayload(token, audits)
-      const decision = evaluateSniper(payload, { circuitLocked, extraWarnings: identityWarnings })
+      // Wallet-DB confirmation is evidence, never a substitute for security.
+      const walletEvidence = deps.smartMoney
+        ? await deps.smartMoney(token.chain, token.contract)
+        : EMPTY_SMART_MONEY(token.chain, token.contract)
+      const smartMoney = evaluateSmartMoneyGate(walletEvidence)
+      const decision = evaluateSniper(payload, {
+        extraWarnings: identityWarnings,
+        smartMoney,
+      })
+
+      // Operator quality tier (policy D): the evaluator says "safe+moving",
+      // the tier says "good enough to send as a TOP signal".
+      const tierResult = classifySignalTier({
+        decision,
+        smartMoney: deps.smartMoney ? walletEvidence : null,
+        ageMinutes: payload.ageMinutes,
+        staleAfterMinutes: STALE_AFTER_MINUTES,
+        dataComplete: true,
+      })
+
       const deduped = seen[token.contract] !== undefined
       let wasDelivered = false
-      // Only push actionable legs, and never re-push a seen contract.
-      if (!deduped && opts.deliver === true && decision.status !== 'REJECT') {
-        wasDelivered = await deps.deliver(decision.alert)
+      // Only push deliverable tiers, and never re-push a seen contract.
+      const policy = opts.deliveryPolicy ?? DEFAULT_DELIVERY_POLICY
+      if (!deduped && opts.deliver === true && shouldDeliver(tierResult.tier, policy)) {
+        // Policy E: delivered signals use the full evidence format, not the
+        // evaluator's short alert. Same facts, complete provenance.
+        const message = formatTieredSignal({
+          payload,
+          tier: tierResult.tier,
+          tierReasons: tierResult.reasons,
+          tierMissing: tierResult.missing,
+          smartMoney: deps.smartMoney ? walletEvidence : null,
+          marketCapUsd: payload.momentum.marketCap,
+        })
+        wasDelivered = await deps.deliver(message)
         if (wasDelivered) delivered++
       }
       seen[token.contract] = Date.now()
@@ -327,6 +562,12 @@ export async function runSniperScan(
         deduped,
         delivered: wasDelivered,
         auditsUsed: auditsAccepted.map((a) => a.platform),
+        tier: tierResult.tier,
+        tierReasons: tierResult.reasons,
+        tierMissing: tierResult.missing,
+        smartMoneyBuyers: walletEvidence.buyers.length,
+        smartMoneyStrongest: walletEvidence.strongest,
+        smartMoneySource: walletEvidence.source,
       })
     } catch (err) {
       errors.push(`${token.contract.slice(0, 8)}: ${err instanceof Error ? err.message : String(err)}`)
@@ -336,7 +577,7 @@ export async function runSniperScan(
 
   return {
     scanned: candidates.length,
-    executed: decisions.filter((d) => d.status === 'EXECUTE').length,
+    screened: decisions.filter((d) => d.status === 'SIGNAL').length,
     watchlisted: decisions.filter((d) => d.status === 'WATCHLIST').length,
     rejected: decisions.filter((d) => d.status === 'REJECT').length,
     deduped: decisions.filter((d) => d.deduped).length,

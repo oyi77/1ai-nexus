@@ -40,20 +40,25 @@ function decision(contract: string, status: SniperScanDecision['status']): Snipe
       avgPnlPercent: 40,
       pnlAssessment: 'neutral',
     },
-    plan: { sizeUsd: 10, stopLossPct: 70, slAmountUsd: 7, tp1Pct: 100, tp2Pct: 400 },
     alert: `alert for ${contract}`,
     contract,
     ticker: contract.toUpperCase(),
     deduped: false,
     delivered: status !== 'REJECT',
     auditsUsed: ['rugcheck', 'birdeye'],
+    tier: status === 'REJECT' ? 'REJECT' : 'HIGH_CONVICTION',
+    tierReasons: ['fixture'],
+    tierMissing: [],
+    smartMoneyBuyers: 1,
+    smartMoneyStrongest: 'QUALIFIED_SMART_MONEY',
+    smartMoneySource: 'fixture',
   }
 }
 
 function result(decisions: SniperScanDecision[]): SniperScanResult {
   return {
     scanned: decisions.length,
-    executed: decisions.filter((d) => d.status === 'EXECUTE').length,
+    screened: decisions.filter((d) => d.status === 'SIGNAL').length,
     watchlisted: decisions.filter((d) => d.status === 'WATCHLIST').length,
     rejected: decisions.filter((d) => d.status === 'REJECT').length,
     deduped: 0,
@@ -68,16 +73,16 @@ describe('sniper-log', () => {
     const log = readSniperLog()
     expect(log.entries).toEqual([])
     expect(log.updatedAt).toBeNull()
-    expect(sniperLogCounts(log)).toEqual({ EXECUTE: 0, WATCHLIST: 0, REJECT: 0, total: 0 })
+    expect(sniperLogCounts(log)).toEqual({ SIGNAL: 0, WATCHLIST: 0, REJECT: 0, total: 0 })
   })
 
   it('persists decisions newest-first and strips the Telegram alert body', () => {
-    appendSniperScan(result([decision('aaa', 'EXECUTE')]))
+    appendSniperScan(result([decision('aaa', 'SIGNAL')]))
     const log = appendSniperScan(result([decision('bbb', 'REJECT')]))
 
     expect(log.entries.map((e) => e.contract)).toEqual(['bbb', 'aaa'])
     expect(log.entries.some((e) => 'alert' in e)).toBe(false)
-    expect(sniperLogCounts(log)).toEqual({ EXECUTE: 1, WATCHLIST: 0, REJECT: 1, total: 2 })
+    expect(sniperLogCounts(log)).toEqual({ SIGNAL: 1, WATCHLIST: 0, REJECT: 1, total: 2 })
     expect(log.lastScan?.scanned).toBe(1)
     expect(log.updatedAt).not.toBeNull()
   })

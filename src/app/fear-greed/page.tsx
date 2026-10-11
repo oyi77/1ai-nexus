@@ -16,9 +16,30 @@ interface FearGreedResponse {
 const scoreColor = (s: number) => s <= 25 ? 'text-data-bear' : s <= 45 ? 'text-data-warn' : s <= 55 ? 'text-data-neutral' : s <= 75 ? 'text-data-bull' : 'text-teal-vivid'
 const scoreLabel = (s: number) => s <= 25 ? 'Extreme Fear' : s <= 45 ? 'Fear' : s <= 55 ? 'Neutral' : s <= 75 ? 'Greed' : 'Extreme Greed'
 
+// ponytail: normalize covers known shapes only ({composite},{composition},{data:{...}}); add when API adds new envelope.
+function normalize(raw: unknown): FearGreedResponse {
+  const r = (raw ?? {}) as Record<string, any>
+  const inner = r?.data?.data ?? r?.data ?? r
+  const src = (inner?.composite ?? inner?.composition ?? {}) as Record<string, any>
+  const n = Number(src?.score)
+  const score = Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 50
+  const cats = inner?.categories ?? inner?.composition?.categories ?? []
+  const categories = Array.isArray(cats)
+    ? cats
+    : typeof cats === 'object' && cats !== null
+      ? Object.entries(cats).map(([name, cat]) => ({ name, ...((cat ?? {}) as { score: number; weight: number }) }))
+      : []
+  return {
+    composite: { score, label: typeof src?.label === 'string' ? src.label : scoreLabel(score) },
+    categories,
+    regime: inner?.regime,
+    history: Array.isArray(inner?.history) ? inner.history : [],
+  }
+}
+
 export default function FearGreedPage() {
-  const { data: resp, status } = useLiveFetch<FearGreedResponse>({ url: '/api/v1/fear-greed', interval: 60_000 })
-  const d = resp
+  const { data: resp, status } = useLiveFetch<unknown>({ url: '/api/v1/fear-greed', interval: 60_000 })
+  const d = resp == null ? undefined : normalize(resp)
 
   return (
     <NexusLayout>

@@ -4,7 +4,9 @@
 //   1. Discover young dexscreener pairs (boosts + volume.m5)
 //   2. Fan out rugcheck/birdeye/gmgn audits per contract
 //   3. Evaluate → EXECUTE / WATCHLIST / REJECT (unproven = REJECT)
-//   4. Push non-REJECT alerts to Telegram (deduped within the seen TTL)
+//   4. Tier (policy D): only HIGH_CONVICTION is delivered as a top signal;
+//      a clean screen without verified smart-money confirmation is withheld
+//   5. Push deliverable tiers to Telegram (deduped within the seen TTL)
 //   5. Log stats; exit non-zero when the scan itself broke
 //
 // Cron: */10 * * * * (every 10 min) — pairs are short-lived, so a
@@ -26,14 +28,17 @@ async function main() {
   const res = await runSniperScan({ limit: LIMIT, deliver: DELIVER })
   appendSniperScan(res)
 
+  const topSignals = res.decisions.filter((d) => d.tier === 'HIGH_CONVICTION').length
   console.log(
-    `[sniper] scanned=${res.scanned} execute=${res.executed} watchlist=${res.watchlisted} ` +
-      `reject=${res.rejected} deduped=${res.deduped} delivered=${res.delivered}`,
+    `[sniper] scanned=${res.scanned} signal=${res.screened} watchlist=${res.watchlisted} ` +
+      `reject=${res.rejected} deduped=${res.deduped} delivered=${res.delivered} top=${topSignals}`,
   )
   for (const d of res.decisions) {
     const why = d.status === 'REJECT' ? `${d.rejections.length} breach(es)` : 'actionable'
+    const money = d.smartMoneyBuyers > 0 ? ` sm=${d.smartMoneyBuyers}(${d.smartMoneyStrongest})` : ' sm=none'
+    const gap = d.tierMissing.length > 0 ? ` missing=[${d.tierMissing.join('; ')}]` : ''
     console.log(
-      `[sniper]   ${d.ticker} ${d.status} (${why}) vol/mc=${d.metrics.volMcRatio.toFixed(2)} age=${d.metrics.ageLabel} audits=[${d.auditsUsed.join(',')}]${d.delivered ? ' → PUSHED' : ''}${d.deduped ? ' (seen)' : ''}`,
+      `[sniper]   ${d.ticker} ${d.status} ${d.tier} (${why}) vol/mc=${d.metrics.volMcRatio.toFixed(2)} age=${d.metrics.ageLabel} audits=[${d.auditsUsed.join(',')}]${money}${gap}${d.delivered ? ' → PUSHED' : ''}${d.deduped ? ' (seen)' : ''}`,
     )
   }
   if (res.errors.length > 0) {

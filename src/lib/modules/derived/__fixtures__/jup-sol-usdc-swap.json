@@ -1,0 +1,102 @@
+{
+  "note": "REAL_MAINNET_FIXTURE — public on-chain data, Jupiter router swap SOL->USDC, fetched read-only 2026-10-11. No keys/sessions.",
+  "signature": "2RbpEiYmTtEx2wWd7o8m27ST4ba93Vis7p3hTU7PjGGNrqBXT2SmUdWkGjULX9sUayisQcX35iYvyDFJkSoWuBf",
+  "wallet": "FHpcNSe6tb2n15bAdq4BkeYWGyZKFD7yLYrH92ng7wCT",
+  "blockTime": 1791682060,
+  "slot": 455469340,
+  "fee": 13343,
+  "payerIndex": 0,
+  "preBalancePayer": 45675597946,
+  "postBalancePayer": 45674096163,
+  "preTokenBalances": [
+    {
+      "mint": "miMqQtz59EhsKf8JkQ9u17ktjb3DMNnt81k51Jmpump",
+      "owner": "AyMUowvfjq4UhBA1Uaouhkvbm5vBFzM9sVX9hkcNimdj",
+      "uiAmount": null
+    },
+    {
+      "mint": "miMqQtz59EhsKf8JkQ9u17ktjb3DMNnt81k51Jmpump",
+      "owner": "4ZBJyEZE1o9X4zSng8NKa5NnKP3yBAchs4SvrHTrg6iK",
+      "uiAmount": 229866726.92945
+    },
+    {
+      "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "owner": "AyMUowvfjq4UhBA1Uaouhkvbm5vBFzM9sVX9hkcNimdj",
+      "uiAmount": 22.654974
+    },
+    {
+      "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "owner": "FHpcNSe6tb2n15bAdq4BkeYWGyZKFD7yLYrH92ng7wCT",
+      "uiAmount": 2.526291
+    },
+    {
+      "mint": "So11111111111111111111111111111111111111112",
+      "owner": "9GTj99g9tbz9U6UYDsX6YeRTgUnkYG6GTnHv3qLa5aXq",
+      "uiAmount": 369.944557344
+    },
+    {
+      "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "owner": "9GTj99g9tbz9U6UYDsX6YeRTgUnkYG6GTnHv3qLa5aXq",
+      "uiAmount": 21376.439351
+    },
+    {
+      "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "owner": "8FnX3xo2yYw3EUE6w3nQA4GfXGS9wpK6oj3veJpbFzLo",
+      "uiAmount": 2503962.019542
+    },
+    {
+      "mint": "So11111111111111111111111111111111111111112",
+      "owner": "8FnX3xo2yYw3EUE6w3nQA4GfXGS9wpK6oj3veJpbFzLo",
+      "uiAmount": 19942.063031672
+    }
+  ],
+  "postTokenBalances": [
+    {
+      "mint": "miMqQtz59EhsKf8JkQ9u17ktjb3DMNnt81k51Jmpump",
+      "owner": "AyMUowvfjq4UhBA1Uaouhkvbm5vBFzM9sVX9hkcNimdj",
+      "uiAmount": 289587.722928
+    },
+    {
+      "mint": "miMqQtz59EhsKf8JkQ9u17ktjb3DMNnt81k51Jmpump",
+      "owner": "4ZBJyEZE1o9X4zSng8NKa5NnKP3yBAchs4SvrHTrg6iK",
+      "uiAmount": 229577139.206522
+    },
+    {
+      "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "owner": "AyMUowvfjq4UhBA1Uaouhkvbm5vBFzM9sVX9hkcNimdj",
+      "uiAmount": 11.159047
+    },
+    {
+      "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "owner": "FHpcNSe6tb2n15bAdq4BkeYWGyZKFD7yLYrH92ng7wCT",
+      "uiAmount": 2.694731
+    },
+    {
+      "mint": "So11111111111111111111111111111111111111112",
+      "owner": "9GTj99g9tbz9U6UYDsX6YeRTgUnkYG6GTnHv3qLa5aXq",
+      "uiAmount": 369.916393795
+    },
+    {
+      "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "owner": "9GTj99g9tbz9U6UYDsX6YeRTgUnkYG6GTnHv3qLa5aXq",
+      "uiAmount": 21379.537419
+    },
+    {
+      "mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "owner": "8FnX3xo2yYw3EUE6w3nQA4GfXGS9wpK6oj3veJpbFzLo",
+      "uiAmount": 2503970.248961
+    },
+    {
+      "mint": "So11111111111111111111111111111111111111112",
+      "owner": "8FnX3xo2yYw3EUE6w3nQA4GfXGS9wpK6oj3veJpbFzLo",
+      "uiAmount": 19941.988202033
+    }
+  ],
+  "walletsInvolved": [
+    "AyMUowvfjq4UhBA1Uaouhkvbm5vBFzM9sVX9hkcNimdj",
+    "4ZBJyEZE1o9X4zSng8NKa5NnKP3yBAchs4SvrHTrg6iK",
+    "FHpcNSe6tb2n15bAdq4BkeYWGyZKFD7yLYrH92ng7wCT",
+    "9GTj99g9tbz9U6UYDsX6YeRTgUnkYG6GTnHv3qLa5aXq",
+    "8FnX3xo2yYw3EUE6w3nQA4GfXGS9wpK6oj3veJpbFzLo"
+  ]
+}
