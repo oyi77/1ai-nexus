@@ -66,7 +66,8 @@ interface RugCheckReport {
   totalMarketLiquidity?: number
   totalStableLiquidity?: number
   rugged?: boolean
-  graphInsidersDetected?: boolean
+  /** Live-proven shape: a NUMBER (0 when none found), not a boolean. */
+  graphInsidersDetected?: number
   token?: { supply?: number; decimals?: number }
   markets?: RugCheckMarket[]
   insiderNetworks?: RugCheckInsiderNetwork[]
@@ -144,17 +145,27 @@ export async function auditRugcheckToken(chain: string, contract: string): Promi
     }
     // Insider networks: linked clusters holding the token. The largest
     // cluster's currentHolding / supply is the linked-cluster share.
+    //
+    // RugCheck returns `insiderNetworks: null` (NOT []) when its graph
+    // analysis found no cluster — proven clean, not unproven. The
+    // discriminator is `graphInsidersDetected`, a number the API always
+    // sends when the analysis ran (live-proven 2026-10-11: 0 for a clean
+    // token, 4 for one with a cluster). Only a finite number proves the
+    // analysis ran; a missing field stays UNKNOWN (undefined) so absence
+    // never launders into a proven-zero.
     let clusterPercent: number | undefined
-    let insiderPercent = 0
-    if (supply > 0) {
+    let insiderPercent: number | undefined
+    const graphCount = report.graphInsidersDetected
+    if (supply > 0 && typeof graphCount === 'number' && Number.isFinite(graphCount)) {
       let maxCluster = 0
+      let totalInsider = 0
       for (const net of report.insiderNetworks ?? []) {
-        const holding = toNum(net.currentHolding)
-        maxCluster = Math.max(maxCluster, holding / supply)
-        insiderPercent += holding / supply
+        const share = toNum(net.currentHolding) / supply
+        maxCluster = Math.max(maxCluster, share)
+        totalInsider += share
       }
-      if ((report.insiderNetworks ?? []).length > 0) clusterPercent = Math.min(1, maxCluster)
-      insiderPercent = Math.min(1, insiderPercent)
+      clusterPercent = Math.min(1, maxCluster)
+      insiderPercent = Math.min(1, totalInsider)
     }
 
     // Top-holder addresses + percents feed the sniper's top-1-3 taint gate.
@@ -178,7 +189,7 @@ export async function auditRugcheckToken(chain: string, contract: string): Promi
       top10HolderPercent,
       lpLockedPercent,
       distribution:
-        devPercent === undefined && insiderPercent === 0 && clusterPercent === undefined
+        devPercent === undefined && (insiderPercent ?? 0) === 0 && clusterPercent === undefined
           ? undefined
           : { devPercent, insiderPercent, clusterPercent },
       topWallets,

@@ -22,7 +22,8 @@ const REPORT = {
   totalMarketLiquidity: 50000,
   totalStableLiquidity: 20000,
   rugged: false,
-  graphInsidersDetected: false,
+  // Live shape is a NUMBER (0 when none found), not a boolean.
+  graphInsidersDetected: 0,
   mintAuthority: null,
   freezeAuthority: 'FreezeAuth1111111111111111111111111111111111',
   topHolders: [
@@ -59,5 +60,45 @@ describe('auditRugcheckToken', () => {
     expect(audit).not.toBeNull()
     expect(audit!.riskLevel).toBe(0)
     expect(audit!.riskLabel).toBe('safe')
+  })
+
+  it('reads a clean bubblemap as proven-zero cluster, not unproven', async () => {
+    // Live-proven 2026-10-11: no cluster -> insiderNetworks null +
+    // graphInsidersDetected 0. That is a completed analysis with zero
+    // findings; treating it as unproven rejected every clean token.
+    mockFetchOnce(200, {
+      ...REPORT,
+      token: { supply: 1_000_000 },
+      creatorBalance: 0,
+      graphInsidersDetected: 0,
+      insiderNetworks: null,
+    })
+    const audit = await auditRugcheckToken('solana', 'addr')
+    expect(audit!.distribution?.clusterPercent).toBe(0)
+    expect(audit!.distribution?.insiderPercent).toBe(0)
+  })
+
+  it('reads a detected cluster share from insiderNetworks', async () => {
+    mockFetchOnce(200, {
+      ...REPORT,
+      token: { supply: 1_000_000 },
+      creatorBalance: 0,
+      graphInsidersDetected: 4,
+      insiderNetworks: [{ currentHolding: 50_000 }],
+    })
+    const audit = await auditRugcheckToken('solana', 'addr')
+    expect(audit!.distribution?.clusterPercent).toBeCloseTo(0.05)
+  })
+
+  it('leaves cluster unproven when the analysis never ran', async () => {
+    mockFetchOnce(200, {
+      ...REPORT,
+      token: { supply: 1_000_000 },
+      creatorBalance: 0,
+      graphInsidersDetected: undefined,
+      insiderNetworks: null,
+    })
+    const audit = await auditRugcheckToken('solana', 'addr')
+    expect(audit!.distribution?.clusterPercent).toBeUndefined()
   })
 })
