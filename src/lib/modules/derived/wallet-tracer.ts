@@ -193,6 +193,13 @@ async function traceOnce(
       traceCache.set(key, { at: Date.now(), evidence: ev })
       return ev
     }
+    // On-chain fallback is OFF by default: measured 2026-10-11 — a single
+    // wallet's 10-signature harvest took 212s (public RPC 429s, then
+    // -32015), so the 20s budget always expired and every slow-path trace
+    // returned 0 buyers after burning the whole budget. GMGN holder rows
+    // (400ms-1s, real realized_pnl) are the working source. Re-enable only
+    // when a keyed RPC is configured.
+    if (process.env.SNIPER_TRACE_ONCHAIN !== 'true') return empty
     // Slow path: on-chain harvest + full classification.
     for (const h of holders) {
       try {
