@@ -17,7 +17,6 @@ import { prisma } from '@/lib/db'
 import { harvestWallet, type NormalizedSwap } from '@/lib/modules/derived/solana-harvest'
 import { buildEpisodes, toTradeEpisodes } from '@/lib/modules/derived/wallet-episodes'
 import { classifyWallet } from '@/lib/modules/derived/wallet-intel'
-import { buildWhaleEvidence } from '@/lib/modules/derived/whale-evidence'
 import {
   BULLISH_STATUSES,
   type SmartMoneyEvidence,
@@ -207,7 +206,6 @@ async function traceOnce(
       ttlMs,
       source: 'wallet-tracer:onchain',
     }
-    void buildWhaleEvidence
     traceCache.set(key, { at: Date.now(), evidence: ev })
     return ev
   } catch {

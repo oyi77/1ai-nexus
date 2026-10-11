@@ -177,11 +177,15 @@ describe('runSniperScan', () => {
     await runSniperScan({ deliver: true }, d)
     const second = await runSniperScan({ deliver: true }, d)
     expect(second.scanned).toBe(2)
-    expect(second.deduped).toBe(2)
+    // GOOD was marked seen (deliverable); BAD was REJECTed and stays
+    // eligible, so only one contract dedupes on the second pass.
+    expect(second.deduped).toBe(1)
     expect(second.delivered).toBe(0)
     expect(deliver).toHaveBeenCalledTimes(1)
-    // Decisions still present (evaluation is cheap; delivery is the gate).
-    expect(second.decisions.every((x) => x.deduped)).toBe(true)
+    // The re-evaluated REJECT proves the point: its vol/mcap had 10 min to
+    // mature instead of being pinned invisible for the whole seen-TTL.
+    expect(second.decisions.find((x) => x.contract === 'GOOD')?.deduped).toBe(true)
+    expect(second.decisions.find((x) => x.contract === 'BAD')?.deduped).toBe(false)
   })
 
   it('surfaces discovery failure as an error instead of throwing', async () => {

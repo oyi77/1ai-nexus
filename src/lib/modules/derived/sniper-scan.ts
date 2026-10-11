@@ -284,9 +284,15 @@ interface CallFeedArtifact {
 
 async function discoverCallFeed(limit: number): Promise<SniperEnrichedToken[]> {
   const rows = await readCallFeedArtifact()
+  // The momentum gate keys on the PAIR's age (2x vol/mcap under 2h, 4x after),
+  // so ranking by call time picks the wrong tokens: a token first called 3
+  // minutes ago can be a 319h-old pair, which the gate can never pass.
+  // Hydrate candidates first, then order by the age the gate actually uses.
+  // Measured 2026-10-11: the only rows clearing 2x were 2-3 minute-old pairs
+  // that call-time ranking never reached.
+  const maxPairAgeMin = Number(process.env.CALL_FEED_MAX_PAIR_AGE_MIN) || 180
   const out: SniperEnrichedToken[] = []
   for (const r of rows) {
-    if (out.length >= limit) break
     if (!/^([1-9A-HJ-NP-Za-km-z]{32,44}pump|0x[0-9a-fA-F]{40})$/.test(r.contract)) continue
     // The feed artifact carries attention only — no price/volume. Hydrate the
     // row from dexscreener so the momentum gates have real numbers instead of
@@ -303,13 +309,18 @@ async function discoverCallFeed(limit: number): Promise<SniperEnrichedToken[]> {
       },
     })
   }
-  // Highest confluence first — the cross-channel count is the rank signal.
-  out.sort((a, b) => {
-    const ra = rows.find((r) => r.contract === a.contract)
-    const rb = rows.find((r) => r.contract === b.contract)
-    return (rb?.source_count ?? 0) - (ra?.source_count ?? 0) || (rb?.mentions ?? 0) - (ra?.mentions ?? 0)
-  })
-  return out.slice(0, limit)
+  // Newest pair first — that is the axis the momentum gate measures against.
+  out.sort(
+    (a, b) =>
+      (b.createdAt ?? 0) - (a.createdAt ?? 0) || (b.volume5m ?? 0) - (a.volume5m ?? 0),
+  )
+  const nowMs = Date.now()
+  return out
+    .filter((t) => {
+      const ageMin = (nowMs - (t.createdAt ?? 0)) / 60_000
+      return !Number.isFinite(ageMin) || ageMin <= maxPairAgeMin
+    })
+    .slice(0, limit)
 }
 
 /**
@@ -554,7 +565,13 @@ export async function runSniperScan(
         wasDelivered = await deps.deliver(message)
         if (wasDelivered) delivered++
       }
-      seen[token.contract] = Date.now()
+      // Only a non-REJECT outcome is worth remembering. Marking a REJECT seen
+      // pinned the contract for the whole seen-TTL, so a token that failed the
+      // momentum gate at minute 3 was never re-evaluated when vol/mcap climbed
+      // past the threshold (measured 2026-10-11: rejected calls later ran
+      // +274%/+683%/+1383%). REJECT rows stay eligible; they are cheap to
+      // re-audit and cached.
+      if (decision.status !== 'REJECT') seen[token.contract] = Date.now()
       decisions.push({
         ...decision,
         contract: token.contract,

@@ -60,6 +60,15 @@ export interface AuditIdentityCheck {
 }
 
 /**
+ * Canonical ticker form for comparison/display: `$PUPPY` / `puppy ` / `PUPPY`
+ * all collapse to `PUPPY`. Pure. Contract stays the identity; this only kills
+ * the label noise that made one ticker look like three (Fase 4).
+ */
+export function canonicalTicker(raw: string | undefined | null): string {
+  return (raw ?? '').replace(/^\$+/, '').trim().toUpperCase()
+}
+
+/**
  * Bind audits to the token they claim to describe.
  *
  * An audit whose `contract` differs from the discovery row is a different
@@ -79,7 +88,7 @@ export function checkAuditIdentity(
   const accepted: MemeRiskAudit[] = []
   const warnings: string[] = []
   const wantContract = token.contract.trim().toLowerCase()
-  const wantSymbol = (token.symbol || token.name || '').trim().toLowerCase()
+  const wantSymbol = canonicalTicker(token.symbol || token.name)
 
   for (const a of audits) {
     const got = (a.contract ?? '').trim().toLowerCase()
@@ -91,7 +100,7 @@ export function checkAuditIdentity(
       )
       continue
     }
-    const gotSymbol = (a.symbol ?? '').trim().toLowerCase()
+    const gotSymbol = canonicalTicker(a.symbol)
     if (wantSymbol && gotSymbol && gotSymbol !== wantSymbol) {
       warnings.push(
         `${a.platform}: symbol mismatch (${a.symbol} ≠ ${wantSymbol}) on the same mint — keeping audit row, canonical ticker from discovery`,
@@ -246,7 +255,8 @@ export function toSniperPayload(
 
   const payload: SniperPayload = {
 
-    ticker: token.symbol || token.name || token.contract.slice(0, 8),
+    ticker:
+      canonicalTicker(token.symbol || token.name) || token.contract.slice(0, 8),
     contract: token.contract,
     chain: token.chain,
     ageMinutes: Number.isFinite(ageMinutes) ? Math.round(ageMinutes) : 10_000,

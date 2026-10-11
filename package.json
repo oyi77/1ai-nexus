@@ -38,6 +38,7 @@
     "deploy": "bash scripts/deploy.sh",
     "seed:feeds": "tsx prisma/seed-feeds.ts",
     "cron:sniper": "tsx src/scripts/sniper-cron.ts",
+    "cron:wallet-refresh": "tsx src/scripts/wallet-refresh-cron.ts",
     "import:wallets": "tsx scripts/import-wallets.ts"
   },
   "dependencies": {

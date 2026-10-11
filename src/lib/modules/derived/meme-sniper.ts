@@ -20,7 +20,13 @@
 // Zero upstream calls in `evaluateSniper`. The only I/O in this module is
 // `deliverSniperAlert` (Telegram), which the route calls explicitly.
 // ─────────────────────────────────────────────────────────────
-
+import {
+  GOLDEN_NEW_PAIRS,
+  GOLDEN_POST_MIGRATED,
+  SNIPER_LAUNCH,
+  evaluateProfile,
+  type SniperMetrics as CriteriaMetrics,
+} from './sniper-criteria';
 export type SniperStage = 'new-pair' | 'post-bonding'
 
 /** Wallet classification for the top-1..3 check. */
@@ -125,7 +131,7 @@ export const SNIPER_LIMITS = {
   postBondingVolMcRatio: 4,
   dumpRiskPnlPercent: 150,
   accumulationPnlPercent: 50,
-} as const
+} as const;
 
 const L = SNIPER_LIMITS
 
@@ -467,6 +473,14 @@ export interface EvaluateOptions {
    * do that). Absent option == no wallet evidence == treated as unconfirmed.
    */
   smartMoney?: { verdict: 'pass' | 'warn'; reason: string; strongest: string | null }
+  /**
+   * Ebook criteria override. When set, the named ebook profile
+   * (sniper-criteria.ts) ALSO judges the token: a hard reject from the
+   * profile adds to rejections, unknowns/warns surface as warnings.
+   * Default unset — the inline SNIPER_LIMITS gates keep working exactly
+   * as before. Thresholds are never edited here, only selected.
+   */
+  criteriaProfile?: 'golden-new-pairs' | 'golden-post-migrated' | 'sniper-launch' | 'bonding-post' | 'exposure-early'
 }
 
 export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions = {}): SniperDecision {
@@ -562,6 +576,35 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
     warnings.push(`No smart-money confirmation: ${opts.smartMoney.reason}`)
   }
 
+  // Ebook criteria cross-check (opt-in via opts.criteriaProfile): the
+  // profile judges the same facts with the operator's documented
+  // thresholds. Rejects append (more evidence), unknowns/warns surface
+  // as warnings — the profile never un-rejects an inline breach.
+  if (opts.criteriaProfile) {
+    const cm: CriteriaMetrics = {
+      devHoldingPct: payload.distribution.devPercent,
+      sniperPct: payload.distribution.sniperPercent,
+      bundlerPct: payload.distribution.bundlerPercent,
+      insiderPct: payload.distribution.insiderPercent,
+      top10HoldersPct: payload.distribution.top10Percent,
+      clusterPct: payload.distribution.clusterPercent,
+      tokenAgeMin: payload.ageMinutes,
+      marketCapUsd: payload.momentum.marketCap,
+      volumeToMc: momentum.ratio,
+      smartWalletPnlPct: payload.momentum.top5AvgPnlPercent,
+    }
+    const profile =
+      opts.criteriaProfile === 'golden-new-pairs' ? GOLDEN_NEW_PAIRS
+      : opts.criteriaProfile === 'golden-post-migrated' ? GOLDEN_POST_MIGRATED
+      : opts.criteriaProfile === 'sniper-launch' ? SNIPER_LAUNCH
+      : null
+    if (profile) {
+      const res = evaluateProfile(profile, cm)
+      for (const r of res.rejects) rejections.push(`[${profile.id}] ${r}`)
+      for (const w of res.warns) warnings.push(`[${profile.id}] ${w}`)
+      for (const u of res.unknowns) warnings.push(`[${profile.id}] ${u}: no data`)
+    }
+  }
   if (rejections.length > 0) {
     status = 'REJECT'
     rationale =
