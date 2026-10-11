@@ -24,7 +24,10 @@ import {
   GOLDEN_NEW_PAIRS,
   GOLDEN_POST_MIGRATED,
   SNIPER_LAUNCH,
+  BONDING_POST,
+  EXPOSURE_EARLY,
   evaluateProfile,
+  type CriteriaProfile,
   type SniperMetrics as CriteriaMetrics,
 } from './sniper-criteria';
 export type SniperStage = 'new-pair' | 'post-bonding'
@@ -483,6 +486,30 @@ export interface EvaluateOptions {
   criteriaProfile?: 'golden-new-pairs' | 'golden-post-migrated' | 'sniper-launch' | 'bonding-post' | 'exposure-early'
 }
 
+/**
+ * All five ebook profiles, selectable by phase. BONDING_POST and
+ * EXPOSURE_EARLY shipped with the criteria module but were unreachable
+ * from the live path — now wired to the same gate as the other three.
+ */
+function profileFor(
+  id: NonNullable<EvaluateOptions['criteriaProfile']>,
+): CriteriaProfile | null {
+  switch (id) {
+    case 'golden-new-pairs':
+      return GOLDEN_NEW_PAIRS
+    case 'golden-post-migrated':
+      return GOLDEN_POST_MIGRATED
+    case 'sniper-launch':
+      return SNIPER_LAUNCH
+    case 'bonding-post':
+      return BONDING_POST
+    case 'exposure-early':
+      return EXPOSURE_EARLY
+    default:
+      return null
+  }
+}
+
 export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions = {}): SniperDecision {
   // Normalize once at the boundary: every downstream consumer (breach fns,
   // metrics, the Telegram formatter) reads only this object, so a malformed
@@ -581,6 +608,16 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
   // thresholds. Rejects append (more evidence), unknowns/warns surface
   // as warnings — the profile never un-rejects an inline breach.
   if (opts.criteriaProfile) {
+    // Map every field the profile can read from what the audit actually
+    // proved. Fields with no source (freshWalletPct, earlyBuyerPct,
+    // devSnipedPct, rugProbabilityPct, proTraderCount, survivedPostBondingMin,
+    // bubblemapChained) are left undefined on purpose: the profile reports
+    // them as unknown, which is honest — never a silent pass.
+    const topWallets = Array.isArray(payload.distribution.topWallets)
+      ? payload.distribution.topWallets
+      : []
+    const singleWhalePct =
+      topWallets.length > 0 ? Math.max(...topWallets.map((w) => w.percent)) : null
     const cm: CriteriaMetrics = {
       devHoldingPct: payload.distribution.devPercent,
       sniperPct: payload.distribution.sniperPercent,
@@ -588,16 +625,17 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
       insiderPct: payload.distribution.insiderPercent,
       top10HoldersPct: payload.distribution.top10Percent,
       clusterPct: payload.distribution.clusterPercent,
+      singleWhalePct,
       tokenAgeMin: payload.ageMinutes,
       marketCapUsd: payload.momentum.marketCap,
       volumeToMc: momentum.ratio,
       smartWalletPnlPct: payload.momentum.top5AvgPnlPercent,
+      lpBurntPct: payload.security.lpBurnedPercent,
+      // An unproven authority is NOT "disabled": null stays unknown.
+      mintEnabled: payload.security.mintable === null ? null : payload.security.mintable,
+      freezeEnabled: payload.security.freezeAuthority === null ? null : payload.security.freezeAuthority,
     }
-    const profile =
-      opts.criteriaProfile === 'golden-new-pairs' ? GOLDEN_NEW_PAIRS
-      : opts.criteriaProfile === 'golden-post-migrated' ? GOLDEN_POST_MIGRATED
-      : opts.criteriaProfile === 'sniper-launch' ? SNIPER_LAUNCH
-      : null
+    const profile = profileFor(opts.criteriaProfile)
     if (profile) {
       const res = evaluateProfile(profile, cm)
       for (const r of res.rejects) rejections.push(`[${profile.id}] ${r}`)

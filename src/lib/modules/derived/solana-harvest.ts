@@ -18,6 +18,17 @@
 // ─────────────────────────────────────────────────────────────
 
 export const SOLANA_RPC_URL = 'https://api.mainnet-beta.solana.com';
+// The single public endpoint answers 429 within seconds of any real burst
+// (measured 2026-10-11: every harvestWallet call, even limit=10, died on
+// "RPC 429" after ~23s of retries). Failover keeps the harvest alive; order
+// is by measured reliability, and SOLANA_RPC_URLS overrides it.
+export const SOLANA_RPC_URLS: string[] = (
+  process.env.SOLANA_RPC_URLS ??
+  'https://solana-rpc.publicnode.com,https://api.mainnet-beta.solana.com'
+)
+  .split(',')
+  .map((u) => u.trim())
+  .filter(Boolean);
 export const JUP_PRICE_URL = 'https://lite-api.jup.ag/price/v3';
 export const SOL_MINT = 'So11111111111111111111111111111111111111112';
 const LAMPORTS_PER_SOL = 1_000_000_000;
@@ -82,34 +93,41 @@ function sleep(ms: number): Promise<void> {
   setTimeout(resolve, ms);
   return promise;
 }
-
 async function rpcCall<T>(method: string, params: unknown[], opts: { timeoutMs?: number; retries?: number } = {}): Promise<T> {
-  const f = http();
-  const retries = opts.retries ?? 5;
-  let delay = 800;
-  for (let attempt = 0; ; attempt++) {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 30_000);
+  const f = http()
+  const retries = opts.retries ?? 5
+  const endpoints = SOLANA_RPC_URLS
+  let delay = 800
+  let lastErr: unknown = null
+  // Rotate endpoints on each attempt: a 429 on one host says nothing about
+  // the next, and the old single-endpoint loop burned all 5 retries against
+  // the same throttled host.
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const url = endpoints[attempt % endpoints.length]
+    const ctrl = new AbortController()
+    const t = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 30_000)
     try {
-      const res = await f(SOLANA_RPC_URL, {
+      const res = await f(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'nexus/1.0' },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
         signal: ctrl.signal,
-      });
-      clearTimeout(t);
-      if (res.status === 429) throw new Error('RPC 429');
-      if (!res.ok) throw new Error(`RPC ${res.status}`);
-      const json = (await res.json()) as { result?: T; error?: unknown };
-      if (json.error) throw new Error(`RPC error: ${JSON.stringify(json.error).slice(0, 160)}`);
-      return json.result as T;
+      })
+      clearTimeout(t)
+      if (res.status === 429) throw new Error('RPC 429')
+      if (!res.ok) throw new Error(`RPC ${res.status}`)
+      const json = (await res.json()) as { result?: T; error?: unknown }
+      if (json.error) throw new Error(`RPC error: ${JSON.stringify(json.error).slice(0, 160)}`)
+      return json.result as T
     } catch (e) {
-      clearTimeout(t);
-      if (attempt >= retries) throw e;
-      await sleep(delay + Math.random() * 400);
-      delay = Math.min(delay * 2, 8_000);
+      clearTimeout(t)
+      lastErr = e
+      if (attempt >= retries) throw e
+      await sleep(delay + Math.random() * 400)
+      delay = Math.min(delay * 2, 8_000)
     }
   }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
 }
 
 /** Page signatures newest→oldest with `before` cursor. Stops at `until` sig or limit. */
@@ -262,7 +280,12 @@ export async function fillCurrentUsd(swaps: NormalizedSwap[]): Promise<void> {
   const prices = new Map<string, number>();
   if (mints.length > 0) {
     try {
-      const res = await f(`${JUP_PRICE_URL}?ids=${mints.join(',')}`, { headers: { 'User-Agent': 'nexus/1.0' } });
+      // Jupiter hangs long enough to eat a whole cron tick when it is slow;
+      // a missing price is already handled (usd stays null), so bound it.
+      const res = await f(`${JUP_PRICE_URL}?ids=${mints.join(',')}`, {
+        headers: { 'User-Agent': 'nexus/1.0' },
+        signal: AbortSignal.timeout(8_000),
+      });
       if (res.ok) {
         const j = (await res.json()) as Record<string, { usdPrice?: number }>;
         for (const m of mints) if (typeof j[m]?.usdPrice === 'number') prices.set(m, j[m].usdPrice as number);
@@ -272,7 +295,10 @@ export async function fillCurrentUsd(swaps: NormalizedSwap[]): Promise<void> {
   // SOL price for fee conversion
   let solUsd: number | null = null;
   try {
-    const res = await f(`${JUP_PRICE_URL}?ids=${SOL_MINT}`, { headers: { 'User-Agent': 'nexus/1.0' } });
+    const res = await f(`${JUP_PRICE_URL}?ids=${SOL_MINT}`, {
+      headers: { 'User-Agent': 'nexus/1.0' },
+      signal: AbortSignal.timeout(8_000),
+    });
     if (res.ok) {
       const j = (await res.json()) as Record<string, { usdPrice?: number }>;
       if (typeof j[SOL_MINT]?.usdPrice === 'number') solUsd = j[SOL_MINT].usdPrice as number;

@@ -428,6 +428,110 @@ export async function listGmgnTokenHolders(chain: string, contract: string): Pro
   }
 }
 
+/** One row of GMGN's wallet leaderboard, with its measured 7d/30d record. */
+export interface GmgnWalletRankRow {
+  address: string
+  tags: string[]
+  /** Fraction, not percent (GMGN reports 0.0744 for +7.44%). */
+  pnl30d: number | null
+  winRate30d: number | null
+  realizedProfit30d: number | null
+  buyVolume30d: number | null
+  txCount30d: number | null
+}
+
+export const GMGN_SMART_MONEY_TAGS = ['smart_degen', 'pump_smart_degen'] as const
+
+/**
+ * GMGN wallet leaderboard (`/defi/quotation/v1/rank/sol/wallets/{window}`),
+ * proven live 2026-10-11: 100 rows with real pnl_30d / winrate_30d /
+ * realized_profit_30d. This is the only working source of measured
+ * per-wallet performance — the on-chain harvest cannot supply it, because
+ * the public RPC 429s under load and returns null for most transactions.
+ * Returns [] when the endpoint refuses — never fabricated rows.
+ */
+export async function listGmgnWalletRank(
+  tag: string,
+  window: '1d' | '7d' | '30d' = '7d',
+): Promise<GmgnWalletRankRow[]> {
+  try {
+    const res = await retryWithBackoff(() =>
+      gmgnFetch<{ code?: number; data?: { rank?: Record<string, unknown>[] } }>(
+        `/rank/sol/wallets/${window}?tag=${encodeURIComponent(tag)}`,
+      ),
+    )
+    const rows = res.data?.rank ?? []
+    const num = (v: unknown): number | null => {
+      const n = typeof v === 'string' ? Number(v) : typeof v === 'number' ? v : NaN
+      return Number.isFinite(n) ? n : null
+    }
+    return rows
+      .filter((r): r is Record<string, unknown> & { address: string } => typeof r.address === 'string' && r.address.length > 0)
+      .map((r) => ({
+        address: r.address,
+        tags: Array.isArray(r.tags) ? (r.tags as string[]) : [],
+        pnl30d: num(r.pnl_30d),
+        winRate30d: num(r.winrate_30d),
+        realizedProfit30d: num(r.realized_profit_30d),
+        buyVolume30d: num(r.volume_30d),
+        txCount30d: num(r.txs_30d),
+      }))
+  } catch (err) {
+    logger.warn(`GMGN wallet rank failed (${tag}/${window}): ${err}`, 'gmgn')
+    return []
+  }
+}
+
+/** One wallet's measured 30d record from GMGN's smartmoney endpoint. */
+export interface GmgnWalletStats {
+  address: string
+  /** Fraction, not percent. */
+  pnl30d: number | null
+  realizedProfit30d: number | null
+  buyCount30d: number | null
+  sellCount30d: number | null
+  /** Fraction of buys that were fast (sniper-like); null when unreported. */
+  fastTxRatio: number | null
+  honeypotRatio: number | null
+  tags: string[]
+}
+
+/**
+ * Per-wallet 30d record (`/defi/quotation/v1/smartmoney/sol/wallet/{addr}`),
+ * proven live 2026-10-11 at ~0.7s per wallet: pnl_30d, realized_profit_30d
+ * and buy/sell counts are real. `winrate` and `token_num` come back null on
+ * this endpoint — the leaderboard endpoint carries winrate_30d instead.
+ * null when the endpoint refuses — never fabricated.
+ */
+export async function fetchGmgnWalletStats(address: string): Promise<GmgnWalletStats | null> {
+  try {
+    const res = await retryWithBackoff(() =>
+      gmgnFetch<{ code?: number; data?: Record<string, unknown> | null }>(
+        `/smartmoney/sol/wallet/${address}`,
+      ),
+    )
+    const d = res.data
+    if (!d) return null
+    const num = (v: unknown): number | null => {
+      const n = typeof v === 'string' ? Number(v) : typeof v === 'number' ? v : NaN
+      return Number.isFinite(n) ? n : null
+    }
+    const risk = (d.risk ?? {}) as Record<string, unknown>
+    return {
+      address,
+      pnl30d: num(d.pnl_30d),
+      realizedProfit30d: num(d.realized_profit_30d),
+      buyCount30d: num(d.buy_30d),
+      sellCount30d: num(d.sell_30d),
+      fastTxRatio: num(risk.fast_tx_ratio),
+      honeypotRatio: num(risk.token_honeypot_ratio),
+      tags: Array.isArray(d.tags) ? (d.tags as string[]) : [],
+    }
+  } catch (err) {
+    logger.warn(`GMGN wallet stats failed for ${address}: ${err}`, 'gmgn', { error: String(err) })
+    return null
+  }
+}
 /**
  * Per-holder PnL for the token's top holders (live-proven 2026-10-09).
  * Returns null when the endpoint refuses or reports nothing, so callers

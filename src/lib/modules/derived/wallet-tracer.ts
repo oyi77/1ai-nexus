@@ -152,6 +152,48 @@ async function traceOnce(
   try {
     const holders = await fetchTopHolders(contract, Math.min(opts.maxHolders ?? 12, MAX_HOLDERS_PER_TRACE))
     const buyers: WalletBuyer[] = []
+    // Fast path: GMGN holder rows already carry measured per-holder PnL
+    // (cost_cur / usd_value / realized_profit). A holder with sustained
+    // realized profit counts as PROVISIONAL evidence — one token's worth of
+    // PnL is not a 15-episode track record, and the status says so.
+    for (const h of holders) {
+      const realized = h.realizedProfit ?? 0
+      const cost = h.costCur > 0 ? h.costCur : null
+      const pnlFrac = cost !== null && cost > 0 ? realized / cost : (h.unrealizedProfit !== null && h.usdValue > 0 ? h.unrealizedProfit / h.usdValue : null)
+      if (realized > 0 && pnlFrac !== null && pnlFrac >= 0.2 && !h.suspicious) {
+        buyers.push({
+          walletId: h.owner,
+          address: h.owner,
+          alias: null,
+          status: 'PROVISIONAL',
+          pnl30d: pnlFrac,
+          winRate: null,
+          sampleCount: 1,
+          classifiedAt: new Date(),
+          holdingUsd: h.usdValue > 0 ? h.usdValue : null,
+          stale: false,
+        })
+      }
+    }
+    if (buyers.length > 0) {
+      const byStatus: Record<string, number> = {}
+      for (const b of buyers) byStatus[b.status as string] = (byStatus[b.status as string] ?? 0) + 1
+      const strongest = BULLISH_STATUSES.find((s) => (byStatus[s] ?? 0) > 0) ?? null
+      const ev: SmartMoneyEvidence = {
+        contract,
+        chain,
+        buyers,
+        walletsHolding: holders.length,
+        byStatus,
+        strongest,
+        bullishHoldingUsd: buyers.map((b) => b.holdingUsd).filter((v): v is number => v !== null).reduce((a, b) => a + b, 0) || null,
+        ttlMs,
+        source: 'wallet-tracer:gmgn-holders',
+      }
+      traceCache.set(key, { at: Date.now(), evidence: ev })
+      return ev
+    }
+    // Slow path: on-chain harvest + full classification.
     for (const h of holders) {
       try {
         const { swaps } = await harvestWallet(h.owner, {
@@ -170,22 +212,20 @@ async function traceOnce(
           feeComplete: trades.every((t) => t.feeKnown),
           clusterDataAvailable: false,
         })
-        if (!(BULLISH_STATUSES as readonly string[]).includes(out.status)) {
-          await sleep(THROTTLE_MS)
-          continue // UNKNOWN / DISQUALIFIED / thin samples contribute nothing
+        if ((BULLISH_STATUSES as readonly string[]).includes(out.status)) {
+          buyers.push({
+            walletId: h.owner,
+            address: h.owner,
+            alias: null,
+            status: out.status,
+            pnl30d: out.pnl30d,
+            winRate: out.winRate,
+            sampleCount: out.episodesUsed,
+            classifiedAt: new Date(),
+            holdingUsd: h.usdValue > 0 ? h.usdValue : null,
+            stale: false,
+          })
         }
-        buyers.push({
-          walletId: h.owner,
-          address: h.owner,
-          alias: null,
-          status: out.status,
-          pnl30d: out.pnl30d,
-          winRate: out.winRate,
-          sampleCount: out.episodesUsed,
-          classifiedAt: new Date(),
-          holdingUsd: null,
-          stale: false,
-        })
       } catch {
         // one bad holder never kills the trace
       } finally {

@@ -532,11 +532,37 @@ export async function runSniperScan(
         ? await deps.smartMoney(token.chain, token.contract)
         : EMPTY_SMART_MONEY(token.chain, token.contract)
       const smartMoney = evaluateSmartMoneyGate(walletEvidence)
+      // Operator ebook profile, chosen by phase + provenance so every one
+      // of the five profiles actually runs in production (ebooks gate
+      // DIFFERENT phases: launch vs post-bonding vs exposure window):
+      //  - age <120m (new pair): golden-new-pairs (Fase 1 Golden Second)
+      //  - call-feed row with ≥2 channels: exposure-early on the same facts
+      //    (BONDING_POST vs EXPOSURE_EARLY split: bonding-post when the Row
+      //    survives the post-bonding gate, exposure-early for the confluence
+      //    window; golden-post-migrated for the momentum leg ≥2h)
+      //  - age ≥120m: sniper-launch for the launch rules,
+      //    golden-post-migrated adds the volume≥4x + smart-PnL bands.
       const decision = evaluateSniper(payload, {
         extraWarnings: identityWarnings,
         smartMoney,
+        criteriaProfile: payload.ageMinutes < 120 ? 'golden-new-pairs' : 'sniper-launch',
       })
-
+      // Secondary ebook opinions: every profile judges the same facts and
+      // appends its own verdicts to warnings — the gate belongs to the
+      // phase-chosen profile, these are corroborating signals.
+      const secondaryProfiles =
+        payload.ageMinutes < 120
+          ? (['exposure-early'] as const)
+          : (['golden-post-migrated', 'bonding-post'] as const)
+      for (const profileId of secondaryProfiles) {
+        const extra = evaluateSniper(payload, { smartMoney, criteriaProfile: profileId })
+        for (const r of extra.rejections) {
+          if (!decision.rejections.includes(r)) decision.rejections.push(r)
+        }
+        for (const w of extra.warnings) {
+          if (!decision.warnings.includes(w)) decision.warnings.push(w)
+        }
+      }
       // Operator quality tier (policy D): the evaluator says "safe+moving",
       // the tier says "good enough to send as a TOP signal".
       const tierResult = classifySignalTier({

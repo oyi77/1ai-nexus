@@ -4,9 +4,8 @@
 // Answers one question for a screening pass: "which classified wallets
 // are holding/buying THIS token, and what does their classification say?"
 //
-// Read-only. No provider call is trusted on label alone: the evidence
-// carries the classifier's status + metrics + provenance so the gate ca
-// weighnt a QUALIFIED_SMART_MONEY buy differently from a WATCHLIST buy.
+// carries the classifier's status + metrics + provenance so the gate can
+// weigh a QUALIFIED_SMART_MONEY buy differently from a WATCHLIST buy.
 //
 // UNKNOWN discipline: a wallet with status UNKNOWN contributes NO
 // evidence (its classification is not a signal); wallets whose
