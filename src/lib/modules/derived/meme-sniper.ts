@@ -28,6 +28,7 @@ import {
   EXPOSURE_EARLY,
   evaluateProfile,
   type CriteriaProfile,
+  type CriteriaProfileId,
   type SniperMetrics as CriteriaMetrics,
 } from './sniper-criteria';
 export type SniperStage = 'new-pair' | 'post-bonding'
@@ -477,13 +478,13 @@ export interface EvaluateOptions {
    */
   smartMoney?: { verdict: 'pass' | 'warn'; reason: string; strongest: string | null }
   /**
-   * Ebook criteria override. When set, the named ebook profile
-   * (sniper-criteria.ts) ALSO judges the token: a hard reject from the
+   * Ebook criteria override. When set, every named ebook profile
+   * (sniper-criteria.ts) ALSO judges the token: a hard reject from any
    * profile adds to rejections, unknowns/warns surface as warnings.
    * Default unset — the inline SNIPER_LIMITS gates keep working exactly
    * as before. Thresholds are never edited here, only selected.
    */
-  criteriaProfile?: 'golden-new-pairs' | 'golden-post-migrated' | 'sniper-launch' | 'bonding-post' | 'exposure-early'
+  criteriaProfiles?: CriteriaProfileId[]
 }
 
 /**
@@ -491,9 +492,7 @@ export interface EvaluateOptions {
  * EXPOSURE_EARLY shipped with the criteria module but were unreachable
  * from the live path — now wired to the same gate as the other three.
  */
-function profileFor(
-  id: NonNullable<EvaluateOptions['criteriaProfile']>,
-): CriteriaProfile | null {
+function profileFor(id: CriteriaProfileId): CriteriaProfile | null {
   switch (id) {
     case 'golden-new-pairs':
       return GOLDEN_NEW_PAIRS
@@ -604,10 +603,11 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
   }
 
   // Ebook criteria cross-check (opt-in via opts.criteriaProfile): the
-  // profile judges the same facts with the operator's documented
-  // thresholds. Rejects append (more evidence), unknowns/warns surface
-  // as warnings — the profile never un-rejects an inline breach.
-  if (opts.criteriaProfile) {
+  // Ebook criteria cross-check (opt-in via opts.criteriaProfiles): every
+  // named profile judges the same facts once, with the operator's
+  // documented thresholds. Rejects append (more evidence), unknowns/warns
+  // surface as warnings — a profile never un-rejects an inline breach.
+  if (opts.criteriaProfiles && opts.criteriaProfiles.length > 0) {
     // Map every field the profile can read from what the audit actually
     // proved. Fields with no source (freshWalletPct, earlyBuyerPct,
     // devSnipedPct, rugProbabilityPct, proTraderCount, survivedPostBondingMin,
@@ -635,12 +635,22 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
       mintEnabled: payload.security.mintable === null ? null : payload.security.mintable,
       freezeEnabled: payload.security.freezeAuthority === null ? null : payload.security.freezeAuthority,
     }
-    const profile = profileFor(opts.criteriaProfile)
-    if (profile) {
+    for (const profileId of opts.criteriaProfiles) {
+      const profile = profileFor(profileId)
+      if (!profile) continue
       const res = evaluateProfile(profile, cm)
-      for (const r of res.rejects) rejections.push(`[${profile.id}] ${r}`)
-      for (const w of res.warns) warnings.push(`[${profile.id}] ${w}`)
-      for (const u of res.unknowns) warnings.push(`[${profile.id}] ${u}: no data`)
+      for (const r of res.rejects) {
+        const line = `[${profile.id}] ${r}`
+        if (!rejections.includes(line)) rejections.push(line)
+      }
+      for (const w of res.warns) {
+        const line = `[${profile.id}] ${w}`
+        if (!warnings.includes(line)) warnings.push(line)
+      }
+      for (const u of res.unknowns) {
+        const line = `[${profile.id}] ${u}: no data`
+        if (!warnings.includes(line)) warnings.push(line)
+      }
     }
   }
   if (rejections.length > 0) {

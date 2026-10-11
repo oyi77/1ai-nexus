@@ -338,7 +338,7 @@ describe('meme-sniper alert safety', () => {
   })
 })
 
-describe('ebook criteria cross-check (opts.criteriaProfile)', () => {
+describe('ebook criteria cross-check (opts.criteriaProfiles)', () => {
   it('adds no rejections when the profile is not selected', () => {
     const d = evaluateSniper(clean(), { smartMoney: CONFIRMED })
     expect(d.rejections).toEqual([])
@@ -350,7 +350,7 @@ describe('ebook criteria cross-check (opts.criteriaProfile)', () => {
     // <=40%, so 35% passes inline but must still be judged by the profile.
     const d = evaluateSniper(
       clean({ distribution: { ...clean().distribution, bundlerPercent: 45 } }),
-      { criteriaProfile: 'golden-new-pairs' },
+      { criteriaProfiles: ['golden-new-pairs'] },
     )
     expect(d.rejections.some((r) => r.includes('[golden-new-pairs]'))).toBe(true)
     expect(d.rejections.some((r) => r.includes('Bundlers'))).toBe(true)
@@ -359,14 +359,14 @@ describe('ebook criteria cross-check (opts.criteriaProfile)', () => {
   it('sniper-launch rejects dev above its 3% documented ceiling', () => {
     const d = evaluateSniper(
       clean({ distribution: { ...clean().distribution, devPercent: 3.5 } }),
-      { criteriaProfile: 'sniper-launch' },
+      { criteriaProfiles: ['sniper-launch'] },
     )
     expect(d.status).toBe('REJECT')
     expect(d.rejections.some((r) => r.includes('[sniper-launch]'))).toBe(true)
   })
 
   it('surfaces profile unknowns as warnings, never as a silent pass', () => {
-    const d = evaluateSniper(clean(), { criteriaProfile: 'golden-post-migrated' })
+    const d = evaluateSniper(clean(), { criteriaProfiles: ['golden-post-migrated'] })
     // top5AvgPnlPercent=20 is present, but volume 3x fails the >=4x warn.
     expect(d.warnings.some((w) => w.includes('[golden-post-migrated]'))).toBe(true)
   })
@@ -374,7 +374,7 @@ describe('ebook criteria cross-check (opts.criteriaProfile)', () => {
   it('never un-rejects an inline breach', () => {
     const d = evaluateSniper(
       clean({ security: { ...clean().security, mintable: true } }),
-      { criteriaProfile: 'golden-new-pairs' },
+      { criteriaProfiles: ['golden-new-pairs'] },
     )
     expect(d.status).toBe('REJECT')
     expect(d.rejections.some((r) => r.includes('Mint authority'))).toBe(true)

@@ -117,6 +117,21 @@ export interface CriteriaProfile {
   boolRules: BoolRule[];
 }
 
+/** The five operator-documented profiles, selectable by token phase. */
+export type CriteriaProfileId =
+  | 'golden-new-pairs'
+  | 'golden-post-migrated'
+  | 'sniper-launch'
+  | 'bonding-post'
+  | 'exposure-early'
+
+/** Phase-appropriate profile set: every applicable ebook gates the token. */
+export function profilesForPhase(ageMinutes: number): CriteriaProfileId[] {
+  return ageMinutes < 120
+    ? ['golden-new-pairs', 'exposure-early']
+    : ['sniper-launch', 'golden-post-migrated', 'bonding-post']
+}
+
 /**
  * PHASE 1 — New Pairs, TF 5m.
  * Doc: "Master Architecture & Logic Specification / Golden Second Engine"
