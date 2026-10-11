@@ -115,6 +115,24 @@ describe('sniper-source mapping', () => {
     expect(p.security.lpLockedPercent).toBe(90)
   })
 
+  it('reads percent-unit adapters without collapsing them to 100', () => {
+    // nansen/bitget/gate report 0..100 percents while rugcheck/birdeye/gmgn
+    // report 0..1 fractions. Clamping the percent shape to 1 fabricated a
+    // 100% concentration breach for every such token.
+    const { payload: p } = toSniperPayload(token(), [
+      audit({ platform: 'nansen', top10HolderPercent: 18.4 }),
+    ])
+    expect(p.distribution.top10Percent).toBeCloseTo(18.4, 4)
+  })
+
+  it('keeps the worst reading when units differ across sources', () => {
+    const { payload: p } = toSniperPayload(token(), [
+      audit({ top10HolderPercent: 0.35 }), // fraction -> 35%
+      audit({ platform: 'nansen', top10HolderPercent: 77.1 }), // percent -> 77.1%
+    ])
+    expect(p.distribution.top10Percent).toBeCloseTo(77.1, 4)
+  })
+
   it('treats absent fields as unproven null, never safe', () => {
     const { payload: p } = toSniperPayload(token(), [])
     expect(p.security.mintable).toBeNull()

@@ -170,10 +170,15 @@ function mergeAudits(audits: MemeRiskAudit[]): {
       if (lpLocked === null || pct > lpLocked) lpLocked = pct
     }
 
-    // Top-10: the WORST (highest) concentration wins.
+    // Top-10: the WORST (highest) concentration wins. Unit is NOT uniform
+    // across adapters — rugcheck/birdeye/gmgn/axiom emit 0..1 fractions,
+    // nansen/bitget/gate emit 0..100 percents (proven by fixtures). A bare
+    // Math.min(1, x) * 100 collapsed every percent value to 100 (nansen
+    // 18.4 -> 100), fabricating a hard concentration breach. asPct01
+    // normalizes both shapes.
     if (a.top10HolderPercent > 0) {
-      const pct = Math.min(1, a.top10HolderPercent) * 100
-      if (top10 === null || pct > top10) top10 = pct
+      const pct = asPct01(a.top10HolderPercent)
+      if (pct !== null && (top10 === null || pct > top10)) top10 = pct
     }
 
     const d = a.distribution
