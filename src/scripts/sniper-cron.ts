@@ -16,17 +16,37 @@
 // Run: npm run cron:sniper
 // -------------------------------------------------------------
 
-import 'dotenv/config'
 import { runSniperScan } from '@/lib/modules/derived/sniper-scan'
 import { appendSniperScan } from '@/lib/modules/derived/sniper-log'
+import { DEFAULT_DELIVERY_POLICY, type DeliveryPolicy } from '@/lib/modules/derived/signal-tier'
+
+import { pushReviewDigest } from '@/lib/modules/derived/sniper-review'
+/**
+ * Policy D keeps WATCHLIST opt-in: it is a labelled, unconfirmed candidate,
+ * never a top signal. The cron is the only production pusher, so the opt-in
+ * lives here — REJECT/UNKNOWN/STALE stay undeliverable regardless (see
+ * shouldDeliver).
+ */
+function deliveryPolicy(): DeliveryPolicy {
+  return { ...DEFAULT_DELIVERY_POLICY, allowWatchlist: process.env.SNIPER_DELIVER_WATCHLIST === 'true' }
+}
 
 const LIMIT = Number(process.env.SNIPER_SCAN_LIMIT) || 5
 const DELIVER = process.env.SNIPER_DELIVER !== 'false'
 
 async function main() {
-  console.log(`[sniper] scan start (limit=${LIMIT}, deliver=${DELIVER})`)
-  const res = await runSniperScan({ limit: LIMIT, deliver: DELIVER })
+  console.log(
+    `[sniper] scan start (limit=${LIMIT}, deliver=${DELIVER}, watchlist=${process.env.SNIPER_DELIVER_WATCHLIST === 'true'})`,
+  )
+  const res = await runSniperScan({ limit: LIMIT, deliver: DELIVER, deliveryPolicy: deliveryPolicy() })
   appendSniperScan(res)
+
+  // Near-miss review digest: REJECTs with real 5m flow go to the operator's
+  // private review chat, never to the sale channel. Off unless the review
+  // chat is configured.
+  const review = await pushReviewDigest(res.decisions)
+  if (review.sent) console.log(`[sniper] review digest sent (${review.candidates} near-miss)`)
+  else if (review.candidates > 0) console.log(`[sniper] review digest skipped: ${review.skipped}`)
 
   const topSignals = res.decisions.filter((d) => d.tier === 'HIGH_CONVICTION').length
   console.log(
