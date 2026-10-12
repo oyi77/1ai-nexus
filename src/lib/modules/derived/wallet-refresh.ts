@@ -21,7 +21,11 @@ import {
 
 // ─── Config ──────────────────────────────────────────────────
 const REFRESH_WINDOW_DAYS = 30
-const BATCH_SIZE = 20
+const BATCH_SIZE = 5
+// Per-wallet signature cap. 1000 @ 650ms ≈ 11 min/wallet (measured
+// 2026-10-12), so a full batch could never finish one run; 200 keeps
+// each wallet ~4-5 min and still yields 10-30 trades to classify.
+const HARVEST_LIMIT = 200
 const THROTTLE_MS = 650
 const STALE_MS = 24 * 60 * 60 * 1000 // reclassify after 24h
 
@@ -184,9 +188,12 @@ export async function refreshOneWallet(candidate: WalletRefreshCandidate): Promi
   try {
     const { swaps, coverage } = await harvestWallet(candidate.address, {
       days: REFRESH_WINDOW_DAYS,
+      // Per-wallet cap (see HARVEST_LIMIT): measured 1.6-2.4s/signature
+      // live, so 200 sigs ≈ 4-5 min/wallet — enough trades to classify
+      // while keeping one batch inside a cron slot.
+      limit: HARVEST_LIMIT,
       withUsd: true,
       throttleMs: THROTTLE_MS,
-      limit: 1000,
     })
 
     const built = buildEpisodes(swaps)
