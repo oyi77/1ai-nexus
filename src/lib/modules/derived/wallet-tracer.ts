@@ -64,13 +64,31 @@ export type { HolderRow }
 export type { HolderSeed as HolderSeedRow }
 
 /**
- * Top holders for a mint. Source: GMGN holder list (proven live via the
- * audit fan-out; the public Solana RPC refuses getProgramAccounts with
- * 403). GMGN rows carry real per-holder PnL, so the tracer's downstream
- * classifier scores real trades, not invented ones.
- * [] when the provider refuses — never a fabricated row.
+ * Top holders for a mint. Source is switchable — GMGN holder list is the
+ * default (real per-holder PnL proven live 2026-10-09, but cookie-gated
+ * and Cloudflare-blocked from Node without one). Helius is the keyed
+ * fallback: free tier 100k credits/mo, getTokenLargestAccounts works
+ * keyless-free-tier without a browser session.
+ *
+ * HOLDER_SOURCE: 'gmgn' (default) | 'helius' | 'auto' (try gmgn, fall to
+ * helius). Helius rows carry NO PnL — usdValue/costCur stay 0 and the
+ * fast path records nothing; holders flow to the slow-path classifier
+ * (harvest → episodes). Missing key/blocked endpoint → [] — never a
+ * fabricated row.
  */
+export type HolderSource = 'gmgn' | 'helius' | 'auto'
+
+export function holderSource(): HolderSource {
+  const v = (process.env.HOLDER_SOURCE ?? 'gmgn').toLowerCase()
+  return v === 'helius' || v === 'auto' ? v : 'gmgn'
+}
 export async function fetchTopHolders(mint: string, limit = 25): Promise<HolderSeed[]> {
+  const src = holderSource()
+  if (src === 'helius') return fetchHeliusHolders(mint, limit)
+  if (src === 'auto') {
+    const viaGmgn = await fetchGmgnHolders(mint, limit)
+    return viaGmgn.length > 0 ? viaGmgn : fetchHeliusHolders(mint, limit)
+  }
   return fetchGmgnHolders(mint, limit)
 }
 
@@ -88,6 +106,105 @@ async function fetchGmgnHolders(mint: string, limit: number): Promise<HolderSeed
     suspicious: h.suspicious,
     tags: h.tags,
   }))
+}
+
+// ─── Helius holder source ────────────────────────────────────
+// Keyed RPC: getTokenLargestAccounts returns the top-20 token accounts
+// (owner + raw amount). No PnL — Helius is an address source only, so
+// every row flows to the slow-path classifier. Both calls are standard
+// Solana JSON-RPC, so this works against Helius, a private RPC, or the
+// free public endpoint (which rate-limits).
+
+/** Parsed RPC JSON-RPC envelope (only the fields this module reads). */
+interface RpcEnvelope<T> {
+  result?: T
+  error?: { code?: number; message?: string }
+}
+
+interface LargestAccountsResult {
+  value?: Array<{ address?: string; amount?: string; uiAmountString?: string }>
+}
+
+interface ParsedAccountResult {
+  value?: { data?: { parsed?: { info?: { owner?: string; decimals?: number } } } }
+}
+
+function heliusRpcUrl(): string | null {
+  const key = process.env.HELIUS_API_KEY
+  if (key) return `https://mainnet.helius-rpc.com/?api-key=${key}`
+  // Keyless: any configured RPC works (public endpoint included).
+  return process.env.SOLANA_RPC_URL ?? process.env.SOLANA_RPC_URLS?.split(',')[0] ?? null
+}
+
+async function rpcCall<T>(url: string, body: unknown, timeoutMs = 15_000): Promise<T | null> {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), timeoutMs)
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    })
+    if (!res.ok) return null
+    const json = (await res.json()) as RpcEnvelope<T>
+    return json.result ?? null
+  } catch {
+    return null
+  } finally {
+    clearTimeout(t)
+  }
+}
+
+async function fetchHeliusHolders(mint: string, limit: number): Promise<HolderSeed[]> {
+  const url = heliusRpcUrl()
+  if (!url) return []
+  try {
+    const largest = await rpcCall<LargestAccountsResult>(url, {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'getTokenLargestAccounts',
+      params: [mint],
+    })
+    const accounts = (largest?.value ?? []).slice(0, limit)
+    if (accounts.length === 0) return []
+
+    // Map token account → owning wallet (getAccountInfo parsed SPL layout).
+    const owners = await Promise.all(
+      accounts.map((a) =>
+        rpcCall<ParsedAccountResult>(url, {
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getAccountInfo',
+          params: [a.address, { encoding: 'jsonParsed' }],
+        }),
+      ),
+    )
+    const seeds: HolderSeed[] = []
+    accounts.forEach((a, i) => {
+      const info = owners[i]?.value?.data?.parsed?.info
+      const owner = info?.owner
+      if (!owner) return
+      const raw = Number(a.amount ?? '0')
+      const decimals = info?.decimals ?? 9
+      seeds.push({
+        owner,
+        amount: Number.isFinite(raw) ? raw / 10 ** decimals : 0,
+        decimals,
+        // No PnL from an address-only source — must stay 0/null so the
+        // fast path records nothing (see fetchTopHolders docs).
+        usdValue: 0,
+        costCur: 0,
+        unrealizedProfit: null,
+        realizedProfit: null,
+        suspicious: false,
+        tags: ['helius-holder'],
+      })
+    })
+    return seeds
+  } catch {
+    return []
+  }
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
