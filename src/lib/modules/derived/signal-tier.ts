@@ -205,6 +205,12 @@ export interface SignalFormatInput {
   marketCapUsd: number | null
   /** Multiples to project. Defaults to 2/5/10. */
   multiples?: number[]
+  /**
+   * Which independent audits agreed on this token (rugged-proof,
+   * rugcheck, ...). Correlation across sources is evidence; a single
+   * source is a single point of failure and MUST read as one.
+   */
+  auditSources?: string[]
   /** Known risks / invalidation conditions, operator-facing. */
   risks?: string[]
   /** Attach inline BUY/chart buttons under the message. Defaults true. */
@@ -287,6 +293,10 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
   L.push('━━━━━━━━━━━━━━━━━━━━━━━━━')
   L.push(`<b>Token:</b> ${escapeSignalHtml(ticker)} <code>${escapeSignalHtml(payload.contract)}</code>`)
   L.push(`<b>Stage:</b> ${stageLabel} | <b>Usia:</b> ${payload.ageMinutes}m | <b>Chain:</b> ${escapeSignalHtml(payload.chain ?? 'solana')}`)
+  // SHADOW/PAPER status is mandatory operator-facing: this repo screens
+  // only, and execution belongs to 1ai-trade-dex. Never optional, never
+  // below the fold.
+  L.push('🧷 <b>STATUS: SHADOW (PAPER) — bukan rekomendasi beli/jual</b>')
   L.push('')
 
   // ─── MARKET ───
@@ -327,6 +337,18 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
   L.push(`• Insider: ${insider}`)
   L.push(`• Top 10: ${top10} ${dst.top10Percent != null && dst.top10Percent > 30 ? '🔴 KONSENTRASI TINGGI' : '✅ OK'}`)
   L.push(`• Cluster: ${cluster} ${dst.clusterPercent != null && dst.clusterPercent > 5 ? '🔴 TERDETEKSI' : dst.clusterPercent != null && dst.clusterPercent < 1 ? '✅ BERSIH' : '❓ UNPROVEN'}`)
+  // Correlation: how many independent audits agreed. One source = one
+  // point of failure; the operator must see that, not infer it.
+  {
+    const srcs = input.auditSources ?? []
+    L.push(
+      srcs.length >= 2
+        ? `• Korelasi: ✅ ${srcs.length} sumber audit sepakat (${srcs.join(', ')})`
+        : srcs.length === 1
+          ? `• Korelasi: ⚠️ 1 sumber saja (${srcs[0]}) — tidak ada konfirmasi silang`
+          : '• Korelasi: ❓ tidak ada sumber audit terkonfirmasi',
+    )
+  }
   L.push('')
 
   // ─── SMART MONEY ───

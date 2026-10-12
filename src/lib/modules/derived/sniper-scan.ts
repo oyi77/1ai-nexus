@@ -751,6 +751,9 @@ export async function runSniperScan(
           tierReasons: tierResult.reasons,
           tierMissing: tierResult.missing,
           smartMoney: deps.smartMoney ? walletEvidence : null,
+          // Provenance: which independent audits actually agreed, so the
+          // operator can weigh cross-confirmation instead of inferring it.
+          auditSources: auditsAccepted.map((a) => a.platform),
           marketCapUsd: payload.momentum.marketCap,
         })
         wasDelivered = await deps.deliver(formatted.text, formatted.replyMarkup)

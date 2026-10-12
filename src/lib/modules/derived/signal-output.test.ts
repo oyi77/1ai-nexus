@@ -75,3 +75,28 @@ describe('signal output — reply markup', () => {
     expect(out.text).toContain('<b>VILONA SNIPER')
   })
 })
+
+describe('signal output — SHADOW status and audit provenance (TAHAP 5)', () => {
+  it('always states SHADOW/PAPER status in the message body', () => {
+    const out = formatTieredSignal(input())
+    expect(out.text).toContain('STATUS: SHADOW (PAPER)')
+    expect(out.text).toContain('bukan rekomendasi')
+  })
+
+  it('reports cross-confirmation when two or more audits agreed', () => {
+    const out = formatTieredSignal(input({ auditSources: ['rugcheck', 'rugged-proof'] }))
+    expect(out.text).toContain('2 sumber audit sepakat')
+    expect(out.text).toContain('rugcheck')
+  })
+
+  it('flags a single audit as no cross-confirmation, not as agreement', () => {
+    const out = formatTieredSignal(input({ auditSources: ['rugcheck'] }))
+    expect(out.text).toContain('1 sumber saja')
+    expect(out.text).not.toContain('sepakat')
+  })
+
+  it('reports absent provenance honestly instead of implying a pass', () => {
+    const out = formatTieredSignal(input({ auditSources: [] }))
+    expect(out.text).toContain('tidak ada sumber audit terkonfirmasi')
+  })
+})
