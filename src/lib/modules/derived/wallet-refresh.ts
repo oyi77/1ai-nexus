@@ -77,8 +77,11 @@ export async function getRefreshCandidates(): Promise<WalletRefreshCandidate[]> 
       smartMoneyWallet: { select: { classifiedAt: true } },
     },
     orderBy: { lastSeen: 'desc' },
-    take: BATCH_SIZE * 3,
+    take: BATCH_SIZE * 10,
   })
+  // EVM-style rows (0x…) are mislabeled 'solana' in some imports — the
+  // Solana RPC cannot serve them. Skip non-base58 here, not after a harvest.
+  const isBase58Addr = (a: string): boolean => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a)
   const nowMs = Date.now()
   return rows
     .map((w) => ({
@@ -88,6 +91,7 @@ export async function getRefreshCandidates(): Promise<WalletRefreshCandidate[]> 
       classifiedAt: w.smartMoneyWallet?.classifiedAt ?? null,
       reason: w.smartMoneyWallet?.classifiedAt == null ? 'never-classified' : 'stale-classification',
     }))
+    .filter((c) => isBase58Addr(c.address))
     .filter((c) => c.classifiedAt == null || nowMs - c.classifiedAt.getTime() > STALE_MS)
     .slice(0, BATCH_SIZE)
 }

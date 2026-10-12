@@ -2,7 +2,7 @@
 // Solana wallet harvest — read-only, paper/shadow mode.
 // Source: public RPC https://api.mainnet-beta.solana.com (keyless).
 // Proven live: getSignaturesForAddress, getTransaction(jsonParsed,
-// maxSupportedTransactionVersion:0), getTokenAccountsByOwner, Jupiter
+// maxSupportedTransactionVersion:1), getTokenAccountsByOwner, Jupiter
 // lite-api.jup.ag/price/v3 (current price only).
 //
 // NOT sources: blockscout-eth / covalent (EVM-only, cannot reconstruct
@@ -23,8 +23,13 @@ export const SOLANA_RPC_URL = 'https://api.mainnet-beta.solana.com';
 // "RPC 429" after ~23s of retries). Failover keeps the harvest alive; order
 // is by measured reliability, and SOLANA_RPC_URLS overrides it.
 export const SOLANA_RPC_URLS: string[] = (
+  // Order = measured completeness, not throughput. 2026-10-11 probes:
+  // mainnet-beta serves every method but 429s under burst; publicnode
+  // serves getSignaturesForAddress only — it answers -32602 "Request
+  // blocked" for getTokenAccountsByOwner and -32015 for some v0
+  // transactions, so it must be the FALLBACK, never the primary.
   process.env.SOLANA_RPC_URLS ??
-  'https://solana-rpc.publicnode.com,https://api.mainnet-beta.solana.com'
+  'https://api.mainnet-beta.solana.com,https://solana-rpc.publicnode.com'
 )
   .split(',')
   .map((u) => u.trim())
@@ -354,13 +359,34 @@ export async function harvestWallet(
     if (sig.blockTime !== null && sig.blockTime * 1000 < cutoff) continue; // 30d window
     let txJson: { result: { blockTime: number | null; meta: { err: unknown; fee?: number; preBalances?: number[]; postBalances?: number[]; preTokenBalances?: TokenBal[]; postTokenBalances?: TokenBal[] } | null; transaction?: { message?: { accountKeys?: Array<string | { pubkey: string }> } } } | null };
     try {
-      txJson = await rpcCall('getTransaction', [sig.signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0 }]);
+      // v0-era and v1 transactions both exist on-chain today: the public
+      // RPC gate rejects version mismatch explicitly, so ask for v1 and
+      // let legacy nodes cap down. Measured 2026-10-11: v0 demand fails
+      // on publicnode for v1 txs; v1 demand succeeds there.
+      txJson = await rpcCall('getTransaction', [sig.signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 1 }]);
     } catch (e) {
       gaps.push(`fetch-fail:${sig.signature.slice(0, 8)}:${e instanceof Error ? e.message.slice(0, 40) : 'err'}`);
       continue;
     }
     txOk++;
-    const res = txJson.result;
+    let res = txJson.result;
+    if (!res) {
+      // Pruned-history failover: some free endpoints keep signatures but
+      // drop old transaction bodies (result null, no error). Retry the
+      // same call against the NEXT configured endpoint before giving up.
+      for (const url of SOLANA_RPC_URLS.slice(1)) {
+        try {
+          const r2 = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getTransaction', params: [sig.signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 1 }] }),
+            signal: AbortSignal.timeout(30_000),
+          });
+          const j2 = (await r2.json()) as typeof txJson;
+          if (j2.result) { res = j2.result; gaps.push(`tx-failover:${sig.signature.slice(0, 8)}`); break; }
+        } catch { /* next endpoint */ }
+      }
+    }
     if (!res) {
       gaps.push(`tx-null:${sig.signature.slice(0, 8)}`);
       continue;
