@@ -704,7 +704,11 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
  * HUB_TELEGRAM_OWNER_CHAT_ID → TELEGRAM_ALERT_CHAT_ID → TELEGRAM_ADMIN_CHAT_ID.
  * Returns false (never throws) when unconfigured or the API rejects.
  */
-export async function deliverSniperAlert(text: string, chatId?: string): Promise<boolean> {
+export async function deliverSniperAlert(
+  text: string,
+  chatId?: string,
+  replyMarkup?: { inline_keyboard: Array<Array<{ text: string; url: string }>> },
+): Promise<boolean> {
   const token =
     process.env.SNIPER_TELEGRAM_BOT_TOKEN ||
     process.env.HUB_TELEGRAM_BOT_TOKEN ||
@@ -722,7 +726,12 @@ export async function deliverSniperAlert(text: string, chatId?: string): Promise
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ chat_id: chat, text, parse_mode: 'Markdown' }),
+      body: JSON.stringify({
+        chat_id: chat,
+        text,
+        parse_mode: 'Markdown',
+        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+      }),
       signal: AbortSignal.timeout(10_000),
     })
     return res.ok

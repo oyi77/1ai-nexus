@@ -207,6 +207,17 @@ export interface SignalFormatInput {
   multiples?: number[]
   /** Known risks / invalidation conditions, operator-facing. */
   risks?: string[]
+  /** Attach inline BUY/chart buttons under the message. Defaults true. */
+  sendButtons?: boolean
+}
+
+export interface ContractButtons {
+  inline_keyboard: Array<Array<{ text: string; url: string }>>
+}
+
+export interface FormattedSignal {
+  text: string
+  replyMarkup: ContractButtons | undefined
 }
 
 
@@ -245,7 +256,7 @@ export function scenarioTargets(
  * Render the delivered message. Length-capped for Telegram (4096 chars).
  * Pure — zero I/O.
  */
-export function formatTieredSignal(input: SignalFormatInput): string {
+export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
   const { payload, tier, tierReasons, tierMissing, smartMoney, marketCapUsd, risks } = input
   const sec = payload.security
   const dst = payload.distribution
@@ -267,8 +278,8 @@ export function formatTieredSignal(input: SignalFormatInput): string {
 
   L.push(`🎯 *VILONA SNIPER — ${TIER_EMOJI[tier]}*`)
   L.push('━━━━━━━━━━━━━━━━━━━━━━━━━')
-  L.push(`*Token:* ${ticker} \`${payload.contract}\``)
-  L.push(`*Stage:* ${stageLabel} | *Usia:* ${payload.ageMinutes}m | *Chain:* ${payload.chain ?? 'solana'}`)
+  L.push(`*Token:* ${escapeSignalMd(ticker)} \`${payload.contract}\``)
+  L.push(`*Stage:* ${stageLabel} | *Usia:* ${payload.ageMinutes}m | *Chain:* ${escapeSignalMd(payload.chain ?? 'solana')}`)
   L.push('')
 
   // ─── MARKET ───
@@ -364,7 +375,11 @@ export function formatTieredSignal(input: SignalFormatInput): string {
   L.push('_Output screening — sizing & eksekusi milik 1ai-trade-dex._')
 
   const text = L.join('\n')
-  return text.length > 4000 ? text.slice(0, 3990) + '\n…(terpotong)' : text
+  const body = text.length > 4000 ? text.slice(0, 3990) + '\n…(terpotong)' : text
+  return {
+    text: body,
+    replyMarkup: input.sendButtons === false ? undefined : contractButtons(payload.contract, payload.chain),
+  }
 }
 
 /**
@@ -373,6 +388,29 @@ export function formatTieredSignal(input: SignalFormatInput): string {
  * to Indonesian; pass anything unrecognized through verbatim (never invent a
  * translation that hides the original fact).
  */
+/**
+ * Inline trade buttons under a signal. Pure URL keyboard — Telegram renders
+ * native tap buttons, no extra API surface. Dexscreener URL doubles as the
+ * chart link; Axiom/Jupiter are the buy endpoints (pump = pump.fun mint,
+ * else the generic Jupiter swap route).
+ */
+export function contractButtons(contract: string, chain?: string | null): ContractButtons {
+  const c = encodeURIComponent(contract)
+  const isPump = contract.endsWith('pump')
+  return {
+    inline_keyboard: [
+      [
+        { text: '🟢 BUY Axiom', url: `https://axiom.trade/t/${c}` },
+        { text: '⚡ BUY Jupiter', url: isPump ? `https://jup.ag/swap/SOL-${c}` : `https://jup.ag/swap/${c}-USDC` },
+      ],
+      [
+        { text: '📊 Dexscreener', url: `https://dexscreener.com/${chain ?? 'solana'}/${c}` },
+        { text: '🔍 GMGN', url: `https://gmgn.ai/sol/token/${c}` },
+      ],
+    ],
+  }
+}
+
 const REASON_ID: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
   [/^security failure: (.+)$/, (m) => `KEAMANAN GAGAL — ${m[1]}`],
   [/^core criterion failed: (.+)$/, (m) => `Kriteria inti gagal — ${m[1]}`],

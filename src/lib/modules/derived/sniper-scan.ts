@@ -35,6 +35,7 @@ import {
   DEFAULT_DELIVERY_POLICY,
   type SignalTier,
   type DeliveryPolicy,
+  type ContractButtons,
 } from '@/lib/modules/derived/signal-tier'
 
 import { profilesForPhase } from '@/lib/modules/derived/sniper-criteria'
@@ -392,7 +393,7 @@ async function collectAudits(chain: string, contract: string): Promise<MemeRiskA
 export interface SniperScanDeps {
   discover: (limit: number) => Promise<SniperEnrichedToken[]>
   audit: (chain: string, contract: string) => Promise<MemeRiskAudit[]>
-  deliver: (text: string) => Promise<boolean>
+  deliver: (text: string, replyMarkup?: ContractButtons) => Promise<boolean>
   /**
    * Wallet-DB smart-money evidence. Injectable so tests stay offline;
    * when omitted the scan runs without wallet confirmation (verdicts cap
@@ -475,7 +476,7 @@ async function liveSmartMoney(chain: string, contract: string): Promise<SmartMon
 const LIVE_DEPS: SniperScanDeps = {
   discover: discoverCombined,
   audit: collectAudits,
-  deliver: deliverSniperAlert,
+  deliver: (text: string, replyMarkup?: ContractButtons) => deliverSniperAlert(text, undefined, replyMarkup),
   smartMoney: liveSmartMoney,
 }
 
@@ -562,7 +563,7 @@ export async function runSniperScan(
       if (!deduped && opts.deliver === true && shouldDeliver(tierResult.tier, policy)) {
         // Policy E: delivered signals use the full evidence format, not the
         // evaluator's short alert. Same facts, complete provenance.
-        const message = formatTieredSignal({
+        const formatted = formatTieredSignal({
           payload,
           tier: tierResult.tier,
           tierReasons: tierResult.reasons,
@@ -570,7 +571,7 @@ export async function runSniperScan(
           smartMoney: deps.smartMoney ? walletEvidence : null,
           marketCapUsd: payload.momentum.marketCap,
         })
-        wasDelivered = await deps.deliver(message)
+        wasDelivered = await deps.deliver(formatted.text, formatted.replyMarkup)
         if (wasDelivered) delivered++
       }
       // Only a non-REJECT outcome is worth remembering. Marking a REJECT seen
