@@ -21,6 +21,7 @@ import { appendSniperScan } from '@/lib/modules/derived/sniper-log'
 import { DEFAULT_DELIVERY_POLICY, type DeliveryPolicy } from '@/lib/modules/derived/signal-tier'
 
 import { pushReviewDigest } from '@/lib/modules/derived/sniper-review'
+import { appendSniperAudit, materiallyChanged } from '@/lib/modules/derived/sniper-audit'
 /**
  * Policy D keeps WATCHLIST opt-in: it is a labelled, unconfirmed candidate,
  * never a top signal. The cron is the only production pusher, so the opt-in
@@ -41,11 +42,17 @@ async function main() {
   const res = await runSniperScan({ limit: LIMIT, deliver: DELIVER, deliveryPolicy: deliveryPolicy() })
   appendSniperScan(res)
 
+  // Phase 7: compute what materially changed BEFORE persisting this pass, so
+  // the label compares against real history; then open the digest for those
+  // contracts even inside the seen-TTL.
+  const forceReReview = materiallyChanged(res)
+  appendSniperAudit(res)
+
   // Near-miss review digest: REJECTs with real 5m flow go to the operator's
   // private review chat, never to the sale channel. Off unless the review
   // chat is configured.
-  const review = await pushReviewDigest(res.decisions)
-  if (review.sent) console.log(`[sniper] review digest sent (${review.candidates} near-miss)`)
+  const review = await pushReviewDigest(res.decisions, { forceContracts: forceReReview })
+  if (review.sent) console.log(`[sniper] review digest sent (${review.candidates} near-miss, ${forceReReview.size} re-review)`)
   else if (review.candidates > 0) console.log(`[sniper] review digest skipped: ${review.skipped}`)
 
   const topSignals = res.decisions.filter((d) => d.tier === 'HIGH_CONVICTION').length

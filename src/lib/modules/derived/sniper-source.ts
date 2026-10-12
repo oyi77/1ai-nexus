@@ -21,6 +21,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { MemeAlphaToken, MemeRiskAudit } from '@/lib/modules/meme/types'
+import type { CandidateEvidence } from '@/lib/modules/derived/unified-candidate'
 import type { SniperPayload } from '@/lib/modules/derived/meme-sniper'
 
 /** Raw passthrough for discovery rows that already carry 5m volume. */
@@ -35,6 +36,12 @@ export interface SniperEnrichedToken extends Omit<MemeAlphaToken, 'platform'> {
   volume5m?: number | null
   /** Free-text catalyst when the source provides one. */
   narrative?: string | null
+  /**
+   * Every source that reported this token, newest first. One token found
+   * by three sources is ONE candidate carrying three evidence rows — the
+   * market snapshot is merged, the provenance is not thrown away.
+   */
+  discoveryEvidence?: CandidateEvidence[]
 }
 
 function asPct01(v: number | null | undefined): number | null {

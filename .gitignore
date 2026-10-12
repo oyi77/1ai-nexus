@@ -104,6 +104,7 @@ data/sniper-circuit.json
 data/sniper-seen.json
 data/sniper-log.json
 data/sniper-review-seen.json
+data/sniper-audit.json
 data/call-feed-latest.json
 
 # nightly DB dumps (large, regenerated — never commit)

@@ -2,7 +2,7 @@
 // Sniper review digest unit tests (pure selection, no Telegram).
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest'
-import { pickReviewCandidates, REVIEW_VOLMC_FLOOR } from './sniper-review'
+import { pickReviewCandidates, selectFreshForReview, REVIEW_VOLMC_FLOOR } from './sniper-review'
 import type { SniperScanDecision } from './sniper-scan'
 
 function decision(over: Partial<SniperScanDecision>): SniperScanDecision {
@@ -39,6 +39,9 @@ function decision(over: Partial<SniperScanDecision>): SniperScanDecision {
     smartMoneyBuyers: 0,
     smartMoneyStrongest: null,
     smartMoneySource: 'wallet-tracer:gmgn-holders',
+    discoveryCategory: 'NEW_PAIRS',
+    discoveryEvidence: [],
+    market: { marketCapUsd: 50_000, liquidityUsd: 12_000, volume5mUsd: 4_000, priceUsd: 0.0005 },
     ...over,
   }
 }
@@ -75,5 +78,19 @@ describe('pickReviewCandidates', () => {
   it('rejects NaN ratios (uncomputable momentum is not a near-miss)', () => {
     const picks = pickReviewCandidates([vol('n', NaN)])
     expect(picks).toHaveLength(0)
+  })
+})
+
+describe('selectFreshForReview (Phase 7 re-review rule)', () => {
+  it('sends unseen contracts and suppresses seen ones', () => {
+    const rows = [vol('a', 3), vol('b', 3)]
+    expect(selectFreshForReview(rows, {}).map((d) => d.contract)).toEqual(['a', 'b'])
+    expect(selectFreshForReview(rows, { a: 1 }).map((d) => d.contract)).toEqual(['b'])
+  })
+
+  it('re-opens a seen contract when force names it', () => {
+    const rows = [vol('a', 3)]
+    const out = selectFreshForReview(rows, { a: Date.now() }, new Set(['a']))
+    expect(out.map((d) => d.contract)).toEqual(['a'])
   })
 })

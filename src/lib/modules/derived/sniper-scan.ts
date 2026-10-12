@@ -37,6 +37,14 @@ import {
   type DeliveryPolicy,
   type ContractButtons,
 } from '@/lib/modules/derived/signal-tier'
+import {
+  candidateKey,
+  categoryFor,
+  mergeEvidence,
+  resolveCategory,
+  type CandidateEvidence,
+  type DiscoveryCategory,
+} from '@/lib/modules/derived/unified-candidate'
 
 import { profilesForPhase } from '@/lib/modules/derived/sniper-criteria'
 import { auditRugcheckToken } from '@/lib/modules/meme/rugcheck'
@@ -180,6 +188,14 @@ async function discoverGeckoNewPools(limit: number): Promise<SniperEnrichedToken
         provider: 'geckoterminal',
         note: 'geckoterminal new_pools (minute-age, volume.m5, fdv fallback)',
       },
+      discoveryEvidence: [
+        {
+          provider: 'geckoterminal',
+          category: categoryFor('geckoterminal', { note: 'new_pools' }),
+          discoveredAt: Date.now(),
+          note: 'GET /api/v2/networks/solana/new_pools?page=1',
+        },
+      ],
       riskKnown: false,
     })
   }
@@ -248,6 +264,14 @@ async function discoverYoungPairs(limit: number): Promise<SniperEnrichedToken[]>
         provider: 'dexscreener',
         note: 'dexscreener boosts + tokens/v1 pairs (volume.m5)',
       },
+      discoveryEvidence: [
+        {
+          provider: 'dexscreener',
+          category: 'NEW_PAIRS',
+          discoveredAt: Date.now(),
+          note: 'GET /token-boosts/latest/v1 → /tokens/v1/{chain}/{addrs}',
+        },
+      ],
       riskKnown: false,
     }
     out.push(token)
@@ -310,6 +334,17 @@ async function discoverCallFeed(limit: number): Promise<SniperEnrichedToken[]> {
         provider: 'call-feed',
         note: `call-feed confluence: ${r.source_count} channels (${r.sources.join(',')})`,
       },
+      discoveryEvidence: [
+        {
+          provider: 'call-feed',
+          category: categoryFor('call-feed', { kinds: r.kinds }),
+          discoveredAt: Date.parse(r.last_seen) || Date.now(),
+          note: `${r.source_count} channels: ${r.sources.join(',')}`,
+          confluence: r.source_count,
+          mentions: r.mentions,
+          kinds: r.kinds,
+        },
+      ],
     })
   }
   // Newest pair first — that is the axis the momentum gate measures against.
@@ -377,6 +412,67 @@ async function readCallFeedArtifact(): Promise<CallFeedCandidate[]> {
   }
 }
 
+
+// ─── Wallet-buy discovery (Phase 4) ─────────────────────────────
+// A tracked wallet's fresh BUY becomes a candidate before any market list
+// ranks it. The wallet-refresh cron already pays the RPC harvest cost and
+// writes fresh buys here — the scan never re-harvests on-chain.
+
+interface WalletBuyFile {
+  generated_at: string
+  min_usd: number
+  candidates: Array<{
+    contract: string
+    chain: string
+    buyers: string[]
+    buyVolumeUsd: number
+    buyCount: number
+    firstBuyAt: number
+    lastBuyAt: number
+  }>
+}
+
+async function readWalletBuyArtifact(): Promise<WalletBuyFile['candidates']> {
+  try {
+    const { readFile } = await import('node:fs/promises')
+    const { join } = await import('node:path')
+    const p = process.env.WALLET_BUYS_PATH || join(process.cwd(), 'data', 'wallet-buys-latest.json')
+    const raw = JSON.parse(await readFile(p, 'utf8')) as WalletBuyFile
+    const ageMin = (Date.now() - Date.parse(raw.generated_at)) / 60_000
+    const maxAge = Number(process.env.WALLET_BUYS_MAX_AGE_MIN) || 120
+    if (!Number.isFinite(ageMin) || ageMin > maxAge) return [] // stale ≠ candidates
+    return raw.candidates ?? []
+  } catch {
+    return [] // artifact missing/unparseable → no wallet candidates
+  }
+}
+
+async function discoverWalletBuys(limit: number): Promise<SniperEnrichedToken[]> {
+  const rows = await readWalletBuyArtifact()
+  const out: SniperEnrichedToken[] = []
+  for (const r of rows) {
+    if (out.length >= limit) break
+    // Same base58 guard as the call feed: an EVM-style row cannot be served
+    // by the Solana RPC and would audit as UNKNOWN for every metric.
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(r.contract)) continue
+    const live = await hydrateFromDexscreener(r.chain, r.contract)
+    if (!live) continue // unlisted pair → not snipeable, never faked
+    out.push({
+      ...live,
+      discoveryEvidence: [
+        {
+          provider: 'wallet-trace',
+          category: 'WHALE_ACTIVITY',
+          discoveredAt: r.lastBuyAt,
+          note: `buyers: ${r.buyers.slice(0, 3).join(', ')} | $${Math.round(r.buyVolumeUsd).toLocaleString()} across ${r.buyCount} legs`,
+        },
+      ],
+    })
+  }
+  return out
+}
+
+
 /** Per-contract audit fan-out — every source isolated. */
 async function collectAudits(chain: string, contract: string): Promise<MemeRiskAudit[]> {
   const results = await Promise.allSettled([
@@ -402,15 +498,64 @@ export interface SniperScanDeps {
   smartMoney?: (chain: string, contract: string) => Promise<SmartMoneyEvidence>
 }
 
-type DiscoverMode = 'auto' | 'api' | 'call-feed'
+type DiscoverMode = 'auto' | 'api' | 'call-feed' | 'wallet'
 
 function discoverMode(): DiscoverMode {
   const v = (process.env.SNIPER_DISCOVER_MODE || 'auto').toLowerCase()
-  return v === 'api' || v === 'call-feed' ? v : 'auto'
+  return v === 'api' || v === 'call-feed' || v === 'wallet' ? v : 'auto'
+}
+
+/**
+ * Union two discovery lists by chain-aware identity. A token seen by both
+ * is ONE row with merged evidence — never a duplicate candidate, and never
+ * silently dropped. Chain-aware key: a Solana mint differing only in case
+ * is a DIFFERENT token (base58 is case-sensitive), so the old blanket
+ * toLowerCase() merge is gone.
+ */
+function unionCandidates(
+  primary: SniperEnrichedToken[],
+  secondary: SniperEnrichedToken[],
+): SniperEnrichedToken[] {
+  const byKey = new Map<string, SniperEnrichedToken>()
+  for (const t of primary) byKey.set(candidateKey(t.chain, t.contract), t)
+  for (const t of secondary) {
+    const k = candidateKey(t.chain, t.contract)
+    const hit = byKey.get(k)
+    if (!hit) {
+      byKey.set(k, t)
+      continue
+    }
+    const merged: SniperEnrichedToken = { ...t, ...hit }
+    // Fill a numeric gap from the secondary row; never zero a real value.
+    for (const f of ['marketCap', 'volume24h', 'liquidity', 'price'] as const) {
+      const hv = hit[f] as number | undefined
+      const tv = t[f] as number | undefined
+      if ((hv === undefined || hv === null || hv === 0) && typeof tv === 'number' && tv > 0) {
+        Object.assign(merged, { [f]: tv })
+      }
+    }
+    if ((hit.volume5m ?? 0) <= 0 && (t.volume5m ?? 0) > 0) merged.volume5m = t.volume5m
+    merged.discoveryEvidence = mergeEvidence(hit.discoveryEvidence, t.discoveryEvidence)
+    byKey.set(k, merged)
+  }
+  return [...byKey.values()]
 }
 
 async function discoverCombined(limit: number): Promise<SniperEnrichedToken[]> {
   const mode = discoverMode()
+  // Wallet buys are the strongest intent signal we own: a classified wallet
+  // already put real money in BEFORE any list ranks it. Runs first in wallet
+  // mode and as an opportunistic union member in auto mode.
+  if (mode === 'wallet' || mode === 'auto') {
+    try {
+      const buys = await discoverWalletBuys(limit)
+      if (buys.length > 0 && mode === 'wallet') return buys
+      if (buys.length > 0) {
+        const api = await discoverApiOnly(limit)
+        return unionCandidates(buys, api).slice(0, limit)
+      }
+    } catch { /* wallet artifact is opportunistic — market lists fallback */ }
+  }
   // Operator call-feed is the fastest attention signal: a token called by
   // 3+ independent channels is worth auditing before the API lists catch up.
   if (mode === 'call-feed' || mode === 'auto') {
@@ -418,10 +563,11 @@ async function discoverCombined(limit: number): Promise<SniperEnrichedToken[]> {
       const feed = await discoverCallFeed(limit)
       if (feed.length > 0) {
         if (mode === 'call-feed') return feed
-        // auto: union feed + API lists, feed-listed contracts first
-        const seenC = new Set(feed.map((t) => t.contract.toLowerCase()))
-        const rest = (await discoverApiOnly(limit)).filter((t) => !seenC.has(t.contract.toLowerCase()))
-        return [...feed, ...rest].slice(0, limit)
+        // auto: union feed + API lists, feed-listed contracts first. An
+        // overlap is merged (feed evidence + API market snapshot), not
+        // dropped — the API row often carries the live m5 flow the feed lacks.
+        const api = await discoverApiOnly(limit)
+        return unionCandidates(feed, api).slice(0, limit)
       }
     } catch { /* feed is opportunistic — API lists are the fallback */ }
   }
@@ -429,11 +575,17 @@ async function discoverCombined(limit: number): Promise<SniperEnrichedToken[]> {
 }
 
 async function discoverApiOnly(limit: number): Promise<SniperEnrichedToken[]> {
-  try {
-    const fresh = await discoverGeckoNewPools(limit)
-    if (fresh.length > 0) return fresh
-  } catch { /* fall through to boosts */ }
-  return discoverYoungPairs(limit)
+  // Both keyless API surfaces run every pass: new_pools catches minute-old
+  // launches, boosts catches promotion-driven flow. Each is error-isolated
+  // (one dead endpoint must not blank the scan) and the union is merged by
+  // chain-aware identity so an overlap is one candidate with two evidence rows.
+  const [fresh, boosts] = await Promise.allSettled([
+    discoverGeckoNewPools(limit),
+    discoverYoungPairs(limit),
+  ])
+  const a = fresh.status === 'fulfilled' ? fresh.value : []
+  const b = boosts.status === 'fulfilled' ? boosts.value : []
+  return unionCandidates(a, b)
 }
 
 /** No-wallet-evidence shape: empty, never a fabricated bullish row. */
@@ -495,6 +647,20 @@ export interface SniperScanDecision extends SniperDecision {
   smartMoneyBuyers: number
   smartMoneyStrongest: string | null
   smartMoneySource: string
+  /** How this candidate entered the funnel (MULTI_SOURCE when >1 provider). */
+  discoveryCategory: DiscoveryCategory
+  /** Every source that reported this token, newest first. */
+  discoveryEvidence: CandidateEvidence[]
+  /**
+   * Market snapshot at evaluation time. Null when the discovery row never
+   * proved the number — REVIEW shows UNKNOWN, never a fabricated 0.
+   */
+  market: {
+    marketCapUsd: number | null
+    liquidityUsd: number | null
+    volume5mUsd: number | null
+    priceUsd: number | null
+  }
 }
 
 export interface SniperScanResult {
@@ -506,6 +672,8 @@ export interface SniperScanResult {
   delivered: number
   decisions: SniperScanDecision[]
   errors: string[]
+  /** Candidates per discovery category — proves coverage per pass. */
+  categories: Record<string, number>
 }
 
 /** One scan pass: discover → audit → evaluate → (optionally) deliver. */
@@ -556,7 +724,8 @@ export async function runSniperScan(
         dataComplete: true,
       })
 
-      const deduped = seen[token.contract] !== undefined
+      const key = candidateKey(token.chain, token.contract)
+      const deduped = seen[key] !== undefined
       let wasDelivered = false
       // Only push deliverable tiers, and never re-push a seen contract.
       const policy = opts.deliveryPolicy ?? DEFAULT_DELIVERY_POLICY
@@ -580,7 +749,7 @@ export async function runSniperScan(
       // past the threshold (measured 2026-10-11: rejected calls later ran
       // +274%/+683%/+1383%). REJECT rows stay eligible; they are cheap to
       // re-audit and cached.
-      if (decision.status !== 'REJECT') seen[token.contract] = Date.now()
+      if (decision.status !== 'REJECT') seen[key] = Date.now()
       decisions.push({
         ...decision,
         contract: token.contract,
@@ -594,6 +763,14 @@ export async function runSniperScan(
         smartMoneyBuyers: walletEvidence.buyers.length,
         smartMoneyStrongest: walletEvidence.strongest,
         smartMoneySource: walletEvidence.source,
+        discoveryCategory: resolveCategory(token.discoveryEvidence),
+        discoveryEvidence: token.discoveryEvidence ?? [],
+        market: {
+          marketCapUsd: token.marketCap > 0 ? token.marketCap : null,
+          liquidityUsd: token.liquidity > 0 ? token.liquidity : null,
+          volume5mUsd: token.volume5m && token.volume5m > 0 ? token.volume5m : null,
+          priceUsd: token.price > 0 ? token.price : null,
+        },
       })
     } catch (err) {
       errors.push(`${token.contract.slice(0, 8)}: ${err instanceof Error ? err.message : String(err)}`)
@@ -610,5 +787,9 @@ export async function runSniperScan(
     delivered,
     decisions,
     errors,
+    categories: decisions.reduce<Record<string, number>>((acc, d) => {
+      acc[d.discoveryCategory] = (acc[d.discoveryCategory] ?? 0) + 1
+      return acc
+    }, {}),
   }
 }

@@ -346,7 +346,9 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
   }
 
   // ─── SCENARIOS ───
-  const targets = scenarioTargets(marketCapUsd, input.multiples)
+  // marketCapUsd is the caller's canonical value; fall back to the payload
+  // so a missed argument renders "unavailable" only when it truly is.
+  const targets = scenarioTargets(marketCapUsd ?? mom.marketCap, input.multiples)
   if (targets.length > 0) {
     L.push('🎯 *SKENARIO TARGET*')
     for (const t of targets) L.push(`   ${t.multiple}x → MC ${usd(t.targetMcap)}`)
@@ -354,6 +356,21 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
     L.push('')
   } else {
     L.push('🎯 *SKENARIO:* Market cap tidak tersedia')
+    L.push('')
+  }
+
+  // ─── KEYAKINAN ───
+  // Confidence is derived, never invented: buyer evidence + what is missing.
+  {
+    const buyers = smartMoney?.buyers.length ?? 0
+    const level = tier === 'HIGH_CONVICTION' && buyers > 0 && tierMissing.length === 0
+      ? 'TINGGI'
+      : buyers > 0
+        ? 'SEDANG'
+        : 'RENDAH'
+    L.push(`📌 *KEYAKINAN: ${level}*`)
+    L.push(`· Bukti wallet terklasifikasi: ${buyers > 0 ? `${buyers} pembeli` : 'tidak ada'}`)
+    if (tierMissing.length > 0) L.push(`· ${tierMissing.length} bukti wajib belum tersedia`)
     L.push('')
   }
 

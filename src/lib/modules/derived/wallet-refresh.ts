@@ -58,6 +58,8 @@ export interface RefreshResult {
     confidence: string
   }
   whaleGates?: Record<string, boolean>
+  /** Complete swaps from this harvest, reused by wallet discovery. */
+  freshSwaps?: NormalizedSwap[]
 }
 
 export interface RefreshSummary {
@@ -66,6 +68,12 @@ export interface RefreshSummary {
   succeeded: number
   failed: number
   results: RefreshResult[]
+  /**
+   * Harvested swaps for downstream discovery. The batch already paid the
+   * RPC cost; sniper-scan re-folds these into WHALE_ACTIVITY candidates
+   * without another harvest (shared with foldWalletBuys).
+   */
+  swapsByWallet: Array<{ wallet: string; swaps: unknown[] }>
 }
 
 // ─── Candidates ──────────────────────────────────────────────
@@ -241,6 +249,9 @@ export async function refreshOneWallet(candidate: WalletRefreshCandidate): Promi
         confidence: out.confidence,
       },
       whaleGates: whale.gates as unknown as Record<string, boolean>,
+      // The harvest is the expensive part: hand the swaps to discovery so it
+      // re-folds them into wallet-buy candidates with no second RPC call.
+      freshSwaps: swaps.filter((x) => x.completeness === 'complete'),
     }
   } catch (e) {
     return {
@@ -257,8 +268,13 @@ export async function refreshOneWallet(candidate: WalletRefreshCandidate): Promi
 export async function runWalletRefreshBatch(): Promise<RefreshSummary> {
   const candidates = await getRefreshCandidates()
   const results: RefreshResult[] = []
+  const allSwaps: Array<{ wallet: string; swaps: unknown[] }> = []
   for (const c of candidates) {
-    results.push(await refreshOneWallet(c))
+    const r = await refreshOneWallet(c)
+    results.push(r)
+    if (r.success && r.freshSwaps && r.freshSwaps.length > 0) {
+      allSwaps.push({ wallet: c.address, swaps: r.freshSwaps })
+    }
   }
   return {
     candidates: candidates.length,
@@ -266,5 +282,6 @@ export async function runWalletRefreshBatch(): Promise<RefreshSummary> {
     succeeded: results.filter((r) => r.success).length,
     failed: results.filter((r) => !r.success).length,
     results,
+    swapsByWallet: allSwaps,
   }
 }

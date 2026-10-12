@@ -52,6 +52,11 @@ function decision(contract: string, status: SniperScanDecision['status']): Snipe
     smartMoneyBuyers: 1,
     smartMoneyStrongest: 'QUALIFIED_SMART_MONEY',
     smartMoneySource: 'fixture',
+    discoveryCategory: 'NEW_PAIRS',
+    discoveryEvidence: [
+      { provider: 'dexscreener', category: 'NEW_PAIRS', discoveredAt: 1_700_000_000_000 },
+    ],
+    market: { marketCapUsd: 50_000, liquidityUsd: 12_000, volume5mUsd: 4_000, priceUsd: 0.0005 },
   }
 }
 
@@ -65,6 +70,7 @@ function result(decisions: SniperScanDecision[]): SniperScanResult {
     delivered: decisions.filter((d) => d.delivered).length,
     decisions,
     errors: [],
+    categories: {},
   }
 }
 
