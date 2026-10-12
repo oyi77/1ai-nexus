@@ -235,9 +235,16 @@ function pct(v: number | null | undefined): string {
   return typeof v === 'number' && Number.isFinite(v) ? `${Math.round(v * 10) / 10}%` : 'n/a'
 }
 
-/** Escape Telegram legacy-Markdown control characters in dynamic text. */
-export function escapeSignalMd(s: string): string {
-  return s.replace(/[_*`\[]/g, '\\$&')
+
+/**
+ * Escape Telegram HTML control characters in dynamic text.
+ *
+ * The sniper transport sends parse_mode=HTML (see deliverSniperAlert). HTML
+ * only reserves `&`, `<`, `>` — tickers/mints/reason strings can never open a
+ * stray entity the way they do under legacy Markdown (`_` in `7tZt1LXb`).
+ */
+export function escapeSignalHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 /**
@@ -276,22 +283,22 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
   const ticker = payload.ticker.startsWith('$') ? payload.ticker : `$${payload.ticker}`
   const stageLabel = payload.ageMinutes < 120 ? '🆕 New Pair' : '🔗 Post-Bonding'
 
-  L.push(`🎯 *VILONA SNIPER — ${TIER_EMOJI[tier]}*`)
+  L.push(`🎯 <b>VILONA SNIPER — ${TIER_EMOJI[tier]}</b>`)
   L.push('━━━━━━━━━━━━━━━━━━━━━━━━━')
-  L.push(`*Token:* ${escapeSignalMd(ticker)} \`${payload.contract}\``)
-  L.push(`*Stage:* ${stageLabel} | *Usia:* ${payload.ageMinutes}m | *Chain:* ${escapeSignalMd(payload.chain ?? 'solana')}`)
+  L.push(`<b>Token:</b> ${escapeSignalHtml(ticker)} <code>${escapeSignalHtml(payload.contract)}</code>`)
+  L.push(`<b>Stage:</b> ${stageLabel} | <b>Usia:</b> ${payload.ageMinutes}m | <b>Chain:</b> ${escapeSignalHtml(payload.chain ?? 'solana')}`)
   L.push('')
 
   // ─── MARKET ───
-  L.push('📊 *MARKET*')
+  L.push('📊 <b>MARKET</b>')
   L.push(`• Market Cap: ${usd(mom.marketCap)}`)
   const volMcRatio = mom.volume5m != null && mom.marketCap != null && mom.marketCap > 0 ? mom.volume5m / mom.marketCap : null
   L.push(`• Vol 5m: ${usd(mom.volume5m)} | Ratio: ${volMcRatio != null ? volMcRatio.toFixed(2) + 'x' : 'n/a'}`)
-  if (volMcRatio != null && volMcRatio >= 5) L.push('   🔥 *Volume sangat tinggi (5x+)*')
+  if (volMcRatio != null && volMcRatio >= 5) L.push('   🔥 <b>Volume sangat tinggi (5x+)</b>')
   L.push('')
 
   // ─── SECURITY ───
-  L.push('🔐 *KEAMANAN*')
+  L.push('🔐 <b>KEAMANAN</b>')
   const mint = sec.mintable === null ? '❓ UNPROVEN' : sec.mintable ? '🔴 ON' : '🟢 OFF'
   const freeze = sec.freezeAuthority === null ? '❓ UNPROVEN' : sec.freezeAuthority ? '🔴 ON' : '🟢 OFF'
   const honeypot = sec.honeypot === null ? '❓ UNPROVEN' : sec.honeypot ? '🔴 YA' : '🟢 AMAN'
@@ -307,7 +314,7 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
   L.push('')
 
   // ─── DISTRIBUTION ───
-  L.push('👥 *DISTRIBUSI HOLDER*')
+  L.push('👥 <b>DISTRIBUSI HOLDER</b>')
   const dev = pct(dst.devPercent)
   const sniper = pct(dst.sniperPercent)
   const bundler = pct(dst.bundlerPercent)
@@ -323,25 +330,25 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
   L.push('')
 
   // ─── SMART MONEY ───
-  L.push('🧠 *SMART MONEY*')
+  L.push('🧠 <b>SMART MONEY</b>')
   if (smartMoney && smartMoney.buyers.length > 0) {
-    L.push(`• ${smartMoney.buyers.length} wallet terklasifikasi, terkuat: ${escapeSignalMd(smartMoney.strongest ?? 'n/a')}`)
+    L.push(`• ${smartMoney.buyers.length} wallet terklasifikasi, terkuat: ${escapeSignalHtml(smartMoney.strongest ?? 'n/a')}`)
     for (const b of smartMoney.buyers.slice(0, 3)) {
-      const alias = escapeSignalMd(b.alias ?? b.address.slice(0, 8))
+      const alias = escapeSignalHtml(b.alias ?? b.address.slice(0, 8))
       const pnl = b.pnl30d != null ? (b.pnl30d > 0 ? '+' : '') + (b.pnl30d * 100).toFixed(1) + '%' : 'n/a'
       const wr = b.winRate != null ? (b.winRate * 100).toFixed(1) + '%' : 'n/a'
-      L.push(`   · ${alias} — ${escapeSignalMd(b.status ?? 'n/a')} | PnL30d ${pnl} | WR ${wr} | n=${b.sampleCount}`)
+      L.push(`   · ${alias} — ${escapeSignalHtml(b.status ?? 'n/a')} | PnL30d ${pnl} | WR ${wr} | n=${b.sampleCount}`)
     }
   } else {
     L.push('• Belum ada wallet terverifikasi memegang token ini')
-    L.push(`   Sumber: ${escapeSignalMd(smartMoney?.source ?? 'tidak tersedia')}`)
+    L.push(`   Sumber: ${escapeSignalHtml(smartMoney?.source ?? 'tidak tersedia')}`)
   }
   L.push('')
 
   // ─── THESIS / REASONS ───
   if (tierReasons.length > 0) {
-    L.push('💡 *ALASAN*')
-    for (const r of tierReasons) L.push(`· ${escapeSignalMd(reasonId(r))}`)
+    L.push('💡 <b>ALASAN</b>')
+    for (const r of tierReasons) L.push(`· ${escapeSignalHtml(reasonId(r))}`)
     L.push('')
   }
 
@@ -350,12 +357,12 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
   // so a missed argument renders "unavailable" only when it truly is.
   const targets = scenarioTargets(marketCapUsd ?? mom.marketCap, input.multiples)
   if (targets.length > 0) {
-    L.push('🎯 *SKENARIO TARGET*')
+    L.push('🎯 <b>SKENARIO TARGET</b>')
     for (const t of targets) L.push(`   ${t.multiple}x → MC ${usd(t.targetMcap)}`)
-    L.push('   _Aritmatika market cap, bukan harga exit terjamin._')
+    L.push('   <i>Aritmatika market cap, bukan harga exit terjamin.</i>')
     L.push('')
   } else {
-    L.push('🎯 *SKENARIO:* Market cap tidak tersedia')
+    L.push('🎯 <b>SKENARIO:</b> Market cap tidak tersedia')
     L.push('')
   }
 
@@ -368,7 +375,7 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
       : buyers > 0
         ? 'SEDANG'
         : 'RENDAH'
-    L.push(`📌 *KEYAKINAN: ${level}*`)
+    L.push(`📌 <b>KEYAKINAN: ${level}</b>`)
     L.push(`· Bukti wallet terklasifikasi: ${buyers > 0 ? `${buyers} pembeli` : 'tidak ada'}`)
     if (tierMissing.length > 0) L.push(`· ${tierMissing.length} bukti wajib belum tersedia`)
     L.push('')
@@ -376,20 +383,20 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
 
   // ─── RISKS / INVALIDATION ───
   const rl = risks && risks.length > 0 ? risks : ['Tidak ada invalidation yang diberikan — anggap belum tervalidasi']
-  L.push('⚠️ *RISIKO / INVALIDASI*')
-  for (const r of rl) L.push(`· ${escapeSignalMd(reasonId(r))}`)
+  L.push('⚠️ <b>RISIKO / INVALIDASI</b>')
+  for (const r of rl) L.push(`· ${escapeSignalHtml(reasonId(r))}`)
   L.push('')
 
   // ─── MISSING ───
   if (tierMissing.length > 0) {
-    L.push('❓ *YANG MASIH HILANG*')
-    for (const m of tierMissing) L.push(`· ${escapeSignalMd(reasonId(m))}`)
+    L.push('❓ <b>YANG MASIH HILANG</b>')
+    for (const m of tierMissing) L.push(`· ${escapeSignalHtml(reasonId(m))}`)
     L.push('')
   }
 
   // Footer
   L.push('━━━━━━━━━━━━━━━━━━━━━━━━━')
-  L.push('_Output screening — sizing & eksekusi milik 1ai-trade-dex._')
+  L.push('<i>Output screening — sizing &amp; eksekusi milik 1ai-trade-dex.</i>')
 
   const text = L.join('\n')
   const body = text.length > 4000 ? text.slice(0, 3990) + '\n…(terpotong)' : text

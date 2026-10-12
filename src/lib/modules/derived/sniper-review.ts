@@ -17,7 +17,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { deliverSniperAlert } from './meme-sniper'
 import type { SniperScanDecision } from './sniper-scan'
-import { escapeSignalMd, rejectionId } from './signal-tier'
+import { escapeSignalHtml, rejectionId } from './signal-tier'
 import { SNIPER_LIMITS } from './meme-sniper'
 
 export const REVIEW_VOLMC_FLOOR = Number(process.env.SNIPER_REVIEW_VOLMC_FLOOR) || 0.5
@@ -87,7 +87,7 @@ function usdOrU(v: number | null | undefined): string {
  */
 function failedChecksBlock(d: SniperScanDecision): string[] {
   if (d.rejections.length === 0) return ['(tidak ada kegagalan tercatat — tidak konsisten dengan status REJECT)']
-  return d.rejections.map((r) => `• ${rejectionId(r)}`)
+  return d.rejections.map((r) => `• ${escapeSignalHtml(rejectionId(r))}`)
 }
 
 function verified(v: number | null | undefined): string {
@@ -97,7 +97,7 @@ function verified(v: number | null | undefined): string {
 function smBlock(d: SniperScanDecision): string[] {
   const L: string[] = []
   if (d.smartMoneyBuyers > 0 && d.smartMoneyStrongest) {
-    L.push(`Ditemukan: ${d.smartMoneyBuyers} wallet (${d.smartMoneyStrongest})`)
+    L.push(`Ditemukan: ${d.smartMoneyBuyers} wallet (${escapeSignalHtml(d.smartMoneyStrongest ?? '')})`)
   } else {
     L.push(`Tidak ada wallet terverifikasi memegang token ini (sumber: ${d.smartMoneySource ?? 'tidak tercatat'})`)
   }
@@ -175,16 +175,16 @@ function tokenBlock(d: SniperScanDecision): string {
   const L: string[] = []
 
   L.push(`━━━━━━━━━━━━━━━━━━━━━━━━━`)
-  L.push(`*${escapeSignalMd(d.ticker)} — ${escapeSignalMd(d.contract.slice(0, 8))}…*`)
-  L.push(`Mint: \`${d.contract}\``)
-  L.push(`Sumber: ${escapeSignalMd(ev?.provider ?? 'tak diketahui')}${d.discoveryCategory !== 'NEW_PAIRS' ? ` (${d.discoveryCategory})` : ''}`)
+  L.push(`<b>${escapeSignalHtml(d.ticker)} — ${escapeSignalHtml(d.contract.slice(0, 8))}…</b>`)
+  L.push(`Mint: <code>${escapeSignalHtml(d.contract)}</code>`)
+  L.push(`Sumber: ${escapeSignalHtml(ev?.provider ?? 'tak diketahui')}${d.discoveryCategory !== 'NEW_PAIRS' ? ` (${escapeSignalHtml(d.discoveryCategory)})` : ''}`)
   // Audit 2026-10-12: INFLUENCER is a raw channel label from call-feed
   // (kind='kol'), NOT verified influencer reach/attribution. Say so at the
   // render site so nobody reads it as a KOL-endorsement claim.
   if (d.discoveryCategory === 'INFLUENCER') {
     L.push(`Catatan: label INFLUENCER = tag channel call-feed, bukan verifikasi jangkauan/pengikut KOL`)
   }
-  L.push(`Usia: ${escapeSignalMd(m.ageLabel)}`)
+  L.push(`Usia: ${escapeSignalHtml(m.ageLabel)}`)
   L.push(`Vol/MC: ${Number.isFinite(m.volMcRatio) ? m.volMcRatio.toFixed(2) + 'x' : 'UNKNOWN'}`)
   L.push(`Market cap: ${usdOrU(mk.marketCapUsd)} (${verified(mk.marketCapUsd as number | null)})`)
   L.push(`Liquidity: ${usdOrU(mk.liquidityUsd)} (${verified(mk.liquidityUsd as number | null)})`)
@@ -199,22 +199,22 @@ function tokenBlock(d: SniperScanDecision): string {
     `freeze ${d.rejections.some((r) => r.startsWith('Freeze authority')) ? '❓/🔴 bermasalah' : '✅ MATI terverifikasi'} · ` +
     `honeypot ${d.rejections.some((r) => r.startsWith('Honeypot')) ? '❓/🔴 perlu cek' : 'tidak ada flag'}`)
   L.push('')
-  L.push(`*SEMUA ALASAN PENOLAKAN (${d.rejections.length}):*`)
+  L.push(`<b>SEMUA ALASAN PENOLAKAN (${d.rejections.length}):</b>`)
   for (const line of failedChecksBlock(d)) L.push(line)
   if (d.warnings.length > 0) {
     L.push('')
-    L.push(`*PERINGATAN (non-fatal):*`)
-    for (const w of d.warnings) L.push(`• ${escapeSignalMd(w)}`)
+    L.push(`<b>PERINGATAN (non-fatal):</b>`)
+    for (const w of d.warnings) L.push(`• ${escapeSignalHtml(w)}`)
   }
 
   const a = assessReview(d)
   L.push('')
-  L.push(`*ASSESSMENT:*`)
-  L.push(`Risiko utama: ${a.mainRisks.join('; ')}`)
-  L.push(`Data belum diketahui: ${a.unknowns.join(', ')}`)
-  L.push(`Mengapa belum jadi sinyal: ${a.whyNotSignal}`)
-  L.push(`Status akhir: *${a.finalStatus}*`)
-  if (a.reevaluateReasons.length > 0) L.push(`Alasan evaluasi ulang: ${a.reevaluateReasons.join('; ')}`)
+  L.push(`<b>ASSESSMENT:</b>`)
+  L.push(`Risiko utama: ${escapeSignalHtml(a.mainRisks.join('; '))}`)
+  L.push(`Data belum diketahui: ${escapeSignalHtml(a.unknowns.join(', '))}`)
+  L.push(`Mengapa belum jadi sinyal: ${escapeSignalHtml(a.whyNotSignal)}`)
+  L.push(`Status akhir: <b>${a.finalStatus}</b>`)
+  if (a.reevaluateReasons.length > 0) L.push(`Alasan evaluasi ulang: ${escapeSignalHtml(a.reevaluateReasons.join('; '))}`)
 
   return L.join('\n')
 }
@@ -272,9 +272,9 @@ export async function pushReviewDigest(
   const reviewedTotal = decisions.length
   const reReviewCount = fresh.filter((d) => force.has(d.contract)).length
   const header =
-    `🔎 *VILONA — MANUAL REVIEW*\n` +
+    `🔎 <b>VILONA — MANUAL REVIEW</b>\n` +
     `Kategori: REJECT-NEAR-PASS\n` +
-    `Periode scan: ${escapeSignalMd(opts.scanAt ?? new Date().toISOString())}\n` +
+    `Periode scan: ${escapeSignalHtml(opts.scanAt ?? new Date().toISOString())}\n` +
     `Kandidat: ${fresh.length} ditampilkan dari ${reviewedTotal} ditinjau` +
     (reReviewCount > 0 ? `\nEvaluasi ulang (perubahan material): ${reReviewCount}` : '')
   const blocks = fresh.map(tokenBlock)
@@ -319,9 +319,9 @@ export function renderReviewDigestForTest(
 ): string[] {
   const picks = pickReviewCandidates(decisions).slice(0, opts.limit ?? 10)
   const header =
-    `🔎 *VILONA — MANUAL REVIEW*\n` +
+    `🔎 <b>VILONA — MANUAL REVIEW</b>\n` +
     `Kategori: REJECT-NEAR-PASS\n` +
-    `Periode scan: ${escapeSignalMd(opts.scanAt ?? new Date().toISOString())}\n` +
+    `Periode scan: ${escapeSignalHtml(opts.scanAt ?? new Date().toISOString())}\n` +
     `Kandidat: ${picks.length} ditampilkan dari ${decisions.length} ditinjau`
   return splitBlocksIntoMessages(header, picks.map(tokenBlock))
 }

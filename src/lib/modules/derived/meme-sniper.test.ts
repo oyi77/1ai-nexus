@@ -1,7 +1,7 @@
 // Contract tests: meme sniper hard filters, decision protocol, risk plan,
 // and Telegram message safety. Pure evaluator — zero network, zero DB.
 import { describe, it, expect } from 'vitest'
-import { evaluateSniper, escapeMd, type SniperPayload } from './meme-sniper'
+import { evaluateSniper, escapeHtml, type SniperPayload } from './meme-sniper'
 
 /** Verified buyer — the only path to SIGNAL now that execution is gone. */
 const CONFIRMED = { verdict: 'pass' as const, reason: 'verified buyer', strongest: 'QUALIFIED_SMART_MONEY' }
@@ -35,12 +35,12 @@ describe('meme-sniper hard filters', () => {
     const d = evaluateSniper(clean(), { smartMoney: CONFIRMED })
     expect(d.status).toBe('SIGNAL')
     expect(d.rejections).toEqual([])
-    expect(d.alert).toContain('VILONA MEME SNIPER')
-    expect(d.alert).toContain('Dev Holding:* 0.00% ✅ (Dev Keluar ✅)')
+    expect(d.alert).toContain('<b>VILONA MEME SNIPER')
+    expect(d.alert).toContain('<b>Dev Holding:</b> 0.00% ✅ (Dev Keluar ✅)')
     expect(d.alert).toContain('Mint 🟢 MATI | Freeze 🟢 MATI | LP')
     expect(d.alert).toContain('100% BURNT ✅')
     expect(d.alert).toContain('🟢 SIGNAL')
-    expect(d.alert).toContain('*Ratio:* 3.00x')
+    expect(d.alert).toContain('<b>Ratio:</b> 3.00x')
   })
 
   it('rejects mint authority enabled AND unproven', () => {
@@ -292,19 +292,22 @@ describe('meme-sniper decision protocol', () => {
 })
 
 describe('meme-sniper alert safety', () => {
-  it('escapes Telegram Markdown control characters in dynamic text', () => {
-    // Only `_ * \` \`` `[` are special per the Bot API — `]` stays bare.
-    expect(escapeMd('WIF_2*X[1]')).toBe('WIF\\_2\\*X\\[1]')
+  it('escapes the three Telegram HTML control characters', () => {
+    // HTML mode only reserves &, <, > — `_ * [ \`` are literal text and must
+    // NOT be backslash-escaped (that renders as visible junk to the operator).
+    expect(escapeHtml('a & b <c> d_e*f[1]')).toBe('a &amp; b &lt;c&gt; d_e*f[1]')
   })
 
-  it('neutralizes a ticker/narrative that would break Markdown parsing', () => {
+  it('neutralizes a ticker/narrative that would break HTML parsing', () => {
     const d = evaluateSniper(clean({
-      ticker: 'EVIL_*[x]',
-      momentum: { marketCap: 1e6, volume5m: 3e6, narrative: 'a_b*c[d]' },
+      ticker: 'EVIL<&>x',
+      momentum: { marketCap: 1e6, volume5m: 3e6, narrative: 'a&b<c>d' },
     }), { smartMoney: CONFIRMED })
-    // Every dynamic control char is escaped, so the message stays parseable.
-    expect(d.alert).toContain('EVIL\\_\\*\\[x]')
-    expect(d.alert).toContain('a\\_b\\*c\\[d]')
+    expect(d.alert).toContain('EVIL&lt;&amp;&gt;x')
+    expect(d.alert).toContain('a&amp;b&lt;c&gt;d')
+    // No legacy-Markdown escapes and no Markdown bold survive in HTML mode.
+    expect(d.alert).not.toContain('\\_')
+    expect(d.alert).not.toContain('*VILONA')
   })
 
   it('states an explicit fallback when no narrative is supplied', () => {

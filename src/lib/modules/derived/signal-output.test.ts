@@ -66,9 +66,12 @@ describe('signal output — reply markup', () => {
     expect(urls.some((u) => u.includes('jup.ag/swap/SOL-'))).toBe(true)
   })
 
-  it('escapes markdown control characters in the ticker', () => {
+  it('passes underscored tickers through — HTML mode cannot be broken by _', () => {
     const out = formatTieredSignal(input({ payload: payload({ ticker: 'A_B' }) }))
-    expect(out.text).toContain('A\\_B')
-    expect(out.text).not.toContain('$A_B ')
+    expect(out.text).toContain('$A_B')
+    expect(out.text).not.toContain('A\\_B')
+    // Legacy-Markdown bold would be `*VILONA`; HTML must use <b>.
+    expect(out.text).not.toContain('*VILONA')
+    expect(out.text).toContain('<b>VILONA SNIPER')
   })
 })

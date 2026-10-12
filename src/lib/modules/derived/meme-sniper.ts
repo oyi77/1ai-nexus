@@ -150,15 +150,15 @@ function fmtUsd(n: unknown): string {
   return isPct(n) ? `$${Math.round(n).toLocaleString('en-US')}` : '$n/a'
 }
 
+
 /**
- * Escape Telegram legacy-Markdown control characters in dynamic text.
- * Per the Bot API only `_ * ` ` `[` are special; unbalanced ones make the
- * API reject the entire message with 400 — user-controlled tickers and
- * narratives must never be trusted raw. `]` and `)` are NOT special and
- * must stay unescaped (a stray backslash would render literally).
+ * Escape Telegram HTML control characters in dynamic text.
+ * The sniper transport sends parse_mode=HTML: only `&`, `<`, `>` are
+ * reserved, so a ticker like `A_B` or a mint ending in `pump` can never
+ * open a stray entity the way it does under legacy Markdown.
  */
-export function escapeMd(s: string): string {
-  return s.replace(/[_\*`\[]/g, '\\$&')
+export function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
 function deriveStage(payload: SniperPayload): SniperStage {
@@ -448,29 +448,29 @@ function buildAlert(
   }
 
   return [
-    '🎯 *VILONA MEME SNIPER — ALPHA ALERT*',
+    '🎯 <b>VILONA MEME SNIPER — ALPHA ALERT</b>',
     '━━━━━━━━━━━━━━━━━━━━━━━━━',
-    `*Token:* ${escapeMd(ticker)} | \`${escapeMd(p.contract)}\``,
-    `*Stage:* ${escapeMd(m.stageLabel)}${stageExtra} | *Usia:* ${escapeMd(m.ageLabel)}`,
+    `<b>Token:</b> ${escapeHtml(ticker)} | <code>${escapeHtml(p.contract)}</code>`,
+    `<b>Stage:</b> ${escapeHtml(m.stageLabel)}${stageExtra} | <b>Usia:</b> ${escapeHtml(m.ageLabel)}`,
     '',
-    '📊 *AUDIT & INTEGRITAS ON-CHAIN*',
-    `• *Dev Holding:* ${pct2(m.devPercent)}% ${passEmoji(m.devPercent, L.devHardCeilingPercent)}${devNote}`,
-    `• *Sniper:* ${pct2(m.sniperPercent)}% ${passEmoji(m.sniperPercent, L.sniperPercent)} | *Bundler:* ${pct2(m.bundlerPercent)}%${bundlerNote} ${passEmoji(m.bundlerPercent, L.bundlerPercent)}`,
-    `• *Insider:* ${pct2(m.insiderPercent)}% ${passEmoji(m.insiderPercent, L.insiderPercent)} | *Top 10 Supply:* ${pct2(m.top10Percent)}% ${passEmoji(m.top10Percent, L.top10Percent)}`,
-    `• *Cluster:* ${pct2(m.clusterPercent)}%${clusterNote} ${passEmoji(m.clusterPercent, L.clusterPercent)}`,
-    `• *LP & Keamanan:* Mint ${mintStatus} | Freeze ${freezeStatus} | LP ${lpStatus}`,
+    '📊 <b>AUDIT &amp; INTEGRITAS ON-CHAIN</b>',
+    `• <b>Dev Holding:</b> ${pct2(m.devPercent)}% ${passEmoji(m.devPercent, L.devHardCeilingPercent)}${devNote}`,
+    `• <b>Sniper:</b> ${pct2(m.sniperPercent)}% ${passEmoji(m.sniperPercent, L.sniperPercent)} | <b>Bundler:</b> ${pct2(m.bundlerPercent)}%${bundlerNote} ${passEmoji(m.bundlerPercent, L.bundlerPercent)}`,
+    `• <b>Insider:</b> ${pct2(m.insiderPercent)}% ${passEmoji(m.insiderPercent, L.insiderPercent)} | <b>Top 10 Supply:</b> ${pct2(m.top10Percent)}% ${passEmoji(m.top10Percent, L.top10Percent)}`,
+    `• <b>Cluster:</b> ${pct2(m.clusterPercent)}%${clusterNote} ${passEmoji(m.clusterPercent, L.clusterPercent)}`,
+    `• <b>LP &amp; Keamanan:</b> Mint ${mintStatus} | Freeze ${freezeStatus} | LP ${lpStatus}`,
     '',
-    '📈 *DINAMIKA MARKET*',
-    `• *Market Cap:* ${fmtUsd(p.momentum.marketCap)}`,
-    `• *Volume 5m:* ${fmtUsd(p.momentum.volume5m)} (*Ratio:* ${m.volMcRatio.toFixed(2)}x)${volFire}`,
-    `• *Top Holder Avg PnL:* ${pnlText}% ${pnlPhase}`,
-    `• *Narasi / Katalis:* ${escapeMd(narrative)}`,
+    '📈 <b>DINAMIKA MARKET</b>',
+    `• <b>Market Cap:</b> ${fmtUsd(p.momentum.marketCap)}`,
+    `• <b>Volume 5m:</b> ${fmtUsd(p.momentum.volume5m)} (<b>Ratio:</b> ${m.volMcRatio.toFixed(2)}x)${volFire}`,
+    `• <b>Top Holder Avg PnL:</b> ${pnlText}% ${pnlPhase}`,
+    `• <b>Narasi / Katalis:</b> ${escapeHtml(narrative)}`,
     '',
     '━━━━━━━━━━━━━━━━━━━━━━━━━',
-    `💡 *KEPUTUSAN:* ${STATUS_EMOJI[status]} — ${statusId[status]}`,
-    `*Alasan:* ${escapeMd(rejectionId(rationale))}`,
+    `💡 <b>KEPUTUSAN:</b> ${STATUS_EMOJI[status]} — ${statusId[status]}`,
+    `<b>Alasan:</b> ${escapeHtml(rejectionId(rationale))}`,
     '',
-    '_Output screening — sizing & eksekusi milik 1ai-trade-dex._',
+    '<i>Output screening — sizing &amp; eksekusi milik 1ai-trade-dex.</i>',
   ].join('\n')
 }
 
@@ -702,6 +702,13 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
  * SNIPER_TELEGRAM_CHAT_ID), then the ecosystem chain:
  * HUB_TELEGRAM_BOT_TOKEN → TELEGRAM_BOT_TOKEN, and
  * HUB_TELEGRAM_OWNER_CHAT_ID → TELEGRAM_ALERT_CHAT_ID → TELEGRAM_ADMIN_CHAT_ID.
+ *
+ * parse_mode is HTML, NOT legacy Markdown. Proven live 2026-10-12: legacy
+ * Markdown 400s with "can't parse entities" whenever an unescaped `_` from
+ * a ticker/mint (e.g. `7tZt1LXb`, `bot_`) opens an italic span, and the
+ * failure is silent (returns false → review digest logs "telegram
+ * rejected"). HTML only needs `&`, `<`, `>` escaped, so dynamic token data
+ * (which never contains those) cannot break the message. See `escapeSignalHtml`.
  * Returns false (never throws) when unconfigured or the API rejects.
  */
 export async function deliverSniperAlert(
@@ -722,20 +729,30 @@ export async function deliverSniperAlert(
     process.env.TELEGRAM_ADMIN_CHAT_ID ||
     ''
   if (!token || !chat) return false
+  // Telegram caps sendMessage text at 4096 chars — truncate there, never let
+  // a digest die on 400 simply for being one block too long.
+  const body = text.length > 4096 ? text.slice(0, 4090) + '…' : text
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         chat_id: chat,
-        text,
-        parse_mode: 'Markdown',
+        text: body,
+        parse_mode: 'HTML',
         ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
       }),
       signal: AbortSignal.timeout(10_000),
     })
-    return res.ok
-  } catch {
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => '')
+      // Redact the token — it is embedded in the URL, never in this log.
+      console.error(`[sniper] telegram send failed: HTTP ${res.status} ${errBody.slice(0, 300)}`)
+      return false
+    }
+    return true
+  } catch (e) {
+    console.error(`[sniper] telegram send error: ${e instanceof Error ? e.message : String(e)}`)
     return false
   }
 }
