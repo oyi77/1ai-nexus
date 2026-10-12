@@ -308,7 +308,12 @@ async function traceOnce(
         strongest,
         bullishHoldingUsd: buyers.map((b) => b.holdingUsd).filter((v): v is number => v !== null).reduce((a, b) => a + b, 0) || null,
         ttlMs,
-        source: 'wallet-tracer:gmgn-holders',
+        // Provenance from the rows themselves, not the env var: under
+        // HOLDER_SOURCE=auto either source can win, and this label is
+        // surfaced to the operator in evidence.reasons.source.
+        source: holders.some((h) => h.tags.includes('helius-holder'))
+          ? 'wallet-tracer:helius-holders'
+          : 'wallet-tracer:gmgn-holders',
       }
       traceCache.set(key, { at: Date.now(), evidence: ev })
       return ev
