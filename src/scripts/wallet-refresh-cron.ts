@@ -60,6 +60,17 @@ async function main() {
     `[wallet-refresh] candidates=${res.candidates} processed=${res.processed} ` +
     `succeeded=${res.succeeded} failed=${res.failed}`
   )
+  if (res.candidates === 0) {
+    // The whole Fase 3 pipeline is CORRECT and IDLE: no Solana wallet rows
+    // exist in the DB (measured 2026-10-12: 6 rows carry chain='solana' but
+    // are 0x… EVM addresses, filtered out by isBase58Addr). Until real
+    // wallets are ingested (scripts/import-wallets.ts), classification,
+    // whale evidence, AND sniper discovery all have zero input.
+    console.warn(
+      '[wallet-refresh] NO Solana wallets in Wallet table — classification, whale evidence, ' +
+        'and sniper wallet-discovery are idle. Ingest real wallets with scripts/import-wallets.ts.',
+    )
+  }
   for (const r of res.results) {
     const cls = r.classification
     const whale = r.whaleGates
@@ -68,6 +79,11 @@ async function main() {
       (cls ? ` status=${cls.status} pnl=${cls.pnl30d?.toFixed(4) ?? 'n/a'} wr=${cls.winRate?.toFixed(4) ?? 'n/a'} n=${cls.episodesUsed} conf=${cls.confidence}` : '') +
       (whale ? ` whale=[pos=${whale.maxSinglePositionUsd} port=${whale.portfolioUsd} vol=${whale.buyVolume30dUsd}]` : '')
     )
+    if (!r.success) {
+      // A bare FAIL hides the cause and makes a throttling problem look
+      // identical to a dead wallet or a schema break. Always name it.
+      console.warn(`[wallet-refresh]   ↳ reason: ${r.error ?? 'unknown'}`)
+    }
   }
   if (res.failed > 0) process.exit(1)
 }

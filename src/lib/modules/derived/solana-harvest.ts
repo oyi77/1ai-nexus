@@ -82,6 +82,24 @@ export interface RpcSig {
   slot: number;
 }
 
+/**
+ * A getTransaction body as returned by `rpcCall` (envelope already
+ * unwrapped). `null` means the endpoint kept the signature but pruned the
+ * body — a real state on free endpoints, not an error.
+ */
+export interface TxResult {
+  blockTime: number | null;
+  meta: {
+    err: unknown;
+    fee?: number;
+    preBalances?: number[];
+    postBalances?: number[];
+    preTokenBalances?: TokenBal[];
+    postTokenBalances?: TokenBal[];
+  } | null;
+  transaction?: { message?: { accountKeys?: Array<string | { pubkey: string }> } };
+}
+
 // Injectable fetch for tests (defaults to global fetch).
 export type FetchFn = (url: string, init?: RequestInit) => Promise<Response>;
 let fetchFn: FetchFn | null = null;
@@ -357,7 +375,9 @@ export async function harvestWallet(
   let prevTs: number | null = null;
   for (const sig of sigs) {
     if (sig.blockTime !== null && sig.blockTime * 1000 < cutoff) continue; // 30d window
-    let txJson: { result: { blockTime: number | null; meta: { err: unknown; fee?: number; preBalances?: number[]; postBalances?: number[]; preTokenBalances?: TokenBal[]; postTokenBalances?: TokenBal[] } | null; transaction?: { message?: { accountKeys?: Array<string | { pubkey: string }> } } } | null };
+    // rpcCall unwraps the JSON-RPC envelope, so this IS the transaction
+    // object (or null for pruned history) — not a `{ result }` wrapper.
+    let txJson: TxResult | null
     try {
       // v0-era and v1 transactions both exist on-chain today: the public
       // RPC gate rejects version mismatch explicitly, so ask for v1 and
@@ -369,7 +389,11 @@ export async function harvestWallet(
       continue;
     }
     txOk++;
-    let res = txJson.result;
+    // rpcCall already unwrapped the JSON-RPC envelope and returned
+    // `json.result` — which IS the transaction. Reading `.result` again
+    // here was both a type lie (the declared shape has no `result`) and a
+    // runtime crash whenever RPC answered 200 with a null body.
+    let res = txJson
     if (!res) {
       // Pruned-history failover: some free endpoints keep signatures but
       // drop old transaction bodies (result null, no error). Retry the
@@ -382,9 +406,10 @@ export async function harvestWallet(
             body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getTransaction', params: [sig.signature, { encoding: 'jsonParsed', maxSupportedTransactionVersion: 1 }] }),
             signal: AbortSignal.timeout(30_000),
           });
-          const j2 = (await r2.json()) as typeof txJson;
-          if (j2.result) { res = j2.result; gaps.push(`tx-failover:${sig.signature.slice(0, 8)}`); break; }
-        } catch { /* next endpoint */ }
+          // Raw fetch here, so the JSON-RPC envelope IS present.
+          const j2 = (await r2.json()) as { result?: TxResult | null };
+          if (j2?.result) { res = j2.result; gaps.push(`tx-failover:${sig.signature.slice(0, 8)}`); break; }
+      } catch { /* next endpoint */ }
       }
     }
     if (!res) {
