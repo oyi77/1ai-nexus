@@ -31,6 +31,9 @@ import {
   type CriteriaProfileId,
   type SniperMetrics as CriteriaMetrics,
 } from './sniper-criteria';
+// Indonesian rejection phrasing shared with the review digest (value
+// import; signal-tier only type-imports this module, so no runtime cycle).
+import { rejectionId } from './signal-tier';
 export type SniperStage = 'new-pair' | 'post-bonding'
 
 /** Wallet classification for the top-1..3 check. */
@@ -383,8 +386,8 @@ function buildAlert(
   m: SniperMetrics,
 ): string {
   const s = p.security
-  const mintStatus = s.mintable === false ? 'OFF' : 'ON 🔴'
-  const freezeStatus = s.freezeAuthority === false ? 'OFF' : 'ON 🔴'
+  const mintStatus = s.mintable === false ? '🟢 MATI' : s.mintable === true ? '🔴 HIDUP' : '❓ UNPROVEN'
+  const freezeStatus = s.freezeAuthority === false ? '🟢 MATI' : s.freezeAuthority === true ? '🔴 HIDUP' : '❓ UNPROVEN'
   const lpTotal = (s.lpBurnedPercent ?? 0) + (s.lpLockedPercent ?? 0)
   // LP 100% burnt (raydium-style burn) vs 100% locked (streamflow-style
   // locker) — the suffix names which was proven so the operator can verify.
@@ -392,9 +395,9 @@ function buildAlert(
   const locked = s.lpLockedPercent ?? 0
   const lpStatus =
     burned >= 99.5
-      ? '100% Burnt ✅'
+      ? '100% BURNT ✅'
       : locked >= 99.5
-        ? '100% Locked ✅'
+        ? '100% LOCKED ✅'
         : `${fmtPct(lpTotal)}% 🔴`
 
   // 2-decimal percents like the reference template (0.00%, 1.8% → 1.80%).
@@ -402,17 +405,17 @@ function buildAlert(
     v === null || v === undefined ? 'n/a' : v.toFixed(2)
 
   // Dev annotation: "(Dev Out)" when proven 0, "(Dev In)" when holding.
-  const devNote = m.devPercent === 0 ? ' (Dev Out)' : m.devPercent != null && m.devPercent > 0 ? ' (Dev In)' : ''
+  const devNote = m.devPercent === 0 ? ' (Dev Keluar ✅)' : m.devPercent != null && m.devPercent > 0 ? ' (Dev PEGANG 🔴)' : ' (UNPROVEN ❓)'
   // PASS = within the hard ceiling (template shows a single trailing emoji
   // per metric; notes carry no emoji of their own).
   const passEmoji = (v: number | null | undefined, ceiling: number): string =>
-    v === null || v === undefined ? '🔴' : v < ceiling ? '✅' : '🔴'
+    v === null || v === undefined ? '❓' : v < ceiling ? '✅' : '🔴'
   // Bundlers: "(100% Sold)" only when the full exit is proven.
   const soldPct = p.distribution.bundlerSoldPercent
-  const bundlerNote = soldPct === 100 ? ' (100% Sold)' : ''
+  const bundlerNote = soldPct === 100 ? ' (100% SOLD ✅)' : ''
   // Cluster: "(Clean bubblemap)" below 1%.
   const clusterNote =
-    m.clusterPercent != null && m.clusterPercent < 1 ? ' (Clean bubblemap)' : ''
+    m.clusterPercent != null && m.clusterPercent < 1 ? ' (Bersih ✅)' : ''
   // Volume fire: ratio >= 5x.
   const volFire = m.volMcRatio >= 5 ? ' 🔥' : ''
 
@@ -426,11 +429,11 @@ function buildAlert(
   // PnL phase labels (ID, matching the reference template).
   const pnlPhase =
     m.pnlAssessment === 'dump-risk'
-      ? '(Fase Distribusi)'
+      ? '(Fase Distribusi ⚠️)'
       : m.pnlAssessment === 'accumulation'
-        ? '(Fase Akumulasi Sehat)'
+        ? '(Fase Akumulasi Sehat ✅)'
         : '(Netral)'
-  const narrative = p.momentum.narrative?.trim() || 'No catalyst data provided'
+  const narrative = p.momentum.narrative?.trim() || 'Belum ada data katalis'
 
   const ticker = p.ticker.startsWith('$') ? p.ticker : `$${p.ticker}`
   const STATUS_EMOJI: Record<SniperStatus, string> = {
@@ -438,35 +441,38 @@ function buildAlert(
     WATCHLIST: '🟡 WATCHLIST',
     REJECT: '🔴 REJECT',
   }
+  const statusId: Record<SniperStatus, string> = {
+    SIGNAL: 'sinyal layak eksekusi',
+    WATCHLIST: 'pantau dulu — belum sinyal utama',
+    REJECT: 'ditolak — ada pelanggaran aturan',
+  }
 
   return [
     '🎯 *VILONA MEME SNIPER — ALPHA ALERT*',
-    '━━━━━━━━━━━━━━━━━━━━',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━',
     `*Token:* ${escapeMd(ticker)} | \`${escapeMd(p.contract)}\``,
-    `*Stage:* ${m.stageLabel}${stageExtra} | *Age:* ${m.ageLabel}`,
+    `*Stage:* ${escapeMd(m.stageLabel)}${stageExtra} | *Usia:* ${escapeMd(m.ageLabel)}`,
     '',
-    '📊 *AUDIT & ON-CHAIN INTEGRITY*',
+    '📊 *AUDIT & INTEGRITAS ON-CHAIN*',
     `• *Dev Holding:* ${pct2(m.devPercent)}% ${passEmoji(m.devPercent, L.devHardCeilingPercent)}${devNote}`,
-    `• *Snipers:* ${pct2(m.sniperPercent)}% ${passEmoji(m.sniperPercent, L.sniperPercent)} | *Bundlers:* ${pct2(m.bundlerPercent)}%${bundlerNote} ${passEmoji(m.bundlerPercent, L.bundlerPercent)}`,
+    `• *Sniper:* ${pct2(m.sniperPercent)}% ${passEmoji(m.sniperPercent, L.sniperPercent)} | *Bundler:* ${pct2(m.bundlerPercent)}%${bundlerNote} ${passEmoji(m.bundlerPercent, L.bundlerPercent)}`,
     `• *Insider:* ${pct2(m.insiderPercent)}% ${passEmoji(m.insiderPercent, L.insiderPercent)} | *Top 10 Supply:* ${pct2(m.top10Percent)}% ${passEmoji(m.top10Percent, L.top10Percent)}`,
-    `• *Cluster Status:* ${pct2(m.clusterPercent)}%${clusterNote} ${passEmoji(m.clusterPercent, L.clusterPercent)}`,
-    `• *LP & Security:* Mint ${mintStatus} | Freeze ${freezeStatus} | LP ${lpStatus}`,
+    `• *Cluster:* ${pct2(m.clusterPercent)}%${clusterNote} ${passEmoji(m.clusterPercent, L.clusterPercent)}`,
+    `• *LP & Keamanan:* Mint ${mintStatus} | Freeze ${freezeStatus} | LP ${lpStatus}`,
     '',
-    '📈 *MARKET DYNAMICS*',
+    '📈 *DINAMIKA MARKET*',
     `• *Market Cap:* ${fmtUsd(p.momentum.marketCap)}`,
-    `• *Volume:* ${fmtUsd(p.momentum.volume5m)} (*Ratio:* ${m.volMcRatio.toFixed(2)}x)${volFire}`,
+    `• *Volume 5m:* ${fmtUsd(p.momentum.volume5m)} (*Ratio:* ${m.volMcRatio.toFixed(2)}x)${volFire}`,
     `• *Top Holder Avg PnL:* ${pnlText}% ${pnlPhase}`,
-    `• *Narrative / Catalyst:* ${escapeMd(narrative)}`,
+    `• *Narasi / Katalis:* ${escapeMd(narrative)}`,
     '',
-    '━━━━━━━━━━━━━━━━━━━━',
-    `💡 *DECISION:* *[${STATUS_EMOJI[status]}]*`,
-    `*Rationale:* ${escapeMd(rationale)}`,
+    '━━━━━━━━━━━━━━━━━━━━━━━━━',
+    `💡 *KEPUTUSAN:* ${STATUS_EMOJI[status]} — ${statusId[status]}`,
+    `*Alasan:* ${escapeMd(rejectionId(rationale))}`,
     '',
-    '_Screening output only — position sizing and execution belong to 1ai-trade-dex._',
+    '_Output screening — sizing & eksekusi milik 1ai-trade-dex._',
   ].join('\n')
 }
-
-// ── Evaluator ─────────────────────────────────────────────────
 
 export interface EvaluateOptions {
   /** Extra provenance warnings (audit identity) surfaced to the operator. */

@@ -15,7 +15,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { deliverSniperAlert } from './meme-sniper'
 import type { SniperScanDecision } from './sniper-scan'
-import { escapeSignalMd } from './signal-tier'
+import { escapeSignalMd, rejectionId } from './signal-tier'
 
 /** Floor as a fraction of the new-pair 2x gate: quarter-way there. */
 export const REVIEW_VOLMC_FLOOR = Number(process.env.SNIPER_REVIEW_VOLMC_FLOOR) || 0.5
@@ -68,11 +68,11 @@ export function pickReviewCandidates(decisions: SniperScanDecision[]): SniperSca
 function oneLine(d: SniperScanDecision): string {
   const m = d.metrics
   const top = m.top10Percent != null ? `${Math.round(m.top10Percent * 10) / 10}%` : 'n/a'
-  const firstBreach = (d.rejections[0] ?? 'no reason').slice(0, 90)
+  const firstBreach = rejectionId(d.rejections[0] ?? 'tidak ada alasan').slice(0, 110)
   const sm =
     d.smartMoneyBuyers > 0
       ? `${d.smartMoneyBuyers}(${escapeSignalMd(d.smartMoneyStrongest ?? '?')})`
-      : 'none'
+      : 'tidak ada'
   const head =
     `- ${escapeSignalMd(d.ticker)} | ${m.volMcRatio.toFixed(2)}x | ${escapeSignalMd(m.ageLabel)} ` +
     `| top10 ${escapeSignalMd(top)} | sm=${sm}`
@@ -100,8 +100,8 @@ export async function pushReviewDigest(decisions: SniperScanDecision[]): Promise
 
   const lines = fresh.map(oneLine)
   const text =
-    `*REVIEW — near-miss rejects (not signals)*\n` +
-    `${fresh.length} token(s) ≥ ${REVIEW_VOLMC_FLOOR}x vol/mcap, rejected on other grounds. Eyeball, forward manually if deserved.\n\n` +
+    `🔎 *REVIEW — reject hampir lolos (bukan sinyal)*\n` +
+    `${fresh.length} token ≥ ${REVIEW_VOLMC_FLOOR}x vol/mcap, ditolak karena alasan lain. Periksa manual, teruskan kalau layak.\n\n` +
     lines.join('\n')
   const chat =
     process.env.SNIPER_REVIEW_CHAT_ID ||

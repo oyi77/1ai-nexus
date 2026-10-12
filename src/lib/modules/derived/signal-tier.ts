@@ -210,10 +210,6 @@ export interface SignalFormatInput {
 }
 
 
-/** Mirrors the evaluator's stage split (<120m = new pair). */
-function metricsStageLabel(payload: SniperPayload): string {
-  return payload.ageMinutes < 120 ? 'new-pair' : 'post-bonding'
-}
 
 /** Compact USD: $1.2M, $340K, $950. */
 function usd(n: number | null): string {
@@ -256,64 +252,186 @@ export function formatTieredSignal(input: SignalFormatInput): string {
   const mom = payload.momentum
   const L: string[] = []
 
-  L.push(`*${escapeSignalMd(tierLabel(tier))}*`)
-  L.push(`*${escapeSignalMd(payload.ticker ?? payload.contract.slice(0, 8))}* · ${escapeSignalMd(payload.chain ?? 'solana')} · ${escapeSignalMd(metricsStageLabel(payload))}`)
-  L.push(`mint \`${escapeSignalMd(payload.contract)}\``)
-  L.push(`analysed ${new Date().toISOString()}`)
+  // Header dengan emoji tier yang jelas
+  const TIER_EMOJI: Record<SignalTier, string> = {
+    HIGH_CONVICTION: '🟢 HIGH-CONVICTION',
+    CANDIDATE: '🟡 CANDIDATE (bukan sinyal utama)',
+    WATCHLIST: '🟡 WATCHLIST (bukan sinyal utama)',
+    UNKNOWN: '⚪ UNKNOWN',
+    STALE: '⚫ STALE (kedaluwarsa)',
+    REJECT: '🔴 REJECT',
+  }
+
+  const ticker = payload.ticker.startsWith('$') ? payload.ticker : `$${payload.ticker}`
+  const stageLabel = payload.ageMinutes < 120 ? '🆕 New Pair' : '🔗 Post-Bonding'
+
+  L.push(`🎯 *VILONA SNIPER — ${TIER_EMOJI[tier]}*`)
+  L.push('━━━━━━━━━━━━━━━━━━━━━━━━━')
+  L.push(`*Token:* ${ticker} \`${payload.contract}\``)
+  L.push(`*Stage:* ${stageLabel} | *Usia:* ${payload.ageMinutes}m | *Chain:* ${payload.chain ?? 'solana'}`)
   L.push('')
 
-  L.push('*Market*')
-  L.push(`mcap ${usd(mom.marketCap)} · LP locked ${pct(sec.lpLockedPercent)} · 5m vol ${usd(mom.volume5m)}`)
-  L.push(`vol/mcap ${pct(mom.volume5m && mom.marketCap ? (mom.volume5m / mom.marketCap) * 100 : null)}`)
+  // ─── MARKET ───
+  L.push('📊 *MARKET*')
+  L.push(`• Market Cap: ${usd(mom.marketCap)}`)
+  const volMcRatio = mom.volume5m != null && mom.marketCap != null && mom.marketCap > 0 ? mom.volume5m / mom.marketCap : null
+  L.push(`• Vol 5m: ${usd(mom.volume5m)} | Ratio: ${volMcRatio != null ? volMcRatio.toFixed(2) + 'x' : 'n/a'}`)
+  if (volMcRatio != null && volMcRatio >= 5) L.push('   🔥 *Volume sangat tinggi (5x+)*')
   L.push('')
 
-  L.push('*Security*')
-  L.push(`mintable ${sec.mintable === null ? 'UNPROVEN' : sec.mintable ? 'YES' : 'no'} · freeze ${sec.freezeAuthority === null ? 'UNPROVEN' : sec.freezeAuthority ? 'YES' : 'no'} · honeypot ${sec.honeypot === null ? 'UNPROVEN' : sec.honeypot ? 'YES' : 'no'}`)
-  L.push(`LP burnt ${pct(sec.lpBurnedPercent)} · LP locked ${pct(sec.lpLockedPercent)}`)
+  // ─── SECURITY ───
+  L.push('🔐 *KEAMANAN*')
+  const mint = sec.mintable === null ? '❓ UNPROVEN' : sec.mintable ? '🔴 ON' : '🟢 OFF'
+  const freeze = sec.freezeAuthority === null ? '❓ UNPROVEN' : sec.freezeAuthority ? '🔴 ON' : '🟢 OFF'
+  const honeypot = sec.honeypot === null ? '❓ UNPROVEN' : sec.honeypot ? '🔴 YA' : '🟢 AMAN'
+  L.push(`• Mint Authority: ${mint}`)
+  L.push(`• Freeze Authority: ${freeze}`)
+  L.push(`• Honeypot: ${honeypot}`)
+  const lpBurned = pct(sec.lpBurnedPercent)
+  const lpLocked = pct(sec.lpLockedPercent)
+  L.push(`• LP: Burn ${lpBurned} | Lock ${lpLocked}`)
+  if (sec.lpBurnedPercent != null && sec.lpBurnedPercent >= 99.5) L.push('   ✅ LP 100% Burnt — aman dari rug pull')
+  else if (sec.lpLockedPercent != null && sec.lpLockedPercent >= 99.5) L.push('   ✅ LP 100% Locked — aman dari rug pull')
+  else if ((sec.lpBurnedPercent ?? 0) + (sec.lpLockedPercent ?? 0) < 99.5) L.push('   🔴 LP belum 100% aman — risiko exit liquidity')
   L.push('')
 
-  L.push('*Distribution*')
-  L.push(`dev ${pct(dst.devPercent)} · snipers ${pct(dst.sniperPercent)} · bundlers ${pct(dst.bundlerPercent)} (sold ${pct(dst.bundlerSoldPercent)})`)
-  L.push(`insiders ${pct(dst.insiderPercent)} · top10 ${pct(dst.top10Percent)} · cluster ${pct(dst.clusterPercent ?? null)}`)
+  // ─── DISTRIBUTION ───
+  L.push('👥 *DISTRIBUSI HOLDER*')
+  const dev = pct(dst.devPercent)
+  const sniper = pct(dst.sniperPercent)
+  const bundler = pct(dst.bundlerPercent)
+  const insider = pct(dst.insiderPercent)
+  const top10 = pct(dst.top10Percent)
+  const cluster = pct(dst.clusterPercent ?? null)
+  L.push(`• Dev: ${dev} ${dst.devPercent != null && dst.devPercent > 0 ? '🔴 DEV PEGANG' : dst.devPercent === 0 ? '✅ DEV OUT' : '❓ UNPROVEN'}`)
+  L.push(`• Sniper: ${sniper} ${dst.sniperPercent != null && dst.sniperPercent > 6 ? '🔴 TINGGI' : '✅ OK'}`)
+  L.push(`• Bundler: ${bundler} ${dst.bundlerSoldPercent != null && dst.bundlerSoldPercent === 100 ? '✅ 100% SOLD' : ''}`)
+  L.push(`• Insider: ${insider}`)
+  L.push(`• Top 10: ${top10} ${dst.top10Percent != null && dst.top10Percent > 30 ? '🔴 KONSENTRASI TINGGI' : '✅ OK'}`)
+  L.push(`• Cluster: ${cluster} ${dst.clusterPercent != null && dst.clusterPercent > 5 ? '🔴 TERDETEKSI' : dst.clusterPercent != null && dst.clusterPercent < 1 ? '✅ BERSIH' : '❓ UNPROVEN'}`)
   L.push('')
 
-  L.push('*Smart money*')
+  // ─── SMART MONEY ───
+  L.push('🧠 *SMART MONEY*')
   if (smartMoney && smartMoney.buyers.length > 0) {
-    L.push(`${smartMoney.buyers.length} classified buyer(s), strongest ${escapeSignalMd(smartMoney.strongest ?? 'n/a')}`)
+    L.push(`• ${smartMoney.buyers.length} wallet terklasifikasi, terkuat: ${escapeSignalMd(smartMoney.strongest ?? 'n/a')}`)
     for (const b of smartMoney.buyers.slice(0, 3)) {
-      L.push(`· ${escapeSignalMd(b.alias ?? b.address.slice(0, 8))} ${escapeSignalMd(b.status ?? 'n/a')} pnl30d ${pct(b.pnl30d)} wr ${pct(b.winRate)} n=${b.sampleCount}`)
+      const alias = escapeSignalMd(b.alias ?? b.address.slice(0, 8))
+      const pnl = b.pnl30d != null ? (b.pnl30d > 0 ? '+' : '') + (b.pnl30d * 100).toFixed(1) + '%' : 'n/a'
+      const wr = b.winRate != null ? (b.winRate * 100).toFixed(1) + '%' : 'n/a'
+      L.push(`   · ${alias} — ${escapeSignalMd(b.status ?? 'n/a')} | PnL30d ${pnl} | WR ${wr} | n=${b.sampleCount}`)
     }
   } else {
-    L.push(`no confirmed buyer (${escapeSignalMd(smartMoney?.source ?? 'unavailable')})`)
+    L.push('• Belum ada wallet terverifikasi memegang token ini')
+    L.push(`   Sumber: ${escapeSignalMd(smartMoney?.source ?? 'tidak tersedia')}`)
   }
   L.push('')
 
-  L.push('*Thesis*')
-  for (const r of tierReasons) L.push(`· ${escapeSignalMd(r)}`)
-  L.push('')
+  // ─── THESIS / REASONS ───
+  if (tierReasons.length > 0) {
+    L.push('💡 *ALASAN*')
+    for (const r of tierReasons) L.push(`· ${escapeSignalMd(reasonId(r))}`)
+    L.push('')
+  }
 
+  // ─── SCENARIOS ───
   const targets = scenarioTargets(marketCapUsd, input.multiples)
-  L.push('*Scenarios*')
-  if (targets.length === 0) {
-    L.push('market cap unavailable — no scenario targets (not a pass)')
+  if (targets.length > 0) {
+    L.push('🎯 *SKENARIO TARGET*')
+    for (const t of targets) L.push(`   ${t.multiple}x → MC ${usd(t.targetMcap)}`)
+    L.push('   _Aritmatika market cap, bukan harga exit terjamin._')
+    L.push('')
   } else {
-    for (const t of targets) L.push(`${t.multiple}x → mcap ${usd(t.targetMcap)}`)
-    L.push('targets are arithmetic on mcap, not a realizable exit price')
+    L.push('🎯 *SKENARIO:* Market cap tidak tersedia')
+    L.push('')
   }
+
+  // ─── RISKS / INVALIDATION ───
+  const rl = risks && risks.length > 0 ? risks : ['Tidak ada invalidation yang diberikan — anggap belum tervalidasi']
+  L.push('⚠️ *RISIKO / INVALIDASI*')
+  for (const r of rl) L.push(`· ${escapeSignalMd(reasonId(r))}`)
   L.push('')
 
-  L.push('*Risks / invalidation*')
-  const rl = risks && risks.length > 0 ? risks : ['no invalidation supplied — treat as unvalidated']
-  for (const r of rl) L.push(`· ${escapeSignalMd(r)}`)
-  L.push('')
+  // ─── MISSING ───
+  if (tierMissing.length > 0) {
+    L.push('❓ *YANG MASIH HILANG*')
+    for (const m of tierMissing) L.push(`· ${escapeSignalMd(reasonId(m))}`)
+    L.push('')
+  }
 
-  L.push('*Missing / confidence*')
-  if (tierMissing.length === 0) L.push('· none — all essential evidence present')
-  else for (const m of tierMissing) L.push(`· ${escapeSignalMd(m)}`)
-  L.push('')
-
-  L.push('_SIGNAL ONLY — screening output; execution belongs to 1ai-trade-dex._')
+  // Footer
+  L.push('━━━━━━━━━━━━━━━━━━━━━━━━━')
+  L.push('_Output screening — sizing & eksekusi milik 1ai-trade-dex._')
 
   const text = L.join('\n')
-  return text.length > 4000 ? text.slice(0, 3990) + '\n…(truncated)' : text
+  return text.length > 4000 ? text.slice(0, 3990) + '\n…(terpotong)' : text
+}
+
+/**
+ * Reason/missing strings originate in classifySignalTier (English, stable
+ * phrasing) and in the evaluator's warnings. Translate the known templates
+ * to Indonesian; pass anything unrecognized through verbatim (never invent a
+ * translation that hides the original fact).
+ */
+const REASON_ID: Array<[RegExp, (m: RegExpMatchArray) => string]> = [
+  [/^security failure: (.+)$/, (m) => `KEAMANAN GAGAL — ${m[1]}`],
+  [/^core criterion failed: (.+)$/, (m) => `Kriteria inti gagal — ${m[1]}`],
+  [/^signal age (\d+)m exceeds (\d+)m freshness window$/, (m) => `Usia sinyal ${m[1]}m melewati jendela kesegaran ${m[2]}m`],
+  [/^clean screen at ([\d.]+)x volume$/, (m) => `Screening bersih di ${m[1]}x volume`],
+  [/^(\d+) confirmed buyer\(s\), strongest=(.+)$/, (m) => `${m[1]} wallet terverifikasi, terkuat: ${m[2]}`],
+  [/^wallet evidence unavailable$/, () => 'Bukti wallet tidak tersedia'],
+  [/^wallet evidence could not be read — absence is not safety$/, () => 'Bukti wallet tidak terbaca — ketiadaan bukti bukan berarti aman'],
+  [/^source coverage incomplete$/, () => 'Cakupan sumber tidak lengkap'],
+  [/^no classified wallet holds this token$/, () => 'Tidak ada wallet terklasifikasi memegang token ini'],
+  [/^classified holders are not bullish or are stale$/, () => 'Wallet terklasifikasi tidak bullish atau sudah kadaluwarsa'],
+  [/^screening passed but essential evidence is missing$/, () => 'Screening lolos tapi bukti esensial masih hilang'],
+  [/^interesting but unconfirmed$/, () => 'Menarik tapi belum terkonfirmasi'],
+]
+
+export function reasonId(s: string): string {
+  for (const [re, fn] of REASON_ID) {
+    const m = s.match(re)
+    if (m) return fn(m)
+  }
+  return s
+}
+
+/**
+ * Translate the evaluator's rejection templates to Indonesian for the
+ * operator. Unmatched text passes through verbatim — a partial translation
+ * must never hide which gate fired.
+ */
+export function rejectionId(s: string): string {
+  let out = s
+  out = out.replace(
+    /^Dead momentum: 5m vol\/mcap ([\d.]+)x < required ([\d.]+)x$/,
+    'Volume lemah — 5m vol/mcap $1x < syarat $2x',
+  )
+  out = out.replace(/^Top 10 hold ([\d.]+)% \(ceiling (\d+)%\)$/, 'Top 10 pegang $1% (batas $2%)')
+  out = out.replace(
+    /^Linked cluster unproven — cannot rule out coordinated wallets$/,
+    'Cluster belum terbukti — wallet terkoordinasi belum bisa disingkirkan',
+  )
+  out = out.replace(/^Dev holds ([\d.]+)%(.*)$/, 'Dev pegang $1%$2')
+  out = out.replace(/^Snipers hold ([\d.]+)%(.*)$/, 'Sniper pegang $1%$2')
+  out = out.replace(/^Bundlers hold ([\d.]+)%(.*)$/, 'Bundler pegang $1%$2')
+  out = out.replace(/^Insiders hold ([\d.]+)%(.*)$/, 'Insider pegang $1%$2')
+  out = out.replace(/^Mint authority unproven \(must be disabled\)$/, 'Mint authority belum terbukti mati')
+  out = out.replace(/^Freeze authority unproven \(must be disabled\)$/, 'Freeze authority belum terbukti mati')
+  out = out.replace(
+    /^Honeypot status unproven \(sell-side safety unknown\)$/,
+    'Status honeypot belum terbukti — keamanan sisi jual tidak diketahui',
+  )
+  out = out.replace(
+    /^LP burn\/lock unproven \(must be 100% burnt or locked\)$/,
+    'LP burn/lock belum terbukti — harus 100% burnt atau locked',
+  )
+  out = out.replace(/^Top-10 concentration unproven$/, 'Konsentrasi top-10 belum terbukti')
+  out = out.replace(/^Insider share unproven$/, 'Porsi insider belum terbukti')
+  out = out.replace(/^Sniper share unproven$/, 'Porsi sniper belum terbukti')
+  out = out.replace(/^Bundler share unproven$/, 'Porsi bundler belum terbukti')
+  out = out.replace(/^Dev holding unproven \(must be 0%\)$/, 'Porsi dev belum terbukti (harus 0%)')
+  out = out.replace(/^Market cap is zero\/unknown — ratio uncomputable$/, 'Market cap nol/tidak diketahui — ratio tidak bisa dihitung')
+  out = out.replace(/^Volume unknown — momentum uncomputable$/, 'Volume tidak diketahui — momentum tidak bisa dihitung')
+  return out
 }

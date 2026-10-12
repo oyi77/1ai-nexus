@@ -135,7 +135,7 @@ describe('runSniperScan', () => {
     // Policy E: delivered signal carries full evidence, not the short alert.
     expect(sent).toContain('HIGH-CONVICTION')
     expect(sent).toContain('GOOD')
-    expect(sent).toContain('SIGNAL ONLY')
+    expect(sent).toContain('Output screening')
   })
 
   it('policy D: a clean screen WITHOUT smart-money confirmation is not delivered', async () => {

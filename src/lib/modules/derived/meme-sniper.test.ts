@@ -36,10 +36,10 @@ describe('meme-sniper hard filters', () => {
     expect(d.status).toBe('SIGNAL')
     expect(d.rejections).toEqual([])
     expect(d.alert).toContain('VILONA MEME SNIPER')
-    expect(d.alert).toContain('Dev Holding:* 0.00% ✅ (Dev Out)')
-    expect(d.alert).toContain('Mint OFF | Freeze OFF | LP')
-    expect(d.alert).toContain('100% Burnt ✅')
-    expect(d.alert).toContain('*[🟢 SIGNAL]*')
+    expect(d.alert).toContain('Dev Holding:* 0.00% ✅ (Dev Keluar ✅)')
+    expect(d.alert).toContain('Mint 🟢 MATI | Freeze 🟢 MATI | LP')
+    expect(d.alert).toContain('100% BURNT ✅')
+    expect(d.alert).toContain('🟢 SIGNAL')
     expect(d.alert).toContain('*Ratio:* 3.00x')
   })
 
@@ -309,7 +309,7 @@ describe('meme-sniper alert safety', () => {
 
   it('states an explicit fallback when no narrative is supplied', () => {
     const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6 } }), { smartMoney: CONFIRMED })
-    expect(d.alert).toContain('No catalyst data provided')
+    expect(d.alert).toContain('Belum ada data katalis')
   })
   it('caps a clean setup at WATCHLIST when no wallet confirms it', () => {
     const d = evaluateSniper(clean({ momentum: { marketCap: 1e6, volume5m: 3e6, top5AvgPnlPercent: 12 } }))
