@@ -89,6 +89,10 @@ data/alphio-session.json
 # gamification rollback snapshot (large prod pg_dump — must NOT be committed)
 /backup_before_gamification.sql
 
+
+# Telethon/MTProto userbot session files — live account credentials, never commit
+*.session
+*.session-journal
 # build / test / typecheck logs (artifacts, never commit)
 *.out
 
