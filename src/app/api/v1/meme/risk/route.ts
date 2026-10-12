@@ -17,7 +17,7 @@
 import { NextResponse } from 'next/server'
 import {
   getAuditModule,
-  getEnabledPlatforms,
+  getEnabledAuditPlatforms,
   normalizeMemePlatformParam,
   type MemePlatform,
 } from '@/lib/modules/meme'
@@ -94,9 +94,11 @@ export async function GET(req: Request) {
       return NextResponse.json(body)
     }
 
-    // 'all' — fetch each enabled platform that has an audit module, independently
-    // so one failure never 500s the whole response.
-    const enabledPlatforms = getEnabledPlatforms().filter((p) => getAuditModule(p) !== undefined)
+    // 'all' — fetch each enabled audit platform, independently so one failure
+    // never 500s the whole response. Audit-scoped enumeration: an audit-only
+    // adapter (e.g. rugcheck) has no discovery module, so the discovery-gated
+    // list would silently drop it from this sweep.
+    const enabledPlatforms = getEnabledAuditPlatforms()
     const results = await Promise.all(
       enabledPlatforms.map((p) => fetchAudit(p, chain, contract)),
     )

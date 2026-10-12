@@ -762,27 +762,37 @@ export async function deliverSniperAlert(
   // Telegram caps sendMessage text at 4096 chars — truncate there, never let
   // a digest die on 400 simply for being one block too long.
   const body = text.length > 4096 ? text.slice(0, 4090) + '…' : text
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chat,
-        text: body,
-        parse_mode: 'HTML',
-        ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
-      }),
-      signal: AbortSignal.timeout(10_000),
-    })
-    if (!res.ok) {
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chat,
+          text: body,
+          parse_mode: 'HTML',
+          ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+        }),
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (res.ok) return true
       const errBody = await res.text().catch(() => '')
-      // Redact the token — it is embedded in the URL, never in this log.
       console.error(`[sniper] telegram send failed: HTTP ${res.status} ${errBody.slice(0, 300)}`)
+      // 400 = parse error — retry won't help, bail immediately
+      if (res.status === 400) return false
+      // 429 = rate limited — respect Retry-After if present
+      if (res.status === 429) {
+        const ra = errBody.match(/"retry_after"\s*:\s*(\d+)/)
+        const wait = ra ? Math.min(Number(ra[1]), 30) : 5
+        if (attempt === 1) { await new Promise(r => setTimeout(r, wait * 1000)); continue }
+      }
       return false
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      console.error(`[sniper] telegram send error (attempt ${attempt}/2): ${msg}`)
+      if (attempt === 2) return false
+      await new Promise(r => setTimeout(r, 3000))
     }
-    return true
-  } catch (e) {
-    console.error(`[sniper] telegram send error: ${e instanceof Error ? e.message : String(e)}`)
-    return false
   }
+  return false
 }

@@ -426,6 +426,18 @@ export function getEnabledPlatforms(): MemePlatform[] {
 }
 
 /**
+ * Enabled platforms that expose a risk-audit module, in `MEME_PLATFORMS`
+ * order. Distinct from `getEnabledPlatforms()`: audit-only adapters (e.g.
+ * rugcheck) have no discovery module, so the discovery-gated list would
+ * silently drop them from the `/meme/risk` sweep.
+ */
+export function getEnabledAuditPlatforms(): MemePlatform[] {
+  return MEME_PLATFORMS.filter((p) => {
+    const entry = registry[p]
+    return entry?.enabled === true && entry.auditModule !== undefined
+  })
+}
+/**
  * Normalize the `platform` query param. Accepts all|bitget|gate|moby|dexscreener
  * (case-insensitive). Non-matching values fall back to 'all'.
  */
