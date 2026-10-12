@@ -661,6 +661,19 @@ export interface SniperScanDecision extends SniperDecision {
     volume5mUsd: number | null
     priceUsd: number | null
   }
+  /**
+   * Holder distribution at evaluation time. Feeds the accumulation phase
+   * (holder-tier delta across scans) via the audit trail. null = unproven.
+   * Optional because older evaluations persisted before this field existed.
+   */
+  distribution?: {
+    devPercent: number | null
+    sniperPercent: number | null
+    bundlerPercent: number | null
+    insiderPercent: number | null
+    top10Percent: number | null
+    clusterPercent: number | null
+  }
 }
 
 export interface SniperScanResult {
@@ -770,6 +783,20 @@ export async function runSniperScan(
           liquidityUsd: token.liquidity > 0 ? token.liquidity : null,
           volume5mUsd: token.volume5m && token.volume5m > 0 ? token.volume5m : null,
           priceUsd: token.price > 0 ? token.price : null,
+        },
+        /**
+         * Holder distribution as read by THIS evaluation. Persisted so the
+         * audit trail can compute a real holder-tier delta across scans
+         * (TAHAP 2) instead of re-reading the chain. null = the audit source
+         * did not prove the number — never a zero.
+         */
+        distribution: {
+          devPercent: payload.distribution.devPercent,
+          sniperPercent: payload.distribution.sniperPercent,
+          bundlerPercent: payload.distribution.bundlerPercent,
+          insiderPercent: payload.distribution.insiderPercent,
+          top10Percent: payload.distribution.top10Percent,
+          clusterPercent: payload.distribution.clusterPercent ?? null,
         },
       })
     } catch (err) {

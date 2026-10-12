@@ -160,11 +160,14 @@ describe('meme-sniper hard filters', () => {
     const d = evaluateSniper(clean({
       distribution: {
         ...clean().distribution,
+        // Every top wallet must respect the operator's single-whale <=5%
+        // rule, otherwise the stage profile rejects the fixture before the
+        // tail-wallet rule under test is reached.
         topWallets: [
-          { address: 'H11111111111111111111111111111111111111111', percent: 9, kind: 'holder' },
-          { address: 'H21111111111111111111111111111111111111111', percent: 8, kind: 'holder' },
-          { address: 'H31111111111111111111111111111111111111111', percent: 7, kind: 'holder' },
-          { address: 'S41111111111111111111111111111111111111111', percent: 6, kind: 'sniper' },
+          { address: 'H11111111111111111111111111111111111111111', percent: 4, kind: 'holder' },
+          { address: 'H21111111111111111111111111111111111111111', percent: 3, kind: 'holder' },
+          { address: 'H31111111111111111111111111111111111111111', percent: 2, kind: 'holder' },
+          { address: 'S41111111111111111111111111111111111111111', percent: 1, kind: 'sniper' },
         ],
       },
     }), { smartMoney: CONFIRMED })

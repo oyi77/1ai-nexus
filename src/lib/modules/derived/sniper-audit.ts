@@ -16,8 +16,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { SniperScanDecision } from './sniper-scan'
+import { classifyAccumulation, type AccumulationReading } from './sniper-accumulation'
 
 export interface AuditEntry {
+
   contract: string
   at: string
   status: string
@@ -31,6 +33,19 @@ export interface AuditEntry {
   /** Contract-level change versus the previous evaluation, if any. */
   change: AuditChange
   previousStatus: string | null
+  /**
+   * Holder distribution as read at this evaluation. Persisted so the
+   * null = the audit source did not prove the number (never a zero).
+   * Optional so pre-existing trail entries (written before this field) parse.
+   */
+  distribution?: {
+    devPercent: number | null
+    sniperPercent: number | null
+    bundlerPercent: number | null
+    insiderPercent: number | null
+    top10Percent: number | null
+    clusterPercent: number | null
+  } | null
 }
 
 export type AuditChange =
@@ -106,7 +121,39 @@ function toEntry(d: SniperScanDecision, at: string, prev: AuditEntry | null): Au
     marketCapUsd: d.market?.marketCapUsd ?? null,
     liquidityUsd: d.market?.liquidityUsd ?? null,
   }
-  return { ...base, change: classifyChange(prev, base), previousStatus: prev?.status ?? null }
+  return {
+    ...base,
+    change: classifyChange(prev, base),
+    previousStatus: prev?.status ?? null,
+    distribution: d.distribution ?? null,
+  }
+}
+
+/**
+ * The reading history for one contract, OLDEST first — the shape
+ * classifyAccumulation consumes. Entries recorded before distribution was
+ * persisted carry `distribution: null` and are skipped: an older entry
+ * with no holder facts cannot contribute a delta.
+ */
+export function accumulationReadings(
+  contract: string,
+  audit: SniperAudit = readSniperAudit(),
+): AccumulationReading[] {
+  return audit.entries
+    .filter((e) => e.contract === contract && e.distribution != null)
+    .reverse() // stored newest-first → oldest-first
+    .map((e) => ({
+      at: e.at,
+      devPercent: e.distribution!.devPercent,
+      sniperPercent: e.distribution!.sniperPercent,
+      bundlerPercent: e.distribution!.bundlerPercent,
+      insiderPercent: e.distribution!.insiderPercent,
+      top10Percent: e.distribution!.top10Percent,
+      clusterPercent: e.distribution!.clusterPercent,
+      marketCapUsd: e.marketCapUsd,
+      liquidityUsd: e.liquidityUsd,
+      volume5mUsd: null as number | null,
+    }))
 }
 
 /**

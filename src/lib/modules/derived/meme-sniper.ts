@@ -52,6 +52,14 @@ export interface SniperPayload {
   /** Explicit stage; derived from `ageMinutes` when omitted. */
   stage?: SniperStage
   ageMinutes: number
+  /**
+   * Launch facts that decide which engine judges the token. `postBonding`
+   * is the authoritative migration signal — when the source provider proves
+   * it, age is not consulted. null/absent = unproven, fall back to age.
+   */
+  launch?: {
+    postBonding: boolean | null
+  }
   security: {
     /** null = unproven. MUST be proven false. */
     mintable: boolean | null
@@ -161,9 +169,25 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+/**
+ * Which engine judges this token. Derived from launch facts, not age alone:
+ * a young token that already migrated is post-bonding, and an old token on
+ * a bonding curve is still a new pair. Explicit `payload.stage` always wins
+ * (the source provider knows more than a timestamp).
+ *
+ * Order matters — `postBonding` is checked first because a migrated token is
+ * past the curve regardless of how few minutes it has existed.
+ */
 function deriveStage(payload: SniperPayload): SniperStage {
   if (payload.stage) return payload.stage
+  if (payload.launch?.postBonding === true) return 'post-bonding'
+  if (payload.launch?.postBonding === false) return 'new-pair'
   return payload.ageMinutes < 120 ? 'new-pair' : 'post-bonding'
+}
+
+/** The profile that judges this stage by default — the operator's own criteria. */
+export function profileForStage(stage: SniperStage): CriteriaProfileId {
+  return stage === 'new-pair' ? 'golden-new-pairs' : 'golden-post-migrated'
 }
 
 function ageLabel(minutes: number): string {
@@ -553,6 +577,12 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
 
   const stage = deriveStage(payload)
   const pnlAssessment = assessPnl(payload.momentum.top5AvgPnlPercent)
+  // Stage decides its golden profile; a caller can add more with
+  // `criteriaProfiles`. The stage default always runs, so a token can never
+  // escape the operator's documented criteria by omission.
+  const criteriaProfilesToRun: CriteriaProfileId[] = [
+    ...new Set([profileForStage(stage), ...(opts.criteriaProfiles ?? [])]),
+  ]
 
   const momentum = momentumBreaches(payload, stage)
   const rejections = [
@@ -613,7 +643,7 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
   // named profile judges the same facts once, with the operator's
   // documented thresholds. Rejects append (more evidence), unknowns/warns
   // surface as warnings — a profile never un-rejects an inline breach.
-  if (opts.criteriaProfiles && opts.criteriaProfiles.length > 0) {
+  if (criteriaProfilesToRun.length > 0) {
     // Map every field the profile can read from what the audit actually
     // proved. Fields with no source (freshWalletPct, earlyBuyerPct,
     // devSnipedPct, rugProbabilityPct, proTraderCount, survivedPostBondingMin,
@@ -641,7 +671,7 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
       mintEnabled: payload.security.mintable === null ? null : payload.security.mintable,
       freezeEnabled: payload.security.freezeAuthority === null ? null : payload.security.freezeAuthority,
     }
-    for (const profileId of opts.criteriaProfiles) {
+    for (const profileId of criteriaProfilesToRun) {
       const profile = profileFor(profileId)
       if (!profile) continue
       const res = evaluateProfile(profile, cm)

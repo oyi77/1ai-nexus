@@ -21,7 +21,17 @@ import { appendSniperScan } from '@/lib/modules/derived/sniper-log'
 import { DEFAULT_DELIVERY_POLICY, type DeliveryPolicy } from '@/lib/modules/derived/signal-tier'
 
 import { pushReviewDigest } from '@/lib/modules/derived/sniper-review'
-import { appendSniperAudit, materiallyChanged } from '@/lib/modules/derived/sniper-audit'
+import { appendSniperAudit, materiallyChanged, accumulationReadings } from '@/lib/modules/derived/sniper-audit'
+import { classifyAccumulation } from '@/lib/modules/derived/sniper-accumulation'
+import {
+  readOutcomes,
+  writeOutcomes,
+  registerDeliveries,
+  sweepOutcomes,
+  summariseOutcomes,
+  type PriceObservation,
+} from '@/lib/modules/derived/sniper-outcomes'
+
 /**
  * Policy D keeps WATCHLIST opt-in: it is a labelled, unconfirmed candidate,
  * never a top signal. The cron is the only production pusher, so the opt-in
@@ -66,6 +76,35 @@ async function main() {
     const gap = d.tierMissing.length > 0 ? ` missing=[${d.tierMissing.join('; ')}]` : ''
     console.log(
       `[sniper]   ${d.ticker} ${d.status} ${d.tier} (${why}) vol/mc=${d.metrics.volMcRatio.toFixed(2)} age=${d.metrics.ageLabel} audits=[${d.auditsUsed.join(',')}]${money}${gap}${d.delivered ? ' → PUSHED' : ''}${d.deduped ? ' (seen)' : ''}`,
+    )
+    // TAHAP 2: holder-tier delta across scans for THIS contract. Needs two
+    // readings that both carry holder facts, so it stays quiet on a first
+    // sighting rather than claiming a phase it cannot prove.
+    const phase = classifyAccumulation(accumulationReadings(d.contract))
+    if (phase.verdict !== 'UNKNOWN') {
+      console.log(
+        `[sniper]     ↳ phase=${phase.verdict} score=${phase.score} (${phase.readings} readings)${phase.reason ? ` — ${phase.reason}` : ''}`,
+      )
+    }
+  }
+
+  // TAHAP 4: close the loop. Every delivered signal enters the outcome log
+  // with the entry market cap it was pushed at, so a later sweep can score
+  // what the market actually did.
+  const observedAt = new Date().toISOString()
+  const prices: PriceObservation[] = res.decisions.map((d) => ({
+    contract: d.contract,
+    marketCapUsd: d.market.marketCapUsd,
+    observedAt,
+  }))
+  let outcomeLog = registerDeliveries(readOutcomes(), res.decisions, observedAt)
+  outcomeLog = writeOutcomes(sweepOutcomes(outcomeLog, prices))
+  const stats = summariseOutcomes(outcomeLog.signals)
+  if (stats.scored > 0 || stats.pending > 0) {
+    const hit = stats.hitRatePct === null ? 'n/a' : `${stats.hitRatePct.toFixed(0)}%`
+    const avg = stats.avgReturnPct === null ? 'n/a' : `${stats.avgReturnPct.toFixed(1)}%`
+    console.log(
+      `[sniper] outcomes: scored=${stats.scored} target=${stats.targets} stopped=${stats.stopped} flat=${stats.flat} pending=${stats.pending} unpriceable=${stats.unpriceable} hitRate=${hit} avgReturn=${avg}`,
     )
   }
   if (res.errors.length > 0) {

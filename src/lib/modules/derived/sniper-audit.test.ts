@@ -10,6 +10,7 @@ import {
   classifyChange,
   materiallyChanged,
   readSniperAudit,
+  accumulationReadings,
   type AuditEntry,
 } from './sniper-audit'
 import type { SniperScanDecision, SniperScanResult } from './sniper-scan'
@@ -180,5 +181,49 @@ describe('sniper-audit', () => {
     appendSniperAudit(result([decision({ contract: 'a' }), decision({ contract: 'b' })]))
     expect(auditTrailFor('a').map((e) => e.contract)).toEqual(['a'])
     expect(auditTrailFor('zzz')).toEqual([])
+  })
+})
+
+describe('accumulationReadings', () => {
+  it('skips entries with no distribution at all — the live crash shape', () => {
+    // A trail written before distribution existed has NO `distribution` key.
+    // `!== null` let `undefined` through and crashed on `.devPercent`.
+    const legacy = prev() as AuditEntry
+    delete (legacy as { distribution?: unknown }).distribution
+    writeFileSync(
+      process.env.SNIPER_AUDIT_PATH!,
+      JSON.stringify({ entries: [legacy], updatedAt: null }),
+    )
+    expect(() => accumulationReadings('mint111')).not.toThrow()
+    expect(accumulationReadings('mint111')).toEqual([])
+  })
+
+  it('skips an explicit null distribution', () => {
+    writeFileSync(
+      process.env.SNIPER_AUDIT_PATH!,
+      JSON.stringify({ entries: [prev({ distribution: null })], updatedAt: null }),
+    )
+    expect(accumulationReadings('mint111')).toEqual([])
+  })
+
+  it('returns oldest-first for two real readings', () => {
+    const dist = { devPercent: 0, sniperPercent: 1, bundlerPercent: 2, insiderPercent: 1, top10Percent: 10, clusterPercent: 1 }
+    writeFileSync(
+      process.env.SNIPER_AUDIT_PATH!,
+      JSON.stringify({
+        entries: [prev({ at: '2026-10-12T07:00:00.000Z', distribution: dist }), prev({ at: '2026-10-12T06:00:00.000Z', distribution: dist })],
+        updatedAt: null,
+      }),
+    )
+    expect(accumulationReadings('mint111').map((r) => r.at)).toEqual([
+      '2026-10-12T06:00:00.000Z',
+      '2026-10-12T07:00:00.000Z',
+    ])
+  })
+
+  it('records distribution on each appended evaluation', () => {
+    const dist = { devPercent: 0, sniperPercent: 2, bundlerPercent: 3, insiderPercent: 1, top10Percent: 12, clusterPercent: 0.5 }
+    appendSniperAudit(result([decision({ distribution: dist })]))
+    expect(readSniperAudit().entries[0].distribution).toEqual(dist)
   })
 })
