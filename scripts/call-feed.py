@@ -28,6 +28,12 @@ from telethon import TelegramClient
 CHANS = [
     ('SeekrTrending', 'trend'),
     ('solearlytrending', 'trend'),
+    # Operator hunting channels (2026-10-12): csolbix verified live via
+    # probe (last post 2026-10-11). PumpLivePool REMOVED — last post
+    # 2025-08-13 (dead 2 months, zero candidates). trendingssol REMOVED —
+    # resolvable but EMPTY (no readable posts). Dead channels cost a fetch
+    # every 2 min for nothing; re-add only after a live probe proves posts.
+    ('csolbix', 'trend'),
     ('AlphAI_signals_bsc_en', 'smart-money'),
     ('AlphAI_signals_sol_en', 'smart-money'),
     ('CallAnalyser2', 'score'),
