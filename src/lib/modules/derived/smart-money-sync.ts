@@ -362,9 +362,18 @@ export async function syncWalletsFromSheet(): Promise<{ synced: number; newWalle
   const sheetWallets = await readWalletsFromSheet()
   if (sheetWallets.length === 0) return { synced: 0, newWallets: 0 }
 
+  // Count existing wallets to determine true new inserts
+  const existingAddresses = new Set(
+    (await prisma.wallet.findMany({
+      where: { address: { in: sheetWallets.map((w) => w.address) } },
+      select: { address: true },
+    })).map((w) => w.address),
+  )
+
   let newWallets = 0
   for (const w of sheetWallets) {
-    const result = await prisma.wallet.upsert({
+    const existed = existingAddresses.has(w.address)
+    await prisma.wallet.upsert({
       where: { address: w.address },
       create: {
         address: w.address,
@@ -377,8 +386,8 @@ export async function syncWalletsFromSheet(): Promise<{ synced: number; newWalle
         alias: w.name || undefined,
         lastSeen: new Date(),
       },
-    }).then(() => 'ok' as const).catch(() => 'fail' as const)
-    if (result === 'ok') newWallets++
+    })
+    if (!existed) newWallets++
   }
   return { synced: sheetWallets.length, newWallets }
 }
