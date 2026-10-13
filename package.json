@@ -39,6 +39,7 @@
     "seed:feeds": "tsx prisma/seed-feeds.ts",
     "cron:sniper": "tsx src/scripts/sniper-cron.ts",
     "cron:wallet-refresh": "tsx src/scripts/wallet-refresh-cron.ts",
+    "cron:smart-money-sync": "tsx src/scripts/smart-money-sync-cron.ts",
     "import:wallets": "tsx scripts/import-wallets.ts"
   },
   "dependencies": {
@@ -63,6 +64,8 @@
     "d3-zoom": "^3.0.0",
     "date-fns": "^4.3.0",
     "framer-motion": "^12.40.0",
+    "google-auth-library": "^9.15.1",
+    "googleapis": "^134.0.0",
     "ioredis": "^5.11.0",
     "lightweight-charts": "^5.2.0",
     "lucide-react": "^1.16.0",
