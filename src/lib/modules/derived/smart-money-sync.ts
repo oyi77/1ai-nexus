@@ -22,10 +22,7 @@
 // block the Telegram alert path.
 // ─────────────────────────────────────────────────────────────
 
-import { google, type sheets_v4 } from 'googleapis'
-import { JWT } from 'google-auth-library'
 import { prisma } from '@/lib/db'
-import { existsSync, readFileSync } from 'node:fs'
 
 /** The operator's spreadsheet ID (from the shared link). */
 export const SPREADSHEET_ID = '14Kr-P8-DByM-jAw4ydo2x29YAp_LPc9uivHMidP6-78'
@@ -41,33 +38,189 @@ export const ALERT_THRESHOLDS = {
   maxMarketCapUsd: 1_000_000,
 } as const
 
-// ── Google Sheets auth ────────────────────────────────────────
+// ── Google Sheets auth via gog CLI ────────────────────────────
+//
+// gog CLI (v0.34+) stores OAuth tokens for Google services. We use it
+// as the credential provider:
+//   - Read: `gog sheets get -j -a <account> <id> <range>` (subprocess)
+//   - Write: extract access token from gog, use googleapis REST client
+//
+// gog v0.34 only ships `sheets get` (read). For writes, we extract the
+// OAuth2 access token gog internally manages and pass it to the
+// googleapis client. The token auto-refreshes via gog's stored refresh
+// token on each invocation.
+//
+// Env:
+//   GOG_ACCOUNT          — Google account email (default: moliangellina@gmail.com)
+//   GOG_KEYRING_PASSWORD — gog keyring decryption password
+//
+// Falls back to public CSV export for reads if gog is unavailable.
+// Falls back to skipping writes if gog token extraction fails.
 
-let sheetsClient: sheets_v4.Sheets | null | undefined
+const GOG_ACCOUNT = process.env.GOG_ACCOUNT || 'moliangellina@gmail.com'
 
-function getSheetsClient(): sheets_v4.Sheets | null {
-  if (sheetsClient !== undefined) return sheetsClient
-  const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
-  if (!keyPath || !existsSync(keyPath)) {
-    sheetsClient = null
-    return null
-  }
+/** gog binary path (checked once, cached). */
+let gogPath: string | null | undefined
+
+function getGogPath(): string | null {
+  if (gogPath !== undefined) return gogPath
   try {
-    const key = JSON.parse(readFileSync(keyPath, 'utf8')) as {
-      client_email: string
-      private_key: string
-    }
-    const auth = new JWT({
-      email: key.client_email,
-      key: key.private_key,
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-    })
-    sheetsClient = google.sheets({ version: 'v4', auth })
-    return sheetsClient
+    const { execSync } = require('node:child_process') as typeof import('node:child_process')
+    const result = execSync('which gog 2>/dev/null || echo ""', { encoding: 'utf8', timeout: 3000 }).trim()
+    gogPath = result || null
   } catch {
-    sheetsClient = null
+    gogPath = null
+  }
+  return gogPath
+}
+
+/** gog keyring password (required to decrypt OAuth tokens). */
+function getGogKeyringPassword(): string | null {
+  return process.env.GOG_KEYRING_PASSWORD || process.env.GMAIL_KEYRING_PASSWORD || null
+}
+
+/**
+ * Extract a fresh OAuth2 access token from gog by running a trivial
+ * authenticated sheets call and capturing the token gog uses internally.
+ *
+ * Strategy: run `gog sheets get` with a valid range. If it succeeds,
+ * the token is valid. We then extract the token via gog's JSON output
+ * or the keyring cache.
+ *
+ * Returns the access token string, or null if unavailable.
+ */
+let cachedAccessToken: { token: string; expiresAt: number } | null = null
+
+async function getGogAccessToken(): Promise<string | null> {
+  // Cache token for 50 minutes (gog tokens expire in ~60 min)
+  if (cachedAccessToken && Date.now() < cachedAccessToken.expiresAt) {
+    return cachedAccessToken.token
+  }
+
+  const gog = getGogPath()
+  if (!gog) return null
+  const keyringPw = getGogKeyringPassword()
+  if (!keyringPw) return null
+
+  // gog doesn't have a direct "print token" command, but we can extract
+  // the access token by running a gog command with GOG_ACCESS_TOKEN
+  // inspection. Instead, we use the googleapis OAuth2 client with the
+  // refresh token from gog's keyring.
+  //
+  // Simpler approach: call the Sheets API directly using the access token
+  // that gog manages. We run `gog sheets get` on a known range — if it
+  // succeeds, we know the token is valid. Then we extract the token from
+  // gog's token cache file.
+  //
+  // The most reliable extraction: gog stores access tokens in its cache
+  // directory after a successful API call. We read the cache file.
+  try {
+    const { execSync } = require('node:child_process') as typeof import('node:child_process')
+    const home = process.env.GOG_HOME || `${process.env.HOME}/.config/gogcli`
+    // gog caches access tokens per-account after first use
+    const tokenCachePath = `${home}/cache/${GOG_ACCOUNT}/token.json`
+    const fs = require('node:fs') as typeof import('node:fs')
+    if (fs.existsSync(tokenCachePath)) {
+      const raw = fs.readFileSync(tokenCachePath, 'utf8')
+      const parsed = JSON.parse(raw) as { access_token?: string; expiry?: string }
+      if (parsed.access_token) {
+        const expiresAt = parsed.expiry ? Date.parse(parsed.expiry) : Date.now() + 50 * 60_000
+        if (Date.now() < expiresAt) {
+          cachedAccessToken = { token: parsed.access_token, expiresAt: expiresAt - 60_000 }
+          return parsed.access_token
+        }
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  // Trigger a gog API call to refresh the token, then re-read the cache
+  try {
+    const { execSync } = require('node:child_process') as typeof import('node:child_process')
+    const env = { ...process.env, GOG_KEYRING_PASSWORD: keyringPw, GOG_ACCOUNT: GOG_ACCOUNT }
+    // A trivial sheets read forces gog to refresh its access token
+    execSync(
+      `gog sheets get -j -a "${GOG_ACCOUNT}" "${SPREADSHEET_ID}" "A1:A1"`,
+      { encoding: 'utf8', timeout: 15000, env },
+    ).trim()
+    // Now re-read the cache
+    const home = process.env.GOG_HOME || `${process.env.HOME}/.config/gogcli`
+    const tokenCachePath = `${home}/cache/${GOG_ACCOUNT}/token.json`
+    const fs = require('node:fs') as typeof import('node:fs')
+    if (fs.existsSync(tokenCachePath)) {
+      const raw = fs.readFileSync(tokenCachePath, 'utf8')
+      const parsed = JSON.parse(raw) as { access_token?: string; expiry?: string }
+      if (parsed.access_token) {
+        const expiresAt = parsed.expiry ? Date.parse(parsed.expiry) : Date.now() + 50 * 60_000
+        cachedAccessToken = { token: parsed.access_token, expiresAt: expiresAt - 60_000 }
+        return parsed.access_token
+      }
+    }
+  } catch (err) {
+    console.error('[smart-money-sync] gog token extraction failed:', err instanceof Error ? err.message : String(err))
+  }
+
+  return null
+}
+
+/**
+ * Build an authenticated Google Sheets REST API helper using the gog
+ * OAuth token. Returns null if gog token extraction fails.
+ *
+ * Uses direct fetch() to the Sheets v4 REST endpoints with
+ * `Authorization: Bearer <token>` — no googleapis client needed.
+ */
+interface SheetsApi {
+  get(range: string): Promise<string[][]>
+  append(range: string, values: unknown[][]): Promise<boolean>
+  update(range: string, values: unknown[][]): Promise<boolean>
+  batchUpdate(requests: unknown[]): Promise<boolean>
+}
+
+let cachedSheetsApi: SheetsApi | null | undefined
+
+async function getSheetsApi(): Promise<SheetsApi | null> {
+  if (cachedSheetsApi !== undefined) return cachedSheetsApi
+  const token = await getGogAccessToken()
+  if (!token) {
+    cachedSheetsApi = null
     return null
   }
+  const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}`
+  const headers: Record<string, string> = {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  }
+  cachedSheetsApi = {
+    async get(range: string): Promise<string[][]> {
+      const res = await fetch(`${baseUrl}/values/${encodeURIComponent(range)}`, { headers })
+      if (!res.ok) throw new Error(`Sheets GET ${res.status}: ${await res.text().catch(() => '')}`)
+      const data = await res.json() as { values?: string[][] }
+      return data.values ?? []
+    },
+    async append(range: string, values: unknown[][]): Promise<boolean> {
+      const res = await fetch(
+        `${baseUrl}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+        { method: 'POST', headers, body: JSON.stringify({ values }) },
+      )
+      return res.ok
+    },
+    async update(range: string, values: unknown[][]): Promise<boolean> {
+      const res = await fetch(
+        `${baseUrl}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,
+        { method: 'PUT', headers, body: JSON.stringify({ values }) },
+      )
+      return res.ok
+    },
+    async batchUpdate(requests: unknown[]): Promise<boolean> {
+      const res = await fetch(`${baseUrl}:batchUpdate`, {
+        method: 'POST', headers, body: JSON.stringify({ requests }),
+      })
+      return res.ok
+    },
+  }
+  return cachedSheetsApi
 }
 
 // ── 1. Read wallet source sheet → sync to DB ──────────────────
@@ -97,15 +250,11 @@ export async function readWalletsFromSheet(): Promise<SheetWallet[]> {
     console.error('[smart-money-sync] CSV export failed:', err instanceof Error ? err.message : String(err))
   }
 
-  // ── Fallback: authenticated Sheets API ──
-  const client = getSheetsClient()
-  if (!client) return []
+  // ── Fallback: authenticated Sheets API via gog ──
+  const api = await getSheetsApi()
+  if (!api) return []
   try {
-    const res = await client.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${WALLET_SOURCE_TAB}!A:B`,
-    })
-    const rows = res.data.values ?? []
+    const rows = await api.get(`${WALLET_SOURCE_TAB}!A:B`)
     return parseWalletRows(rows)
   } catch (err) {
     console.error('[smart-money-sync] Sheet read failed:', err instanceof Error ? err.message : String(err))
@@ -331,35 +480,20 @@ export function filterAlertableTrades(trades: SmartMoneyTrade[]): SmartMoneyTrad
  */
 export async function writeResultsToSheet(trades: SmartMoneyTrade[]): Promise<boolean> {
   if (trades.length === 0) return true
-  const client = getSheetsClient()
-  if (!client) return false
+  const api = await getSheetsApi()
+  if (!api) return false
 
   try {
-    // Ensure the results tab exists
-    await client.spreadsheets.batchUpdate({
-      spreadsheetId: SPREADSHEET_ID,
-      requestBody: {
-        requests: [{
-          addSheet: { properties: { title: RESULTS_TAB } },
-        }],
-      },
-    }).catch(() => {}) // already exists → ignore error
+    // Ensure the results tab exists (ignore error if already exists)
+    await api.batchUpdate([{ addSheet: { properties: { title: RESULTS_TAB } } }])
 
     // Write header if empty
-    const headerRange = await client.spreadsheets.values.get({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${RESULTS_TAB}!A1:I1`,
-    })
-    if (!headerRange.data.values || headerRange.data.values.length === 0) {
-      await client.spreadsheets.values.update({
-        spreadsheetId: SPREADSHEET_ID,
-        range: `${RESULTS_TAB}!A1:I1`,
-        valueInputOption: 'RAW',
-        requestBody: { values: [[
-          'Timestamp', 'Wallet', 'Alias', 'Status',
-          'Action', 'Token', 'Amount USD', 'Token Age (h)', 'Market Cap USD',
-        ]] },
-      })
+    const header = await api.get(`${RESULTS_TAB}!A1:I1`).catch(() => [] as string[][])
+    if (header.length === 0) {
+      await api.update(`${RESULTS_TAB}!A1:I1`, [[
+        'Timestamp', 'Wallet', 'Alias', 'Status',
+        'Action', 'Token', 'Amount USD', 'Token Age (h)', 'Market Cap USD',
+      ]])
     }
 
     // Append rows
@@ -375,12 +509,7 @@ export async function writeResultsToSheet(trades: SmartMoneyTrade[]): Promise<bo
       t.marketCapUsd !== null ? t.marketCapUsd.toFixed(0) : '',
     ])
 
-    await client.spreadsheets.values.append({
-      spreadsheetId: SPREADSHEET_ID,
-      range: `${RESULTS_TAB}!A:I`,
-      valueInputOption: 'RAW',
-      requestBody: { values: rows },
-    })
+    await api.append(`${RESULTS_TAB}!A:I`, rows)
 
     return true
   } catch (err) {
