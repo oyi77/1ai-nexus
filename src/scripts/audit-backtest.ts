@@ -30,6 +30,8 @@ import {
   type BacktestSummary,
 } from '@/lib/modules/derived/audit-backtest'
 import { JUP_PRICE_URL } from '@/lib/modules/derived/solana-harvest'
+import { buildBacktestDigest } from '@/lib/modules/derived/backtest-digest'
+import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
 
 const AUDIT_PATH = process.env.SNIPER_AUDIT_PATH ?? join(process.cwd(), 'data', 'sniper-audit.json')
 const LOG_PATH = process.env.SNIPER_LOG_PATH ?? join(process.cwd(), 'data', 'sniper-log.json')
@@ -249,6 +251,21 @@ async function main(): Promise<void> {
 
   for (const line of compactLines(rows, summary)) console.log(line)
   console.log(`[audit-backtest] wrote ${REPORT_PATH} fetchFailures=${fetchFailures}`)
+
+  // Optional Telegram digest — best-effort, never fails the script.
+  if (process.env.BACKTEST_SEND_DIGEST === 'true') {
+    try {
+      const digest = buildBacktestDigest(report)
+      if (digest === null) {
+        console.log('[audit-backtest] digest skipped (nothing priced or no summary)')
+      } else {
+        const sent = await deliverSniperAlert(digest)
+        console.log(sent ? '[audit-backtest] digest sent' : '[audit-backtest] digest skipped (telegram unavailable)')
+      }
+    } catch (e) {
+      console.log(`[audit-backtest] digest skipped (${errorMessage(e)})`)
+    }
+  }
 }
 
 void main()
