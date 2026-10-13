@@ -1017,6 +1017,8 @@ model ConvictionSignal {
 
   @@index([market, conviction])
   @@index([emittedAt])
+  @@index([emittedAt, outcome])
+  @@index([market, outcome, conviction])
   @@index([symbol, emittedAt(sort: Desc)])
 }
 // ── IDX Saham data layer (DB-backed, replaces data/idx/*.json snapshots) ──

@@ -91,6 +91,7 @@ CREATE INDEX IF NOT EXISTS "SniperAuditEntry_contract_chain_observedAt_idx" ON "
 CREATE INDEX IF NOT EXISTS "SniperAuditEntry_observedAt_idx" ON "SniperAuditEntry"("observedAt" DESC);
 
 -- CreateIndex (SniperSignalOutcome)
+CREATE UNIQUE INDEX IF NOT EXISTS "SniperSignalOutcome_signalId_key" ON "SniperSignalOutcome"("signalId");
 CREATE INDEX IF NOT EXISTS "SniperSignalOutcome_contract_chain_idx" ON "SniperSignalOutcome"("contract", "chain");
 CREATE INDEX IF NOT EXISTS "SniperSignalOutcome_status_alertedAt_idx" ON "SniperSignalOutcome"("status", "alertedAt" DESC);
 CREATE INDEX IF NOT EXISTS "SniperSignalOutcome_alertedAt_idx" ON "SniperSignalOutcome"("alertedAt" DESC);
