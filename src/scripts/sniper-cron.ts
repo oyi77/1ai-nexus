@@ -30,6 +30,7 @@ import {
   sweepOutcomes,
   summariseOutcomes,
   summariseByTier,
+  summariseByProfile,
   type PriceObservation,
 } from '@/lib/modules/derived/sniper-outcomes'
 import { calibrateTiers, demotionSummary } from '@/lib/modules/derived/tier-calibration'
@@ -99,7 +100,19 @@ async function main() {
     marketCapUsd: d.market.marketCapUsd,
     observedAt,
   }))
-  let outcomeLog = registerDeliveries(readOutcomes(), res.decisions, observedAt)
+  let outcomeLog = registerDeliveries(
+    readOutcomes(),
+    res.decisions.map((d) => ({
+      contract: d.contract,
+      ticker: d.ticker,
+      tier: d.tier,
+      delivered: d.delivered,
+      market: d.market,
+      rejections: d.rejections,
+      warnings: d.warnings,
+    })),
+    observedAt,
+  )
   outcomeLog = writeOutcomes(sweepOutcomes(outcomeLog, prices))
   const stats = summariseOutcomes(outcomeLog.signals)
   if (stats.scored > 0 || stats.pending > 0) {
@@ -121,6 +134,12 @@ async function main() {
   console.log(
     `[sniper] tier hit rates: ${calibrations
       .map((c) => `${c.tier}=${c.hitRatePct === null ? 'n/a' : `${c.hitRatePct.toFixed(0)}%`}(${c.scored})`)
+      .join(' ')}`,
+  )
+  const byProfile = summariseByProfile(outcomeLog.signals)
+  console.log(
+    `[sniper] profile hit rates: ${Object.entries(byProfile)
+      .map(([profile, s]) => `${profile}=${s.hitRatePct === null ? 'n/a' : `${s.hitRatePct.toFixed(0)}%`}(${s.scored})`)
       .join(' ')}`,
   )
 

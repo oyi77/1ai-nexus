@@ -21,6 +21,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
+import { type CriteriaProfileId } from './sniper-criteria'
+
 export type OutcomeVerdict = 'PENDING' | 'TARGET' | 'STOPPED' | 'FLAT' | 'UNPRICEABLE'
 
 export interface SignalOutcome {
@@ -43,6 +45,14 @@ export interface SignalOutcome {
   verdict: OutcomeVerdict
   /** When the verdict was last computed. */
   scoredAt: string | null
+  /**
+   * Applicable ebook criteria profiles, derived from bracket-prefixed
+   * rejection/warning entries. Optional: pre-attribution records (and
+   * records registered before this field existed) have none.
+   */
+  profileIds?: string[]
+  /** The profile-attributed breach strings (leading `[profile-id]`). */
+  profileBreaches?: string[]
 }
 
 export interface OutcomeLog {
@@ -66,6 +76,36 @@ export interface OutcomeConfig {
   horizonHours: number
   targetReturn: number
   stopReturn: number
+}
+
+/** The five operator-documented ebook profiles — kept as a static lookup. */
+const CRITERIA_PROFILE_IDS: Readonly<Record<string, true>> = {
+  'golden-new-pairs': true,
+  'golden-post-migrated': true,
+  'sniper-launch': true,
+  'bonding-post': true,
+  'exposure-early': true,
+}
+
+/** Leading `[profile-id]` of a text, only when it is a known ebook profile. */
+function profilePrefix(text: string): CriteriaProfileId | null {
+  const m = /^\[([^\]]+)\]/.exec(text)
+  if (!m) return null
+  return m[1] in CRITERIA_PROFILE_IDS ? (m[1] as CriteriaProfileId) : null
+}
+
+/**
+ * Extract every applicable ebook profile from bracket-prefixed strings
+ * (rejections/warnings). Deduped and sorted; non-profile and bare strings
+ * are ignored.
+ */
+export function extractProfileIds(texts: string[]): string[] {
+  return [...new Set(texts.map(profilePrefix).filter((id): id is CriteriaProfileId => id !== null))].sort()
+}
+
+/** Return only the full strings whose leading `[x]` is a known profile id. */
+export function extractProfileBreaches(texts: string[]): string[] {
+  return texts.filter((text) => profilePrefix(text) !== null)
 }
 
 function outcomePath(): string {
@@ -99,7 +139,15 @@ export function writeOutcomes(log: OutcomeLog): OutcomeLog {
 
 export function registerDelivered(
   log: OutcomeLog,
-  signal: { contract: string; ticker: string; tier: string; entryMarketCapUsd: number | null; deliveredAt: string },
+  signal: {
+    contract: string
+    ticker: string
+    tier: string
+    entryMarketCapUsd: number | null
+    deliveredAt: string
+    profileIds?: string[]
+    profileBreaches?: string[]
+  },
   config: OutcomeConfig = OUTCOME_DEFAULTS,
 ): OutcomeLog {
   if (log.signals.some((s) => s.contract === signal.contract)) return log
@@ -128,6 +176,8 @@ export function registerDelivered(
         // scored, and saying PENDING forever is the honest answer.
         verdict: signal.entryMarketCapUsd === null ? 'UNPRICEABLE' : 'PENDING',
         scoredAt: null,
+        profileIds: signal.profileIds,
+        profileBreaches: signal.profileBreaches,
       },
     ],
   }
@@ -218,6 +268,22 @@ export function summariseByTier(signals: SignalOutcome[]): Record<string, Outcom
 }
 
 /**
+ * Per-ebook-profile performance — the number that tells the operator WHICH
+ * criteria profile predicts winners. Keyed by profile id; only signals that
+ * carry `profileIds` participate, so pre-attribution history never pollutes
+ * the answer. A profile with no scored signals reports null, NOT 0%.
+ */
+export function summariseByProfile(signals: SignalOutcome[]): Record<string, OutcomeStats> {
+  const attributed = signals.filter(
+    (s): s is SignalOutcome & { profileIds: string[] } => s.profileIds !== undefined,
+  )
+  const profiles = [...new Set(attributed.flatMap((s) => s.profileIds))]
+  return Object.fromEntries(
+    profiles.map((p) => [p, summariseOutcomes(attributed.filter((s) => s.profileIds.includes(p)))]),
+  )
+}
+
+/**
  * Price observation for the sweep: the market cap the pipeline currently
  * believes for a contract, and the time that belief belongs to.
  */
@@ -240,6 +306,8 @@ export function registerDeliveries(
     tier: string
     delivered: boolean
     market?: { marketCapUsd?: number | null } | null
+    rejections?: string[]
+    warnings?: string[]
   }>,
   deliveredAt: string,
   config: OutcomeConfig = OUTCOME_DEFAULTS,
@@ -247,6 +315,9 @@ export function registerDeliveries(
   let next = log
   for (const d of decisions) {
     if (!d.delivered) continue
+    const texts = [...(d.rejections ?? []), ...(d.warnings ?? [])]
+    const profileIds = extractProfileIds(texts)
+    const profileBreaches = extractProfileBreaches(texts)
     next = registerDelivered(
       next,
       {
@@ -255,6 +326,8 @@ export function registerDeliveries(
         tier: d.tier,
         entryMarketCapUsd: d.market?.marketCapUsd ?? null,
         deliveredAt,
+        ...(profileIds.length > 0 ? { profileIds } : {}),
+        ...(profileBreaches.length > 0 ? { profileBreaches } : {}),
       },
       config,
     )
