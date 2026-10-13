@@ -19,6 +19,7 @@ function wallet(over: Partial<HarvestedWallet> = {}): HarvestedWallet {
     winRate30d: 0.64,
     pnl30d: 0.3,
     realizedProfit30d: null,
+    buyVolume30d: null,
     ...over,
   }
 }

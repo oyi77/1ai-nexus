@@ -104,6 +104,7 @@ async function main(): Promise<void> {
   let unknown = 0
   let watchlist = 0
   let provisional = 0
+  let whale = 0
   let failures = 0
 
   for (const w of harvested) {
@@ -118,6 +119,7 @@ async function main(): Promise<void> {
     if (verdict.status === 'UNKNOWN') unknown += 1
     else if (verdict.status === 'WATCHLIST') watchlist += 1
     else if (verdict.status === 'PROVISIONAL') provisional += 1
+    else if (verdict.status === 'WHALE') whale += 1
 
     if (isRicherClassification(existingByWalletId.get(walletId))) {
       skipped += 1
@@ -163,7 +165,7 @@ async function main(): Promise<void> {
 
   console.log(
     `[gmgn-bootstrap] harvested=${harvested.length} inDb=${inDb} upserted=${upserted} skipped=${skipped} ` +
-      `unknown=${unknown} watchlist=${watchlist} provisional=${provisional} failures=${failures}`,
+      `whale=${whale} unknown=${unknown} watchlist=${watchlist} provisional=${provisional} failures=${failures}`,
   )
 
   process.exit(0)

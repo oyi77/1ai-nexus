@@ -46,6 +46,7 @@ export interface HarvestedWallet {
   winRate30d: number | null
   pnl30d: number | null
   realizedProfit30d: number | null
+  buyVolume30d: number | null
 }
 
 /**
@@ -78,6 +79,7 @@ export async function harvestGmgnWallets(
         winRate30d: row.winRate30d,
         pnl30d: row.pnl30d,
         realizedProfit30d: row.realizedProfit30d,
+        buyVolume30d: row.buyVolume30d,
       }
       const existing = byAddress.get(row.address)
       if (!existing) {
@@ -89,7 +91,11 @@ export async function harvestGmgnWallets(
       const eScore = existing.realizedProfit30d ?? existing.pnl30d ?? 0
       const better =
         cScore > eScore ||
-        (cScore === eScore && (candidate.winRate30d ?? -1) > (existing.winRate30d ?? -1))
+        (cScore === eScore && (candidate.winRate30d ?? -1) > (existing.winRate30d ?? -1)) ||
+        (cScore === eScore &&
+          (candidate.winRate30d ?? -1) === (existing.winRate30d ?? -1) &&
+          candidate.buyVolume30d !== null &&
+          existing.buyVolume30d === null)
       if (better) {
         // First tag keeps ownership; better row supplies the measurements.
         byAddress.set(row.address, { ...candidate, source: existing.source })
@@ -112,6 +118,7 @@ export async function harvestKolscanWallets(): Promise<HarvestedWallet[]> {
     winRate30d: null,
     pnl30d: null,
     realizedProfit30d: null,
+    buyVolume30d: null,
   }))
 }
 
