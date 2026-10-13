@@ -43,7 +43,8 @@
     "cron:wallet-refresh": "tsx src/scripts/wallet-refresh-cron.ts",
     "cron:smart-money-sync": "tsx src/scripts/smart-money-sync-cron.ts",
     "cron:kol-monitor": "tsx src/scripts/kol-monitor-cron.ts",
-    "import:wallets": "tsx scripts/import-wallets.ts"
+    "import:wallets": "tsx scripts/import-wallets.ts",
+    "harvest:whales": "tsx src/scripts/whale-harvester-cron.ts"
   },
   "dependencies": {
     "@1ai/payment": "file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",
