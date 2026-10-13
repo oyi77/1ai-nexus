@@ -108,6 +108,7 @@ data/sniper-audit.json
 data/call-feed-latest.json
 data/wallet-buys-latest.json
 data/sniper-outcomes.json
+data/kolscan-seen.json
 
 # nightly DB dumps (large, regenerated — never commit)
 backups/
