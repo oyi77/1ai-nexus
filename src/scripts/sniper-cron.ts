@@ -29,8 +29,10 @@ import {
   registerDeliveries,
   sweepOutcomes,
   summariseOutcomes,
+  summariseByTier,
   type PriceObservation,
 } from '@/lib/modules/derived/sniper-outcomes'
+import { calibrateTiers, demotionSummary } from '@/lib/modules/derived/tier-calibration'
 
 /**
  * Policy D keeps WATCHLIST opt-in: it is a labelled, unconfirmed candidate,
@@ -107,6 +109,21 @@ async function main() {
       `[sniper] outcomes: scored=${stats.scored} target=${stats.targets} stopped=${stats.stopped} flat=${stats.flat} pending=${stats.pending} unpriceable=${stats.unpriceable} hitRate=${hit} avgReturn=${avg}`,
     )
   }
+
+  // TAHAP 4 (observability only): surface per-tier performance so the
+  // operator can see which tiers are earning their volume. The actual
+  // delivery-policy demotion is a later, operator-approved step — nothing
+  // here changes what gets pushed.
+  const byTier = summariseByTier(outcomeLog.signals)
+  const calibrations = calibrateTiers(byTier)
+  const demotions = demotionSummary(calibrations)
+  if (demotions !== null) console.log(`[sniper] calibration: ${demotions}`)
+  console.log(
+    `[sniper] tier hit rates: ${calibrations
+      .map((c) => `${c.tier}=${c.hitRatePct === null ? 'n/a' : `${c.hitRatePct.toFixed(0)}%`}(${c.scored})`)
+      .join(' ')}`,
+  )
+
   if (res.errors.length > 0) {
     for (const e of res.errors) console.error(`[sniper] error: ${e}`)
   }
