@@ -2,7 +2,13 @@
 // Sniper review digest unit tests (pure selection, no Telegram).
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest'
-import { pickReviewCandidates, selectFreshForReview, REVIEW_VOLMC_FLOOR } from './sniper-review'
+import {
+  pickReviewCandidates,
+  selectFreshForReview,
+  REVIEW_VOLMC_FLOOR,
+  assessReview,
+  renderReviewDigestForTest,
+} from './sniper-review'
 import type { SniperScanDecision } from './sniper-scan'
 
 function decision(over: Partial<SniperScanDecision>): SniperScanDecision {
@@ -92,5 +98,107 @@ describe('selectFreshForReview (Phase 7 re-review rule)', () => {
     const rows = [vol('a', 3)]
     const out = selectFreshForReview(rows, { a: Date.now() }, new Set(['a']))
     expect(out.map((d) => d.contract)).toEqual(['a'])
+  })
+})
+
+
+// ─────────────────────────────────────────────────────────────
+// TAHAP 7 fixtures: render pipeline must survive the operator's
+// edge cases and never emit an unparseable HTML message.
+// ─────────────────────────────────────────────────────────────
+
+/** Every `<` in a rendered message must open a real HTML tag or be `&lt;`. */
+function assertHtmlSafe(msgs: string[]): void {
+  for (const m of msgs) {
+    expect(m.length).toBeLessThanOrEqual(4096)
+    for (let i = 0; i < m.length; i++) {
+      if (m[i] !== '<') continue
+      const rest = m.slice(i)
+      const escaped = m.slice(Math.max(0, i - 3), i).includes('&lt;')
+      const tag = /^<\/?(b|i|code|u|s|a)(\s|>)/.test(rest)
+      expect(escaped || tag, `raw < at offset ${i}: ${JSON.stringify(rest.slice(0, 24))}`).toBe(true)
+    }
+  }
+}
+
+describe('renderReviewDigestForTest (TAHAP 7 fixtures)', () => {
+  it('multi-reject: renders every rejection, none silently dropped', () => {
+    const d = decision({
+      contract: 'multi1',
+      rejections: [
+        'Dev holds 22.5% — beyond hard ceiling',
+        'Snipers hold 22.5% (ceiling 6%)',
+        'Top 10 hold 72.9% (ceiling 30%)',
+        'Dead momentum: 5m vol/mcap 0.10x < required 4x',
+      ],
+      metrics: { ...decision({}).metrics, volMcRatio: 1.5, top10Percent: 72.9 },
+    })
+    const msgs = renderReviewDigestForTest([d])
+    expect(msgs).toHaveLength(1)
+    expect(msgs[0]).toContain('SEMUA ALASAN PENOLAKAN (4)')
+    assertHtmlSafe(msgs)
+  })
+
+  it('UNKNOWN: unverified metrics render as ❓, never as 0', () => {
+    const d = decision({
+      contract: 'unk1',
+      rejections: ['Dev holding unproven — cannot confirm'],
+      metrics: {
+        ...decision({}).metrics,
+        devPercent: null,
+        insiderPercent: null,
+        clusterPercent: null,
+        volMcRatio: 3,
+      },
+      market: { marketCapUsd: 50_000, liquidityUsd: null, volume5mUsd: null, priceUsd: null },
+    })
+    expect(assessReview(d).finalStatus).toBe('UNKNOWN')
+    const msgs = renderReviewDigestForTest([d])
+    expect(msgs[0]).toContain('❓ belum terverifikasi')
+    assertHtmlSafe(msgs)
+  })
+
+  it('duplicate: a deduped row is never rendered into the digest', () => {
+    const rows = [
+      vol('dup1', 3),
+      decision({ contract: 'dup1', deduped: true, metrics: { ...decision({}).metrics, volMcRatio: 3 } }),
+    ]
+    const msgs = renderReviewDigestForTest(rows)
+    expect(msgs[0]).toContain('Kandidat: 1 ditampilkan')
+    assertHtmlSafe(msgs)
+  })
+
+  it('bonding: POST_MIGRATED category is labelled, not shown as NEW_PAIRS', () => {
+    const d = vol('bond1', 2.5)
+    d.discoveryCategory = 'POST_MIGRATED'
+    const msgs = renderReviewDigestForTest([d])
+    expect(msgs[0]).toContain('POST_MIGRATED')
+    assertHtmlSafe(msgs)
+  })
+
+  it('whale: a WHALE_AND_SMART_MONEY holder renders as detected, not absent', () => {
+    const d = decision({
+      contract: 'whale1',
+      metrics: { ...decision({}).metrics, volMcRatio: 3 },
+      smartMoneyBuyers: 3,
+      smartMoneyStrongest: 'WHALE_AND_SMART_MONEY',
+    })
+    const msgs = renderReviewDigestForTest([d])
+    expect(msgs[0]).toContain('WHALE_AND_SMART_MONEY')
+    expect(msgs[0]).not.toContain('tidak ada bukti whale terklasifikasi')
+    assertHtmlSafe(msgs)
+  })
+
+  it('E2E payload: a 30-block flood splits, every chunk HTML-safe and ≤4096', () => {
+    const flood = Array.from({ length: 30 }, (_, i) =>
+      decision({
+        contract: `flood${i}`,
+        ticker: `T_${i}`,
+        metrics: { ...decision({}).metrics, volMcRatio: 3 + i },
+      }),
+    )
+    const msgs = renderReviewDigestForTest(flood)
+    expect(msgs.length).toBeGreaterThan(1)
+    assertHtmlSafe(msgs)
   })
 })

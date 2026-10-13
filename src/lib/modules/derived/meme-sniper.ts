@@ -778,20 +778,18 @@ export async function deliverSniperAlert(
       if (res.ok) return true
       const errBody = await res.text().catch(() => '')
       console.error(`[sniper] telegram send failed: HTTP ${res.status} ${errBody.slice(0, 300)}`)
-      // 400 = parse error — retry won't help, bail immediately
       if (res.status === 400) return false
-      // 429 = rate limited — respect Retry-After if present
       if (res.status === 429) {
         const ra = errBody.match(/"retry_after"\s*:\s*(\d+)/)
         const wait = ra ? Math.min(Number(ra[1]), 30) : 5
-        if (attempt === 1) { await new Promise(r => setTimeout(r, wait * 1000)); continue }
+        if (attempt === 1) { await new Promise((r) => setTimeout(r, wait * 1000)); continue }
       }
       return false
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       console.error(`[sniper] telegram send error (attempt ${attempt}/2): ${msg}`)
       if (attempt === 2) return false
-      await new Promise(r => setTimeout(r, 3000))
+      await new Promise((r) => setTimeout(r, 3000))
     }
   }
   return false
