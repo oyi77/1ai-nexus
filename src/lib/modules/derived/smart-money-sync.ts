@@ -566,6 +566,30 @@ export async function writeResultsToSheet(trades: SmartMoneyTrade[]): Promise<bo
   }
 }
 
+// ── 4b. Append wallets to source sheet ────────────────────────
+
+/**
+ * Append new wallet rows (Address, Name) to the wallet source tab.
+ * Used to bulk-add researched whale/smart-money wallets to the sheet.
+ */
+export async function appendWalletsToSheet(wallets: SheetWallet[]): Promise<number> {
+  if (wallets.length === 0) return 0
+  const api = await getSheetsApi()
+  if (!api) {
+    console.error('[smart-money-sync] Cannot append wallets — no gog token')
+    return 0
+  }
+  try {
+    const rows = wallets.map((w) => [w.address, w.name])
+    const ok = await api.append(`${WALLET_SOURCE_TAB}!A:B`, rows)
+    if (ok) return wallets.length
+    return 0
+  } catch (err) {
+    console.error('[smart-money-sync] Wallet append failed:', err instanceof Error ? err.message : String(err))
+    return 0
+  }
+}
+
 // ── 5. Telegram alert ─────────────────────────────────────────
 
 function escapeHtml(s: string): string {
