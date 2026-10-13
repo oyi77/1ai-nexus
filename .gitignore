@@ -105,6 +105,7 @@ data/sniper-seen.json
 data/sniper-log.json
 data/sniper-review-seen.json
 data/sniper-audit.json
+data/audit-backtest-report.json
 data/call-feed-latest.json
 data/wallet-buys-latest.json
 data/sniper-outcomes.json
