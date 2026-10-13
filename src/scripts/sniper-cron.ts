@@ -34,6 +34,7 @@ import {
   type PriceObservation,
 } from '@/lib/modules/derived/sniper-outcomes'
 import { calibrateTiers, demotionSummary } from '@/lib/modules/derived/tier-calibration'
+import { adaptDeliveryPolicy, adaptivePolicyReason } from '@/lib/modules/derived/adaptive-policy'
 
 /**
  * Policy D keeps WATCHLIST opt-in: it is a labelled, unconfirmed candidate,
@@ -41,8 +42,17 @@ import { calibrateTiers, demotionSummary } from '@/lib/modules/derived/tier-cali
  * lives here — REJECT/UNKNOWN/STALE stay undeliverable regardless (see
  * shouldDeliver).
  */
-function deliveryPolicy(): DeliveryPolicy {
-  return { ...DEFAULT_DELIVERY_POLICY, allowWatchlist: process.env.SNIPER_DELIVER_WATCHLIST === 'true' }
+function deliveryPolicy(byTier?: Record<string, { scored: number; hitRatePct: number | null }>): DeliveryPolicy {
+  const base: DeliveryPolicy = {
+    ...DEFAULT_DELIVERY_POLICY,
+    allowWatchlist: process.env.SNIPER_DELIVER_WATCHLIST === 'true',
+  }
+  if (process.env.SNIPER_ADAPTIVE_POLICY !== 'true' || byTier === undefined) return base
+
+  const policy = adaptDeliveryPolicy({ base, byTier })
+  const reason = adaptivePolicyReason({ base, byTier })
+  console.log(`[sniper] adaptive policy: ${reason ?? 'no change'}`)
+  return policy
 }
 
 const LIMIT = Number(process.env.SNIPER_SCAN_LIMIT) || 5
@@ -52,7 +62,14 @@ async function main() {
   console.log(
     `[sniper] scan start (limit=${LIMIT}, deliver=${DELIVER}, watchlist=${process.env.SNIPER_DELIVER_WATCHLIST === 'true'})`,
   )
-  const res = await runSniperScan({ limit: LIMIT, deliver: DELIVER, deliveryPolicy: deliveryPolicy() })
+  // Adaptive policy reads PRE-EXISTING outcome history (before this pass
+  // registers new, unproven signals) so adaptation reflects real evidence.
+  const priorByTier = summariseByTier(readOutcomes().signals)
+  const res = await runSniperScan({
+    limit: LIMIT,
+    deliver: DELIVER,
+    deliveryPolicy: deliveryPolicy(priorByTier),
+  })
   appendSniperScan(res)
 
   // Phase 7: compute what materially changed BEFORE persisting this pass, so
