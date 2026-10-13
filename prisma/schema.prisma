@@ -1270,3 +1270,82 @@ model FeedHealthEvent {
   @@index([feedId, checkedAt(sort: Desc)])
   @@index([checkedAt(sort: Desc)])
 }
+// ─────────────────────────────────────────────────────────────
+// Meme Sniper — State & Audit Tables (migrated from data/*.json)
+// ─────────────────────────────────────────────────────────────
+
+model SniperScanDecision {
+  id              String   @id @default(cuid())
+  contract        String
+  chain           String
+  symbol          String
+  name            String
+  status          String   // APPROVED, REJECTED, WATCHLISTED, UNKNOWN
+  stage           String?
+  tier            String?
+  reasons         String[]
+  metrics         Json
+  scores          Json?
+  source          String?
+  delivered       Boolean  @default(false)
+  deliveryTier    String?
+  scannedAt       DateTime @default(now())
+  metadata        Json?
+
+  @@index([contract, chain])
+  @@index([status, scannedAt(sort: Desc)])
+  @@index([scannedAt(sort: Desc)])
+  @@index([chain, scannedAt(sort: Desc)])
+}
+
+model SniperAuditEntry {
+  id              String   @id @default(cuid())
+  contract        String
+  chain           String
+  symbol          String
+  marketCapUsd    Float
+  liquidityUsd    Float
+  volume1hUsd     Float?
+  volume24hUsd    Float?
+  holderCount     Int?
+  top10HoldersPct Float?
+  observedAt      DateTime @default(now())
+
+  @@index([contract, chain, observedAt(sort: Desc)])
+  @@index([observedAt(sort: Desc)])
+}
+
+model SniperSignalOutcome {
+  id              String    @id @default(cuid())
+  signalId        String    @unique
+  contract        String
+  chain           String
+  symbol          String
+  source          String?
+  stage           String?
+  tier            String?
+  alertPriceUsd   Float
+  highestPriceUsd Float     @default(0)
+  lowestPriceUsd  Float     @default(0)
+  currentPriceUsd Float?
+  currentMcapUsd  Float?
+  status          String
+  hitMultiple     Float?
+  roiPct          Float?
+  closedAt        DateTime?
+  alertedAt       DateTime
+  updatedAt       DateTime  @updatedAt
+
+  @@index([contract, chain])
+  @@index([status, alertedAt(sort: Desc)])
+  @@index([alertedAt(sort: Desc)])
+}
+
+model SniperReviewSeen {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  seenAt    DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
