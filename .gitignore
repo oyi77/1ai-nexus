@@ -111,5 +111,8 @@ data/wallet-buys-latest.json
 data/sniper-outcomes.json
 data/kolscan-seen.json
 
+# GMGN tag inventory sweep (runtime artifact, regenerated on demand)
+data/gmgn-tag-inventory.json
+
 # nightly DB dumps (large, regenerated — never commit)
 backups/
