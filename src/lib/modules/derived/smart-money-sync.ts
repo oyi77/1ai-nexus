@@ -28,8 +28,8 @@ import { prisma } from '@/lib/db'
 export const SPREADSHEET_ID = '14Kr-P8-DByM-jAw4ydo2x29YAp_LPc9uivHMidP6-78'
 
 /** Sheet tab names. */
-const WALLET_SOURCE_TAB = 'Wallets'      // operator input: Address, Name
-const RESULTS_TAB = 'SmartMoneyActivity' // screening output
+const WALLET_SOURCE_TAB = process.env.SMART_MONEY_WALLET_TAB || 'Sheet1'
+const RESULTS_TAB = process.env.SMART_MONEY_RESULTS_TAB || 'SmartMoneyActivity'
 
 /** Alert thresholds (operator-specified). */
 export const ALERT_THRESHOLDS = {
@@ -80,19 +80,51 @@ function getGogKeyringPassword(): string | null {
 }
 
 /**
- * Extract a fresh OAuth2 access token from gog by running a trivial
- * authenticated sheets call and capturing the token gog uses internally.
+ * Extract a fresh OAuth2 access token from gog's encrypted keyring.
  *
- * Strategy: run `gog sheets get` with a valid range. If it succeeds,
- * the token is valid. We then extract the token via gog's JSON output
- * or the keyring cache.
+ * Flow:
+ *   1. Decrypt the JWE-encrypted keyring file (PBES2-HS256+A128KW + A256GCM)
+ *      using the keyring password — via Python subprocess (cryptography lib).
+ *   2. Extract the refresh_token from the decrypted keyring Data field.
+ *   3. Exchange the refresh_token for an access_token via Google's OAuth
+ *      endpoint using the gog client credentials.
+ *   4. Cache the access_token for 50 minutes (Google tokens expire in ~1h).
  *
  * Returns the access token string, or null if unavailable.
  */
 let cachedAccessToken: { token: string; expiresAt: number } | null = null
 
+const GOG_KEYRING_DECRYPT_SCRIPT = `import base64, json, hashlib, sys
+from pathlib import Path
+
+password = sys.argv[1].encode()
+keyring_file = sys.argv[2]
+
+raw = Path(keyring_file).read_text()
+parts = raw.split('.')
+header = json.loads(base64.urlsafe_b64decode(parts[0] + '=='))
+alg = header['alg']
+p2s_raw = base64.urlsafe_b64decode(header['p2s'] + '==')
+salt = alg.encode() + b'\\x00' + p2s_raw
+kw_key = hashlib.pbkdf2_hmac('sha256', password, salt, header['p2c'], dklen=16)
+
+enc_key = base64.urlsafe_b64decode(parts[1] + '==')
+iv = base64.urlsafe_b64decode(parts[2] + '==')
+ct = base64.urlsafe_b64decode(parts[3] + '==')
+tag = base64.urlsafe_b64decode(parts[4] + '==')
+
+from cryptography.hazmat.primitives.keywrap import aes_key_unwrap
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+cek = aes_key_unwrap(kw_key, enc_key)
+plaintext = AESGCM(cek).decrypt(iv, ct + tag, parts[0].encode())
+entry = json.loads(plaintext)
+token_json = base64.b64decode(entry['Data']).decode()
+token_data = json.loads(token_json)
+sys.stdout.write(token_data.get('refresh_token', ''))
+`
+
 async function getGogAccessToken(): Promise<string | null> {
-  // Cache token for 50 minutes (gog tokens expire in ~60 min)
+  // Cache token for 50 minutes
   if (cachedAccessToken && Date.now() < cachedAccessToken.expiresAt) {
     return cachedAccessToken.token
   }
@@ -102,66 +134,73 @@ async function getGogAccessToken(): Promise<string | null> {
   const keyringPw = getGogKeyringPassword()
   if (!keyringPw) return null
 
-  // gog doesn't have a direct "print token" command, but we can extract
-  // the access token by running a gog command with GOG_ACCESS_TOKEN
-  // inspection. Instead, we use the googleapis OAuth2 client with the
-  // refresh token from gog's keyring.
-  //
-  // Simpler approach: call the Sheets API directly using the access token
-  // that gog manages. We run `gog sheets get` on a known range — if it
-  // succeeds, we know the token is valid. Then we extract the token from
-  // gog's token cache file.
-  //
-  // The most reliable extraction: gog stores access tokens in its cache
-  // directory after a successful API call. We read the cache file.
-  try {
-    const { execSync } = require('node:child_process') as typeof import('node:child_process')
-    const home = process.env.GOG_HOME || `${process.env.HOME}/.config/gogcli`
-    // gog caches access tokens per-account after first use
-    const tokenCachePath = `${home}/cache/${GOG_ACCOUNT}/token.json`
-    const fs = require('node:fs') as typeof import('node:fs')
-    if (fs.existsSync(tokenCachePath)) {
-      const raw = fs.readFileSync(tokenCachePath, 'utf8')
-      const parsed = JSON.parse(raw) as { access_token?: string; expiry?: string }
-      if (parsed.access_token) {
-        const expiresAt = parsed.expiry ? Date.parse(parsed.expiry) : Date.now() + 50 * 60_000
-        if (Date.now() < expiresAt) {
-          cachedAccessToken = { token: parsed.access_token, expiresAt: expiresAt - 60_000 }
-          return parsed.access_token
-        }
-      }
-    }
-  } catch {
-    // fall through
-  }
+  const gogHome = process.env.GOG_HOME || `${process.env.HOME}/.config/gogcli`
+  const keyringFile = `${gogHome}/keyring/token:${GOG_ACCOUNT}`
 
-  // Trigger a gog API call to refresh the token, then re-read the cache
   try {
+    // Step 1: Decrypt keyring → get refresh token
     const { execSync } = require('node:child_process') as typeof import('node:child_process')
-    const env = { ...process.env, GOG_KEYRING_PASSWORD: keyringPw, GOG_ACCOUNT: GOG_ACCOUNT }
-    // A trivial sheets read forces gog to refresh its access token
-    execSync(
-      `gog sheets get -j -a "${GOG_ACCOUNT}" "${SPREADSHEET_ID}" "A1:A1"`,
-      { encoding: 'utf8', timeout: 15000, env },
-    ).trim()
-    // Now re-read the cache
-    const home = process.env.GOG_HOME || `${process.env.HOME}/.config/gogcli`
-    const tokenCachePath = `${home}/cache/${GOG_ACCOUNT}/token.json`
     const fs = require('node:fs') as typeof import('node:fs')
-    if (fs.existsSync(tokenCachePath)) {
-      const raw = fs.readFileSync(tokenCachePath, 'utf8')
-      const parsed = JSON.parse(raw) as { access_token?: string; expiry?: string }
-      if (parsed.access_token) {
-        const expiresAt = parsed.expiry ? Date.parse(parsed.expiry) : Date.now() + 50 * 60_000
-        cachedAccessToken = { token: parsed.access_token, expiresAt: expiresAt - 60_000 }
-        return parsed.access_token
-      }
+    const os = require('node:os') as typeof import('node:os')
+    const path = require('node:path') as typeof import('node:path')
+
+    // Write decrypt script to temp file (avoids shell escaping issues with -c)
+    const scriptPath = path.join(os.tmpdir(), 'gog-keyring-decrypt.py')
+    fs.writeFileSync(scriptPath, GOG_KEYRING_DECRYPT_SCRIPT, { mode: 0o600 })
+
+    const refreshToken = execSync(
+      `python3 "${scriptPath}" "${keyringPw}" "${keyringFile}"`,
+      { encoding: 'utf8', timeout: 10000 },
+    ).trim()
+
+    if (!refreshToken) {
+      console.error('[smart-money-sync] No refresh_token in gog keyring')
+      return null
     }
+
+    // Step 2: Read gog client credentials
+    const credsPath = `${gogHome}/credentials.json`
+    if (!fs.existsSync(credsPath)) {
+      console.error('[smart-money-sync] gog credentials.json not found')
+      return null
+    }
+    const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8')) as {
+      client_id: string
+      client_secret: string
+    }
+
+    // Step 3: Exchange refresh token for access token
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: creds.client_id,
+        client_secret: creds.client_secret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    })
+
+    if (!tokenRes.ok) {
+      const errText = await tokenRes.text().catch(() => '')
+      console.error(`[smart-money-sync] Token exchange failed (${tokenRes.status}): ${errText}`)
+      return null
+    }
+
+    const tokenData = await tokenRes.json() as {
+      access_token: string
+      expires_in: number
+    }
+
+    cachedAccessToken = {
+      token: tokenData.access_token,
+      expiresAt: Date.now() + (tokenData.expires_in - 60) * 1000,
+    }
+    return tokenData.access_token
   } catch (err) {
     console.error('[smart-money-sync] gog token extraction failed:', err instanceof Error ? err.message : String(err))
+    return null
   }
-
-  return null
 }
 
 /**
