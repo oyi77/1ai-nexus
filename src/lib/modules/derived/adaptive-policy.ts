@@ -87,3 +87,36 @@ export function adaptivePolicyReason(input: AdaptivePolicyInput): string | null 
 
   return changes.length > 0 ? changes.join(' | ') : null
 }
+
+export type AdaptivePolicyMode = 'off' | 'on' | 'dry-run'
+
+export interface ResolvedAdaptivePolicy {
+  /** The policy to actually deliver under for this pass. */
+  policy: DeliveryPolicy
+  /** What adaptation would change and why, or null when there is no change. */
+  reason: string | null
+  /** True only when the returned policy differs from the base (mode 'on'). */
+  effective: boolean
+}
+
+/**
+ * Env-gate the pure adaptation step. Pure and deterministic:
+ *   - 'off'     — base policy unchanged, adaptation not even computed.
+ *   - 'dry-run' — adaptation IS computed (and the reason is returned for
+ *                 logging) but the base policy is returned unchanged.
+ *   - 'on'      — the adapted policy is returned.
+ */
+export function resolveAdaptivePolicy(
+  base: DeliveryPolicy,
+  byTier: Record<string, { scored: number; hitRatePct: number | null }>,
+  mode: AdaptivePolicyMode,
+  opts?: AdaptivePolicyInput['opts'],
+): ResolvedAdaptivePolicy {
+  if (mode === 'off') return { policy: { ...base }, reason: null, effective: false }
+
+  const input: AdaptivePolicyInput = { base, byTier, ...(opts ? { opts } : {}) }
+  const adapted = adaptDeliveryPolicy(input)
+  const reason = adaptivePolicyReason(input)
+  const effective = mode === 'on' && reason !== null
+  return { policy: mode === 'on' ? adapted : { ...base }, reason, effective }
+}

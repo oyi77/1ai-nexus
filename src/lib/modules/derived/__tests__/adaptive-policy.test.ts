@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { adaptDeliveryPolicy, adaptivePolicyReason } from '../adaptive-policy'
+import { adaptDeliveryPolicy, adaptivePolicyReason, resolveAdaptivePolicy } from '../adaptive-policy'
 import { DEFAULT_DELIVERY_POLICY } from '../signal-tier'
 
 const BASE = { ...DEFAULT_DELIVERY_POLICY, allowWatchlist: true }
@@ -117,5 +117,53 @@ describe('adaptivePolicyReason', () => {
     }
 
     expect(adaptivePolicyReason(input)).toBeNull()
+  })
+})
+
+describe('resolveAdaptivePolicy', () => {
+  const byTier = { HIGH_CONVICTION: { scored: 10, hitRatePct: 40 } }
+
+  it('off: returns the base policy unchanged without computing a reason', () => {
+    const resolved = resolveAdaptivePolicy(BASE, byTier, 'off')
+
+    expect(resolved.policy).toEqual(BASE)
+    expect(resolved.reason).toBeNull()
+    expect(resolved.effective).toBe(false)
+  })
+
+  it('on: returns the adapted policy and marks it effective', () => {
+    const resolved = resolveAdaptivePolicy(BASE, byTier, 'on')
+
+    expect(resolved.policy.allowTopSignal).toBe(false)
+    expect(resolved.policy.allowWatchlist).toBe(true)
+    expect(resolved.reason).toContain('allowTopSignal=false')
+    expect(resolved.effective).toBe(true)
+  })
+
+  it('dry-run: computes reason but returns the base policy unchanged', () => {
+    const resolved = resolveAdaptivePolicy(BASE, byTier, 'dry-run')
+
+    expect(resolved.policy).toEqual(BASE)
+    expect(resolved.reason).toContain('allowTopSignal=false')
+    expect(resolved.effective).toBe(false)
+  })
+
+  it('dry-run: reports no change when the adapted policy equals the base', () => {
+    const resolved = resolveAdaptivePolicy(
+      BASE,
+      { HIGH_CONVICTION: { scored: 10, hitRatePct: 80 } },
+      'dry-run',
+    )
+
+    expect(resolved.policy).toEqual(BASE)
+    expect(resolved.reason).toBeNull()
+    expect(resolved.effective).toBe(false)
+  })
+
+  it('on: does not mutate the base policy', () => {
+    const base = { ...BASE }
+    resolveAdaptivePolicy(base, byTier, 'on')
+
+    expect(base).toEqual(BASE)
   })
 })

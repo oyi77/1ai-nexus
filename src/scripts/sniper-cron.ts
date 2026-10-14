@@ -36,7 +36,7 @@ import {
   type PriceObservation,
 } from '@/lib/modules/derived/sniper-outcomes'
 import { calibrateTiers, demotionSummary } from '@/lib/modules/derived/tier-calibration'
-import { adaptDeliveryPolicy, adaptivePolicyReason } from '@/lib/modules/derived/adaptive-policy'
+import { resolveAdaptivePolicy } from '@/lib/modules/derived/adaptive-policy'
 
 /**
  * Policy D keeps WATCHLIST opt-in: it is a labelled, unconfirmed candidate,
@@ -49,12 +49,23 @@ function deliveryPolicy(byTier?: Record<string, { scored: number; hitRatePct: nu
     ...DEFAULT_DELIVERY_POLICY,
     allowWatchlist: process.env.SNIPER_DELIVER_WATCHLIST === 'true',
   }
-  if (process.env.SNIPER_ADAPTIVE_POLICY !== 'true' || byTier === undefined) return base
+  if (byTier === undefined) return base
 
-  const policy = adaptDeliveryPolicy({ base, byTier })
-  const reason = adaptivePolicyReason({ base, byTier })
-  console.log(`[sniper] adaptive policy: ${reason ?? 'no change'}`)
-  return policy
+  const mode =
+    process.env.SNIPER_ADAPTIVE_POLICY === 'true'
+      ? 'on'
+      : process.env.SNIPER_ADAPTIVE_POLICY_DRY_RUN === 'true'
+        ? 'dry-run'
+        : 'off'
+  if (mode === 'off') return base
+
+  const resolved = resolveAdaptivePolicy(base, byTier, mode)
+  if (mode === 'dry-run') {
+    console.log(`[sniper] adaptive policy (dry-run): ${resolved.reason ?? 'no change'}`)
+  } else {
+    console.log(`[sniper] adaptive policy: ${resolved.reason ?? 'no change'}`)
+  }
+  return resolved.policy
 }
 
 const LIMIT = Number(process.env.SNIPER_SCAN_LIMIT) || 5
