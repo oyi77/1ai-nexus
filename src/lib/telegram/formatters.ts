@@ -1,6 +1,9 @@
 // NEXUS Telegram Bot — API-backed message formatters.
 
 import { fetchApi, fmtUsd, fmtPrice, registeredChats, isPolling, startTime } from './core'
+import { auditRugcheckToken } from '@/lib/modules/meme/rugcheck'
+import type { MemeRiskAudit } from '@/lib/modules/meme/types'
+import { readSniperLog, sniperLogCounts } from '@/lib/modules/derived/sniper-log'
 
 export async function formatFearGreed(): Promise<string> {
   const d = await fetchApi<Record<string, unknown>>('/api/v1/fear-greed')
@@ -286,4 +289,279 @@ export async function formatStablecoins(): Promise<string> {
     lines.push(`${emoji} *${sym}* $${price.toFixed(4)} | Dev: ${dev.toFixed(3)}% | MCap: ${fmtUsd(mcap)}`)
   }
   return lines.join('\n')
+}
+
+const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
+const EVM_ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/
+
+export async function formatTokenCheck(input: string): Promise<string> {
+  try {
+    const contract = (input ?? '').trim()
+    const isSolana = SOLANA_ADDRESS_REGEX.test(contract)
+    const isEvm = EVM_ADDRESS_REGEX.test(contract)
+
+    if (!isSolana && !isEvm) {
+      return [
+        '❌ *Invalid Token Contract*',
+        '',
+        `"${contract.slice(0, 44)}" is not a recognized token address.`,
+        '',
+        'Please provide a valid contract address:',
+        '• *Solana:* 32–44 alphanumeric characters (Base58)',
+        '• *EVM:* 42 characters starting with `0x` (Ethereum/Base/BSC)',
+        '',
+        'Example:',
+        '`/check EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`',
+        'Or simply paste the address directly into this chat.',
+      ].join('\n')
+    }
+
+    let audit: MemeRiskAudit | null = null
+
+    if (isSolana) {
+      try {
+        audit = await auditRugcheckToken('solana', contract)
+      } catch {
+        audit = null
+      }
+      if (!audit) {
+        try {
+          const resp = await fetchApi<{ audits?: MemeRiskAudit[] } | MemeRiskAudit[]>(
+            `/api/v1/meme/risk?contract=${encodeURIComponent(contract)}&chain=solana`,
+          )
+          if (resp) {
+            if (Array.isArray(resp)) {
+              audit = resp[0] ?? null
+            } else if (Array.isArray(resp.audits)) {
+              audit = resp.audits[0] ?? null
+            }
+          }
+        } catch {
+          audit = null
+        }
+      }
+    } else {
+      try {
+        const resp = await fetchApi<{ audits?: MemeRiskAudit[] } | MemeRiskAudit[]>(
+          `/api/v1/meme/risk?contract=${encodeURIComponent(contract)}&chain=ethereum`,
+        )
+        if (resp) {
+          if (Array.isArray(resp)) {
+            audit = resp[0] ?? null
+          } else if (Array.isArray(resp.audits)) {
+            audit = resp.audits[0] ?? null
+          }
+        }
+      } catch {
+        audit = null
+      }
+    }
+
+    const shortAddr = contract.length > 10 ? `${contract.slice(0, 6)}...${contract.slice(-4)}` : contract
+
+    if (!audit) {
+      const chainName = isSolana ? 'Solana' : 'EVM'
+      const dexUrl = isSolana
+        ? `https://dexscreener.com/solana/${contract}`
+        : `https://dexscreener.com/ethereum/${contract}`
+      return [
+        '⚠️ *Security Audit Unavailable*',
+        '',
+        `Could not retrieve automated security report for ${chainName} contract \`${shortAddr}\`.`,
+        '',
+        'Possible reasons:',
+        '• Newly created token not yet indexed by security scanners',
+        '• Standard wallet address instead of a token mint',
+        '• Upstream scanner rate limit or temporary network outage',
+        '',
+        `🔗 [Check on DexScreener](${dexUrl})`,
+      ].join('\n')
+    }
+
+    const name = audit.name ? audit.name.replace(/[*_`[\]()]/g, '') : ''
+    const symbol = audit.symbol ? audit.symbol.replace(/[*_`[\]()]/g, '') : ''
+    const tokenDisplay = name && symbol
+      ? `*${name}* (\`$${symbol}\`)`
+      : symbol
+      ? `*\$${symbol}*`
+      : name
+      ? `*${name}*`
+      : '*Unknown Token*'
+
+    const isHighRisk = !!(audit.isHoneypot || audit.riskLevel >= 3 || audit.canFreeze)
+    const isCaution = !isHighRisk && !!(audit.riskLevel === 2 || audit.top10HolderPercent > 0.30 || audit.canMint)
+
+    let verdictLabel: string
+    if (isHighRisk) {
+      verdictLabel = '🚨 *HIGH RISK / RUG WARNING*'
+    } else if (isCaution) {
+      verdictLabel = '⚠️ *CAUTION*'
+    } else {
+      verdictLabel = '✅ *PASSED SECURITY CHECKS*'
+    }
+
+    const lines = [
+      '🛡 *Token Security Audit*',
+      '',
+      `${tokenDisplay} · \`${shortAddr}\``,
+      `Chain: *${isSolana ? 'Solana' : 'EVM'}*`,
+      '',
+      `Verdict: ${verdictLabel}`,
+      '',
+      `• Risk Level: *${audit.riskLevel}/3* (${(audit.riskLabel || 'N/A').toUpperCase()})`,
+      `• Mint Authority: *${audit.canMint ? 'Enabled ⚠️' : 'Disabled ✅'}*`,
+      `• Freeze Authority: *${audit.canFreeze ? 'Enabled 🚨' : 'Disabled ✅'}*`,
+      `• Top 10 Holders: *${(audit.top10HolderPercent * 100).toFixed(1)}%*`,
+      `• LP Locked: *${audit.lpLockedPercent >= 0 ? `${(audit.lpLockedPercent * 100).toFixed(1)}%` : 'Unknown'}*`,
+      `• Buy / Sell Tax: *${(audit.buyTax * 100).toFixed(1)}% / ${(audit.sellTax * 100).toFixed(1)}%*`,
+    ]
+
+    if (audit.isHoneypot) {
+      lines.push('• Honeypot: *🚨 YES*')
+    }
+
+    lines.push('')
+    if (isSolana) {
+      lines.push(`🔗 [RugCheck](https://rugcheck.xyz/tokens/${contract}) · [DexScreener](https://dexscreener.com/solana/${contract})`)
+    } else {
+      lines.push(`🔗 [DexScreener](https://dexscreener.com/ethereum/${contract})`)
+    }
+
+    return lines.join('\n')
+  } catch (err) {
+    return `❌ Failed to audit token: ${(err as Error).message || 'Unknown error'}`
+  }
+}
+
+export async function formatTopMeme(): Promise<string> {
+  try {
+    let tokens: Array<Record<string, unknown>> = []
+    const d = await fetchApi<{ tokens?: Array<Record<string, unknown>> } | Array<Record<string, unknown>>>(
+      '/api/v1/meme/leaderboard?limit=5',
+    )
+    if (d) {
+      if (Array.isArray(d)) {
+        tokens = d
+      } else if (Array.isArray(d.tokens)) {
+        tokens = d.tokens
+      }
+    }
+    if (!tokens.length) {
+      const fallback = await fetchApi<Array<Record<string, unknown>>>('/api/v1/tokens')
+      if (fallback?.length) {
+        tokens = fallback
+      }
+    }
+    if (!tokens.length) {
+      return '❌ No trending meme tokens available right now.'
+    }
+
+    const lines = ['🔥 *Top Trending Tokens*', '']
+    for (const t of tokens.slice(0, 5)) {
+      const sym = String(t.symbol ?? '?').replace(/[*_`[\]()]/g, '').toUpperCase()
+      const price = typeof t.price === 'number' ? t.price : parseFloat(String(t.price ?? 0))
+      const changeRaw = typeof t.change24h === 'number' ? t.change24h : parseFloat(String(t.change24h ?? 0))
+      const changePct = Math.abs(changeRaw) <= 1 && changeRaw !== 0 ? changeRaw * 100 : changeRaw
+      const vol = typeof t.volume24h === 'number' ? t.volume24h : parseFloat(String(t.volume24h ?? 0))
+      const mcap = typeof t.marketCap === 'number' ? t.marketCap : parseFloat(String(t.marketCap ?? 0))
+      const arrow = changeRaw >= 0 ? '🟢' : '🔴'
+      const statParts: string[] = []
+      if (mcap > 0) statParts.push(`MCap: ${fmtUsd(mcap)}`)
+      if (vol > 0) statParts.push(`Vol: ${fmtUsd(vol)}`)
+      const stat = statParts.length ? ` · ${statParts.join(' · ')}` : ''
+      lines.push(`${arrow} *${sym}* ${fmtPrice(price)} (${changeRaw >= 0 ? '+' : ''}${changePct.toFixed(2)}%)${stat}`)
+    }
+    return lines.join('\n')
+  } catch (err) {
+    return `❌ Failed to fetch top tokens: ${(err as Error).message || 'Unknown error'}`
+  }
+}
+
+export async function formatSniperScan(): Promise<string> {
+  try {
+    let entries: Array<Record<string, unknown>> = []
+    let lastScan: {
+      at: string
+      scanned: number
+      screened: number
+      watchlisted: number
+      rejected: number
+      delivered: number
+      errors: string[]
+    } | null = null
+    let counts: Record<string, number> | undefined
+
+    const d = await fetchApi<{
+      entries?: Array<Record<string, unknown>>
+      lastScan?: {
+        at: string
+        scanned: number
+        screened: number
+        watchlisted: number
+        rejected: number
+        delivered: number
+        errors: string[]
+      } | null
+      counts?: Record<string, number>
+    }>('/api/v1/meme/sniper/history')
+
+    if (d && (d.entries || d.lastScan)) {
+      entries = d.entries ?? []
+      lastScan = d.lastScan ?? null
+      counts = d.counts
+    } else {
+      try {
+        const log = readSniperLog()
+        entries = (log.entries ?? []) as unknown as Array<Record<string, unknown>>
+        lastScan = log.lastScan ?? null
+        counts = sniperLogCounts(log)
+      } catch {
+        // fallback if log module fails
+      }
+    }
+
+    if (!entries.length && !lastScan) {
+      return '🎯 *Sniper Radar Status*\n\nNo recent scan activity recorded. Automated scans evaluate meme liquidity pools periodically.'
+    }
+
+    const lines = ['🎯 *Meme Sniper Radar*', '']
+    if (lastScan) {
+      const scanTime = lastScan.at ? new Date(lastScan.at).toLocaleTimeString() : 'Recent'
+      lines.push(`*Last Scan:* ${scanTime}`)
+      lines.push(`• Scanned: *${lastScan.scanned}* · Screened: *${lastScan.screened}*`)
+      lines.push(`• Watchlisted: *${lastScan.watchlisted}* · Rejected: *${lastScan.rejected}*`)
+      if (lastScan.delivered > 0) {
+        lines.push(`• Alerts Delivered: *${lastScan.delivered}*`)
+      }
+      lines.push('')
+    } else if (counts) {
+      const watchlisted = counts.WATCHLIST ?? counts.watchlisted ?? 0
+      const rejected = counts.REJECT ?? counts.rejected ?? 0
+      const total = counts.total ?? 0
+      lines.push(`*Activity Totals:* ${total} evaluated (${watchlisted} watchlisted · ${rejected} rejected)`)
+      lines.push('')
+    }
+
+    if (entries.length > 0) {
+      lines.push('*Latest Evaluated Tokens:*')
+      for (const e of entries.slice(0, 5)) {
+        const sym = String(e.symbol || 'UNKNOWN').replace(/[*_`[\]()]/g, '').toUpperCase()
+        const contract = String(e.contract || '')
+        const shortAddr = contract.length > 8 ? `${contract.slice(0, 4)}...${contract.slice(-4)}` : contract || '?'
+        const status = String(e.status || 'UNKNOWN')
+        const emoji = status === 'WATCHLIST' ? '🟢' : status === 'REJECT' ? '🔴' : '⚪'
+        const mc = typeof e.marketCapUsd === 'number' && e.marketCapUsd > 0 ? ` · ${fmtUsd(e.marketCapUsd)}` : ''
+        lines.push(`${emoji} *${sym}* (\`${shortAddr}\`) — ${status}${mc}`)
+        const reasons = Array.isArray(e.reasons) ? (e.reasons as string[]) : []
+        if (status === 'REJECT' && reasons.length) {
+          const reasonText = String(reasons[0]).replace(/[*_`[\]()]/g, '')
+          lines.push(`   └ _${reasonText.slice(0, 50)}_`)
+        }
+      }
+    }
+
+    return lines.join('\n')
+  } catch (err) {
+    return `❌ Failed to fetch sniper scan: ${(err as Error).message || 'Unknown error'}`
+  }
 }

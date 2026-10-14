@@ -2,7 +2,7 @@
 
 import { callTelegram, fetchApi, fmtUsd, keyboard, registeredChats, type TgMessage, type TgCallbackQuery } from './core'
 import { BACK_ROW, MAIN_MENU, MENU_MAP } from './menus'
-import { formatFearGreed, formatPrices, formatExchangeFlow, formatWhaleClusters, formatMempool, formatInsider, formatDerivatives, formatLiquidations, formatGas, formatSmartMoney, formatNews, formatWeather, formatStatus, formatTokens, formatSectors, formatMacro, formatStablecoins } from './formatters'
+import { formatFearGreed, formatPrices, formatExchangeFlow, formatWhaleClusters, formatMempool, formatInsider, formatDerivatives, formatLiquidations, formatGas, formatSmartMoney, formatNews, formatWeather, formatStatus, formatTokens, formatSectors, formatMacro, formatStablecoins, formatTokenCheck, formatTopMeme, formatSniperScan } from './formatters'
 
 export type DataHandler = () => Promise<string>
 
@@ -11,6 +11,10 @@ export const DATA_HANDLERS: Record<string, DataHandler> = {
   'prices': formatPrices,
   'sectors': formatSectors,
   'macro': formatMacro,
+  'top': formatTopMeme,
+  'meme-top': formatTopMeme,
+  'scan': formatSniperScan,
+  'sniper-scan': formatSniperScan,
   'correlations': async () => {
     const d = await fetchApi<Array<Record<string, unknown>>>('/api/v1/correlations')
     if (!d?.length) return '📊 *Correlations*\n\nNo correlation data available'
@@ -158,13 +162,43 @@ export const DATA_HANDLERS: Record<string, DataHandler> = {
   },
 }
 
+export function formatHelpText(): string {
+  return [
+    '❓ *NEXUS Bot Help*',
+    '',
+    'Commands:',
+    '• /check `<address>` — Audit token security & rug risk',
+    '• /top — Top trending meme tokens',
+    '• /scan — Meme sniper scan status & radar',
+    '• /sub — Subscribe to high-confidence signals',
+    '• /stop — Unregister from alerts',
+    '• /help — Show this help message',
+    '',
+    '💡 *Tip:* Paste any Solana or EVM token address directly into this chat to run a safety audit immediately!',
+    '',
+    'Categories:',
+    '• 📊 Market — prices, fear/greed, sectors, macro',
+    '• 🐋 Whale — clusters, exchange flows, mempool, insider',
+    '• 💹 Trading — derivatives, liquidations, DEX, scanner',
+    '• 🧠 Smart Money — top wallets, copy trades, signals',
+    '• ⛽ Network — gas, stablecoins, DeFi',
+    '• 🛡 Safety — rugcheck, system status',
+    '• 📰 Intel — news, weather, alt data',
+    '• 🔔 Alerts — manage your alert rules',
+    '',
+    'Send /start anytime to return to the main menu.',
+  ].join('\n')
+}
+
 export async function handleMessage(msg: TgMessage): Promise<void> {
   const chatId = String(msg.chat.id)
-  const text = (msg.text ?? '').trim().toLowerCase()
+  const rawText = (msg.text ?? '').trim()
+  const lower = rawText.toLowerCase()
+  const command = lower.split(/\s+/)[0].replace(/@\w+$/, '')
 
   // /start and /sub both register the chat AND attempt to link it to an app user
   // via a matching Telegram username (persisted by linkTelegram on the web side).
-  if (text === '/start' || text === '/sub') {
+  if (command === '/start' || command === '/sub') {
     registeredChats.add(chatId)
     if (msg.from?.username) {
       try {
@@ -174,13 +208,13 @@ export async function handleMessage(msg: TgMessage): Promise<void> {
         // Non-fatal — linking is best-effort.
       }
     }
-    if (text === '/sub') {
+    if (command === '/sub') {
       const sub = await import('./signal-publisher')
       sub.subscribeSignals(chatId)
     }
     await callTelegram('sendMessage', {
       chat_id: chatId,
-      text: text === '/sub'
+      text: command === '/sub'
         ? '🔔 *Signal Subscription Active*\n\nYou\'ll now receive high-confidence signals automatically as they\'re generated.'
         : '🔔 *NEXUS Intelligence Terminal*\n\nWelcome! Tap a button to explore:',
       parse_mode: 'Markdown',
@@ -189,13 +223,92 @@ export async function handleMessage(msg: TgMessage): Promise<void> {
     return
   }
 
-  if (text === '/stop') {
+  if (command === '/stop') {
     registeredChats.delete(chatId)
     await callTelegram('sendMessage', {
       chat_id: chatId,
       text: '🔕 Unregistered from alerts. Send /start to re-enable.',
     })
     return
+  }
+
+  if (command === '/help' || lower === 'help') {
+    await callTelegram('sendMessage', {
+      chat_id: chatId,
+      text: formatHelpText(),
+      parse_mode: 'Markdown',
+      reply_markup: keyboard([BACK_ROW]),
+    })
+    return
+  }
+
+  if (command === '/check') {
+    const target = rawText.replace(/^\/check(@\w+)?/i, '').trim()
+    if (target) {
+      const text = await formatTokenCheck(target)
+      await callTelegram('sendMessage', {
+        chat_id: chatId,
+        text,
+        parse_mode: 'Markdown',
+        reply_markup: keyboard([BACK_ROW]),
+      })
+      return
+    }
+    await callTelegram('sendMessage', {
+      chat_id: chatId,
+      text: '🛡 *Token Safety Check*\n\nPlease specify a token contract address:\nExample: `/check <address>`\nOr simply paste the address directly into this chat.',
+      parse_mode: 'Markdown',
+    })
+    return
+  }
+
+  if (command === '/top') {
+    const text = await formatTopMeme()
+    await callTelegram('sendMessage', {
+      chat_id: chatId,
+      text,
+      parse_mode: 'Markdown',
+      reply_markup: keyboard([BACK_ROW]),
+    })
+    return
+  }
+
+  if (command === '/scan') {
+    const text = await formatSniperScan()
+    await callTelegram('sendMessage', {
+      chat_id: chatId,
+      text,
+      parse_mode: 'Markdown',
+      reply_markup: keyboard([BACK_ROW]),
+    })
+    return
+  }
+
+  // Automatic Address Detection (Text Routing):
+  // If the message is NOT a slash command, test if text (or first word) matches
+  // Solana Base58 regex or EVM regex.
+  if (!rawText.startsWith('/')) {
+    const firstWord = rawText.split(/\s+/)[0]
+    const SOLANA_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
+    const EVM_REGEX = /^0x[a-fA-F0-9]{40}$/
+
+    let matchedAddress: string | null = null
+    if (SOLANA_REGEX.test(rawText) || EVM_REGEX.test(rawText)) {
+      matchedAddress = rawText
+    } else if (SOLANA_REGEX.test(firstWord) || EVM_REGEX.test(firstWord)) {
+      matchedAddress = firstWord
+    }
+
+    if (matchedAddress) {
+      const text = await formatTokenCheck(matchedAddress)
+      await callTelegram('sendMessage', {
+        chat_id: chatId,
+        text,
+        parse_mode: 'Markdown',
+        reply_markup: keyboard([BACK_ROW]),
+      })
+      return
+    }
   }
 
   // Default: show main menu
@@ -253,37 +366,24 @@ export async function handleCallback(cb: TgCallbackQuery): Promise<void> {
         await callTelegram('editMessageText', {
           chat_id: chatId,
           message_id: msgId,
-          text: [
-            '❓ *NEXUS Bot Help*',
-            '',
-            'Navigate using the inline buttons below each message.',
-            '',
-            '• 📊 Market — prices, fear/greed, sectors, macro',
-            '• 🐋 Whale — clusters, exchange flows, mempool, insider',
-            '• 💹 Trading — derivatives, liquidations, DEX, scanner',
-            '• 🧠 Smart Money — top wallets, copy trades, signals',
-            '• ⛽ Network — gas, stablecoins, DeFi',
-            '• 🛡 Safety — rugcheck, system status',
-            '• 📰 Intel — news, weather, alt data',
-            '• 🔔 Alerts — manage your alert rules',
-            '',
-            'Send /start anytime to return to the main menu.',
-          ].join('\n'),
+          text: formatHelpText(),
           parse_mode: 'Markdown',
           reply_markup: keyboard([BACK_ROW]),
         })
       } else if (param === 'rugcheck') {
-        await callTelegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Enter a token address to check.' })
+        await callTelegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Paste an address to audit.' })
         await callTelegram('sendMessage', {
           chat_id: chatId,
-          text: '🛡 *RugCheck*\n\nSend a token contract address to check safety.\nExample: `0xdac17f958d2ee523a2206206994597c13d831ec7`',
+          text: '🛡 *RugCheck & Token Security*\n\nPaste any Solana (Base58) or EVM (0x...) token contract address directly into this chat to check safety.\n\nExample:\n• Solana: `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`\n• EVM: `0xdac17f958d2ee523a2206206994597c13d831ec7`\n\nOr use `/check <address>`',
           parse_mode: 'Markdown',
+          reply_markup: keyboard([BACK_ROW]),
         })
       } else if (param === 'token-search') {
         await callTelegram('sendMessage', {
           chat_id: chatId,
-          text: '🔍 *Token Search*\n\nSend a token symbol or contract address.',
+          text: '🔍 *Token Search & Security*\n\nPaste a token contract address directly into this chat to run an instant security audit.\n\nYou can also use `/check <address>` or view trending tokens with `/top`.',
           parse_mode: 'Markdown',
+          reply_markup: keyboard([BACK_ROW]),
         })
       } else if (param === 'create-alert') {
         await callTelegram('sendMessage', {

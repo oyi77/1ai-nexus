@@ -29,7 +29,8 @@ export const WHALE_MENU = keyboard([
 export const TRADING_MENU = keyboard([
   [{ text: '📊 Derivatives', callback_data: 'data:derivatives' }, { text: '💦 Liquidations', callback_data: 'data:liquidations' }],
   [{ text: '🔄 DEX Monitor', callback_data: 'data:dex' }, { text: '📡 New Pairs', callback_data: 'data:scanner' }],
-  [{ text: '🪙 Tokens', callback_data: 'data:tokens' }, { text: '🔍 Token Search', callback_data: 'act:token-search' }],
+  [{ text: '🪙 Tokens', callback_data: 'data:tokens' }, { text: '🔥 Top Memes', callback_data: 'data:top' }],
+  [{ text: '🔍 Token Search', callback_data: 'act:token-search' }],
   BACK_ROW,
 ])
 
@@ -47,7 +48,8 @@ export const NETWORK_MENU = keyboard([
 ])
 
 export const SAFETY_MENU = keyboard([
-  [{ text: '🛡 RugCheck', callback_data: 'act:rugcheck' }, { text: '📊 System Status', callback_data: 'data:status' }],
+  [{ text: '🛡 RugCheck', callback_data: 'act:rugcheck' }, { text: '🎯 Sniper Radar', callback_data: 'data:scan' }],
+  [{ text: '📊 System Status', callback_data: 'data:status' }],
   BACK_ROW,
 ])
 

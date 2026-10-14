@@ -45,7 +45,7 @@ export async function fetchApi<T>(path: string): Promise<T | null> {
     const res = await fetch(`${BASE_URL}${path}`, { signal: AbortSignal.timeout(15_000) })
     if (!res.ok) return null
     const json = await res.json() as { data?: T }
-    return json.data ?? null
+    return json.data !== undefined ? (json.data as T) : (json as unknown as T)
   } catch {
     return null
   }
