@@ -452,11 +452,9 @@ function renderSmartMoneySection(smartMoney: SmartMoneyEvidence | null): string[
       L.push(`• ${count} Classified Whales entered (${firstAlias} + ${otherLabel})`)
     }
 
-    if (first.winRate != null || first.pnl30d != null) {
-      const wrStr = first.winRate != null ? `${Math.round(first.winRate * 100)}%` : 'n/a'
-      const pnlStr = first.pnl30d != null ? `${first.pnl30d > 0 ? '+' : ''}${Math.round(first.pnl30d * 100)}%` : 'n/a'
-      L.push(`   · Top Whale: ${firstAlias} (Win Rate: ${wrStr} | PnL: ${pnlStr})`)
-    }
+    const wrStr = first.winRate != null ? `${Math.round(first.winRate * 100)}%` : 'n/a'
+    const pnlStr = first.pnl30d != null ? `${first.pnl30d > 0 ? '+' : ''}${Math.round(first.pnl30d * 100)}%` : 'n/a'
+    L.push(`   · Top Whale: ${firstAlias} (Win Rate: ${wrStr} | PnL: ${pnlStr})`)
   } else {
     L.push('• No classified whales detected yet (Early stage)')
   }

@@ -172,6 +172,21 @@ describe('renderAccumulationAlert — operator format', () => {
     expect(text).toContain('$38.5K')
   })
 
+  it('renders WR n/a badge when winRate is genuinely null', () => {
+    const status = new Map([
+      [WHALE, { status: 'WHALE', alias: 'Wugi', winRate: null, pnl: null }],
+    ])
+    const ev = buildAccumulationEvents({
+      candidates: [candidate()],
+      buyerStatus: status,
+      market: market(200_000),
+    })[0]
+    const text = renderAccumulationAlert(ev)
+    expect(text).toContain('• <b>Wugi</b> [WHALE · WR n/a]')
+    expect(text).not.toContain('WR 0%')
+    expect(text).not.toContain('PnL')
+  })
+
   it('renders unverified MC/liquidity honestly', () => {
     const ev = buildAccumulationEvents({
       candidates: [candidate()],

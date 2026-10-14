@@ -413,6 +413,7 @@ export interface SmartMoneyTrade {
   amountUsd: number
   tokenAgeHours: number | null
   marketCapUsd: number | null
+  winRate: number | null  // 0..1 fraction, null = unmeasured (never fabricated)
   timestamp: Date
 }
 
@@ -434,6 +435,7 @@ export async function querySmartMoneyActivity(hours = 1): Promise<SmartMoneyTrad
     select: {
       walletId: true,
       status: true,
+      winRate: true,
       wallet: {
         select: { address: true, alias: true, chain: true },
       },
@@ -507,6 +509,7 @@ export async function querySmartMoneyActivity(hours = 1): Promise<SmartMoneyTrad
       amountUsd: tx.amountUsd ?? 0,
       tokenAgeHours,
       marketCapUsd: tokenRow?.marketCap ?? null,
+      winRate: sm.winRate ?? null,
       timestamp: tx.timestamp,
     })
   }
@@ -632,6 +635,7 @@ export function renderSmartMoneyAlert(t: SmartMoneyTrade): string {
     `💰 <b>Amount:</b> <b>$${Math.round(t.amountUsd).toLocaleString('en-US')}</b>`,
     `📊 <b>Market Cap:</b> ${mcStr}  |  ⏱ <b>Age:</b> ${ageStr}`,
     `👤 <b>Wallet:</b> <b>${alias}</b> [${status}]`,
+    t.winRate !== null && t.winRate !== undefined ? `📈 Win Rate: <b>${Math.round(t.winRate * 100)}%</b>` : `📈 Win Rate: <i>n/a</i>`,
     `   └ <code>${escapeHtml(t.walletAddress)}</code>`,
     `🕐 ${tsStr}`,
     `━━━━━━━━━━━━━━━━━━━━━━━━━`,

@@ -18,6 +18,7 @@ function trade(over: Partial<SmartMoneyTrade> = {}): SmartMoneyTrade {
     amountUsd: 5000,
     tokenAgeHours: 6,
     marketCapUsd: 500_000,
+    winRate: 0.78,
     timestamp: new Date(),
     ...over,
   }
@@ -105,6 +106,7 @@ describe('renderSmartMoneyAlert', () => {
     expect(text).toContain('💰 <b>Amount:</b> <b>$5,000</b>')
     expect(text).toContain('📊 <b>Market Cap:</b> $500K  |  ⏱ <b>Age:</b> 6.0h')
     expect(text).toContain('👤 <b>Wallet:</b> <b>Wugi</b> [QUALIFIED_SMART_MONEY]')
+    expect(text).toContain('📈 Win Rate: <b>78%</b>')
     expect(text).toContain(`   └ <code>${t.walletAddress}</code>`)
     expect(text).toContain('UTC')
   })
@@ -123,5 +125,12 @@ describe('renderSmartMoneyAlert', () => {
     expect(text).toContain('💰 <b>Amount:</b> <b>$12,500</b>')
     expect(text).toContain('📊 <b>Market Cap:</b> $1.2M  |  ⏱ <b>Age:</b> unknown')
     expect(text).toContain(`👤 <b>Wallet:</b> <b>${t.walletAddress.slice(0, 8)}…</b> [WHALE]`)
+  })
+
+  it('renders n/a win rate when the DB value is genuinely null', () => {
+    const t = trade({ winRate: null })
+    const text = renderSmartMoneyAlert(t)
+    expect(text).toContain('📈 Win Rate: <i>n/a</i>')
+    expect(text).not.toContain('Win Rate: <b>')
   })
 })

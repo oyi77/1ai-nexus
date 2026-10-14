@@ -261,9 +261,13 @@ export function renderAccumulationAlert(event: AccumulationEvent): string {
     const statusLabel = b.status || b.classification || 'WHALE'
     badgeParts.push(escapeHtml(statusLabel))
 
-    if (b.winRate !== undefined && b.winRate !== null) {
-      badgeParts.push(`WR ${(b.winRate * 100).toFixed(0)}%`)
-    }
+    // Win rate is always shown: a measured fraction becomes "WR NN%", a
+    // genuinely unmeasured buyer renders "n/a" (never a fabricated 0%).
+    badgeParts.push(
+      b.winRate !== undefined && b.winRate !== null
+        ? `WR ${(b.winRate * 100).toFixed(0)}%`
+        : 'WR n/a',
+    )
     if (b.pnl !== undefined && b.pnl !== null) {
       const rounded = Math.round(b.pnl * 100)
       badgeParts.push(`PnL ${rounded >= 0 ? '+' : ''}${rounded}%`)
