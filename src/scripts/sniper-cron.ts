@@ -21,8 +21,10 @@ import { appendSniperScan } from '@/lib/modules/derived/sniper-log'
 import { DEFAULT_DELIVERY_POLICY, type DeliveryPolicy } from '@/lib/modules/derived/signal-tier'
 
 import { pushReviewDigest } from '@/lib/modules/derived/sniper-review'
-import { appendSniperAudit, materiallyChanged, accumulationReadings } from '@/lib/modules/derived/sniper-audit'
-import { classifyAccumulation } from '@/lib/modules/derived/sniper-accumulation'
+import { appendSniperAudit, materiallyChanged } from '@/lib/modules/derived/sniper-audit'
+import { persistAccumulationPhases } from '@/lib/modules/derived/sniper-phase'
+import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
+import { escapeSignalHtml } from '@/lib/modules/derived/signal-tier'
 import {
   readOutcomes,
   writeOutcomes,
@@ -85,6 +87,13 @@ async function main() {
   if (review.sent) console.log(`[sniper] review digest sent (${review.candidates} near-miss, ${forceReReview.size} re-review)`)
   else if (review.candidates > 0) console.log(`[sniper] review digest skipped: ${review.skipped}`)
 
+  // TAHAP 2: classify each contract's holder-tier phase and persist it
+  // (previously stdout-only). Non-UNKNOWN verdicts are appended to
+  // data/sniper-phase.json; ACCUMULATION verdicts that pass the cooldown
+  // gate are also sent to the operator's review chat.
+  const phaseResult = persistAccumulationPhases(res.decisions)
+  const phaseByContract = new Map(phaseResult.phases.map((p) => [p.contract, p]))
+
   const topSignals = res.decisions.filter((d) => d.tier === 'HIGH_CONVICTION').length
   console.log(
     `[sniper] scanned=${res.scanned} signal=${res.screened} watchlist=${res.watchlisted} ` +
@@ -97,14 +106,31 @@ async function main() {
     console.log(
       `[sniper]   ${d.ticker} ${d.status} ${d.tier} (${why}) vol/mc=${d.metrics.volMcRatio.toFixed(2)} age=${d.metrics.ageLabel} audits=[${d.auditsUsed.join(',')}]${money}${gap}${d.delivered ? ' → PUSHED' : ''}${d.deduped ? ' (seen)' : ''}`,
     )
-    // TAHAP 2: holder-tier delta across scans for THIS contract. Needs two
-    // readings that both carry holder facts, so it stays quiet on a first
-    // sighting rather than claiming a phase it cannot prove.
-    const phase = classifyAccumulation(accumulationReadings(d.contract))
-    if (phase.verdict !== 'UNKNOWN') {
+    const phase = phaseByContract.get(d.contract)?.phase
+    if (phase !== undefined && phase.verdict !== 'UNKNOWN') {
       console.log(
         `[sniper]     ↳ phase=${phase.verdict} score=${phase.score} (${phase.readings} readings)${phase.reason ? ` — ${phase.reason}` : ''}`,
       )
+    }
+  }
+
+  for (const p of phaseResult.alerts) {
+    const phase = p.phase
+    const evidence = phase.evidence.length > 0 ? `\n• ${phase.evidence.map(escapeSignalHtml).join('\n• ')}` : ''
+    const text =
+      `📈 <b>ACCUMULATION PHASE</b>\n` +
+      `${escapeSignalHtml(p.ticker)} (${p.contract})\n` +
+      `Skor: ${phase.score}/100 (${phase.readings} readings)${evidence}`
+    const chat =
+      process.env.SNIPER_REVIEW_CHAT_ID ||
+      process.env.HUB_TELEGRAM_OWNER_CHAT_ID ||
+      process.env.TELEGRAM_ADMIN_CHAT_ID ||
+      ''
+    if (chat) {
+      const sent = await deliverSniperAlert(text, chat)
+      console.log(`[sniper] accumulation alert for ${p.ticker}: ${sent ? 'sent' : 'rejected/unconfigured'}`)
+    } else {
+      console.log(`[sniper] accumulation alert for ${p.ticker}: skipped (no review chat configured)`)
     }
   }
 
