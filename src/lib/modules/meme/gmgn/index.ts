@@ -256,7 +256,7 @@ export function __setGmgnCurlForTests(fn: typeof runCurl | null): void {
       }) as string)
 }
 
-async function gmgnFetch<T>(endpoint: string, _signal?: AbortSignal): Promise<T> {
+export async function gmgnFetch<T>(endpoint: string, _signal?: AbortSignal): Promise<T> {
   await RATE_LIMITER.acquire()
   const cookie = gmgnSessionCookie()
   // Absolute URLs bypass the quotation base (the /vas/* holder endpoints
