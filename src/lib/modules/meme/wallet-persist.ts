@@ -127,7 +127,8 @@ function signedPct(v: number | null): string {
   return `${rounded >= 0 ? '+' : ''}${rounded}%`
 }
 
-function escapeHtml(s: string): string {
+function escapeHtml(s: string | null | undefined): string {
+  if (typeof s !== 'string') return ''
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
@@ -141,28 +142,38 @@ export function buildKolAxiomDigest(input: KolAxiomDigestInput): string | null {
   const axiomRows = input.axiom.slice(0, 5)
   if (kolscanRows.length === 0 && axiomRows.length === 0) return null
 
-  const lines: string[] = ['<b>🧠 KOL/AXIOM SMART-MONEY ALERT</b>', '']
+  const lines: string[] = [
+    '📡 <b>SMART MONEY / KOL RADAR</b>',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━',
+  ]
 
   if (kolscanRows.length > 0) {
-    lines.push(`<b>KOLScan buys (${kolscanRows.length})</b>`)
+    lines.push(`🎯 <b>KOLScan Buys (${kolscanRows.length}):</b>`)
     for (const tx of kolscanRows) {
-      const token = tx.outTokenSymbol
-        ? escapeHtml(tx.outTokenSymbol)
-        : escapeHtml(tx.outTokenAddress.slice(0, 8))
-      const usd = tx.usdValue !== null ? `$${Math.round(tx.usdValue)}` : 'n/a'
-      lines.push(`• ${escapeHtml(tx.kolName)} — ${token} ${usd} · ${escapeHtml(tx.dex)}`)
+      const rawSymbol = tx.outTokenSymbol && tx.outTokenSymbol.trim() !== ''
+        ? tx.outTokenSymbol.trim().toUpperCase()
+        : tx.outTokenAddress.slice(0, 8)
+      const token = rawSymbol.startsWith('$') ? rawSymbol : `$${rawSymbol}`
+      const usd = tx.usdValue !== null ? `<b>$${Math.round(tx.usdValue).toLocaleString('en-US')}</b>` : 'n/a'
+      const dex = escapeHtml(tx.dex)
+      const kol = escapeHtml(tx.kolName)
+      const mint = escapeHtml(tx.outTokenAddress)
+
+      lines.push(`• <b>${kol}</b> bought <b>${escapeHtml(token)}</b> (${usd} · ${dex})`)
+      lines.push(`  └ CA: <code>${mint}</code>`)
     }
     lines.push('')
   }
 
   if (axiomRows.length > 0) {
-    lines.push(`<b>Axiom wallets (${axiomRows.length})</b>`)
+    lines.push(`⚡ <b>Axiom Wallets (${axiomRows.length}):</b>`)
     for (const w of axiomRows) {
+      const shortAddr = escapeHtml(w.address.slice(0, 8))
       lines.push(
-        `• ${escapeHtml(w.address.slice(0, 8))}… — WR ${pct(w.winRate30d)} · PnL ${signedPct(w.pnl30d)}`,
+        `• <code>${shortAddr}…</code> — WR ${pct(w.winRate30d)} · PnL ${signedPct(w.pnl30d)}`,
       )
     }
   }
 
-  return lines.join('\n')
+  return lines.join('\n').trimEnd()
 }

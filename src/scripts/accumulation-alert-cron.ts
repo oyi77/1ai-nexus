@@ -24,6 +24,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { prisma } from '@/lib/db'
 import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
+import { contractButtons } from '@/lib/modules/derived/signal-tier'
 import {
   ACCUMULATION_BUYER_STATUSES,
   ACCUMULATION_DEFAULTS,
@@ -97,18 +98,37 @@ function readArtifactCandidates(): WalletBuyCandidate[] | null {
   }
 }
 
-async function loadBuyerStatus(): Promise<Map<string, { status: string; alias: string | null }>> {
-  const map = new Map<string, { status: string; alias: string | null }>()
+async function loadBuyerStatus(): Promise<
+  Map<string, { status: string; alias: string | null; winRate?: number | null; pnl?: number | null }>
+> {
+  const map = new Map<
+    string,
+    { status: string; alias: string | null; winRate?: number | null; pnl?: number | null }
+  >()
   try {
     const rows = await prisma.smartMoneyWallet.findMany({
       where: { status: { in: [...ACCUMULATION_BUYER_STATUSES] } },
-      include: { wallet: { select: { address: true, alias: true } } },
+      select: {
+        status: true,
+        winRate: true,
+        pnl30d: true,
+        wallet: { select: { address: true, alias: true } },
+      },
     })
     for (const row of rows) {
-      map.set(row.wallet.address, { status: row.status ?? 'UNKNOWN', alias: row.wallet.alias ?? null })
+      map.set(row.wallet.address, {
+        status: row.status ?? 'UNKNOWN',
+        alias: row.wallet.alias ?? null,
+        winRate: row.winRate ?? null,
+        pnl: row.pnl30d ?? null,
+      })
     }
   } catch (err) {
-    console.error(`[accumulation-alert] smartMoneyWallet query failed: ${err instanceof Error ? err.message : String(err)}`)
+    console.error(
+      `[accumulation-alert] smartMoneyWallet query failed: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    )
   }
   return map
 }
@@ -185,7 +205,8 @@ async function main() {
       continue
     }
     const text = renderAccumulationAlert(event)
-    const ok = await deliverSniperAlert(text)
+    const replyMarkup = contractButtons(event.token.contract, event.token.chain)
+    const ok = await deliverSniperAlert(text, undefined, replyMarkup)
     if (ok) {
       sent += 1
       state = markSent(state, event.token.contract, now)

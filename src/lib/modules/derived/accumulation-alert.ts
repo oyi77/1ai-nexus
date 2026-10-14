@@ -58,6 +58,8 @@ export interface AccumulationBuyer {
   buyValueUsd: number | null
   stale: boolean
   alias: string | null
+  winRate?: number | null
+  pnl?: number | null
 }
 
 export interface AccumulationToken {
@@ -89,7 +91,7 @@ export interface AccumulationOptions {
 export interface AccumulationSourceInput {
   candidates: WalletBuyCandidate[]
   /** Buyer classification by address. Caller builds it from SmartMoneyWallet. */
-  buyerStatus: Map<string, { status: string; alias: string | null }>
+  buyerStatus: Map<string, { status: string; alias: string | null; winRate?: number | null; pnl?: number | null }>
   /** Verified market data by contract. MC null = unverified (flagged). */
   market?: Map<string, { marketCapUsd: number | null; liquidityUsd: number | null; symbol: string | null }>
   opts?: Partial<AccumulationOptions>
@@ -158,6 +160,8 @@ export function buildAccumulationEvents(input: AccumulationSourceInput): Accumul
         buyValueUsd: null,
         stale: false,
         alias: cls.alias,
+        winRate: cls.winRate ?? null,
+        pnl: cls.pnl ?? null,
       })
     }
     if (buyers.length === 0) continue // a random wallet's buy is not a whale event
@@ -192,59 +196,123 @@ export function buildAccumulationEvents(input: AccumulationSourceInput): Accumul
   return out.sort((a, b) => b.totalBuyUsd - a.totalBuyUsd)
 }
 
+function formatCompactUsd(n: number | null): string {
+  if (n === null || !Number.isFinite(n)) return '<i>unverified</i>'
+  const abs = Math.abs(n)
+  if (abs >= 1e9) return `$${(n / 1e9).toFixed(1)}B`
+  if (abs >= 1e6) return `$${(n / 1e6).toFixed(1)}M`
+  if (abs >= 1e3) {
+    const k = n / 1e3
+    return (k >= 100 && Number.isInteger(k) ? `$${k}K` : `$${k.toFixed(1)}K`).replace('.0K', 'K')
+  }
+  return `$${Math.round(n).toLocaleString('en-US')}`
+}
+
+function formatWindow(startIso: string, endIso: string): string {
+  const start = new Date(startIso).getTime()
+  const end = new Date(endIso).getTime()
+  if (Number.isFinite(start) && Number.isFinite(end) && end > start) {
+    const diffMin = Math.round((end - start) / 60000)
+    if (diffMin < 60) return `${Math.max(1, diffMin)}m`
+    const diffH = (diffMin / 60).toFixed(1).replace(/\.0$/, '')
+    return `${diffH}h`
+  }
+  return '1h'
+}
+
 /**
  * Render the operator-facing HTML alert. Exact title `WHALE ACCUMULATION
- * ALERT`; includes token/mint, verified-at, MC + liquidity + total buy,
+ * DETECTED`; includes token/mint, MC + liquidity + total buy,
  * per-buyer status/classification, evidence, risks, missing, and an
- * explicit "alert ≠ entry" footer. Under 4096 chars: buyer lines are
+ * explicit footer. Under 4096 chars: buyer lines are
  * truncated first, then the whole text is sliced for Telegram.
  */
 export function renderAccumulationAlert(event: AccumulationEvent): string {
   const t = event.token
-  const symbol =
-    t.symbol && t.symbol.trim() !== '' ? escapeHtml(t.symbol.trim()) : '?'
-  const mc =
-    t.marketCapUsd !== null
-      ? `$${Math.round(t.marketCapUsd).toLocaleString('en-US')}`
-      : '<i>unverified</i>'
-  const liquidity =
-    t.liquidityUsd !== null ? `$${Math.round(t.liquidityUsd).toLocaleString('en-US')}` : '<i>unverified</i>'
+  const rawSymbol = t.symbol && t.symbol.trim() !== '' ? t.symbol.trim().toUpperCase() : '?'
+  const symbol = rawSymbol.startsWith('$') ? rawSymbol : (rawSymbol === '?' ? '<i>Unknown</i>' : `$${escapeHtml(rawSymbol)}`)
+  const chainName = t.chain ? escapeHtml(t.chain.charAt(0).toUpperCase() + t.chain.slice(1)) : 'Solana'
+
+  const mc = formatCompactUsd(t.marketCapUsd)
+  const liquidity = formatCompactUsd(t.liquidityUsd)
   const total = `$${Math.round(event.totalBuyUsd).toLocaleString('en-US')}`
+  const windowStr = formatWindow(event.windowStartAt, event.windowEndAt)
 
   const lines: string[] = [
-    `<b>WHALE ACCUMULATION ALERT</b>`,
+    `🐋 <b>WHALE ACCUMULATION DETECTED</b>`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `🪙 <b>Token:</b> ${symbol}`,
+    `📋 <b>CA:</b> <code>${escapeHtml(t.contract)}</code> <i>(tap to copy)</i>`,
+    `⛓ <b>Chain:</b> ${chainName}`,
     ``,
-    `<b>Token:</b> ${symbol}`,
-    `<b>Chain:</b> ${escapeHtml(t.chain)}`,
-    `<b>Mint:</b> <code>${escapeHtml(t.contract)}</code>`,
-    `<b>Verified at:</b> ${escapeHtml(new Date().toISOString())}`,
-    `<b>Window:</b> ${escapeHtml(event.windowStartAt)} → ${escapeHtml(event.windowEndAt)}`,
+    `💰 <b>Whale Buy Inflow:</b> <b>${total}</b>`,
+    `📊 <b>Market Cap:</b> ${mc}  |  💧 <b>Liquidity:</b> ${liquidity}`,
+    `⏱ <b>Window:</b> ${windowStr}`,
     ``,
-    `<b>Market cap:</b> ${mc}`,
-    `<b>Liquidity:</b> ${liquidity}`,
-    `<b>Total verified buy:</b> ${total}`,
-    ``,
-    `<b>Buyers (${event.buyers.length}):</b>`,
+    `👤 <b>Accumulating Whales (${event.buyers.length}):</b>`,
   ]
 
   for (const b of event.buyers) {
-    const alias = b.alias ? ` (${escapeHtml(b.alias)})` : ''
-    const buy = b.buyValueUsd !== null ? ` — $${Math.round(b.buyValueUsd).toLocaleString('en-US')}` : ''
-    const stale = b.stale ? ' [stale]' : ''
-    lines.push(
-      `• <code>${escapeHtml(b.address)}</code>${alias} — ${escapeHtml(b.classification)} [${escapeHtml(b.status)}]${buy}${stale}`,
-    )
+    const name = b.alias && b.alias.trim() !== ''
+      ? escapeHtml(b.alias.trim())
+      : `${escapeHtml(b.address.slice(0, 6))}…${escapeHtml(b.address.slice(-4))}`
+
+    const badgeParts: string[] = []
+    const statusLabel = b.status || b.classification || 'WHALE'
+    badgeParts.push(escapeHtml(statusLabel))
+
+    if (b.winRate !== undefined && b.winRate !== null) {
+      badgeParts.push(`WR ${(b.winRate * 100).toFixed(0)}%`)
+    }
+    if (b.pnl !== undefined && b.pnl !== null) {
+      const rounded = Math.round(b.pnl * 100)
+      badgeParts.push(`PnL ${rounded >= 0 ? '+' : ''}${rounded}%`)
+    }
+    if (
+      b.classification &&
+      b.classification.toLowerCase().replace(/[\s_]+/g, '') !==
+        statusLabel.toLowerCase().replace(/[\s_]+/g, '')
+    ) {
+      badgeParts.push(escapeHtml(b.classification))
+    }
+    if (b.stale) badgeParts.push('stale')
+
+    const badge = `[${badgeParts.join(' · ')}]`
+
+    let boughtAmount: string
+    if (b.buyValueUsd !== null && Number.isFinite(b.buyValueUsd)) {
+      boughtAmount = `$${Math.round(b.buyValueUsd).toLocaleString('en-US')}`
+    } else if (event.buyers.length === 1) {
+      boughtAmount = total
+    } else {
+      boughtAmount = `Part of ${total}`
+    }
+
+    lines.push(`• <b>${name}</b> ${badge}`)
+    lines.push(`  └ Bought: <b>${boughtAmount}</b> · Wallet: <code>${escapeHtml(b.address)}</code>`)
   }
 
-  lines.push(``, `<b>Evidence:</b>`)
-  lines.push(...event.evidence.map((e) => `• ${escapeHtml(e)}`))
-  lines.push(``, `<b>Risks:</b>`)
-  lines.push(...(event.risks.length > 0 ? event.risks.map((r) => `• ${escapeHtml(r)}`) : ['• none listed']))
-  lines.push(``, `<b>Missing:</b>`)
-  lines.push(...(event.missing.length > 0 ? event.missing.map((m) => `• ${escapeHtml(m)}`) : ['• none']))
+  // Evidence (concise, compact)
+  if (event.evidence.length > 0) {
+    lines.push(``, `🔍 <b>Evidence:</b>`)
+    for (const e of event.evidence.slice(0, 3)) {
+      lines.push(`• <i>${escapeHtml(e)}</i>`)
+    }
+  }
+
+  // Risks & Missing flags
+  const riskLines = [
+    ...event.risks.map((r) => `• <i>${escapeHtml(r)}</i>`),
+    ...event.missing.map((m) => `• <i>Missing ${escapeHtml(m)}</i>`),
+  ]
+  if (riskLines.length > 0) {
+    lines.push(``, `⚠️ <b>Flags & Warnings:</b>`)
+    lines.push(...riskLines)
+  }
+
   lines.push(
-    ``,
-    `<i>alert ≠ entry — screening signal only, never financial advice</i>`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `⚠️ <i>Screening alert only — DYOR & manage risk</i>`,
   )
 
   return truncateLines(lines, 4090)
@@ -252,10 +320,22 @@ export function renderAccumulationAlert(event: AccumulationEvent): string {
 
 /** Keep the message under Telegram's 4096 cap; drop buyer lines first. */
 function truncateLines(lines: string[], cap: number): string {
-  const joined = lines.join('\n')
+  let joined = lines.join('\n')
   if (joined.length <= cap) return joined
-  const fallback = joined.slice(0, cap - 1) + '…'
-  return fallback
+
+  const footerIdx = lines.findIndex((l) => l.includes('Screening alert only'))
+  if (footerIdx > 0) {
+    const headerLines = lines.slice(0, footerIdx)
+    const footerLines = lines.slice(footerIdx)
+    while (headerLines.length > 8 && (headerLines.join('\n') + '\n' + footerLines.join('\n')).length > cap - 50) {
+      headerLines.pop()
+    }
+    headerLines.push('• <i>…additional buyers truncated</i>')
+    joined = [...headerLines, ...footerLines].join('\n')
+    if (joined.length <= cap) return joined
+  }
+
+  return joined.slice(0, cap - 1) + '…'
 }
 
 /**

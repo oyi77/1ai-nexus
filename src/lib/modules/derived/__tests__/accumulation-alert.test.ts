@@ -144,15 +144,32 @@ describe('renderAccumulationAlert — operator format', () => {
     })[0]
   }
 
-  it('renders the exact title, mint, MC, total buy, buyer status and the alert≠entry footer', () => {
+  it('renders modern header, CA in code block, MC, total buy, buyer status and risk footer', () => {
     const text = renderAccumulationAlert(event())
-    expect(text).toContain('<b>WHALE ACCUMULATION ALERT</b>')
-    expect(text).toContain(MINT)
-    expect(text).toContain('$500,000')
-    expect(text).toContain('$2,500')
-    expect(text).toContain('Whale')
+    expect(text).toContain('🐋 <b>WHALE ACCUMULATION DETECTED</b>')
+    expect(text).toContain('━━━━━━━━━━━━━━━━━━━━━━━━━')
+    expect(text).toContain(`<code>${MINT}</code>`)
+    expect(text).toContain('<i>(tap to copy)</i>')
+    expect(text).toContain('<b>$2,500</b>')
+    expect(text).toContain('$500K')
+    expect(text).toContain('Kang Rug')
     expect(text).toContain('WHALE')
-    expect(text).toContain('alert ≠ entry')
+    expect(text).toContain('Screening alert only — DYOR & manage risk')
+  })
+
+  it('renders buyer winRate and pnl badges when available', () => {
+    const status = new Map([
+      [WHALE, { status: 'WHALE', alias: 'Wugi', winRate: 0.78, pnl: 1.42 }],
+    ])
+    const ev = buildAccumulationEvents({
+      candidates: [candidate()],
+      buyerStatus: status,
+      market: market(145_200, 38_500),
+    })[0]
+    const text = renderAccumulationAlert(ev)
+    expect(text).toContain('• <b>Wugi</b> [WHALE · WR 78% · PnL +142%]')
+    expect(text).toContain('$145.2K')
+    expect(text).toContain('$38.5K')
   })
 
   it('renders unverified MC/liquidity honestly', () => {
@@ -175,7 +192,7 @@ describe('renderAccumulationAlert — operator format', () => {
     })[0]
     const text = renderAccumulationAlert(ev)
     expect(text.length).toBeLessThanOrEqual(4096)
-    expect(text).toContain('WHALE ACCUMULATION ALERT')
+    expect(text).toContain('WHALE ACCUMULATION DETECTED')
   })
 })
 

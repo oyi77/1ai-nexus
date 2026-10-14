@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   filterAlertableTrades,
+  renderSmartMoneyAlert,
   ALERT_THRESHOLDS,
   type SmartMoneyTrade,
 } from './smart-money-sync'
@@ -90,5 +91,37 @@ describe('ALERT_THRESHOLDS', () => {
     expect(ALERT_THRESHOLDS.maxTokenAgeHours).toBe(24)
     expect(ALERT_THRESHOLDS.minAmountUsd).toBe(1000)
     expect(ALERT_THRESHOLDS.maxMarketCapUsd).toBe(1_000_000)
+  })
+})
+
+describe('renderSmartMoneyAlert', () => {
+  it('formats modern header, dividers, CA tap-to-copy, amount, and wallet info', () => {
+    const t = trade()
+    const text = renderSmartMoneyAlert(t)
+    expect(text).toContain('🧠 <b>SMART MONEY ACTIVITY</b>')
+    expect(text).toContain('━━━━━━━━━━━━━━━━━━━━━━━━━')
+    expect(text).toContain('🟢 <b>BUY</b> · <b>$BONK</b>')
+    expect(text).toContain(`📋 <b>CA:</b> <code>${t.tokenAddress}</code> <i>(tap to copy)</i>`)
+    expect(text).toContain('💰 <b>Amount:</b> <b>$5,000</b>')
+    expect(text).toContain('📊 <b>Market Cap:</b> $500K  |  ⏱ <b>Age:</b> 6.0h')
+    expect(text).toContain('👤 <b>Wallet:</b> <b>Wugi</b> [QUALIFIED_SMART_MONEY]')
+    expect(text).toContain(`   └ <code>${t.walletAddress}</code>`)
+    expect(text).toContain('UTC')
+  })
+
+  it('handles SELL action with red indicator and fallback alias', () => {
+    const t = trade({
+      action: 'SELL',
+      walletAlias: null,
+      walletStatus: 'WHALE',
+      amountUsd: 12500,
+      tokenAgeHours: null,
+      marketCapUsd: 1_200_000,
+    })
+    const text = renderSmartMoneyAlert(t)
+    expect(text).toContain('🔴 <b>SELL</b> · <b>$BONK</b>')
+    expect(text).toContain('💰 <b>Amount:</b> <b>$12,500</b>')
+    expect(text).toContain('📊 <b>Market Cap:</b> $1.2M  |  ⏱ <b>Age:</b> unknown')
+    expect(text).toContain(`👤 <b>Wallet:</b> <b>${t.walletAddress.slice(0, 8)}…</b> [WHALE]`)
   })
 })

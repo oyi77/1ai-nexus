@@ -27,6 +27,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { prisma } from '@/lib/db'
+import { contractButtons } from './signal-tier'
 
 /** The operator's spreadsheet ID (from the shared link). */
 export const SPREADSHEET_ID = '14Kr-P8-DByM-jAw4ydo2x29YAp_LPc9uivHMidP6-78'
@@ -599,8 +600,42 @@ export async function appendWalletsToSheet(wallets: SheetWallet[]): Promise<numb
 
 // ── 5. Telegram alert ─────────────────────────────────────────
 
-function escapeHtml(s: string): string {
+function escapeHtml(s: string | null | undefined): string {
+  if (typeof s !== 'string') return ''
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * Render the operator-facing HTML alert for a smart-money trade.
+ */
+export function renderSmartMoneyAlert(t: SmartMoneyTrade): string {
+  const ageStr = t.tokenAgeHours !== null
+    ? `${t.tokenAgeHours.toFixed(1)}h`
+    : 'unknown'
+  const mcStr = t.marketCapUsd !== null
+    ? (t.marketCapUsd >= 1_000_000 ? `$${(t.marketCapUsd / 1_000_000).toFixed(1)}M` : `$${(t.marketCapUsd / 1000).toFixed(0)}K`)
+    : 'unknown'
+  const alias = t.walletAlias ? escapeHtml(t.walletAlias) : `${t.walletAddress.slice(0, 8)}…`
+  const status = escapeHtml(t.walletStatus ?? 'CLASSIFIED')
+  const rawSym = t.tokenSymbol ? t.tokenSymbol.trim().toUpperCase() : t.tokenAddress.slice(0, 8)
+  const symDisplay = rawSym.startsWith('$') ? rawSym : `$${rawSym}`
+  const actionEmoji = t.action === 'BUY' ? '🟢' : '🔴'
+  const tsStr = t.timestamp instanceof Date && !isNaN(t.timestamp.getTime())
+    ? t.timestamp.toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
+    : new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
+
+  return [
+    `🧠 <b>SMART MONEY ACTIVITY</b>`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+    `${actionEmoji} <b>${escapeHtml(t.action)}</b> · <b>${escapeHtml(symDisplay)}</b>`,
+    `📋 <b>CA:</b> <code>${escapeHtml(t.tokenAddress)}</code> <i>(tap to copy)</i>`,
+    `💰 <b>Amount:</b> <b>$${Math.round(t.amountUsd).toLocaleString('en-US')}</b>`,
+    `📊 <b>Market Cap:</b> ${mcStr}  |  ⏱ <b>Age:</b> ${ageStr}`,
+    `👤 <b>Wallet:</b> <b>${alias}</b> [${status}]`,
+    `   └ <code>${escapeHtml(t.walletAddress)}</code>`,
+    `🕐 ${tsStr}`,
+    `━━━━━━━━━━━━━━━━━━━━━━━━━`,
+  ].join('\n')
 }
 
 /**
@@ -616,41 +651,25 @@ export async function sendSmartMoneyAlerts(trades: SmartMoneyTrade[]): Promise<n
 
   let sent = 0
   for (const t of trades) {
-    const ageStr = t.tokenAgeHours !== null
-      ? `${t.tokenAgeHours.toFixed(1)}h`
-      : 'unknown'
-    const mcStr = t.marketCapUsd !== null
-      ? `$${(t.marketCapUsd / 1000).toFixed(0)}K`
-      : 'unknown'
-    const alias = t.walletAlias ? escapeHtml(t.walletAlias) : `${t.walletAddress.slice(0, 8)}…`
-    const status = escapeHtml(t.walletStatus ?? 'CLASSIFIED')
-    const tokenName = escapeHtml(t.tokenSymbol ?? t.tokenAddress.slice(0, 8))
-    const actionEmoji = t.action === 'BUY' ? '🟢' : '🔴'
-    const text = [
-      `🧠 <b>SMART MONEY ALERT</b>`,
-      ``,
-      `${actionEmoji} <b>${escapeHtml(t.action)}</b> · ${tokenName}`,
-      `💰 Amount: <b>$${t.amountUsd.toFixed(0)}</b>`,
-      `⏱ Token age: <b>${ageStr}</b>`,
-      `📊 Market cap: <b>${mcStr}</b>`,
-      ``,
-      `👤 Wallet: <code>${t.walletAddress}</code>`,
-      `   Alias: ${alias} (${status})`,
-      `⛓ Chain: ${escapeHtml(t.chain)}`,
-      ``,
-      `🕐 ${t.timestamp.toISOString().slice(0, 19)}Z`,
-    ].join('\n')
+    const text = renderSmartMoneyAlert(t)
+    const buttons = contractButtons(t.tokenAddress, t.chain)
+    const replyMarkup = buttons.inline_keyboard.length > 0 ? buttons : undefined
 
     try {
+      const payload: Record<string, unknown> = {
+        chat_id: chatId,
+        text,
+        parse_mode: 'HTML',
+        disable_web_page_preview: true,
+      }
+      if (replyMarkup) {
+        payload.reply_markup = replyMarkup
+      }
+
       const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId,
-          text,
-          parse_mode: 'HTML',
-          disable_web_page_preview: true,
-        }),
+        body: JSON.stringify(payload),
       })
       if (res.ok) sent++
       else {

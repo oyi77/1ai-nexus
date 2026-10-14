@@ -50,8 +50,10 @@ describe('buildKolAxiomDigest', () => {
         },
       ],
     })
-    expect(out).toContain('🧠 KOL/AXIOM SMART-MONEY ALERT')
-    expect(out).toContain('Kang Rug — TOK $1600 · Pump.fun')
+    expect(out).toContain('📡 <b>SMART MONEY / KOL RADAR</b>')
+    expect(out).toContain('━━━━━━━━━━━━━━━━━━━━━━━━━')
+    expect(out).toContain('• <b>Kang Rug</b> bought <b>$TOK</b> (<b>$1,600</b> · Pump.fun)')
+    expect(out).toContain(`  └ CA: <code>${'E'.repeat(40)}</code>`)
   })
 
   it('falls back to the first 8 address chars when the token symbol is empty', () => {
@@ -68,7 +70,8 @@ describe('buildKolAxiomDigest', () => {
         },
       ],
     })
-    expect(out).toContain(`kol — ${addr.slice(0, 8)} $900 · Raydium`)
+    expect(out).toContain(`• <b>kol</b> bought <b>$${addr.slice(0, 8)}</b> (<b>$900</b> · Raydium)`)
+    expect(out).toContain(`  └ CA: <code>${addr}</code>`)
   })
 
   it('renders n/a when usdValue is null', () => {
@@ -84,7 +87,8 @@ describe('buildKolAxiomDigest', () => {
         },
       ],
     })
-    expect(out).toContain('kol — TOK n/a · Jupiter')
+    expect(out).toContain('• <b>kol</b> bought <b>$TOK</b> (n/a · Jupiter)')
+    expect(out).toContain(`  └ CA: <code>${'E'.repeat(40)}</code>`)
   })
 
   it('formats Axiom wallets with short address, win rate, and signed pnl', () => {
@@ -95,8 +99,8 @@ describe('buildKolAxiomDigest', () => {
         { address: 'E'.repeat(40), winRate30d: null, pnl30d: -0.03 },
       ],
     })
-    expect(out).toContain(`${'D'.repeat(40).slice(0, 8)}… — WR 67% · PnL +42%`)
-    expect(out).toContain(`${'E'.repeat(40).slice(0, 8)}… — WR n/a · PnL -3%`)
+    expect(out).toContain(`• <code>${'D'.repeat(40).slice(0, 8)}…</code> — WR 67% · PnL +42%`)
+    expect(out).toContain(`• <code>${'E'.repeat(40).slice(0, 8)}…</code> — WR n/a · PnL -3%`)
   })
 
   it('caps both sources at 5 rows', () => {
