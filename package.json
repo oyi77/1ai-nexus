@@ -45,6 +45,7 @@
     "cron:accumulation-alert": "tsx src/scripts/accumulation-alert-cron.ts",
     "cron:smart-money-sync": "tsx src/scripts/smart-money-sync-cron.ts",
     "cron:kol-monitor": "tsx src/scripts/kol-monitor-cron.ts",
+    "cron:paper-buy": "tsx src/scripts/paper-buy-cron.ts",
     "import:wallets": "tsx scripts/import-wallets.ts",
     "harvest:whales": "tsx src/scripts/whale-harvester-cron.ts",
     "bootstrap:gmgn": "tsx src/scripts/gmgn-bootstrap-cron.ts",
