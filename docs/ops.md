@@ -598,3 +598,92 @@ rm package-lock.json && npm install
 # Rebuild Docker images
 docker compose build --no-cache
 ```
+
+## Scheduled Tasks & Cron Jobs
+
+The production server runs a user crontab (`crontab -l`) that drives all
+background harvesters, scanners, and pipelines. Key entries:
+
+| Schedule | Command | Log | Purpose |
+|----------|---------|-----|---------|
+| `*/5 * * * *` | `npm run cron:sniper` | `/tmp/sniper-cron.log` | Meme sniper scan (call-feed discovery, GMGN audit, signal delivery) |
+| `*/2 * * * *` | `python3 scripts/call-feed.py --limit 25 --window-min 60` | `/tmp/call-feed-cron.err` | Read operator call channels, score token confluence → `data/call-feed-latest.json` |
+| `0 */6 * * *` | `npm run cron:caller-scores` | `/tmp/caller-scores-cron.log` | Refresh Telegram Alpha Caller weights from Solpump → `data/caller-scores.json` |
+| `*/15 * * * *` | `npm run cron:zero-issue` | `/tmp/nexus-zero-issue.log` | Zero-issue audit sweep + Telegram alerting |
+| `*/5 * * * *` | `npm run cron:smart-money-sync` | `/tmp/smart-money-sync.log` | Smart-money wallet sync |
+| `0 3 * * *` | `npm run cron:wallet-refresh` | `/tmp/wallet-refresh.log` | Wallet refresh |
+| `30 3 * * *` | `npm run harvest:whales` | `/tmp/whale-harvester.log` | Whale harvest |
+| `0 4 * * *` | `npm run bootstrap:gmgn` | `/tmp/gmgn-bootstrap.log` | GMGN session bootstrap |
+| `*/20 * * * *` | `npm run harvest:crossex` | `/tmp/crossex-harvest.log` | CrossEx funding harvest |
+| `0 3 * * *` | `scripts/backup-db.sh` | `/tmp/nexus-db-backup.log` | PostgreSQL backup |
+| `17 */6 * * *` | `npm run harvest:idx-universe` | `/tmp/idx-universe-harvest.log` | IDX universe harvest |
+| `0 11 * * 1-5` | `npm run harvest:idx-screener` | `/tmp/idx-screener.log` | IDX screener harvest (weekdays) |
+| `0 12 * * 1-5` | `npm run cron:alpha-track` | `/tmp/alpha-track-cron.log` | Alpha track (weekdays) |
+| `40 10 * * 1-5` | `npm run harvest:idx-saham` | `/tmp/idx-saham-harvest.log` | IDX saham harvest (weekdays) |
+| `5/15/19/30/45 19 * * 1-5` | `harvest:idx-ajaib/stockbit`, `track/alert:idx-signals` | various | IDX broker + signal pipeline (weekdays) |
+| `20 18 * * 1-5` | `npm run harvest:idx-fundamentals` | `/tmp/idx-fundamentals.log` | IDX fundamentals (weekdays) |
+
+> **Conventions**: all cron lines `cd /home/openclaw/projects/1ai-tracker` first,
+> prefix `PATH=/home/openclaw/.nvm/versions/node/v22.22.3/bin:/usr/bin:/bin`
+> for npm/tsx, and append `>> /tmp/<name>.log 2>&1`. Python scripts use the
+> system python3 directly (no PATH prefix needed). Edit with:
+> `crontab -l > /tmp/crontab.bak && crontab -l | { cat; echo "<line>"; } | crontab -`
+
+### Caller Score Refresh — `cron:caller-scores`
+
+**Script**: `scripts/fetch-caller-scores.py`
+**npm script**: `npm run cron:caller-scores`
+**Cron**: `0 */6 * * *` (every 6 hours, log: `/tmp/caller-scores-cron.log`)
+
+Fetches Telegram Alpha Caller rankings from the **public keyless** Solpump
+endpoint and writes per-caller confluence weights to
+`data/caller-scores.json`:
+
+- **Source**: `GET https://trade.solpump.io/api/v2/watchlist/ranking/all?timeframe=30d`
+  (paginated via `nextCursor`, max 5 pages, filters `source.type == "CALLER"`,
+  drops callers below 20 calls)
+- **Output**: `data/caller-scores.json` — top-level keys: `generated_at`,
+  `source`, `timeframe`, `caller_count`, `callers`, `callers_by_id`. Each
+  caller record: `{id, name, winRatePct, totalCalls, averageMultiplier,
+  topBucket, weight}`. Currently 75 callers with weights 0.1051–1.0992.
+- **Weight formula**: `winRatePct/100 * (1 + min(averageMultiplier, 1000)/1000)`,
+  clamped to `[0.1, 5.0]`
+- **Dependencies**: Python 3 stdlib only (no pip packages)
+- **Exit codes**: 0 = ok, 1 = partial data (some pages failed), 2 = no data
+
+This artifact feeds the **weighted confluence scoring** in
+`scripts/call-feed.py` (see below). It never touches candidate safety gates.
+
+### Call-Feed Pipeline — `scripts/call-feed.py`
+
+**Cron**: `*/2 * * * *` (every 2 min, output: `data/call-feed-latest.json`)
+
+Reads recent messages from 12 operator Telegram call channels via the live
+user session (read-only Telethon), extracts contract addresses, and emits
+candidate rows ranked by confluence — how many **independent** channels
+called the same token.
+
+**Weighted confluence scoring** (upgraded to consume `caller-scores.json`):
+
+- When `data/caller-scores.json` is present, each token mention contributes
+  the caller's measured **weight** (win rate × realized multiple, clamped
+  0.1–5.0) to a per-token `weighted_score`. The token record also carries a
+  `caller_weights` map of `{channel_handle: weight}` for its contributors.
+- **Sort order**: `source_count` desc, then `weighted_score` desc (replaces
+  raw mention count as the tiebreaker).
+- **Backward compatible**: if `data/caller-scores.json` is absent, all
+  weights default to 1.0 — the script degrades to the original unweighted
+  ranking with no behavior change.
+- **Fields in each candidate**: `contract`, `chain`, `sources`,
+  `source_count`, `mentions`, `weighted_score`, `caller_weights`,
+  `first_seen`, `last_seen`, `kinds`
+
+Channel handle normalization: leading `@` stripped + lowercased for lookup
+in `caller-scores.json`. Channels with no matching Solpump caller fall back
+to weight 1.0.
+
+> ⚠️ **`data/caller-scores.json` is NOT in `.gitignore`** — it currently
+> shows as untracked (`??`) in `git status`. This is a runtime artifact
+> regenerated every 6 hours by cron and should not be committed. Add it to
+> `.gitignore` before staging (see `data/call-feed-latest.json` pattern at
+> line 111 of `.gitignore` for reference).

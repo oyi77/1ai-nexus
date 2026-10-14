@@ -49,7 +49,8 @@
     "bootstrap:gmgn": "tsx src/scripts/gmgn-bootstrap-cron.ts",
     "cleanup:whale-list": "tsx src/scripts/whale-list-cleanup.ts",
     "tidy:whale-sheet": "tsx src/scripts/tidy-whale-sheet.ts",
-    "cleanup:sheet1": "tsx src/scripts/sheet1-cleanup.ts"
+    "cleanup:sheet1": "tsx src/scripts/sheet1-cleanup.ts",
+    "cron:caller-scores": "python3 scripts/fetch-caller-scores.py"
   },
   "dependencies": {
     "@1ai/payment": "file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",

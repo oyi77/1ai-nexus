@@ -13,6 +13,18 @@ never safety. Every safety gate stays in the TS evaluator.
 Usage: python3 scripts/call-feed.py [--limit 12] [--window-min 1440]
 Env required: TELEGRAM_API_ID, TELEGRAM_API_HASH (same as leak finder).
 Session: ~/.openclaw/workspace/vilona_session (read-only).
+
+Weighted confluence scoring: raw `source_count` treats every channel as
+equally credible, so a spam shill counts the same as a track-recorded
+Alpha Caller. When `data/caller-scores.json` (produced by
+scripts/fetch-caller-scores.py) is present, each mention contributes the
+caller's measured weight (win rate x realized multiple, clamped 0.1-5.0)
+to a per-token `weighted_score`, and every token carries the
+`caller_weights` map of its contributing channels. Channels with no
+matching caller name fall back to 1.0, so the artifact is strictly
+additive: absent the scores file the script degrades to the old
+unweighted ranking. Ordering stays source_count-first, then by
+weighted_score instead of raw mention count.
 """
 import argparse
 import asyncio
@@ -51,12 +63,37 @@ EVM = re.compile(r'0x[0-9a-fA-F]{40}')
 
 STATE_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'call-feed-state.sqlite')
 
-
 def chain_of(contract: str) -> str:
     if contract.startswith('0x'):
         return 'bsc'  # evm-family; chain resolved downstream by audit fan-out
     return 'solana'
 
+def load_scores(path: str) -> dict[str, float]:
+    """Load caller name/id -> weight from caller-scores.json. Empty dict if absent."""
+    try:
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print(f'SCORES-MISSING {path}: all weights default to 1.0', file=sys.stderr)
+        return {}
+    except (json.JSONDecodeError, OSError) as e:
+        print(f'SCORES-BAD {path}: {type(e).__name__}: all weights default to 1.0', file=sys.stderr)
+        return {}
+    scores: dict[str, float] = {}
+    for name, rec in (data.get('callers') or {}).items():
+        w = rec.get('weight')
+        if isinstance(w, (int, float)) and name:
+            scores[name.strip().lstrip('@').lower()] = float(w)
+    for name, rec in (data.get('callers_by_id') or {}).items():
+        w = rec.get('weight')
+        if isinstance(w, (int, float)) and name:
+            scores[name.strip().lstrip('@').lower()] = float(w)
+    return scores
+
+
+def caller_weight(scores: dict[str, float], channel: str) -> float:
+    """Weight for a Telegram channel name; 1.0 when no Solpump caller matches."""
+    return scores.get(channel.strip().lstrip('@').lower(), 1.0)
 
 def upsert_state(cur: "sqlite3.Cursor", contract: str, source: str, msg_id: int, ts: str) -> bool:
     try:
@@ -73,7 +110,10 @@ async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('--limit', type=int, default=25)
     ap.add_argument('--window-min', type=int, default=1440)
+    ap.add_argument('--scores-file', default='data/caller-scores.json')
     args = ap.parse_args()
+
+    scores = load_scores(args.scores_file)
 
     api_id = int(os.environ.get('TELEGRAM_API_ID', '0') or 0)
     api_hash = os.environ.get('TELEGRAM_API_HASH', '')
@@ -110,7 +150,10 @@ async def main() -> int:
                         new_rows += 1
                     rec = mentions.setdefault(ca, {'contract': ca, 'chain': chain_of(ca),
                                                   'mentions': 0, 'sources': [], 'first_seen': ts,
-                                                  'last_seen': ts, 'kinds': set()})
+                                                  'last_seen': ts, 'kinds': set(),
+                                                  'weighted_score': 0.0, 'caller_weights': {}})
+                    rec['weighted_score'] += caller_weight(scores, handle)
+                    rec['caller_weights'][handle] = caller_weight(scores, handle)
                     rec['mentions'] += 1
                     if handle not in rec['sources']:
                         rec['sources'].append(handle)
@@ -121,9 +164,9 @@ async def main() -> int:
             print(f'CHAN-FAIL {handle}: {type(e).__name__}', file=sys.stderr)
 
     db.commit()
-    rows = sorted(mentions.values(), key=lambda r: (-len(r['sources']), -r['mentions']))
+    rows = sorted(mentions.values(), key=lambda r: (-len(r['sources']), -r['weighted_score']))
     out = [{**r, 'sources': r['sources'], 'kinds': sorted(r['kinds']),
-            'source_count': len(r['sources'])} for r in rows]
+            'source_count': len(r['sources']), 'weighted_score': round(r['weighted_score'], 4)} for r in rows]
     print(json.dumps({'generated_at': datetime.now(timezone.utc).isoformat(),
                       'window_min': args.window_min, 'new_mentions': new_rows,
                       'candidates': out}, indent=1))
