@@ -203,3 +203,24 @@
 ---
 
 *Manual verification complete. 2026-06-21.*
+
+---
+
+## Deprecated Sniper DB Tables (2026-10-14)
+
+Decision: **DEPRECATE** (comment-only; tables retained). The four Prisma models
+below are defined in `prisma/schema.prisma` but are not written by any code.
+The live, tested writers use JSON files instead. Do not insert rows into these
+tables; a JSON→DB migration would need explicit operator approval.
+
+| Deprecated table | Live JSON path | Live writer module |
+| --- | --- | --- |
+| `SniperScanDecision` | `data/sniper-log.json` | `src/lib/modules/derived/sniper-log.ts` |
+| `SniperAuditEntry` | `data/sniper-audit.json` | `src/lib/modules/derived/sniper-audit.ts` |
+| `SniperSignalOutcome` | `data/sniper-outcomes.json` | `src/lib/modules/derived/sniper-outcomes.ts` |
+| `SniperReviewSeen` | `data/sniper-review-seen.json` | `src/lib/modules/derived/sniper-review.ts` |
+
+All four tables have 0 rows (verified 2026-10-14). The models remain in the
+schema, marked `@deprecated`, until a migration is approved — deletion is a
+destructive migration and is intentionally out of scope.
+

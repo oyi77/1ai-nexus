@@ -1276,6 +1276,9 @@ model FeedHealthEvent {
 // Meme Sniper — State & Audit Tables (migrated from data/*.json)
 // ─────────────────────────────────────────────────────────────
 
+// @deprecated — not written by any code; live path is data/sniper-log.json
+// via src/lib/modules/derived/sniper-log.ts. Do not insert rows here.
+// Revisit if JSON→DB migration is approved.
 model SniperScanDecision {
   id              String   @id @default(cuid())
   contract        String
@@ -1300,6 +1303,9 @@ model SniperScanDecision {
   @@index([chain, scannedAt(sort: Desc)])
 }
 
+// @deprecated — not written by any code; live path is data/sniper-audit.json
+// via src/lib/modules/derived/sniper-audit.ts. Do not insert rows here.
+// Revisit if JSON→DB migration is approved.
 model SniperAuditEntry {
   id              String   @id @default(cuid())
   contract        String
@@ -1317,6 +1323,9 @@ model SniperAuditEntry {
   @@index([observedAt(sort: Desc)])
 }
 
+// @deprecated — not written by any code; live path is data/sniper-outcomes.json
+// via src/lib/modules/derived/sniper-outcomes.ts. Do not insert rows here.
+// Revisit if JSON→DB migration is approved.
 model SniperSignalOutcome {
   id              String    @id @default(cuid())
   signalId        String    @unique
@@ -1343,6 +1352,9 @@ model SniperSignalOutcome {
   @@index([alertedAt(sort: Desc)])
 }
 
+// @deprecated — not written by any code; live path is data/sniper-review-seen.json
+// via src/lib/modules/derived/sniper-review.ts. Do not insert rows here.
+// Revisit if JSON→DB migration is approved.
 model SniperReviewSeen {
   id        String   @id @default(cuid())
   key       String   @unique
