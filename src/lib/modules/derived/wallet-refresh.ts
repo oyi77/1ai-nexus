@@ -17,6 +17,8 @@ import {
   type NormalizedSwap,
   type RpcSig,
 } from '@/lib/modules/derived/solana-harvest'
+import { fetchWalletActivity } from '@/lib/modules/derived/wallet-activity'
+import { fetchHistoricalTokenUsd } from '@/lib/modules/derived/historical-price'
 import { buildEpisodes, toTradeEpisodes } from '@/lib/modules/derived/wallet-episodes'
 import { classifyWallet, SMART_MONEY_DEFAULTS, type ClassifyInput } from '@/lib/modules/derived/wallet-intel'
 import { persistWalletClassification } from '@/lib/modules/derived/wallet-classifier'
@@ -46,6 +48,40 @@ const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
  */
 export function resolveClusterDataAvailable(): boolean {
   return (process.env.CLUSTER_DATA_AVAILABLE ?? '').trim().toLowerCase() === 'true'
+}
+
+/**
+ * Which wallet swap source the refresh should prefer. `gmgn` (the keyless
+ * wallet-activity feed) is the default because it carries real timestamps,
+ * mints and trade-time USD; `rpc` forces the legacy public-RPC harvest.
+ * Any other value falls back to `gmgn` so a misconfigured env never
+ * silently disables the preferred source.
+ */
+export function resolveWalletActivitySource(): 'gmgn' | 'rpc' {
+  const value = (process.env.WALLET_ACTIVITY_SOURCE ?? '').trim().toLowerCase()
+  return value === 'rpc' ? 'rpc' : 'gmgn'
+}
+
+/**
+ * Fill the SOL leg of a COMPLETE GMGN-sourced buy with a historical USD
+ * price. Only the exact `stalePrice-current-only` limitation is cleared,
+ * and only when the oracle actually returns a number — if the oracle comes
+ * back null the flag stays so `classifyBuy`/`swapToTransactionRow` keep
+ * rejecting the leg. Returns true when a number was applied.
+ */
+export function applyHistoricalUsdToSwap(
+  swap: NormalizedSwap,
+  historicalUsd: number | null,
+): boolean {
+  if (historicalUsd === null || !Number.isFinite(historicalUsd) || historicalUsd <= 0) return false
+  if (swap.completeness !== 'complete') return false
+  if (swap.inputMint !== SOL_MINT) return false
+  swap.inputUsd = historicalUsd * swap.inputAmount
+  swap.outputUsd = historicalUsd * swap.inputAmount
+  swap.source = `${swap.source}+geckoterminal`
+  const i = swap.limitations.indexOf('stalePrice-current-only')
+  if (i >= 0) swap.limitations.splice(i, 1)
+  return true
 }
 
 /**
@@ -355,26 +391,75 @@ export function buildBuyVolume30d(swaps: NormalizedSwap[], nowMs: number): BuyVo
   return { legs, windowMs, now: nowMs }
 }
 
+/**
+ * Fill complete SOL→token GMGN legs whose trade-time USD is missing or
+ * stale with the keyless GeckoTerminal OHLCV oracle. Only the stale flag is
+ * cleared and only when a real number comes back — never weaken the gate.
+ */
+async function fillHistoricalUsdForSwaps(swaps: NormalizedSwap[]): Promise<void> {
+  for (const swap of swaps) {
+    if (swap.completeness !== 'complete') continue
+    if (swap.inputMint !== SOL_MINT) continue
+    if (!swap.outputMint || swap.outputMint === SOL_MINT) continue
+    if (swap.inputUsd !== null && !swap.limitations.includes('stalePrice-current-only')) continue
+    if (swap.timestamp === null || !Number.isFinite(swap.timestamp) || swap.timestamp <= 0) continue
+    const price = await fetchHistoricalTokenUsd(swap.outputMint, swap.timestamp)
+    applyHistoricalUsdToSwap(swap, price.usd)
+  }
+}
+
 // ─── Refresh one wallet ──────────────────────────────────────
 
 export async function refreshOneWallet(candidate: WalletRefreshCandidate): Promise<RefreshResult> {
   try {
-    const { swaps, coverage } = await harvestWallet(candidate.address, {
-      days: REFRESH_WINDOW_DAYS,
-      // Per-wallet cap (see HARVEST_LIMIT): measured 1.6-2.4s/signature
-      // live, so 200 sigs ≈ 4-5 min/wallet — enough trades to classify
-      // while keeping one batch inside a cron slot.
-      limit: HARVEST_LIMIT,
-      withUsd: true,
-      throttleMs: THROTTLE_MS,
-    })
+    const source = resolveWalletActivitySource()
+    let swaps: NormalizedSwap[]
+    let coverage: { sigsSeen: number; validEvents: number; rejectedEvents: number; gaps: string[]; complete30d: boolean; truncated?: boolean; signatures?: RpcSig[] }
+    let sigs: RpcSig[]
+
+    if (source === 'rpc') {
+      const harvested = await harvestWallet(candidate.address, {
+        days: REFRESH_WINDOW_DAYS,
+        // Per-wallet cap (see HARVEST_LIMIT): measured 1.6-2.4s/signature
+        // live, so 200 sigs ≈ 4-5 min/wallet — enough trades to classify
+        // while keeping one batch inside a cron slot.
+        limit: HARVEST_LIMIT,
+        withUsd: true,
+        throttleMs: THROTTLE_MS,
+      })
+      swaps = harvested.swaps
+      coverage = harvested.coverage
+      sigs = harvested.coverage.signatures
+    } else {
+      // Preferred: keyless GMGN wallet activity — real timestamps, mints and
+      // trade-time USD. Falls back to the public-RPC harvest (inside
+      // fetchWalletActivity) only when GMGN returns no usable swaps, so a
+      // wallet with an empty GMGN feed still gets its legacy harvest.
+      const activity = await fetchWalletActivity(candidate.address, { limit: HARVEST_LIMIT })
+      if (activity.source === 'gmgn' && activity.swaps.length > 0) {
+        // GMGN rows are COMPLETE but may still carry a null trade-time USD
+        // (or a current-only fill from upstream). Fill the SOL leg with the
+        // keyless GeckoTerminal OHLCV oracle — and only clear the stale flag
+        // when that oracle returns a real number.
+        await fillHistoricalUsdForSwaps(activity.swaps)
+      }
+      swaps = activity.swaps
+      coverage = {
+        sigsSeen: activity.coverage.sigsSeen,
+        validEvents: activity.coverage.validEvents,
+        rejectedEvents: Math.max(0, activity.coverage.sigsSeen - activity.coverage.validEvents),
+        gaps: activity.coverage.gaps,
+        complete30d: activity.coverage.complete,
+      }
+      sigs = []
+    }
 
     const built = buildEpisodes(swaps)
     const trades = toTradeEpisodes(built.episodes)
 
     const nowMs = Date.now()
-    const tx7d = countSignaturesLast7d(coverage.signatures, nowMs)
-    const tx7dTruncated = isTx7dTruncated(coverage, nowMs)
+    const tx7d = countSignaturesLast7d(sigs, nowMs)
+    const tx7dTruncated = isTx7dTruncated({ truncated: coverage.truncated === true, signatures: sigs }, nowMs)
     const clusterDataAvailable = resolveClusterDataAvailable()
 
     const [positions, portfolio] = await Promise.all([
