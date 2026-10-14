@@ -45,7 +45,8 @@
     "cron:kol-monitor": "tsx src/scripts/kol-monitor-cron.ts",
     "import:wallets": "tsx scripts/import-wallets.ts",
     "harvest:whales": "tsx src/scripts/whale-harvester-cron.ts",
-    "bootstrap:gmgn": "tsx src/scripts/gmgn-bootstrap-cron.ts"
+    "bootstrap:gmgn": "tsx src/scripts/gmgn-bootstrap-cron.ts",
+    "tidy:whale-sheet": "tsx src/scripts/tidy-whale-sheet.ts"
   },
   "dependencies": {
     "@1ai/payment": "file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",

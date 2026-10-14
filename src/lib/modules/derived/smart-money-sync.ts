@@ -210,7 +210,7 @@ async function getGogAccessToken(): Promise<string | null> {
  * Uses direct fetch() to the Sheets v4 REST endpoints with
  * `Authorization: Bearer <token>` — no googleapis client needed.
  */
-interface SheetsApi {
+export interface SheetsApi {
   get(range: string): Promise<string[][]>
   append(range: string, values: unknown[][]): Promise<boolean>
   update(range: string, values: unknown[][]): Promise<boolean>
@@ -219,7 +219,7 @@ interface SheetsApi {
 
 let cachedSheetsApi: SheetsApi | null | undefined
 
-async function getSheetsApi(): Promise<SheetsApi | null> {
+export async function getSheetsApi(): Promise<SheetsApi | null> {
   if (cachedSheetsApi !== undefined) return cachedSheetsApi
   const token = await getGogAccessToken()
   if (!token) {
