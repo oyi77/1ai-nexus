@@ -38,6 +38,7 @@
     "deploy": "bash scripts/deploy.sh",
     "seed:feeds": "tsx prisma/seed-feeds.ts",
     "cron:sniper": "tsx src/scripts/sniper-cron.ts",
+    "realtime:consumer": "tsx src/scripts/realtime-sniper-consumer.ts",
     "cron:meme-price-observer": "tsx src/scripts/meme-price-observer-cron.ts",
     "backtest:audit": "tsx src/scripts/audit-backtest.ts",
     "cron:wallet-refresh": "tsx src/scripts/wallet-refresh-cron.ts",

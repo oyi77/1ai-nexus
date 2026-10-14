@@ -59,6 +59,36 @@ interface DexScreenerBoost {
 
 const TELEGRAM_HYPNOTIC_SCORE = 75 // score threshold for Telegram push alert
 
+// ══ REALTIME SNIPER BRIDGE (publish side) ══
+// Hype-scored tokens that clear the Telegram threshold are ALSO published
+// to `nexus:realtime-sniper` for a separate consumer process
+// (src/scripts/realtime-sniper-consumer.ts) that runs them through the
+// heavy sniper pipeline (audit fan-out → tier gates → Telegram). The
+// consumer is env-gated: when SNIPER_REALTIME_ENABLED !== 'true' it exits
+// immediately, so this publish is a no-op in practice and the existing
+// alert behaviour is untouched. Kept as a raw flat object — the consumer
+// parses it into the bridge's RealtimeScoredToken contract.
+const SNIPER_REALTIME_ENABLED = process.env.SNIPER_REALTIME_ENABLED === 'true'
+const REALTIME_SNIPER_CHANNEL = 'nexus:realtime-sniper'
+
+function publishRealtimeSniper(token: ScoredToken): void {
+  if (!SNIPER_REALTIME_ENABLED) return
+  const event = {
+    address: token.address,
+    chain: token.chain,
+    name: token.name,
+    symbol: token.symbol,
+    priceUsd: token.priceUsd,
+    liquidity: token.liquidity,
+    fdv: token.fdv,
+    volume24h: token.volume24h,
+    score: token.score,
+    sources: token.sources,
+    firstSeen: token.firstSeen,
+  }
+  alertRedis.publish(REALTIME_SNIPER_CHANNEL, JSON.stringify(event)).catch(() => {})
+}
+
 function scheduleTelegramAlert(token: ScoredToken) {
   if (token.score < TELEGRAM_HYPNOTIC_SCORE) return
 
@@ -87,6 +117,8 @@ function scheduleTelegramAlert(token: ScoredToken) {
 
   // Publish to Redis for the Next.js Telegram bot to consume
   alertRedis.publish('nexus:memecoin-alerts', JSON.stringify(alertPayload)).catch(() => {})
+  // Publish to the realtime sniper consumer (env-gated, see above)
+  publishRealtimeSniper(token)
 }
 
 function formatCompact(n: number): string {
