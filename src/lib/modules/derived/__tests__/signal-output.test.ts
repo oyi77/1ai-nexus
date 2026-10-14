@@ -37,7 +37,7 @@ describe('signal output — reply markup', () => {
   it('returns text plus a button keyboard by default', () => {
     const out = formatTieredSignal(input())
     expect(typeof out.text).toBe('string')
-    expect(out.text).toContain('POTENTIAL COIN SIGNAL')
+    expect(out.text).toContain('HIGH CONVICTION SIGNAL')
     expect(out.replyMarkup).toBeDefined()
     expect(out.replyMarkup!.inline_keyboard.length).toBeGreaterThan(0)
     for (const row of out.replyMarkup!.inline_keyboard) {
@@ -71,7 +71,7 @@ describe('signal output — reply markup', () => {
     expect(out.text).toContain('$A_B')
     expect(out.text).not.toContain('A\\_B')
     expect(out.text).not.toContain('*POTENTIAL')
-    expect(out.text).toContain('<b>POTENTIAL COIN SIGNAL</b>')
+    expect(out.text).toContain('<b>HIGH CONVICTION SIGNAL</b>')
   })
 })
 

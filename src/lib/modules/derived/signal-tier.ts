@@ -535,7 +535,11 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
   const L: string[] = []
 
   // Header with tier badge
-  L.push(`⚡ <b>POTENTIAL COIN SIGNAL</b> · ${tierBadge(tier)}`)
+  L.push(
+    tier === 'HIGH_CONVICTION'
+      ? `🚀 <b>HIGH CONVICTION SIGNAL</b> · ${tierBadge(tier)}`
+      : `⚡ <b>POTENTIAL COIN SIGNAL</b> · ${tierBadge(tier)}`,
+  )
   L.push('━━━━━━━━━━━━━━━━━━━━━━━━━')
 
   // Prominent Token info
