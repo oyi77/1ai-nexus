@@ -35,6 +35,12 @@ export interface CandidateEvidence {
   confluence?: number
   mentions?: number
   /** Source-defined kinds: trend, whale, kol, shill, score, tool… */
+  /** Call-feed weighted confluence (scripts/call-feed.py): sum of per-caller
+   * weights. Optional — absent means the artifact predates the field or the
+   * source never measured it; never a fabricated 0. */
+  weightedScore?: number
+  /** Per-caller weights behind weightedScore (channel name → weight). */
+  callerWeights?: Record<string, number>
   kinds?: string[]
 }
 

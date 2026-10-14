@@ -380,6 +380,10 @@ interface CallFeedCandidate {
   sources: string[]
   first_seen: string
   last_seen: string
+  /** Weighted confluence from scripts/call-feed.py. Optional: older
+   * artifacts predate the field — absent stays absent, never a default. */
+  weighted_score?: number
+  caller_weights?: Record<string, number>
 }
 
 interface CallFeedArtifact {
@@ -419,17 +423,29 @@ async function discoverCallFeed(limit: number): Promise<SniperEnrichedToken[]> {
           category: categoryFor('call-feed', { kinds: r.kinds }),
           discoveredAt: Date.parse(r.last_seen) || Date.now(),
           note: `${r.source_count} channels: ${r.sources.join(',')}`,
-          confluence: r.source_count,
           mentions: r.mentions,
+          confluence: r.source_count,
+          ...(typeof r.weighted_score === 'number' && Number.isFinite(r.weighted_score) && {
+            weightedScore: r.weighted_score,
+          }),
+          ...(r.caller_weights !== undefined &&
+            typeof r.caller_weights === 'object' &&
+            r.caller_weights !== null && { callerWeights: r.caller_weights }),
           kinds: r.kinds,
         },
       ],
     })
   }
-  // Newest pair first — that is the axis the momentum gate measures against.
+  // Newest pair first (the momentum gate's axis), then most 5m flow; the
+  // call-feed weighted confluence is only a TIE-BREAKER — it reorders
+  // equally-fresh, equally-moving candidates, it never promotes a token
+  // past a fresher or better-moving one, and absent weights (0) rank last.
   out.sort(
     (a, b) =>
-      (b.createdAt ?? 0) - (a.createdAt ?? 0) || (b.volume5m ?? 0) - (a.volume5m ?? 0),
+      (b.createdAt ?? 0) - (a.createdAt ?? 0) ||
+      (b.volume5m ?? 0) - (a.volume5m ?? 0) ||
+      (b.discoveryEvidence?.[0]?.weightedScore ?? 0) -
+        (a.discoveryEvidence?.[0]?.weightedScore ?? 0),
   )
   const nowMs = Date.now()
   return out
