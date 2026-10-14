@@ -57,14 +57,17 @@ describe('mergeHarvest', () => {
 })
 
 describe('toSheetRow', () => {
-  it('formats gmgn rows as GMGN wr=64% pnl=+30%', () => {
-    const row = toSheetRow(wallet({ winRate30d: 0.64, pnl30d: 0.3 }))
-    expect(row.address).toBe('A'.repeat(40))
-    expect(row.name).toBe('GMGN wr=64% pnl=+30%')
+  it('formats gmgn rows with verification as GMGN-{kind} wr=64% pnl=+30%', () => {
+    expect(toSheetRow(wallet({ winRate30d: 0.64, pnl30d: 0.3, verification: 'WHALE' })).name).toBe(
+      'GMGN-WHALE wr=64% pnl=+30%',
+    )
+    expect(
+      toSheetRow(wallet({ winRate30d: 0.64, pnl30d: 0.3, verification: 'QUALITY' })).name,
+    ).toBe('GMGN-QUALITY wr=64% pnl=+30%')
   })
 
-  it('renders n/a for null stats', () => {
-    expect(toSheetRow(wallet({ winRate30d: null, pnl30d: null })).name).toBe('GMGN wr=n/a pnl=n/a')
+  it('renders n/a for null stats and UNVERIFIED when verification is absent', () => {
+    expect(toSheetRow(wallet({ winRate30d: null, pnl30d: null })).name).toBe('GMGN-UNVERIFIED wr=n/a pnl=n/a')
   })
 
   it('formats kolscan rows as KOLSCAN {name}', () => {
@@ -84,12 +87,20 @@ describe('toSheetRow', () => {
 })
 
 describe('toPersistWallet', () => {
-  it('maps gmgn rows to gmgn labels + whale-harvest and formatted alias', () => {
-    const persisted = toPersistWallet(wallet({ source: 'smart_degen', winRate30d: 0.64, pnl30d: 0.3 }))
+  it('maps gmgn rows to gmgn verification labels + whale-verification and formatted alias', () => {
+    const persisted = toPersistWallet(
+      wallet({ source: 'smart_degen', winRate30d: 0.64, pnl30d: 0.3, verification: 'WHALE' }),
+    )
     expect(persisted.address).toBe('A'.repeat(40))
     expect(persisted.chain).toBe('solana')
-    expect(persisted.labels).toEqual(['gmgn', 'whale-harvest'])
-    expect(persisted.alias).toBe('GMGN wr=64% pnl=+30%')
+    expect(persisted.labels).toEqual(['gmgn', 'whale', 'whale-verification'])
+    expect(persisted.alias).toBe('GMGN-WHALE wr=64% pnl=+30%')
+  })
+
+  it('maps unverified gmgn rows to unverified labels', () => {
+    const persisted = toPersistWallet(wallet({ source: 'smart_degen', winRate30d: 0.64, pnl30d: 0.3 }))
+    expect(persisted.labels).toEqual(['gmgn', 'unverified', 'whale-verification'])
+    expect(persisted.alias).toBe('GMGN-UNVERIFIED wr=64% pnl=+30%')
   })
 
   it('maps kolscan rows to kolscan labels and the KOLSCAN alias', () => {

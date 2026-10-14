@@ -104,16 +104,20 @@ async function main() {
     kolscanEnabled ? harvestKolscanWallets() : Promise.resolve([]),
   ])
 
-  // ── 2. Merge + dedupe ──
+  // ── 2. Merge + dedupe, then keep ONLY GMGN-verified rows ──
   const merged = mergeHarvest(gmgnWallets, kolscanWallets)
+  const verified = merged.filter((w) => w.verification === 'WHALE' || w.verification === 'QUALITY')
+  const whaleCount = verified.filter((w) => w.verification === 'WHALE').length
+  const qualityCount = verified.filter((w) => w.verification === 'QUALITY').length
+  const excluded = merged.length - verified.length
 
   // ── 3a. Persist to DB (failure-isolated; never throws) ──
-  const persisted = merged.map(toPersistWallet)
+  const persisted = verified.map(toPersistWallet)
   const { failures, newAddresses } = await persistWallets(persisted)
 
   // ── 3b. Append ONLY new wallets to the operator sheet ──
   let sheetCount = 0
-  const newWallets = merged.filter((w) => newAddresses.has(w.address))
+  const newWallets = verified.filter((w) => newAddresses.has(w.address))
   const newCount = newWallets.length
 
   if (sheetEnabled && newCount > 0) {
@@ -130,7 +134,8 @@ async function main() {
 
   console.log(
     `[whale-harvester] gmgn=${gmgnWallets.length} kolscan=${kolscanWallets.length} ` +
-      `merged=${merged.length} new=${newCount} sheet=${sheetCount} db-failures=${failures}`,
+      `merged=${merged.length} verified=${verified.length} whale=${whaleCount} quality=${qualityCount} ` +
+      `excluded=${excluded} new=${newCount} sheet=${sheetCount} db-failures=${failures}`,
   )
 
   // created is informational; keep the exit clean unless the DB itself broke.

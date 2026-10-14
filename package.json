@@ -46,6 +46,7 @@
     "import:wallets": "tsx scripts/import-wallets.ts",
     "harvest:whales": "tsx src/scripts/whale-harvester-cron.ts",
     "bootstrap:gmgn": "tsx src/scripts/gmgn-bootstrap-cron.ts",
+    "cleanup:whale-list": "tsx src/scripts/whale-list-cleanup.ts",
     "tidy:whale-sheet": "tsx src/scripts/tidy-whale-sheet.ts"
   },
   "dependencies": {

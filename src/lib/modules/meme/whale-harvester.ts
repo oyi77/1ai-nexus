@@ -15,6 +15,7 @@
 
 import { listGmgnWalletRank, type GmgnWalletRankRow } from './gmgn'
 import { fetchKolscanFeed } from './kolscan'
+import { verifyWhaleForList, type WhaleVerification } from './whale-verifier'
 import { logger } from '../../logger'
 import { setTimeout as sleep } from 'node:timers/promises'
 
@@ -47,6 +48,8 @@ export interface HarvestedWallet {
   pnl30d: number | null
   realizedProfit30d: number | null
   buyVolume30d: number | null
+  /** GMGN verification verdict (WHALE/QUALITY). Absent for KOLScan rows. */
+  verification?: 'WHALE' | 'QUALITY'
 }
 
 /**
@@ -55,6 +58,10 @@ export interface HarvestedWallet {
  * realizedProfit30d ?? pnl30d ?? 0, then best winRate30d). `source` stays
  * the FIRST tag that found the wallet, while the stat fields come from the
  * best-ranked row. Per-tag failure (0 rows / 403) is tolerated.
+ *
+ * GMGN verification gate: only wallets that pass `verifyWhaleForList`
+ * are returned, and each carries its `verification` label (WHALE/QUALITY).
+ * `wr=0 pnl=0` and below-bars rows never enter the whale list.
  */
 export async function harvestGmgnWallets(
   window: '1d' | '7d' | '30d' = '30d',
@@ -102,7 +109,27 @@ export async function harvestGmgnWallets(
       }
     }
   }
-  return [...byAddress.values()]
+  return filterVerifiedWhales([...byAddress.values()])
+}
+
+/**
+ * Pure post-filter: keep only GMGN rows that pass `verifyWhaleForList`,
+ * stamping each with its WHALE/QUALITY label. Exported so tests can cover
+ * the gate without hitting the network.
+ */
+export function filterVerifiedWhales(wallets: HarvestedWallet[]): HarvestedWallet[] {
+  const verified: HarvestedWallet[] = []
+  for (const w of wallets) {
+    const verdict: WhaleVerification = verifyWhaleForList({
+      winRate30d: w.winRate30d,
+      pnl30d: w.pnl30d,
+      buyVolume30d: w.buyVolume30d,
+    })
+    if (verdict.include && verdict.label !== 'UNVERIFIED') {
+      verified.push({ ...w, verification: verdict.label })
+    }
+  }
+  return verified
 }
 
 /**
@@ -151,8 +178,10 @@ export function mergeHarvest(...batches: HarvestedWallet[][]): HarvestedWallet[]
 
 /**
  * Format a harvested wallet as a sheet row (Address, Name).
- *   - GMGN rows:   `GMGN wr=64% pnl=+30%` (null-safe `n/a`)
- *   - KOLScan rows: `KOLSCAN {name}` (short-address fallback)
+ *   - GMGN WHALE rows:    `GMGN-WHALE wr=64% pnl=+30%`
+ *   - GMGN QUALITY rows:  `GMGN-QUALITY wr=64% pnl=+30%`
+ *   - unverified GMGN:    `GMGN-UNVERIFIED wr=.. pnl=..` (null-safe)
+ *   - KOLScan rows:       `KOLSCAN {name}` (short-address fallback)
  * Name is capped below 80 chars.
  */
 export function toSheetRow(w: HarvestedWallet): { address: string; name: string } {
@@ -163,7 +192,8 @@ export function toSheetRow(w: HarvestedWallet): { address: string; name: string 
     const wr = w.winRate30d !== null ? `${Math.round(w.winRate30d * 100)}%` : 'n/a'
     const pct = w.pnl30d !== null ? Math.round(w.pnl30d * 100) : null
     const pnl = pct !== null ? `${pct >= 0 ? '+' : ''}${pct}%` : 'n/a'
-    name = `GMGN wr=${wr} pnl=${pnl}`
+    const kind = w.verification === 'WHALE' ? 'WHALE' : w.verification === 'QUALITY' ? 'QUALITY' : 'UNVERIFIED'
+    name = `GMGN-${kind} wr=${wr} pnl=${pnl}`
   }
   return { address: w.address, name: name.length < 80 ? name : name.slice(0, 79) }
 }
@@ -177,11 +207,23 @@ export interface WhalePersistWallet {
 }
 
 /**
- * Build the persistable Wallet row. Labels are `[sourcePrefix, 'whale-harvest']`
- * with sourcePrefix ∈ {'gmgn', 'kolscan'}; alias reuses the sheet name.
+ * Build the persistable Wallet row. Labels are
+ * `[sourcePrefix, verification, 'whale-verification']` for GMGN rows
+ * (verification ∈ {whale, quality, unverified}), or
+ * `[sourcePrefix, 'whale-harvest']` for KOLScan rows; alias reuses the
+ * sheet name.
  */
 export function toPersistWallet(w: HarvestedWallet): WhalePersistWallet {
   const source = w.source.toLowerCase() === 'kolscan' ? 'kolscan' : 'gmgn'
+  if (source === 'gmgn') {
+    const verification = w.verification === 'WHALE' ? 'whale' : w.verification === 'QUALITY' ? 'quality' : 'unverified'
+    return {
+      address: w.address,
+      chain: 'solana',
+      alias: toSheetRow(w).name || null,
+      labels: [source, verification, 'whale-verification'],
+    }
+  }
   return {
     address: w.address,
     chain: 'solana',
