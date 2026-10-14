@@ -20,7 +20,7 @@ import { logger } from '../../logger'
 import { setTimeout as sleep } from 'node:timers/promises'
 
 /** GMGN leaderboard tags swept by the harvester (per-tag failure is fine). */
-export const WHALE_HARVEST_TAGS = [
+export const WHALE_HARVEST_TAGS: string[] = [
   'smart_degen',
   'pump_smart_degen',
   'sniper',
@@ -33,7 +33,9 @@ export const WHALE_HARVEST_TAGS = [
   'bluechip_owner',
   'app_smart_money',
   'arbitrager',
-] as const
+  'photon',
+  'bullx',
+]
 
 /** Delay between GMGN tag sweeps so the endpoint is never hammered. */
 const TAG_DELAY_MS = 800
@@ -50,65 +52,120 @@ export interface HarvestedWallet {
   buyVolume30d: number | null
   /** GMGN verification verdict (WHALE/QUALITY). Absent for KOLScan rows. */
   verification?: 'WHALE' | 'QUALITY'
+  /** Windows in which the wallet appeared on a GMGN leaderboard. */
+  windows?: string[]
+}
+
+export type GmgnRankWindow = '1d' | '7d' | '30d'
+
+/**
+ * Shared GMGN sweep + merge for one or more windows. `source` stays the
+ * FIRST tag/window that found the wallet, while the stat fields come from
+ * the best-ranked row (highest realizedProfit30d ?? pnl30d ?? 0, then best
+ * winRate30d). `windows` records every window in which the address
+ * appeared. Per-tag/per-window failure (0 rows / 403) is tolerated.
+ */
+async function sweepGmgnRankings(
+  windows: readonly GmgnRankWindow[],
+  tags: readonly string[],
+  delayMs: number,
+): Promise<Map<string, HarvestedWallet>> {
+  const byAddress = new Map<string, HarvestedWallet>()
+  let calls = 0
+  for (const window of windows) {
+    for (const tag of tags) {
+      if (calls > 0) await sleep(delayMs)
+      calls += 1
+      let rows: GmgnWalletRankRow[] = []
+      try {
+        rows = await listGmgnWalletRank(tag, window)
+      } catch {
+        rows = [] // listGmgnWalletRank already degrades; double-guard here.
+      }
+      logger.info(
+        `GMGN wallet rank window=${window} tag=${tag} rows=${rows.length}`,
+        'whale-harvester',
+      )
+      for (const row of rows) {
+        const candidate: HarvestedWallet = {
+          address: row.address,
+          name: '',
+          source: tag,
+          winRate30d: row.winRate30d,
+          pnl30d: row.pnl30d,
+          realizedProfit30d: row.realizedProfit30d,
+          buyVolume30d: row.buyVolume30d,
+          windows: [window],
+        }
+        const existing = byAddress.get(row.address)
+        byAddress.set(row.address, existing ? mergeRowGmgn(existing, candidate) : candidate)
+      }
+    }
+  }
+  return byAddress
+}
+
+/**
+ * Pure per-address merge used by `sweepGmgnRankings`. Exported so tests
+ * can verify the multi-window merge semantics without hitting the network.
+ *
+ * `existing` is the row already in the map (first-seen). `candidate` is
+ * the new row from a later tag/window. The winner keeps `existing.source`
+ * (first-seen ownership) but takes the better measured stats, and the
+ * `windows` list accumulates every window the address was seen in.
+ */
+export function mergeRowGmgn(existing: HarvestedWallet, candidate: HarvestedWallet): HarvestedWallet {
+  const mergedWindows = existing.windows ?? []
+  for (const w of candidate.windows ?? []) {
+    if (!mergedWindows.includes(w)) mergedWindows.push(w)
+  }
+  // Best row wins the stats: realizedProfit30d ?? pnl30d ?? 0, then win rate,
+  // then a tie-break preferring non-null buyVolume30d.
+  const cScore = candidate.realizedProfit30d ?? candidate.pnl30d ?? 0
+  const eScore = existing.realizedProfit30d ?? existing.pnl30d ?? 0
+  const better =
+    cScore > eScore ||
+    (cScore === eScore && (candidate.winRate30d ?? -1) > (existing.winRate30d ?? -1)) ||
+    (cScore === eScore &&
+      (candidate.winRate30d ?? -1) === (existing.winRate30d ?? -1) &&
+      candidate.buyVolume30d !== null &&
+      existing.buyVolume30d === null)
+  if (better) {
+    return { ...candidate, source: existing.source, windows: mergedWindows }
+  }
+  return { ...existing, windows: mergedWindows }
 }
 
 /**
  * Sweep every tag in `tags` against GMGN's wallet leaderboard and merge
- * per-address, keeping the best measured row (highest
- * realizedProfit30d ?? pnl30d ?? 0, then best winRate30d). `source` stays
- * the FIRST tag that found the wallet, while the stat fields come from the
- * best-ranked row. Per-tag failure (0 rows / 403) is tolerated.
+ * per-address, keeping the best measured row. `window` defaults to '30d'
+ * for backward compatibility; pass an array to sweep several windows.
+ * Per-tag failure (0 rows / 403) is tolerated.
  *
  * GMGN verification gate: only wallets that pass `verifyWhaleForList`
  * are returned, and each carries its `verification` label (WHALE/QUALITY).
  * `wr=0 pnl=0` and below-bars rows never enter the whale list.
  */
 export async function harvestGmgnWallets(
-  window: '1d' | '7d' | '30d' = '30d',
+  window: GmgnRankWindow | readonly GmgnRankWindow[] = '30d',
   tags: readonly string[] = WHALE_HARVEST_TAGS,
 ): Promise<HarvestedWallet[]> {
-  const byAddress = new Map<string, HarvestedWallet>()
-  for (let i = 0; i < tags.length; i++) {
-    if (i > 0) await sleep(TAG_DELAY_MS)
-    const tag = tags[i]
-    let rows: GmgnWalletRankRow[] = []
-    try {
-      rows = await listGmgnWalletRank(tag, window)
-    } catch {
-      rows = [] // listGmgnWalletRank already degrades; double-guard here.
-    }
-    logger.info(`GMGN wallet rank tag=${tag} rows=${rows.length}`, 'whale-harvester')
-    for (const row of rows) {
-      const candidate: HarvestedWallet = {
-        address: row.address,
-        name: '',
-        source: tag,
-        winRate30d: row.winRate30d,
-        pnl30d: row.pnl30d,
-        realizedProfit30d: row.realizedProfit30d,
-        buyVolume30d: row.buyVolume30d,
-      }
-      const existing = byAddress.get(row.address)
-      if (!existing) {
-        byAddress.set(row.address, candidate)
-        continue
-      }
-      // Best row wins the stats: realizedProfit30d ?? pnl30d ?? 0, then win rate.
-      const cScore = candidate.realizedProfit30d ?? candidate.pnl30d ?? 0
-      const eScore = existing.realizedProfit30d ?? existing.pnl30d ?? 0
-      const better =
-        cScore > eScore ||
-        (cScore === eScore && (candidate.winRate30d ?? -1) > (existing.winRate30d ?? -1)) ||
-        (cScore === eScore &&
-          (candidate.winRate30d ?? -1) === (existing.winRate30d ?? -1) &&
-          candidate.buyVolume30d !== null &&
-          existing.buyVolume30d === null)
-      if (better) {
-        // First tag keeps ownership; better row supplies the measurements.
-        byAddress.set(row.address, { ...candidate, source: existing.source })
-      }
-    }
-  }
+  const windows = typeof window === 'string' ? [window] : [...window]
+  const byAddress = await sweepGmgnRankings(windows, tags, TAG_DELAY_MS)
+  return filterVerifiedWhales([...byAddress.values()])
+}
+
+/**
+ * Sweep each GMGN window × each tag, merging per-address across windows
+ * with the same best-row + gate semantics as `harvestGmgnWallets`.
+ * `windows` defaults to ['1d','7d','30d'] — 1d/7d leaderboards surface
+ * fresh winners that never appear on the 30d board.
+ */
+export async function harvestGmgnWalletsMultiWindow(
+  windows: readonly GmgnRankWindow[] = ['1d', '7d', '30d'],
+  tags: readonly string[] = WHALE_HARVEST_TAGS,
+): Promise<HarvestedWallet[]> {
+  const byAddress = await sweepGmgnRankings(windows, tags, TAG_DELAY_MS)
   return filterVerifiedWhales([...byAddress.values()])
 }
 
@@ -148,6 +205,61 @@ export async function harvestKolscanWallets(): Promise<HarvestedWallet[]> {
     buyVolume30d: null,
   }))
 }
+
+export interface KolscanHarvestResult {
+  wallets: HarvestedWallet[]
+  kolscanTotal: number
+  kolscanGmgnVerified: number
+  kolscanSourceOnly: number
+}
+
+/**
+ * Fetch the KOLScan roster and cross-reference each KOL against the
+ * GMGN leaderboard rows already harvested by `harvestGmgnWalletsMultiWindow`.
+ * KOLs that also appear in GMGN keep their GMGN verification label and
+ * stats; the rest are labeled `'KOL'` (source-verified identity only,
+ * no measured stats — never fabricated) and must NOT be written to
+ * SmartMoneyWallet by callers.
+ */
+export async function harvestKolscanWalletsVerified(
+  gmgnWallets: readonly HarvestedWallet[],
+): Promise<KolscanHarvestResult> {
+  const feed = await fetchKolscanFeed()
+  const gmgnByAddress = new Map(gmgnWallets.map((w) => [w.address, w]))
+  const wallets: HarvestedWallet[] = []
+  let gmgnVerified = 0
+  let sourceOnly = 0
+
+  for (const kol of feed.wallets) {
+    const gmgn = gmgnByAddress.get(kol.address)
+    if (gmgn) {
+      gmgnVerified += 1
+      wallets.push({
+        ...gmgn,
+        name: gmgn.name || kol.name,
+      })
+    } else {
+      sourceOnly += 1
+      wallets.push({
+        address: kol.address,
+        name: kol.name,
+        source: 'kolscan',
+        winRate30d: null,
+        pnl30d: null,
+        realizedProfit30d: null,
+        buyVolume30d: null,
+      })
+    }
+  }
+
+  return {
+    wallets,
+    kolscanTotal: feed.wallets.length,
+    kolscanGmgnVerified: gmgnVerified,
+    kolscanSourceOnly: sourceOnly,
+  }
+}
+
 
 /**
  * Pure cross-batch dedupe. On collision prefer the row with the most

@@ -1,11 +1,21 @@
 // ─────────────────────────────────────────────────────────────
 // Whale harvester unit tests (pure parts only — no network/DB/sheet).
-// Covers: mergeHarvest, toSheetRow, toPersistWallet.
+// Covers: mergeHarvest, toSheetRow, toPersistWallet, filterVerifiedWhales,
+// WHALE_HARVEST_TAGS.
+//
+// harvestGmgnWallets / harvestGmgnWalletsMultiWindow are NOT unit-tested:
+// they call the live GMGN endpoint with an internal sleep. Their merge
+// semantics mirror `mergeHarvest` (same scorer) and their gate is exactly
+// `filterVerifiedWhales` — integration proved by the daily cron + before/
+// after DB counts reported at commit time.
 // ─────────────────────────────────────────────────────────────
 
 import { describe, expect, it } from 'vitest'
 import {
+  WHALE_HARVEST_TAGS,
+  filterVerifiedWhales,
   mergeHarvest,
+  mergeRowGmgn,
   toSheetRow,
   toPersistWallet,
   type HarvestedWallet,
@@ -53,6 +63,106 @@ describe('mergeHarvest', () => {
     const reverse = mergeHarvest([b], [a])
     expect(forward).toHaveLength(1)
     expect(forward[0]).toEqual(reverse[0])
+  })
+})
+
+describe('mergeRowGmgn', () => {
+  it('keeps the best measured row when a wallet appears in several windows', () => {
+    const addr = 'D'.repeat(40)
+    const from1d = wallet({
+      address: addr,
+      source: 'sniper',
+      pnl30d: 9.9,
+      winRate30d: 0.95,
+      realizedProfit30d: 250_000,
+      windows: ['1d'],
+    })
+    const from30d = wallet({
+      address: addr,
+      source: 'whale',
+      pnl30d: 0.1,
+      winRate30d: 0.2,
+      realizedProfit30d: 1_000,
+      windows: ['30d'],
+    })
+
+    // Existing row is 30d (lower score); candidate is 1d (higher score).
+    const merged = mergeRowGmgn(from30d, from1d)
+    expect(merged.realizedProfit30d).toBe(250_000)
+    expect(merged.winRate30d).toBe(0.95)
+    // First-seen source keeps ownership; candidate only supplies stats.
+    expect(merged.source).toBe('whale')
+  })
+
+  it('records every window the wallet was seen in, without duplicates', () => {
+    const addr = 'E'.repeat(40)
+    const first = wallet({ address: addr, source: 'kol', windows: ['1d'] })
+    const second = mergeRowGmgn(first, wallet({ address: addr, source: 'kol', windows: ['7d'] }))
+    const third = mergeRowGmgn(second, wallet({ address: addr, source: 'kol', windows: ['30d'] }))
+    const again = mergeRowGmgn(third, wallet({ address: addr, source: 'kol', windows: ['1d'] }))
+
+    expect(again.windows).toEqual(['1d', '7d', '30d'])
+  })
+
+  it('keeps the existing row when the incoming row is not better', () => {
+    const addr = 'F'.repeat(40)
+    const existing = wallet({ address: addr, source: 'whale', winRate30d: 0.8, pnl30d: 1.5, windows: ['30d'] })
+    const worse = wallet({ address: addr, source: 'sniper', winRate30d: 0.1, pnl30d: 0.05, windows: ['1d'] })
+
+    const merged = mergeRowGmgn(existing, worse)
+    expect(merged.winRate30d).toBe(0.8)
+    expect(merged.pnl30d).toBe(1.5)
+    expect(merged.source).toBe('whale')
+    expect(merged.windows).toEqual(['30d', '1d'])
+  })
+})
+
+describe('filterVerifiedWhales', () => {
+  it('labels the whale-volume leg WHALE and the quality leg QUALITY', () => {
+    const whale = wallet({
+      address: 'W'.repeat(40),
+      winRate30d: 0.5,
+      pnl30d: 0.2,
+      buyVolume30d: 400_000,
+    })
+    const quality = wallet({
+      address: 'Q'.repeat(40),
+      winRate30d: 0.65,
+      pnl30d: 0.9,
+      buyVolume30d: 1_000,
+    })
+
+    const out = filterVerifiedWhales([whale, quality])
+    expect(out.map((w) => w.verification)).toEqual(['WHALE', 'QUALITY'])
+  })
+
+  it('excludes below-bar rows, unmeasured rows, and the wr=0 pnl=0 noise case', () => {
+    const belowBars = wallet({ address: 'X'.repeat(40), winRate30d: 0.3, pnl30d: 0.1 })
+    const unmeasured = wallet({ address: 'Y'.repeat(40), winRate30d: null, pnl30d: null })
+    const noise = wallet({ address: 'Z'.repeat(40), winRate30d: 0, pnl30d: 0 })
+
+    expect(filterVerifiedWhales([belowBars, unmeasured, noise])).toEqual([])
+  })
+})
+
+describe('WHALE_HARVEST_TAGS', () => {
+  it('appends the photon/bullx trader tags without reordering the original 12', () => {
+    expect(WHALE_HARVEST_TAGS.slice(0, 12)).toEqual([
+      'smart_degen',
+      'pump_smart_degen',
+      'sniper',
+      'kol',
+      'axiom',
+      'whale',
+      'launchpad_smart',
+      'top_followed',
+      'wash_trader',
+      'bluechip_owner',
+      'app_smart_money',
+      'arbitrager',
+    ])
+    expect(WHALE_HARVEST_TAGS).toContain('photon')
+    expect(WHALE_HARVEST_TAGS).toContain('bullx')
   })
 })
 
