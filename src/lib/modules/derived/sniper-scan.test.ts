@@ -244,4 +244,54 @@ describe('runSniperScan', () => {
     expect(d.auditsUsed).toEqual(['rugcheck'])
     expect(d.warnings.some((w) => w.includes('contract mismatch') && w.includes('birdeye'))).toBe(true)
   })
+
+  it('collapses copycats with duplicate tickers, keeping only the most-trusted mint', async () => {
+    const deliver = vi.fn(async (_text: string) => true)
+    // Two mints sharing ticker PEPE: REAL has 100k liquidity, SCAM has 5k
+    const real = tok('REAL', { symbol: 'PEPE', liquidity: 100_000 })
+    const scam = tok('SCAM', { symbol: '$PEPE', liquidity: 5_000 })
+    const res = await runSniperScan(
+      { deliver: true },
+      deps({
+        discover: async () => [real, scam],
+        audit: async (_chain, contract) => [{ ...CLEAN, contract }],
+        deliver,
+      }),
+    )
+    // Only 1 candidate was evaluated and delivered: REAL won, SCAM dropped
+    expect(res.scanned).toBe(1)
+    expect(res.decisions).toHaveLength(1)
+    expect(res.decisions[0].contract).toBe('REAL')
+    expect(res.delivered).toBe(1)
+    expect(deliver).toHaveBeenCalledTimes(1)
+  })
+
+  it('suppresses delivery of a copycat re-launch when ticker was already delivered under another contract', async () => {
+    const deliver = vi.fn(async (_text: string) => true)
+    // Pass 1: deliver the authentic token
+    const original = tok('ORIGINAL', { symbol: 'DOGE', liquidity: 50_000 })
+    const d = deps({
+      discover: async () => [original],
+      audit: async (_chain, contract) => [{ ...CLEAN, contract }],
+      deliver,
+    })
+    const first = await runSniperScan({ deliver: true }, d)
+    expect(first.delivered).toBe(1)
+    expect(deliver).toHaveBeenCalledTimes(1)
+
+    // Pass 2: a copycat launches under a new contract but same ticker
+    const copycat = tok('COPYCAT', { symbol: '$DOGE', liquidity: 80_000 })
+    const second = await runSniperScan(
+      { deliver: true },
+      deps({
+        discover: async () => [copycat],
+        audit: async (_chain, contract) => [{ ...CLEAN, contract }],
+        deliver,
+      }),
+    )
+    // Evaluated, but delivery is suppressed by ticker seen state
+    expect(second.delivered).toBe(0)
+    expect(deliver).toHaveBeenCalledTimes(1) // Still 1 from pass 1
+    expect(second.decisions[0].deduped).toBe(true)
+  })
 })

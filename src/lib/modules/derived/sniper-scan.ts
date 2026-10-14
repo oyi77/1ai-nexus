@@ -45,6 +45,10 @@ import {
   type CandidateEvidence,
   type DiscoveryCategory,
 } from '@/lib/modules/derived/unified-candidate'
+import {
+  collapseDuplicateCandidatesByTrust,
+  normalizeTickerForDedup,
+} from '@/lib/modules/derived/candidate-trust'
 
 import { profilesForPhase } from '@/lib/modules/derived/sniper-criteria'
 import { auditRugcheckToken } from '@/lib/modules/meme/rugcheck'
@@ -129,6 +133,68 @@ export function markSeenState(map: Record<string, number>): void {
     mkdirSync(dirname(p), { recursive: true })
     writeFileSync(p, JSON.stringify(map))
   } catch { /* dedupe state is best-effort */ }
+}
+
+// ─────────────────────────────────────────────────────────────
+// Ticker-level seen state — suppresses delivery of copycat mints
+// that re-launch under the same normalized ticker but a different
+// contract within the seen-TTL. Stored alongside contract keys in
+// the same sniper-seen.json file under a `ticker:` prefix so there
+// is no second file to manage or drift out of sync.
+// ─────────────────────────────────────────────────────────────
+
+const TICKER_SEEN_PREFIX = 'ticker:'
+
+/**
+ * Read the ticker-level seen map from the same seen-state file.
+ * Keys are `ticker:<normalizedTicker>`, values are timestamps.
+ * Pure read — does not mutate the file.
+ */
+export function readTickerSeenState(): Record<string, number> {
+  const seen = readSeenState()
+  const out: Record<string, number> = {}
+  for (const [k, v] of Object.entries(seen)) {
+    if (k.startsWith(TICKER_SEEN_PREFIX)) {
+      out[k.slice(TICKER_SEEN_PREFIX.length)] = v
+    }
+  }
+  return out
+}
+
+/**
+ * Mark a normalized ticker as seen in the shared seen-state map.
+ * Mutates `map` in place — caller persists via `markSeenState`.
+ */
+export function markTickerSeen(map: Record<string, number>, normalizedTicker: string): void {
+  if (normalizedTicker.length === 0) return
+  map[`${TICKER_SEEN_PREFIX}${normalizedTicker}`] = Date.now()
+}
+
+/**
+ * Check whether a normalized ticker was seen under a DIFFERENT contract
+ * within the TTL. Returns the timestamp if a prior delivery happened
+ * under a different contract, or `null` if not suppressed.
+ *
+ * `currentContract` is the contract being evaluated now; if the ticker
+ * was seen but the key matches this exact contract, re-evaluation is
+ * allowed (the contract itself is just re-evaluated, not a copycat).
+ */
+export function tickerSeenUnderDifferentContract(
+  seen: Record<string, number>,
+  normalizedTicker: string,
+  chain: string,
+  contract: string,
+): number | null {
+  if (normalizedTicker.length === 0) return null
+  const tickerKey = `${TICKER_SEEN_PREFIX}${normalizedTicker}`
+  const ts = seen[tickerKey]
+  if (ts === undefined) return null
+  // The ticker was delivered before. If THIS exact contract is already
+  // in seen state it is a re-evaluation of the same mint (contract-level
+  // dedup owns that case) — not a copycat. Only suppress when the ticker
+  // belongs to a different, un-seen contract.
+  if (seen[candidateKey(chain, contract)] !== undefined) return null
+  return ts
 }
 
 interface DexPair {
@@ -766,6 +832,26 @@ export async function runSniperScan(
   }
 
   const seen = readSeenState()
+
+  // Trust-ranking dedup: when multiple mints share the same normalized
+  // ticker (copycats / re-launches), keep only the single most-trusted
+  // one and drop the rest BEFORE audit/evaluation so the pipeline never
+  // wastes an audit pass or a delivery slot on a less-trusted duplicate.
+  // Dropped copycats are marked seen so they don't re-enter next pass.
+  const collapse = collapseDuplicateCandidatesByTrust(candidates)
+  candidates = collapse.kept
+  if (collapse.dropped.length > 0) {
+    const dupTickers = new Set(
+      collapse.dropped.map((d) => normalizeTickerForDedup(d.candidate.symbol)),
+    )
+    console.log(
+      `[sniper] ticker dedup: dropped ${collapse.dropped.length} copycat mints across ${dupTickers.size} duplicate tickers`,
+    )
+    for (const d of collapse.dropped) {
+      seen[candidateKey(d.candidate.chain, d.candidate.contract)] = Date.now()
+    }
+  }
+
   const decisions: SniperScanDecision[] = []
   let delivered = 0
 
@@ -800,9 +886,18 @@ export async function runSniperScan(
       })
 
       const key = candidateKey(token.chain, token.contract)
-      const deduped = seen[key] !== undefined
+      const contractSeen = seen[key] !== undefined
+      const normTicker = normalizeTickerForDedup(payload.ticker)
+      const priorTickerSeen = tickerSeenUnderDifferentContract(
+        seen,
+        normTicker,
+        token.chain,
+        token.contract,
+      )
+      const deduped = contractSeen || priorTickerSeen !== null
       let wasDelivered = false
-      // Only push deliverable tiers, and never re-push a seen contract.
+      // Only push deliverable tiers, and never re-push a seen contract or a
+      // copycat sharing a ticker already delivered under another contract.
       const policy = opts.deliveryPolicy ?? DEFAULT_DELIVERY_POLICY
       if (!deduped && opts.deliver === true && shouldDeliver(tierResult.tier, policy)) {
         // Policy E: delivered signals use the full evidence format, not the
@@ -819,7 +914,10 @@ export async function runSniperScan(
           marketCapUsd: payload.momentum.marketCap,
         })
         wasDelivered = await deps.deliver(formatted.text, formatted.replyMarkup)
-        if (wasDelivered) delivered++
+        if (wasDelivered) {
+          delivered++
+          markTickerSeen(seen, normTicker)
+        }
       }
       // Only a non-REJECT outcome is worth remembering. Marking a REJECT seen
       // pinned the contract for the whole seen-TTL, so a token that failed the
