@@ -203,6 +203,8 @@ export interface SignalFormatInput {
   smartMoney: SmartMoneyEvidence | null
   /** USD market cap used as the scenario base. Null disables targets. */
   marketCapUsd: number | null
+  liquidityUsd?: number | null
+  volumeUsd?: number | null
   /** Multiples to project. Defaults to 2/5/10. */
   multiples?: number[]
   /**
@@ -249,15 +251,17 @@ export interface FormattedSignal {
   replyMarkup: ContractButtons | undefined
 }
 
-
-
-/** Compact USD: $1.2M, $340K, $950. */
-function usd(n: number | null): string {
-  if (n === null || !Number.isFinite(n)) return 'n/a'
-  if (Math.abs(n) >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(2)}B`
-  if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`
-  if (Math.abs(n) >= 1_000) return `$${(n / 1_000).toFixed(1)}K`
-  return `$${n.toFixed(2)}`
+/** Compact USD: $145.2K, $1.2M, $850. */
+export function formatCompactUsd(n: number | null | undefined): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return 'n/a'
+  const abs = Math.abs(n)
+  const sign = n < 0 ? '-' : ''
+  if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(1)}B`
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`
+  if (abs >= 1_000) return `${sign}$${(abs / 1_000).toFixed(1)}K`
+  if (abs >= 1) return `${sign}$${Math.round(abs)}`
+  if (abs === 0) return '$0'
+  return `${sign}$${abs.toFixed(2)}`
 }
 
 function pct(v: number | null | undefined): string {
@@ -271,7 +275,7 @@ function verifiedAtLabel(v: string | Date | number | null | undefined): string {
   return new Date(ms).toISOString()
 }
 
-/** Per-check verdict for the CANDIDATE evidence block. */
+/** Per-check verdict for the evidence block. */
 function potentialCheckVerdict(reason: string): 'PASS' | 'CAUTION' | 'FAIL' | 'UNKNOWN' {
   const r = reason.toLowerCase()
   if (r.includes('security failure') || r.includes('gagal') || r.includes('fail')) return 'FAIL'
@@ -279,7 +283,6 @@ function potentialCheckVerdict(reason: string): 'PASS' | 'CAUTION' | 'FAIL' | 'U
   if (r.includes('clean') || r.includes('bersih') || r.includes('confirmed') || r.includes('terverifikasi') || r.includes('pass')) return 'PASS'
   return 'UNKNOWN'
 }
-
 
 /**
  * Escape Telegram HTML control characters in dynamic text.
@@ -291,6 +294,221 @@ function potentialCheckVerdict(reason: string): 'PASS' | 'CAUTION' | 'FAIL' | 'U
 export function escapeSignalHtml(s: string | null | undefined): string {
   if (typeof s !== 'string') return ''
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/** Tier badge with emoji for Telegram header. */
+function tierBadge(tier: SignalTier): string {
+  switch (tier) {
+    case 'HIGH_CONVICTION':
+      return '🟢 <b>HIGH-CONVICTION</b>'
+    case 'CANDIDATE':
+      return '🟡 <b>CANDIDATE</b>'
+    case 'WATCHLIST':
+      return '🟡 <b>WATCHLIST</b>'
+    case 'UNKNOWN':
+      return '⚪ <b>UNKNOWN</b>'
+    case 'STALE':
+      return '⚫ <b>STALE</b>'
+    case 'REJECT':
+      return '🔴 <b>REJECT</b>'
+    default:
+      return `⚪ <b>${escapeSignalHtml(tier)}</b>`
+  }
+}
+
+/** Prominent Token Info block. */
+function renderTokenInfo(payload: SniperPayload): string[] {
+  const L: string[] = []
+  const symbol = payload.ticker.startsWith('$') ? payload.ticker : `$${payload.ticker}`
+  const nameStr = payload.name ? ` (${payload.name})` : ''
+  L.push(`🪙 <b>Token:</b> ${escapeSignalHtml(symbol)}${escapeSignalHtml(nameStr)}`)
+  L.push(`📋 <b>CA:</b> <code>${escapeSignalHtml(payload.contract)}</code> <i>(tap to copy)</i>`)
+
+  const stageName = payload.stage === 'post-bonding' || payload.ageMinutes >= 120 ? 'Post-Bonding' : 'New Pair'
+  const chainName = payload.chain ? (payload.chain.charAt(0).toUpperCase() + payload.chain.slice(1).toLowerCase()) : 'Solana'
+  L.push(`⏱ <b>Stage:</b> ${stageName} (${payload.ageMinutes}m) | ⛓ <b>Chain:</b> ${escapeSignalHtml(chainName)}`)
+  return L
+}
+
+/** Compact Market Metrics block. */
+function renderMarketSection(
+  marketCap: number | null | undefined,
+  liquidity: number | null | undefined,
+  volume5m: number | null | undefined,
+  priceChangePct?: number | null | undefined,
+): string[] {
+  const L: string[] = []
+  L.push('📊 <b>Market:</b>')
+
+  const mcStr = formatCompactUsd(marketCap)
+  const liqStr = formatCompactUsd(liquidity)
+  L.push(`• Market Cap: <b>${mcStr}</b> | Liq: <b>${liqStr}</b>`)
+
+  const volStr = formatCompactUsd(volume5m)
+  const volMcRatio = volume5m != null && marketCap != null && marketCap > 0 ? volume5m / marketCap : null
+  const ratioStr = volMcRatio != null ? `${volMcRatio.toFixed(1)}x` : null
+  const flame = volMcRatio != null && volMcRatio >= 3 ? ' 🔥' : ''
+  const ratioPart = ratioStr ? ` (Ratio: <b>${ratioStr}</b>${flame})` : ''
+
+  const changePart = priceChangePct != null && Number.isFinite(priceChangePct)
+    ? ` | 24h: <b>${priceChangePct > 0 ? '+' : ''}${Math.round(priceChangePct * 10) / 10}%</b>`
+    : ''
+
+  L.push(`• Vol 5m: <b>${volStr}</b>${ratioPart}${changePart}`)
+  return L
+}
+
+/** Concise Safety Badges block. */
+function renderSafetySection(
+  sec: SniperPayload['security'],
+  auditSources?: string[],
+): string[] {
+  const L: string[] = []
+  L.push('🛡️ <b>Safety:</b>')
+
+  const mint = sec.mintable === false ? '✅ OFF' : sec.mintable === true ? '🔴 ON' : '❓ N/A'
+  const freeze = sec.freezeAuthority === false ? '✅ OFF' : sec.freezeAuthority ? '🔴 ON' : '❓ N/A'
+  const honeypot = sec.honeypot === false ? '✅ PASS' : sec.honeypot === true ? '🔴 FAIL' : '❓ N/A'
+  L.push(`• Mint: ${mint} | Freeze: ${freeze} | Honeypot: ${honeypot}`)
+
+  let lpBadge: string
+  const lpBurn = sec.lpBurnedPercent
+  const lpLock = sec.lpLockedPercent
+  if (lpBurn != null && lpBurn >= 99.5) {
+    lpBadge = '🔥 100% Burnt (Rug-proof)'
+  } else if (lpLock != null && lpLock >= 99.5) {
+    lpBadge = '🔒 100% Locked (Rug-proof)'
+  } else if ((lpBurn ?? 0) > 0 || (lpLock ?? 0) > 0) {
+    lpBadge = `⚠️ Burn ${pct(lpBurn)} | Lock ${pct(lpLock)}`
+  } else {
+    lpBadge = '⚠️ LP Unlocked'
+  }
+  L.push(`• LP: ${lpBadge}`)
+
+  if (auditSources && auditSources.length > 0) {
+    if (auditSources.length >= 2) {
+      L.push(`• Audits: ✅ ${auditSources.length} sources agreed (${escapeSignalHtml(auditSources.join(', '))})`)
+    } else {
+      L.push(`• Audits: ⚠️ 1 source only (${escapeSignalHtml(auditSources[0])}) — no cross-check`)
+    }
+  } else if (auditSources !== undefined) {
+    L.push('• Audits: ⚠️ No confirmed audit sources')
+  }
+
+  return L
+}
+
+/** Compact Distribution block. */
+function renderDistributionSection(dst: SniperPayload['distribution']): string[] {
+  const L: string[] = []
+  L.push('👥 <b>Distribution:</b>')
+
+  let devStr = 'n/a'
+  if (dst.devPercent !== null && dst.devPercent !== undefined) {
+    devStr = dst.devPercent === 0 ? '0% (OUT)' : `${pct(dst.devPercent)} (⚠️ DEV IN)`
+  }
+
+  let top10Str = pct(dst.top10Percent)
+  if (dst.top10Percent != null && dst.top10Percent > 30) {
+    top10Str += ' ⚠️'
+  }
+
+  let sniperStr = pct(dst.sniperPercent)
+  if (dst.sniperPercent != null && dst.sniperPercent > 6) {
+    sniperStr += ' ⚠️'
+  }
+
+  L.push(`• Dev: ${devStr} | Top 10: ${top10Str} | Snipers: ${sniperStr}`)
+
+  if (dst.bundlerPercent != null && dst.bundlerPercent > 5 && dst.bundlerSoldPercent !== 100) {
+    L.push(`• ⚠️ Bundler holding ${pct(dst.bundlerPercent)}`)
+  }
+  if (dst.clusterPercent != null && dst.clusterPercent > 5) {
+    L.push(`• ⚠️ Wallet cluster detected: ${pct(dst.clusterPercent)}`)
+  }
+  if (dst.insiderPercent != null && dst.insiderPercent > 5) {
+    L.push(`• ⚠️ Insider holding ${pct(dst.insiderPercent)}`)
+  }
+
+  return L
+}
+
+/** Smart Money Inflow block. */
+function renderSmartMoneySection(smartMoney: SmartMoneyEvidence | null): string[] {
+  const L: string[] = []
+  L.push('🧠 <b>Smart Money:</b>')
+
+  const buyers = smartMoney?.buyers ?? []
+  if (buyers.length > 0) {
+    const count = buyers.length
+    const first = buyers[0]
+    const firstAlias = escapeSignalHtml(first.alias ?? `${first.address.slice(0, 4)}…${first.address.slice(-4)}`)
+
+    if (count === 1) {
+      L.push(`• 1 Classified Whale entered (${firstAlias})`)
+    } else {
+      const otherCount = count - 1
+      const otherLabel = otherCount === 1 ? '1 other' : `${otherCount} others`
+      L.push(`• ${count} Classified Whales entered (${firstAlias} + ${otherLabel})`)
+    }
+
+    if (first.winRate != null || first.pnl30d != null) {
+      const wrStr = first.winRate != null ? `${Math.round(first.winRate * 100)}%` : 'n/a'
+      const pnlStr = first.pnl30d != null ? `${first.pnl30d > 0 ? '+' : ''}${Math.round(first.pnl30d * 100)}%` : 'n/a'
+      L.push(`   · Top Whale: ${firstAlias} (Win Rate: ${wrStr} | PnL: ${pnlStr})`)
+    }
+  } else {
+    L.push('• No classified whales detected yet (Early stage)')
+  }
+
+  return L
+}
+
+/** Scenario Targets block. */
+function renderTargetsSection(marketCapUsd: number | null | undefined, multiples?: number[]): string[] {
+  const targets = scenarioTargets(marketCapUsd ?? null, multiples)
+  if (targets.length === 0) return []
+  const L: string[] = []
+  L.push('🎯 <b>Targets (MCap Projection):</b>')
+  const targetStr = targets.map((t) => `${t.multiple}x: <b>${formatCompactUsd(t.targetMcap)}</b>`).join(' | ')
+  L.push(`• ${targetStr}`)
+  L.push('   <i>Arithmetic projection, not guaranteed exit.</i>')
+  return L
+}
+
+/** Highlights & checks block. */
+function renderHighlightsSection(reasons: string[], missing: string[] = []): string[] {
+  const L: string[] = []
+  if (reasons.length > 0) {
+    L.push('💡 <b>Key Highlights:</b>')
+    for (const r of reasons) {
+      const v = potentialCheckVerdict(r)
+      const icon = v === 'FAIL' ? '🔴' : v === 'CAUTION' ? '⚠️' : '✅'
+      L.push(`• ${icon} ${escapeSignalHtml(r)}`)
+    }
+  }
+  if (missing.length > 0) {
+    L.push('⚠️ <b>Unconfirmed Data:</b>')
+    for (const m of missing) {
+      L.push(`• ❓ ${escapeSignalHtml(m)}`)
+    }
+  }
+  return L
+}
+
+/** Filtered Risks block. */
+function renderRisksSection(risks?: string[]): string[] {
+  if (!risks || risks.length === 0) return []
+  const filtered = risks.filter(
+    (r) => !r.toLowerCase().includes('tidak ada invalidation') && !r.toLowerCase().includes('none provided'),
+  )
+  if (filtered.length === 0) return []
+  const L: string[] = []
+  L.push('⚠️ <b>Risk Factors:</b>')
+  for (const r of filtered) {
+    L.push(`• ${escapeSignalHtml(r)}`)
+  }
+  return L
 }
 
 /**
@@ -316,152 +534,60 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
   const mom = payload.momentum
   const L: string[] = []
 
-  // Header dengan emoji tier yang jelas
-  const TIER_EMOJI: Record<SignalTier, string> = {
-    HIGH_CONVICTION: '🟢 HIGH-CONVICTION',
-    CANDIDATE: '🟡 CANDIDATE (bukan sinyal utama)',
-    WATCHLIST: '🟡 WATCHLIST (bukan sinyal utama)',
-    UNKNOWN: '⚪ UNKNOWN',
-    STALE: '⚫ STALE (kedaluwarsa)',
-    REJECT: '🔴 REJECT',
-  }
-
-  const ticker = payload.ticker.startsWith('$') ? payload.ticker : `$${payload.ticker}`
-  const stageLabel = payload.ageMinutes < 120 ? '🆕 New Pair' : '🔗 Post-Bonding'
-
-  L.push(`🎯 <b>VILONA SNIPER — ${TIER_EMOJI[tier]}</b>`)
+  // Header with tier badge
+  L.push(`⚡ <b>POTENTIAL COIN SIGNAL</b> · ${tierBadge(tier)}`)
   L.push('━━━━━━━━━━━━━━━━━━━━━━━━━')
-  L.push(`<b>Token:</b> ${escapeSignalHtml(ticker)} <code>${escapeSignalHtml(payload.contract)}</code>`)
-  L.push(`<b>Stage:</b> ${stageLabel} | <b>Usia:</b> ${payload.ageMinutes}m | <b>Chain:</b> ${escapeSignalHtml(payload.chain ?? 'solana')}`)
-  // SHADOW/PAPER status is mandatory operator-facing: this repo screens
-  // only, and execution belongs to 1ai-trade-dex. Never optional, never
-  // below the fold.
-  L.push('🧷 <b>STATUS: SHADOW (PAPER) — bukan rekomendasi beli/jual</b>')
+
+  // Prominent Token info
+  L.push(...renderTokenInfo(payload))
   L.push('')
 
-  // ─── MARKET ───
-  L.push('📊 <b>MARKET</b>')
-  L.push(`• Market Cap: ${usd(mom.marketCap)}`)
-  const volMcRatio = mom.volume5m != null && mom.marketCap != null && mom.marketCap > 0 ? mom.volume5m / mom.marketCap : null
-  L.push(`• Vol 5m: ${usd(mom.volume5m)} | Ratio: ${volMcRatio != null ? volMcRatio.toFixed(2) + 'x' : 'n/a'}`)
-  if (volMcRatio != null && volMcRatio >= 5) L.push('   🔥 <b>Volume sangat tinggi (5x+)</b>')
+  // Market
+  const mc = marketCapUsd ?? mom.marketCap
+  const vol = input.volumeUsd ?? mom.volume5m ?? null
+  const liq = input.liquidityUsd ?? payload.liquidityUsd ?? null
+  L.push(...renderMarketSection(mc, liq, vol))
   L.push('')
 
-  // ─── SECURITY ───
-  L.push('🔐 <b>KEAMANAN</b>')
-  const mint = sec.mintable === null ? '❓ UNPROVEN' : sec.mintable ? '🔴 ON' : '🟢 OFF'
-  const freeze = sec.freezeAuthority === null ? '❓ UNPROVEN' : sec.freezeAuthority ? '🔴 ON' : '🟢 OFF'
-  const honeypot = sec.honeypot === null ? '❓ UNPROVEN' : sec.honeypot ? '🔴 YA' : '🟢 AMAN'
-  L.push(`• Mint Authority: ${mint}`)
-  L.push(`• Freeze Authority: ${freeze}`)
-  L.push(`• Honeypot: ${honeypot}`)
-  const lpBurned = pct(sec.lpBurnedPercent)
-  const lpLocked = pct(sec.lpLockedPercent)
-  L.push(`• LP: Burn ${lpBurned} | Lock ${lpLocked}`)
-  if (sec.lpBurnedPercent != null && sec.lpBurnedPercent >= 99.5) L.push('   ✅ LP 100% Burnt — aman dari rug pull')
-  else if (sec.lpLockedPercent != null && sec.lpLockedPercent >= 99.5) L.push('   ✅ LP 100% Locked — aman dari rug pull')
-  else if ((sec.lpBurnedPercent ?? 0) + (sec.lpLockedPercent ?? 0) < 99.5) L.push('   🔴 LP belum 100% aman — risiko exit liquidity')
+  // Safety
+  L.push(...renderSafetySection(sec, input.auditSources))
   L.push('')
 
-  // ─── DISTRIBUTION ───
-  L.push('👥 <b>DISTRIBUSI HOLDER</b>')
-  const dev = pct(dst.devPercent)
-  const sniper = pct(dst.sniperPercent)
-  const bundler = pct(dst.bundlerPercent)
-  const insider = pct(dst.insiderPercent)
-  const top10 = pct(dst.top10Percent)
-  const cluster = pct(dst.clusterPercent ?? null)
-  L.push(`• Dev: ${dev} ${dst.devPercent != null && dst.devPercent > 0 ? '🔴 DEV PEGANG' : dst.devPercent === 0 ? '✅ DEV OUT' : '❓ UNPROVEN'}`)
-  L.push(`• Sniper: ${sniper} ${dst.sniperPercent != null && dst.sniperPercent > 6 ? '🔴 TINGGI' : '✅ OK'}`)
-  L.push(`• Bundler: ${bundler} ${dst.bundlerSoldPercent != null && dst.bundlerSoldPercent === 100 ? '✅ 100% SOLD' : ''}`)
-  L.push(`• Insider: ${insider}`)
-  L.push(`• Top 10: ${top10} ${dst.top10Percent != null && dst.top10Percent > 30 ? '🔴 KONSENTRASI TINGGI' : '✅ OK'}`)
-  L.push(`• Cluster: ${cluster} ${dst.clusterPercent != null && dst.clusterPercent > 5 ? '🔴 TERDETEKSI' : dst.clusterPercent != null && dst.clusterPercent < 1 ? '✅ BERSIH' : '❓ UNPROVEN'}`)
-  // Correlation: how many independent audits agreed. One source = one
-  // point of failure; the operator must see that, not infer it.
-  {
-    const srcs = input.auditSources ?? []
-    L.push(
-      srcs.length >= 2
-        ? `• Korelasi: ✅ ${srcs.length} sumber audit sepakat (${srcs.join(', ')})`
-        : srcs.length === 1
-          ? `• Korelasi: ⚠️ 1 sumber saja (${srcs[0]}) — tidak ada konfirmasi silang`
-          : '• Korelasi: ❓ tidak ada sumber audit terkonfirmasi',
-    )
-  }
+  // Distribution
+  L.push(...renderDistributionSection(dst))
   L.push('')
 
-  // ─── SMART MONEY ───
-  L.push('🧠 <b>SMART MONEY</b>')
-  if (smartMoney && smartMoney.buyers.length > 0) {
-    L.push(`• ${smartMoney.buyers.length} wallet terklasifikasi, terkuat: ${escapeSignalHtml(smartMoney.strongest ?? 'n/a')}`)
-    for (const b of smartMoney.buyers.slice(0, 3)) {
-      const alias = escapeSignalHtml(b.alias ?? b.address.slice(0, 8))
-      const pnl = b.pnl30d != null ? (b.pnl30d > 0 ? '+' : '') + (b.pnl30d * 100).toFixed(1) + '%' : 'n/a'
-      const wr = b.winRate != null ? (b.winRate * 100).toFixed(1) + '%' : 'n/a'
-      L.push(`   · ${alias} — ${escapeSignalHtml(b.status ?? 'n/a')} | PnL30d ${pnl} | WR ${wr} | n=${b.sampleCount}`)
-    }
-  } else {
-    L.push('• Belum ada wallet terverifikasi memegang token ini')
-    L.push(`   Sumber: ${escapeSignalHtml(smartMoney?.source ?? 'tidak tersedia')}`)
-  }
+  // Smart Money
+  L.push(...renderSmartMoneySection(smartMoney))
   L.push('')
 
-  // ─── THESIS / REASONS ───
-  if (tierReasons.length > 0) {
-    L.push('💡 <b>ALASAN</b>')
-    for (const r of tierReasons) L.push(`· ${escapeSignalHtml(reasonId(r))}`)
+  // Targets (MCap Projection)
+  const targetLines = renderTargetsSection(mc, input.multiples)
+  if (targetLines.length > 0) {
+    L.push(...targetLines)
     L.push('')
   }
 
-  // ─── SCENARIOS ───
-  // marketCapUsd is the caller's canonical value; fall back to the payload
-  // so a missed argument renders "unavailable" only when it truly is.
-  const targets = scenarioTargets(marketCapUsd ?? mom.marketCap, input.multiples)
-  if (targets.length > 0) {
-    L.push('🎯 <b>SKENARIO TARGET</b>')
-    for (const t of targets) L.push(`   ${t.multiple}x → MC ${usd(t.targetMcap)}`)
-    L.push('   <i>Aritmatika market cap, bukan harga exit terjamin.</i>')
-    L.push('')
-  } else {
-    L.push('🎯 <b>SKENARIO:</b> Market cap tidak tersedia')
+  // Highlights
+  const highlightLines = renderHighlightsSection(tierReasons, tierMissing)
+  if (highlightLines.length > 0) {
+    L.push(...highlightLines)
     L.push('')
   }
 
-  // ─── KEYAKINAN ───
-  // Confidence is derived, never invented: buyer evidence + what is missing.
-  {
-    const buyers = smartMoney?.buyers.length ?? 0
-    const level = tier === 'HIGH_CONVICTION' && buyers > 0 && tierMissing.length === 0
-      ? 'TINGGI'
-      : buyers > 0
-        ? 'SEDANG'
-        : 'RENDAH'
-    L.push(`📌 <b>KEYAKINAN: ${level}</b>`)
-    L.push(`· Bukti wallet terklasifikasi: ${buyers > 0 ? `${buyers} pembeli` : 'tidak ada'}`)
-    if (tierMissing.length > 0) L.push(`· ${tierMissing.length} bukti wajib belum tersedia`)
-    L.push('')
-  }
-
-  // ─── RISKS / INVALIDATION ───
-  const rl = risks && risks.length > 0 ? risks : ['Tidak ada invalidation yang diberikan — anggap belum tervalidasi']
-  L.push('⚠️ <b>RISIKO / INVALIDASI</b>')
-  for (const r of rl) L.push(`· ${escapeSignalHtml(reasonId(r))}`)
-  L.push('')
-
-  // ─── MISSING ───
-  if (tierMissing.length > 0) {
-    L.push('❓ <b>YANG MASIH HILANG</b>')
-    for (const m of tierMissing) L.push(`· ${escapeSignalHtml(reasonId(m))}`)
+  // Risks
+  const riskLines = renderRisksSection(risks)
+  if (riskLines.length > 0) {
+    L.push(...riskLines)
     L.push('')
   }
 
   // Footer
   L.push('━━━━━━━━━━━━━━━━━━━━━━━━━')
-  L.push('<i>Output screening — sizing &amp; eksekusi milik 1ai-trade-dex.</i>')
+  L.push('🧷 <i>SHADOW (PAPER) — Output screening only, not financial advice</i>')
 
   const text = L.join('\n')
-  const body = text.length > 4000 ? text.slice(0, 3990) + '\n…(terpotong)' : text
+  const body = text.length > 4000 ? text.slice(0, 3990) + '\n…(truncated)' : text
   return {
     text: body,
     replyMarkup: input.sendButtons === false ? undefined : contractButtons(payload.contract, payload.chain),
@@ -471,76 +597,72 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
 /**
  * CANDIDATE/WATCHLIST-tier message: named `POTENTIAL COIN SIGNAL`.
  *
- * NOT wired into production delivery yet — CANDIDATE is currently opt-in
- * watchlist and this formatter is only the downstream rendering contract.
- * Wiring it to a delivery path is a later, operator-approved step.
+ * Downstream rendering contract for candidate coins.
  */
 export function formatPotentialCoinSignal(input: PotentialCoinSignalInput): FormattedSignal {
   const { payload, tier, tierReasons, tierMissing, smartMoney } = input
+  const sec = payload.security
+  const dst = payload.distribution
+  const mom = payload.momentum
   const L: string[] = []
-  const ticker = payload.ticker.startsWith('$') ? payload.ticker : `$${payload.ticker}`
-  const chain = payload.chain ?? 'solana'
-  const mc = input.marketCapUsd ?? payload.momentum.marketCap
-  const vol = input.volumeUsd ?? payload.momentum.volume5m ?? null
 
-  L.push(`🪙 <b>POTENTIAL COIN SIGNAL</b> — ${tierLabel(tier)}`)
+  // Header with tier badge
+  L.push(`⚡ <b>POTENTIAL COIN SIGNAL</b> · ${tierBadge(tier)}`)
   L.push('━━━━━━━━━━━━━━━━━━━━━━━━━')
-  L.push(`<b>Token:</b> ${escapeSignalHtml(ticker)}`)
-  L.push(`<b>Symbol:</b> ${escapeSignalHtml(payload.ticker)}`)
-  L.push(`<b>Chain:</b> ${escapeSignalHtml(chain)}`)
-  L.push(`<b>Mint:</b> <code>${escapeSignalHtml(payload.contract)}</code>`)
-  L.push(`<b>Verified at:</b> ${escapeSignalHtml(verifiedAtLabel(input.verifiedAt))}`)
-  L.push('')
 
-  // ─── MARKET ───
-  L.push('📊 <b>MARKET</b>')
-  L.push(`• Market Cap: ${usd(mc)}`)
-  L.push(`• Liquidity: ${usd(input.liquidityUsd)}`)
-  L.push(`• Volume: ${usd(vol)}`)
-  L.push(`• Price Change: ${pct(input.priceChangePct)}`)
-  L.push('')
-
-  // ─── SMART MONEY ───
-  const buyers = smartMoney?.buyers ?? []
-  L.push('🧠 <b>SMART MONEY</b>')
-  L.push(`• Classified buyers: ${buyers.length}`)
-  for (const b of buyers.slice(0, 5)) {
-    const alias = escapeSignalHtml(b.alias ?? b.address.slice(0, 8))
-    L.push(`   · ${alias} — ${escapeSignalHtml(b.status ?? 'n/a')}`)
-  }
-  if (buyers.length === 0) L.push('   · none — UNKNOWN')
-  L.push('')
-
-  // ─── CHECKS (PASS / CAUTION / FAIL / UNKNOWN) ───
-  L.push('📋 <b>CHECKS</b>')
-  for (const r of tierReasons) L.push(`• [${potentialCheckVerdict(r)}] ${escapeSignalHtml(r)}`)
-  for (const m of tierMissing) L.push(`• [UNKNOWN] ${escapeSignalHtml(m)}`)
-  if (tierReasons.length === 0 && tierMissing.length === 0) L.push('• [UNKNOWN] no tier checks provided')
-  L.push('')
-
-  // ─── RISKS ───
-  const riskLines = input.risks && input.risks.length > 0 ? input.risks : ['None provided — treat as unvalidated']
-  L.push('⚠️ <b>RISKS</b>')
-  for (const r of riskLines) L.push(`· ${escapeSignalHtml(r)}`)
-  L.push('')
-
-  // ─── MISSING DATA ───
-  const missing: string[] = [...tierMissing]
-  if (mc === null || mc === undefined || !Number.isFinite(mc) || mc <= 0) missing.push('market cap')
-  if (input.liquidityUsd === null || input.liquidityUsd === undefined || !Number.isFinite(input.liquidityUsd) || input.liquidityUsd <= 0) missing.push('liquidity')
-  if (vol === null || vol === undefined || !Number.isFinite(vol) || vol <= 0) missing.push('volume')
-  L.push('❓ <b>MISSING DATA</b>')
-  if (missing.length > 0) {
-    for (const m of missing) L.push(`· ${escapeSignalHtml(m)}`)
-  } else {
-    L.push('· none')
+  // Prominent Token info
+  L.push(...renderTokenInfo(payload))
+  if (input.verifiedAt) {
+    const vAt = verifiedAtLabel(input.verifiedAt)
+    if (vAt !== 'n/a') {
+      L.push(`🕒 <b>Verified at:</b> ${escapeSignalHtml(vAt)}`)
+    }
   }
   L.push('')
 
-  // ─── BANNERS ───
-  L.push('🧷 <b>STATUS: SHADOW (PAPER)</b>')
-  L.push('⚠️ <b>alert ≠ entry</b> — screening output only, not a buy/sell recommendation')
+  // Market
+  const mc = input.marketCapUsd ?? mom.marketCap
+  const vol = input.volumeUsd ?? mom.volume5m ?? null
+  const liq = input.liquidityUsd ?? payload.liquidityUsd ?? null
+  L.push(...renderMarketSection(mc, liq, vol, input.priceChangePct))
+  L.push('')
+
+  // Safety
+  L.push(...renderSafetySection(sec))
+  L.push('')
+
+  // Distribution
+  L.push(...renderDistributionSection(dst))
+  L.push('')
+
+  // Smart Money
+  L.push(...renderSmartMoneySection(smartMoney))
+  L.push('')
+
+  // Targets (MCap Projection) if MC available
+  const targetLines = renderTargetsSection(mc)
+  if (targetLines.length > 0) {
+    L.push(...targetLines)
+    L.push('')
+  }
+
+  // Highlights
+  const highlightLines = renderHighlightsSection(tierReasons, tierMissing)
+  if (highlightLines.length > 0) {
+    L.push(...highlightLines)
+    L.push('')
+  }
+
+  // Risks
+  const riskLines = renderRisksSection(input.risks)
+  if (riskLines.length > 0) {
+    L.push(...riskLines)
+    L.push('')
+  }
+
+  // Footer
   L.push('━━━━━━━━━━━━━━━━━━━━━━━━━')
+  L.push('🧷 <i>SHADOW (PAPER) — Output screening only, not financial advice</i>')
 
   const text = L.join('\n')
   const body = text.length > 4000 ? text.slice(0, 3990) + '\n…(truncated)' : text

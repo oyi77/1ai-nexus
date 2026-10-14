@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { formatTieredSignal, contractButtons, type SignalFormatInput } from './signal-tier'
-import type { SniperPayload } from './meme-sniper'
+import { formatTieredSignal, contractButtons, type SignalFormatInput } from '../signal-tier'
+import type { SniperPayload } from '../meme-sniper'
 
 function payload(over: Partial<SniperPayload> = {}): SniperPayload {
   return {
@@ -37,7 +37,7 @@ describe('signal output — reply markup', () => {
   it('returns text plus a button keyboard by default', () => {
     const out = formatTieredSignal(input())
     expect(typeof out.text).toBe('string')
-    expect(out.text).toContain('VILONA SNIPER')
+    expect(out.text).toContain('POTENTIAL COIN SIGNAL')
     expect(out.replyMarkup).toBeDefined()
     expect(out.replyMarkup!.inline_keyboard.length).toBeGreaterThan(0)
     for (const row of out.replyMarkup!.inline_keyboard) {
@@ -70,33 +70,32 @@ describe('signal output — reply markup', () => {
     const out = formatTieredSignal(input({ payload: payload({ ticker: 'A_B' }) }))
     expect(out.text).toContain('$A_B')
     expect(out.text).not.toContain('A\\_B')
-    // Legacy-Markdown bold would be `*VILONA`; HTML must use <b>.
-    expect(out.text).not.toContain('*VILONA')
-    expect(out.text).toContain('<b>VILONA SNIPER')
+    expect(out.text).not.toContain('*POTENTIAL')
+    expect(out.text).toContain('<b>POTENTIAL COIN SIGNAL</b>')
   })
 })
 
 describe('signal output — SHADOW status and audit provenance (TAHAP 5)', () => {
   it('always states SHADOW/PAPER status in the message body', () => {
     const out = formatTieredSignal(input())
-    expect(out.text).toContain('STATUS: SHADOW (PAPER)')
-    expect(out.text).toContain('bukan rekomendasi')
+    expect(out.text).toContain('SHADOW (PAPER)')
+    expect(out.text).toContain('Output screening')
   })
 
   it('reports cross-confirmation when two or more audits agreed', () => {
     const out = formatTieredSignal(input({ auditSources: ['rugcheck', 'rugged-proof'] }))
-    expect(out.text).toContain('2 sumber audit sepakat')
+    expect(out.text).toContain('2 sources agreed')
     expect(out.text).toContain('rugcheck')
   })
 
   it('flags a single audit as no cross-confirmation, not as agreement', () => {
     const out = formatTieredSignal(input({ auditSources: ['rugcheck'] }))
-    expect(out.text).toContain('1 sumber saja')
-    expect(out.text).not.toContain('sepakat')
+    expect(out.text).toContain('1 source only')
+    expect(out.text).not.toContain('sources agreed')
   })
 
   it('reports absent provenance honestly instead of implying a pass', () => {
     const out = formatTieredSignal(input({ auditSources: [] }))
-    expect(out.text).toContain('tidak ada sumber audit terkonfirmasi')
+    expect(out.text).toContain('No confirmed audit sources')
   })
 })

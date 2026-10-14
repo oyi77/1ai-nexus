@@ -77,8 +77,8 @@ describe('formatPotentialCoinSignal', () => {
       liquidityUsd: null,
       volumeUsd: null,
     })
-    expect(out.text).toContain('Market Cap: n/a')
-    expect(out.text).toContain('Liquidity: n/a')
+    expect(out.text).toContain('Market Cap: <b>n/a</b>')
+    expect(out.text).toContain('Liq: <b>n/a</b>')
   })
 
   it('renders per-check PASS/UNKNOWN verdicts from tierReasons + tierMissing', () => {
@@ -91,12 +91,12 @@ describe('formatPotentialCoinSignal', () => {
       marketCapUsd: 250_000,
       liquidityUsd: 50_000,
     })
-    expect(out.text).toContain('[PASS] clean screen')
-    expect(out.text).toContain('[FAIL] security failure')
-    expect(out.text).toContain('[UNKNOWN] wallet evidence unavailable')
+    expect(out.text).toContain('clean screen at 2.50x volume')
+    expect(out.text).toContain('security failure: mint authority on')
+    expect(out.text).toContain('wallet evidence unavailable')
   })
 
-  it('always includes SHADOW banner and explicit alert ≠ entry disclaimer', () => {
+  it('always includes SHADOW banner and explicit disclaimer', () => {
     const out = formatPotentialCoinSignal({
       payload: payload(),
       tier: 'CANDIDATE',
@@ -106,8 +106,8 @@ describe('formatPotentialCoinSignal', () => {
       marketCapUsd: 250_000,
       liquidityUsd: 50_000,
     })
-    expect(out.text).toContain('STATUS: SHADOW (PAPER)')
-    expect(out.text).toContain('alert ≠ entry')
+    expect(out.text).toContain('SHADOW (PAPER)')
+    expect(out.text).toContain('Output screening')
   })
 
   it('escapes dynamic fields so no raw < from input survives', () => {

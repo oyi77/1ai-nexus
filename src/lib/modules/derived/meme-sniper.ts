@@ -50,6 +50,8 @@ export interface SniperTopWallet {
 export interface SniperPayload {
   ticker: string
   contract: string
+  name?: string
+  liquidityUsd?: number | null
   chain?: string
   /** Explicit stage; derived from `ageMinutes` when omitted. */
   stage?: SniperStage

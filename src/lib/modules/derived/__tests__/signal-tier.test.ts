@@ -9,9 +9,9 @@ import {
   tierLabel,
   DEFAULT_DELIVERY_POLICY,
   type TierInput,
-} from './signal-tier';
-import type { SniperDecision } from './meme-sniper';
-import type { SmartMoneyEvidence } from './smart-money-provider';
+} from '../signal-tier';
+import type { SniperDecision } from '../meme-sniper';
+import type { SmartMoneyEvidence } from '../smart-money-provider';
 
 function decision(over: Partial<SniperDecision> = {}): SniperDecision {
   return {
