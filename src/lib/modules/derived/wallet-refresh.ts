@@ -276,34 +276,113 @@ export interface RefreshSummary {
 
 // ─── Candidates ──────────────────────────────────────────────
 
-/** Wallets needing classification: never classified, or stale >24h. */
+/** Raw DB shape fed into the pure candidate selector. */
+export interface WalletRefreshCandidateRow {
+  id: string
+  address: string
+  chain: string
+  classifiedAt: Date | null
+  lastSeen: Date
+  reason?: string
+}
+
+export interface SelectRefreshCandidatesOptions {
+  batchSize: number
+  staleMs: number
+  nowMs: number
+}
+
+// EVM-style rows (0x…) are mislabeled 'solana' in some imports — the
+// Solana RPC cannot serve them. Skip non-base58 BEFORE any slot is consumed.
+const BASE58_ADDR_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/
+
+/**
+ * Pure, Prisma-free candidate selection.
+ *
+ * Selection contract:
+ *  1. Drop non-base58 addresses FIRST — an `0x…` row must never consume a slot.
+ *  2. Never-classified (classifiedAt == null) wallets first, ordered by
+ *     `lastSeen desc` (tiebreak: `id asc` for determinism), up to batchSize.
+ *  3. Fill remaining slots with stale classified wallets (classifiedAt older
+ *     than staleMs), oldest classification first (tiebreak: `id asc`).
+ *  4. Fresh classified wallets are excluded.
+ */
+export function selectRefreshCandidates(
+  rows: WalletRefreshCandidateRow[],
+  opts: SelectRefreshCandidatesOptions,
+): WalletRefreshCandidate[] {
+  const { batchSize, staleMs, nowMs } = opts
+  const base58Rows = rows.filter((r) => BASE58_ADDR_RE.test(r.address))
+
+  const neverClassified = base58Rows
+    .filter((r) => r.classifiedAt == null)
+    .sort(
+      (a, b) =>
+        b.lastSeen.getTime() - a.lastSeen.getTime() ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    )
+
+  const staleClassified = base58Rows
+    .filter((r) => r.classifiedAt != null && nowMs - r.classifiedAt.getTime() > staleMs)
+    .sort(
+      (a, b) =>
+        a.classifiedAt!.getTime() - b.classifiedAt!.getTime() ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    )
+
+  const neverPicked = neverClassified.slice(0, batchSize)
+  const remaining = batchSize - neverPicked.length
+  const toCandidate = (row: WalletRefreshCandidateRow): WalletRefreshCandidate => ({
+    walletId: row.id,
+    address: row.address,
+    chain: row.chain,
+    classifiedAt: row.classifiedAt,
+    reason: row.classifiedAt == null ? 'never-classified' : 'stale-classification',
+  })
+  return [
+    ...neverPicked.map(toCandidate),
+    ...staleClassified.slice(0, Math.max(0, remaining)).map(toCandidate),
+  ]
+}
+
+/**
+ * Wallets needing classification: never classified, or stale >24h.
+ *
+ * The Prisma filter does the classification gate up-front so a flood of
+ * fresh-classified wallets (e.g. 426 GMGN rows with fresh `lastSeen`) never
+ * crowds out never-classified wallets. The pure selector then applies the
+ * base58 filter and pool ordering without any further DB truncation.
+ */
 export async function getRefreshCandidates(): Promise<WalletRefreshCandidate[]> {
+  const nowMs = Date.now()
+  const staleCutoff = new Date(nowMs - STALE_MS)
   const rows = await prisma.wallet.findMany({
-    where: { chain: 'solana' },
+    where: {
+      chain: 'solana',
+      OR: [
+        { smartMoneyWallet: { is: null } },
+        { smartMoneyWallet: { classifiedAt: { lt: staleCutoff } } },
+      ],
+    },
     select: {
       id: true,
       address: true,
       chain: true,
+      lastSeen: true,
       smartMoneyWallet: { select: { classifiedAt: true } },
     },
     orderBy: { lastSeen: 'desc' },
-    take: BATCH_SIZE * 10,
   })
-  // EVM-style rows (0x…) are mislabeled 'solana' in some imports — the
-  // Solana RPC cannot serve them. Skip non-base58 here, not after a harvest.
-  const isBase58Addr = (a: string): boolean => /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a)
-  const nowMs = Date.now()
-  return rows
-    .map((w) => ({
-      walletId: w.id,
+  return selectRefreshCandidates(
+    rows.map((w) => ({
+      id: w.id,
       address: w.address,
       chain: w.chain,
       classifiedAt: w.smartMoneyWallet?.classifiedAt ?? null,
-      reason: w.smartMoneyWallet?.classifiedAt == null ? 'never-classified' : 'stale-classification',
-    }))
-    .filter((c) => isBase58Addr(c.address))
-    .filter((c) => c.classifiedAt == null || nowMs - c.classifiedAt.getTime() > STALE_MS)
-    .slice(0, BATCH_SIZE)
+      lastSeen: w.lastSeen,
+    })),
+    { batchSize: BATCH_SIZE, staleMs: STALE_MS, nowMs },
+  )
 }
 
 // ─── Evidence helpers ────────────────────────────────────────
