@@ -122,7 +122,8 @@ const BUYER_CLASSIFICATION: Record<string, string> = {
  * Escape Telegram HTML control characters in dynamic text. Same discipline
  * as meme-sniper's escapeHtml — keep the renderer self-contained/pure.
  */
-export function escapeHtml(s: string): string {
+export function escapeHtml(s: string | null | undefined): string {
+  if (typeof s !== 'string') return ''
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 

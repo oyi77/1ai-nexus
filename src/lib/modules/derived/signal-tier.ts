@@ -288,7 +288,8 @@ function potentialCheckVerdict(reason: string): 'PASS' | 'CAUTION' | 'FAIL' | 'U
  * only reserves `&`, `<`, `>` — tickers/mints/reason strings can never open a
  * stray entity the way they do under legacy Markdown (`_` in `7tZt1LXb`).
  */
-export function escapeSignalHtml(s: string): string {
+export function escapeSignalHtml(s: string | null | undefined): string {
+  if (typeof s !== 'string') return ''
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 

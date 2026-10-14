@@ -167,7 +167,8 @@ function fmtUsd(n: unknown): string {
  * reserved, so a ticker like `A_B` or a mint ending in `pump` can never
  * open a stray entity the way it does under legacy Markdown.
  */
-export function escapeHtml(s: string): string {
+export function escapeHtml(s: string | null | undefined): string {
+  if (typeof s !== 'string') return ''
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 

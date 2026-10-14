@@ -177,7 +177,7 @@ function tokenBlock(d: SniperScanDecision): string {
   L.push(`━━━━━━━━━━━━━━━━━━━━━━━━━`)
   L.push(`<b>${escapeSignalHtml(d.ticker)} — ${escapeSignalHtml(d.contract.slice(0, 8))}…</b>`)
   L.push(`Mint: <code>${escapeSignalHtml(d.contract)}</code>`)
-  L.push(`Sumber: ${escapeSignalHtml(ev?.provider ?? 'tak diketahui')}${d.discoveryCategory !== 'NEW_PAIRS' ? ` (${escapeSignalHtml(d.discoveryCategory)})` : ''}`)
+  L.push(`Sumber: ${escapeSignalHtml(ev?.provider ?? 'tak diketahui')}${d.discoveryCategory && d.discoveryCategory !== 'NEW_PAIRS' ? ` (${escapeSignalHtml(d.discoveryCategory)})` : ''}`)
   // Audit 2026-10-12: INFLUENCER is a raw channel label from call-feed
   // (kind='kol'), NOT verified influencer reach/attribution. Say so at the
   // render site so nobody reads it as a KOL-endorsement claim.
