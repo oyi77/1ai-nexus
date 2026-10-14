@@ -727,9 +727,17 @@ export function validateSignalLinkUrls(contract: string, chain?: string | null):
 
 /**
  * Inline trade buttons under a signal. Pure URL keyboard — Telegram renders
- * native tap buttons, no extra API surface. Dexscreener URL doubles as the
- * chart link; Axiom/Jupiter are the buy endpoints (pump = pump.fun mint,
- * else the generic Jupiter swap route).
+ * native tap buttons, no extra API surface.
+ *
+ * Bot targets:
+ * - Row 1: Axiom, Jupiter (direct buy routes)
+ * - Row 2: Dexscreener (chart), GMGN (screening)
+ * - Row 3: Trojan (Solana TG bot), Phantom (deep-link via Jup)
+ * - Row 4: Photon (terminal), BullX (terminal)
+ * - Row 5: Maestro (multi-chain TG bot), Solscan (explorer)
+ *
+ * Note: Telegram bot deeplinks (Trojan, Maestro) rely on the target bot's
+ * /start parser handling raw mints.
  */
 export function contractButtons(contract: string, chain?: string | null): ContractButtons {
   const v = validateSignalLinkUrls(contract, chain)
@@ -746,6 +754,18 @@ export function contractButtons(contract: string, chain?: string | null): Contra
       [
         { text: '📊 Dexscreener', url: v.chartUrl ?? '' },
         { text: '🔍 GMGN', url: `https://gmgn.ai/sol/token/${c}` },
+      ],
+      [
+        { text: '🐴 Trojan', url: `https://t.me/solana_trojanbot?start=${c}` },
+        { text: '👻 Phantom', url: `https://phantom.app/ul/browse/https://jup.ag/swap/SOL-${c}` },
+      ],
+      [
+        { text: '⚡ Photon', url: `https://photon-sol.tinyastro.io/en/lp/${c}` },
+        { text: '🐂 BullX', url: `https://bullx.io/terminal?chainId=1399811149&address=${c}` },
+      ],
+      [
+        { text: '🎩 Maestro', url: `https://t.me/maestro?start=${c}` },
+        { text: '🔎 Solscan', url: `https://solscan.io/token/${c}` },
       ],
     ],
   }

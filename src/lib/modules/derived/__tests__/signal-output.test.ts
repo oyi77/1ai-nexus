@@ -66,6 +66,27 @@ describe('signal output — reply markup', () => {
     expect(urls.some((u) => u.includes('jup.ag/swap/SOL-'))).toBe(true)
   })
 
+  it('includes the extended trade bot rows (Trojan/Phantom/Photon/BullX/Maestro/Solscan)', () => {
+    const c = '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R'
+    const kb = contractButtons(c, 'solana')
+    const texts = kb.inline_keyboard.flat().map((b) => b.text)
+    expect(texts).toContain('🐴 Trojan')
+    expect(texts).toContain('👻 Phantom')
+    expect(texts).toContain('⚡ Photon')
+    expect(texts).toContain('🐂 BullX')
+    expect(texts).toContain('🎩 Maestro')
+    expect(texts).toContain('🔎 Solscan')
+  })
+
+  it('every extended bot URL carries the full mint', () => {
+    const c = '4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R'
+    const kb = contractButtons(c, 'solana')
+    const urls = kb.inline_keyboard.flat().map((b) => b.url)
+    for (const u of urls) {
+      expect(u).toContain(encodeURIComponent(c))
+    }
+  })
+
   it('passes underscored tickers through — HTML mode cannot be broken by _', () => {
     const out = formatTieredSignal(input({ payload: payload({ ticker: 'A_B' }) }))
     expect(out.text).toContain('$A_B')

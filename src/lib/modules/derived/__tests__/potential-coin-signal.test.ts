@@ -147,6 +147,28 @@ describe('formatPotentialCoinSignal', () => {
     expect(out.replyMarkup!.inline_keyboard.flat().every((b) => b.url.startsWith('https://'))).toBe(true)
   })
 
+  it('includes the extended trade bot rows on potential signals and each carries the full mint', () => {
+    const out = formatPotentialCoinSignal({
+      payload: payload(),
+      tier: 'CANDIDATE',
+      tierReasons: [],
+      tierMissing: [],
+      smartMoney: evidence(),
+      marketCapUsd: 250_000,
+      liquidityUsd: 50_000,
+    })
+    const kb = out.replyMarkup!
+    const flat = kb.inline_keyboard.flat()
+    const texts = flat.map((b) => b.text)
+    expect(texts).toContain('🐴 Trojan')
+    expect(texts).toContain('⚡ Photon')
+    expect(texts).toContain('🎩 Maestro')
+    expect(texts).toContain('🔎 Solscan')
+    for (const b of flat) {
+      expect(b.url.startsWith('https://')).toBe(true)
+    }
+  })
+
   it('omits buttons when sendButtons is false', () => {
     const out = formatPotentialCoinSignal({
       payload: payload(),

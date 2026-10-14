@@ -60,3 +60,47 @@ describe('contractButtons uses validated URLs', () => {
     expect(contractButtons('nope', 'solana').inline_keyboard).toEqual([])
   })
 })
+
+describe('contractButtons — extended trade bot targets', () => {
+  it('includes Axiom, Jupiter, Dexscreener, GMGN in the keyboard', () => {
+    const kb = contractButtons(MINT, 'solana')
+    const texts = kb.inline_keyboard.flat().map((b) => b.text)
+    expect(texts).toContain('🟢 BUY Axiom')
+    expect(texts).toContain('⚡ BUY Jupiter')
+    expect(texts).toContain('📊 Dexscreener')
+    expect(texts).toContain('🔍 GMGN')
+  })
+
+  it('includes Trojan, Phantom, Photon, BullX, Maestro, Solscan bot rows', () => {
+    const kb = contractButtons(MINT, 'solana')
+    const texts = kb.inline_keyboard.flat().map((b) => b.text)
+    expect(texts).toContain('🐴 Trojan')
+    expect(texts).toContain('👻 Phantom')
+    expect(texts).toContain('⚡ Photon')
+    expect(texts).toContain('🐂 BullX')
+    expect(texts).toContain('🎩 Maestro')
+    expect(texts).toContain('🔎 Solscan')
+  })
+
+  it('every new bot URL starts with https:// and encodes the contract', () => {
+    const c = encodeURIComponent(MINT)
+    const kb = contractButtons(MINT, 'solana')
+    const urls = kb.inline_keyboard.flat().map((b) => b.url)
+    for (const u of urls) {
+      expect(u.startsWith('https://')).toBe(true)
+    }
+    // Spot-check that the new targets actually reference the mint.
+    expect(urls.some((u) => u.includes(c))).toBe(true)
+    expect(urls.some((u) => u.includes('trojanbot'))).toBe(true)
+    expect(urls.some((u) => u.includes('phantom.app'))).toBe(true)
+    expect(urls.some((u) => u.includes('photon-sol'))).toBe(true)
+    expect(urls.some((u) => u.includes('bullx.io'))).toBe(true)
+    expect(urls.some((u) => u.includes('t.me/maestro'))).toBe(true)
+    expect(urls.some((u) => u.includes('solscan.io/token'))).toBe(true)
+  })
+
+  it('emits at least 5 rows of buttons for a valid mint', () => {
+    const kb = contractButtons(MINT, 'solana')
+    expect(kb.inline_keyboard.length).toBeGreaterThanOrEqual(5)
+  })
+})
