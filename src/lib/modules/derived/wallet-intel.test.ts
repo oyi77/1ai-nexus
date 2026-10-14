@@ -22,6 +22,7 @@ function input(episodes: TradeEpisode[], over: Partial<ClassifyInput> = {}): Cla
     episodes,
     whale: { maxSinglePositionUsd: null, portfolioUsd: null, buyVolume30dUsd: null },
     tx7d: 12,
+    tx7dTruncated: false,
     distinctTokensTraded: 10,
     feeComplete: true,
     clusterDataAvailable: true,

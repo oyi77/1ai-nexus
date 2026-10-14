@@ -106,6 +106,13 @@ export interface ClassifyInput {
   episodes: TradeEpisode[];
   whale: WhaleEvidence;
   tx7d: number | null;
+  /**
+   * True when the signature list that produced `tx7d` hit the per-wallet
+   * harvest cap before walking the full 7d window. `tx7d` is then a proven
+   * LOWER BOUND, not an exact 7-day transaction count — the classifier must
+   * record that limitation instead of comparing the number as exact.
+   */
+  tx7dTruncated: boolean;
   distinctTokensTraded: number;
   feeComplete: boolean;
   clusterDataAvailable: boolean;
@@ -205,8 +212,12 @@ export function classifyWallet(input: ClassifyInput, config?: SmartMoneyConfig):
   if (!input.clusterDataAvailable) limitations.push('cluster data unavailable — wash trades not excluded');
   if (input.tx7d === null || input.tx7d === undefined) {
     limitations.push('7d tx count unknown');
-  } else if (input.tx7d >= C.tx7dMax) {
-    limitations.push(`7d tx count ${input.tx7d} ≥ ${C.tx7dMax} (bot-like cadence)`);
+  } else {
+    if (input.tx7dTruncated) {
+      limitations.push(`7d tx count ${input.tx7d}+ (signature list truncated — lower bound, not exact)`);
+    } else if (input.tx7d >= C.tx7dMax) {
+      limitations.push(`7d tx count ${input.tx7d} ≥ ${C.tx7dMax} (bot-like cadence)`);
+    }
   }
 
   // 4) Smart legs.

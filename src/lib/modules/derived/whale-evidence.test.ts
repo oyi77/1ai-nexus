@@ -51,6 +51,7 @@ function baseInput(episodes: TradeEpisode[], whale: ClassifyInput['whale']): Cla
     episodes,
     whale,
     tx7d: 12,
+    tx7dTruncated: false,
     distinctTokensTraded: 10,
     feeComplete: true,
     clusterDataAvailable: true,

@@ -1,14 +1,22 @@
 // ─────────────────────────────────────────────────────────────
 // Incremental wallet refresh — daily batch job.
 // Harvest → FIFO episodes → whale evidence → classify → persist.
-// Read-only against Solana RPC; single DB writer is
-// persistWalletClassification (SmartMoneyWallet upsert).
+// Read-only against Solana RPC; DB writers are
+// persistWalletClassification (SmartMoneyWallet upsert) and, only when the
+// operator opts in, persistSolanaTransactions (Transaction upsert).
 // Re-run safe: classification is idempotent (same input -> same row),
-// Wallet.lastSeen only moves forward.
+// Wallet.lastSeen only moves forward, Transaction upsert is keyed by
+// (chain, txHash).
 // ─────────────────────────────────────────────────────────────
 
 import { prisma } from '@/lib/db'
-import { harvestWallet, SOL_MINT, type NormalizedSwap } from '@/lib/modules/derived/solana-harvest'
+import {
+  harvestWallet,
+  SOL_MINT,
+  type HarvestCoverage,
+  type NormalizedSwap,
+  type RpcSig,
+} from '@/lib/modules/derived/solana-harvest'
 import { buildEpisodes, toTradeEpisodes } from '@/lib/modules/derived/wallet-episodes'
 import { classifyWallet, SMART_MONEY_DEFAULTS, type ClassifyInput } from '@/lib/modules/derived/wallet-intel'
 import { persistWalletClassification } from '@/lib/modules/derived/wallet-classifier'
@@ -28,6 +36,155 @@ const BATCH_SIZE = 5
 const HARVEST_LIMIT = 200
 const THROTTLE_MS = 650
 const STALE_MS = 24 * 60 * 60 * 1000 // reclassify after 24h
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
+
+/**
+ * Cluster/wash-trade data is NOT produced by the free public RPC path.
+ * Default false so the classifier records the limitation; an operator with
+ * a real cluster source can turn it on, and a future source that actually
+ * produces cluster data should OR its availability in here.
+ */
+export function resolveClusterDataAvailable(): boolean {
+  return (process.env.CLUSTER_DATA_AVAILABLE ?? '').trim().toLowerCase() === 'true'
+}
+
+/**
+ * 7d transaction cadence from harvested signature timestamps.
+ *
+ * HONESTY: this is the COUNT of harvested signatures whose blockTime is
+ * >= now-7d. The signature list is capped by HARVEST_LIMIT, so the number
+ * is a PROVEN LOWER BOUND — never an exact on-chain 7d total. Callers must
+ * combine it with isTx7dTruncated() before presenting it.
+ */
+export function countSignaturesLast7d(sigs: RpcSig[], nowMs: number): number {
+  const cutoff = nowMs - SEVEN_DAYS_MS
+  let count = 0
+  for (const sig of sigs) {
+    if (sig.blockTime !== null && sig.blockTime * 1000 >= cutoff) count++
+  }
+  return count
+}
+
+/**
+ * True when the tx7d figure above may under-count the real 7d cadence:
+ * either the signature list hit the per-wallet cap before exhausting the
+ * wallet's history, or the oldest harvested signature is still inside the
+ * 7d window (the window was never fully walked).
+ */
+export function isTx7dTruncated(
+  coverage: Pick<HarvestCoverage, 'truncated' | 'signatures'>,
+  nowMs: number,
+): boolean {
+  if (coverage.truncated) return true
+  const sigs = coverage.signatures ?? []
+  // No signatures at all proves nothing about the last-7d cadence.
+  if (sigs.length === 0) return true
+  const cutoff = nowMs - SEVEN_DAYS_MS
+  // Not truncated only when the harvest actually walked PAST the 7d
+  // boundary (at least one signature older than now-7d exists).
+  return !sigs.some((s) => s.blockTime !== null && s.blockTime * 1000 < cutoff)
+}
+
+/**
+ * Pure Solana `Transaction` row mapping for ONE proven buy leg.
+ * Only COMPLETE swaps with non-null historical USD qualify; token symbols
+ * are unknown from the parser, so they are deliberately '' (never invented).
+ * Returns null for anything that cannot be proven.
+ */
+export interface SolanaTransactionRow {
+  walletId: string
+  chain: 'solana'
+  txHash: string
+  value: number
+  amountUsd: number
+  tokenSymbol: string
+  tokenAddress: string
+  timestamp: Date
+}
+
+export function swapToTransactionRow(swap: NormalizedSwap, walletId = ''): SolanaTransactionRow | null {
+  // Same discipline as classifyBuy / buildBuyVolume30d: current-price legs
+  // are not cost basis and partial legs cannot prove their size.
+  if (swap.completeness !== 'complete') return null
+  if (swap.inputUsd === null) return null
+  if (swap.inputMint !== SOL_MINT) return null
+  if (!swap.outputMint || swap.outputMint === SOL_MINT) return null
+  if (
+    swap.limitations.includes('stalePrice-current-only') ||
+    swap.limitations.includes('historical-usd-unavailable')
+  ) {
+    return null
+  }
+  if (swap.timestamp === null || !Number.isFinite(swap.timestamp) || swap.timestamp <= 0) return null
+  return {
+    walletId,
+    chain: 'solana',
+    txHash: swap.transactionSignature,
+    value: swap.inputUsd,
+    amountUsd: swap.inputUsd,
+    tokenSymbol: '', // unknown from public RPC — never fabricated
+    tokenAddress: swap.outputMint,
+    timestamp: new Date(swap.timestamp),
+  }
+}
+
+export function isSolanaTransactionPersistEnabled(): boolean {
+  return (process.env.PERSIST_SOLANA_TRANSACTIONS ?? '').trim().toLowerCase() === 'true'
+}
+
+export interface SolanaTransactionPersistResult {
+  enabled: boolean
+  dryRun: boolean
+  /** Proven buy legs eligible for a Transaction row. */
+  eligible: number
+  persisted: number
+  failed: number
+}
+
+/**
+ * Idempotent, failure-isolated ingest of verified Solana buy legs into the
+ * Transaction table. Gated behind PERSIST_SOLANA_TRANSACTIONS (default
+ * false): without it, this is a dry-run that only reports what WOULD be
+ * persisted. Upsert key = (chain, txHash) → re-runs never double-insert.
+ */
+export async function persistSolanaTransactions(
+  walletId: string,
+  swaps: NormalizedSwap[],
+): Promise<SolanaTransactionPersistResult> {
+  const enabled = isSolanaTransactionPersistEnabled()
+  const eligible = swaps.filter((s) => swapToTransactionRow(s, walletId) !== null).length
+  if (!enabled) {
+    return { enabled: false, dryRun: true, eligible, persisted: 0, failed: 0 }
+  }
+  let persisted = 0
+  let failed = 0
+  for (const swap of swaps) {
+    const row = swapToTransactionRow(swap, walletId)
+    if (!row) continue
+    try {
+      await prisma.transaction.upsert({
+        where: { chain_txHash: { chain: row.chain, txHash: row.txHash } },
+        create: row,
+        update: {
+          value: row.value,
+          amountUsd: row.amountUsd,
+          tokenAddress: row.tokenAddress,
+          tokenSymbol: row.tokenSymbol,
+          timestamp: row.timestamp,
+        },
+      })
+      persisted++
+    } catch (e) {
+      // One bad row must never take down the classification batch.
+      failed++
+      console.warn(
+        `[wallet-refresh] Solana Transaction upsert failed for ${row.txHash.slice(0, 12)}: ` +
+          `${e instanceof Error ? e.message.slice(0, 120) : String(e)}`,
+      )
+    }
+  }
+  return { enabled: true, dryRun: false, eligible, persisted, failed }
+}
 
 // ─── Types ───────────────────────────────────────────────────
 export interface WalletRefreshCandidate {
@@ -49,6 +206,11 @@ export interface RefreshResult {
     rejectedEvents: number
     gaps: string[]
     complete30d: boolean
+  }
+  /** Honest 7d cadence lower-bound (see countSignaturesLast7d). */
+  tx7d?: {
+    count: number
+    truncated: boolean
   }
   classification?: {
     status: string
@@ -177,7 +339,10 @@ export function buildBuyVolume30d(swaps: NormalizedSwap[], nowMs: number): BuyVo
   const legs: BuyVolume30dInput['legs'] = []
   for (const s of swaps) {
     const isBuy = s.inputMint === SOL_MINT && s.outputMint !== SOL_MINT
-    const historical = s.inputUsd !== null && !s.limitations.includes('stalePrice-current-only')
+    const historical =
+      s.inputUsd !== null &&
+      !s.limitations.includes('stalePrice-current-only') &&
+      !s.limitations.includes('historical-usd-unavailable')
     if (isBuy && historical && s.completeness === 'complete' && s.inputUsd !== null) {
       legs.push({
         ts: s.timestamp ?? nowMs,
@@ -207,23 +372,44 @@ export async function refreshOneWallet(candidate: WalletRefreshCandidate): Promi
     const built = buildEpisodes(swaps)
     const trades = toTradeEpisodes(built.episodes)
 
+    const nowMs = Date.now()
+    const tx7d = countSignaturesLast7d(coverage.signatures, nowMs)
+    const tx7dTruncated = isTx7dTruncated(coverage, nowMs)
+    const clusterDataAvailable = resolveClusterDataAvailable()
+
     const [positions, portfolio] = await Promise.all([
       fetchPositions(candidate.address),
       buildPortfolioSnapshot(),
     ])
-    const buyVol = buildBuyVolume30d(swaps, Date.now())
+    const buyVol = buildBuyVolume30d(swaps, nowMs)
     const whale = buildWhaleEvidence(positions, portfolio, buyVol, null, SMART_MONEY_DEFAULTS)
 
     const input: ClassifyInput = {
       episodes: trades,
       whale: whale.evidence,
-      tx7d: null,
+      // PROVEN LOWER BOUND, not an exact 7d on-chain total: the public RPC
+      // signature list is capped at HARVEST_LIMIT. The truncation flag below
+      // makes the classifier say "N+" instead of "N".
+      tx7d,
+      tx7dTruncated,
       distinctTokensTraded: new Set(trades.map((t) => t.token)).size,
       feeComplete: trades.length > 0 && trades.every((t) => t.feeKnown),
-      clusterDataAvailable: false,
+      // Public RPC does NOT provide cluster/wash-trade data. Default false
+      // (operator can opt in via CLUSTER_DATA_AVAILABLE) so the limitation
+      // is recorded rather than silently assuming clean trades.
+      clusterDataAvailable,
     }
     const out = classifyWallet(input)
     const status = await persistWalletClassification(candidate.walletId, input)
+
+    // Audit item #6: only persist verified buy legs, gated by operator opt-in.
+    const txPersist = await persistSolanaTransactions(candidate.walletId, swaps)
+    if (txPersist.dryRun) {
+      console.log(
+        `[wallet-refresh] Solana tx persist dry-run for ${candidate.address.slice(0, 8)}: ` +
+          `${txPersist.eligible} eligible of ${swaps.length} swaps — set PERSIST_SOLANA_TRANSACTIONS=true to write`,
+      )
+    }
 
     await prisma.wallet.update({
       where: { id: candidate.walletId },
@@ -241,6 +427,7 @@ export async function refreshOneWallet(candidate: WalletRefreshCandidate): Promi
         gaps: coverage.gaps,
         complete30d: coverage.complete30d,
       },
+      tx7d: { count: tx7d, truncated: tx7dTruncated },
       classification: {
         status,
         pnl30d: out.pnl30d,

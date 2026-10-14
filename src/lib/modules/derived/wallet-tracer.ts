@@ -340,6 +340,7 @@ async function traceOnce(
           episodes: trades,
           whale: { maxSinglePositionUsd: null, portfolioUsd: null, buyVolume30dUsd: null },
           tx7d: null,
+          tx7dTruncated: false,
           distinctTokensTraded: new Set(trades.map((t) => t.token)).size,
           feeComplete: trades.every((t) => t.feeKnown),
           clusterDataAvailable: false,

@@ -68,7 +68,9 @@ export function classifyBuy(
   if (s.completeness !== 'complete') return { ok: false, reason: `completeness=${s.completeness}` }
   if (s.inputMint !== SOL_MINT) return { ok: false, reason: 'not-sol-leg' }
   if (!s.outputMint || s.outputMint === SOL_MINT) return { ok: false, reason: 'sol-to-sol-or-empty' }
-  if (s.limitations.includes('stalePrice-current-only')) return { ok: false, reason: 'current-price-not-historical' }
+  if (s.limitations.includes('stalePrice-current-only') || s.limitations.includes('historical-usd-unavailable')) {
+    return { ok: false, reason: 'current-price-not-historical' }
+  }
   if (s.inputUsd === null) return { ok: false, reason: 'missing-historical-usd' }
   if (s.walletAddress !== walletAddress) return { ok: false, reason: 'wallet-mismatch' }
   return { ok: true, amountUsd: s.inputUsd }

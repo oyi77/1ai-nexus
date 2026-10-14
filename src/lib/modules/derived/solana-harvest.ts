@@ -73,6 +73,14 @@ export interface HarvestCoverage {
   gaps: string[];
   sources: string[];
   complete30d: boolean;
+  /**
+   * True when getSignaturesForAddress hit the per-wallet cap before the
+   * 30d window was fully walked. Every count derived from this harvest is
+   * then a proven LOWER BOUND, never an exact total.
+   */
+  truncated: boolean;
+  /** Raw signature-page rows (blockTime) so callers can derive honest 7d cadence counts. */
+  signatures: RpcSig[];
 }
 
 export interface RpcSig {
@@ -294,7 +302,16 @@ export function parseSolanaTransaction(
   }];
 }
 
-/** Current-price USD fill (Jupiter v3). Marks stalePrice — never historical. */
+/**
+ * Current-price USD fill (Jupiter v3). Marks stalePrice — never historical.
+ *
+ * LIMITATION (honest): the free public RPC/Jupiter path cannot reconstruct
+ * the USD value at trade time. `JUP_PRICE_URL` returns the CURRENT price
+ * only, so any `inputUsd`/`outputUsd`/`feeUsd` written here is a
+ * current-price mark-to-market, NOT historical cost basis. Both flags are
+ * added deliberately and downstream gates (buildBuyVolume30d, classifyBuy)
+ * MUST keep rejecting `stalePrice-current-only` legs — do not weaken.
+ */
 export async function fillCurrentUsd(swaps: NormalizedSwap[]): Promise<void> {
   const f = http();
   const mints = [...new Set(swaps.flatMap((s) => [s.inputMint, s.outputMint]))]
@@ -337,6 +354,11 @@ export async function fillCurrentUsd(swaps: NormalizedSwap[]): Promise<void> {
     if (s.feeNative !== null && solUsd !== null) s.feeUsd = s.feeNative * solUsd;
     if (!s.limitations.includes('stalePrice-current-only')) s.limitations.push('stalePrice-current-only');
     if (!s.limitations.includes('current-price-not-historical')) s.limitations.push('current-price-not-historical');
+    // Audit item #6: explicit, machine-readable limitation for swaps whose
+    // USD came from Jupiter CURRENT price. Historical USD is simply not
+    // available from the free sources; this flag records that instead of
+    // silently treating current price as cost basis.
+    if (!s.limitations.includes('historical-usd-unavailable')) s.limitations.push('historical-usd-unavailable');
     // NEVER promote partial→complete from current Jupiter price: current ≠ historical.
   }
 }
@@ -448,6 +470,8 @@ export async function harvestWallet(
       validEvents: valid, rejectedEvents: rejected, gaps,
       sources: ['solana-rpc:mainnet-beta'],
       complete30d,
+      truncated,
+      signatures: sigs,
     },
   };
 }
