@@ -96,6 +96,19 @@ function seenPath(): string {
   return process.env.SNIPER_SEEN_PATH || join(process.cwd(), 'data', 'sniper-seen.json')
 }
 
+// Discovery pre-filter floors (spec C / audit finding F2 #1). These are
+// env-configurable because no documented criteria threshold exists for a
+// discovery-time MC/liquidity floor — they are NOT invented screening rules,
+// just a spam gate upstream of the evaluator.
+function sniperPrefilterFloors(): { minMcUsd: number; minLiqUsd: number } {
+  const mc = Number(process.env.SNIPER_MIN_MARKET_CAP_USD)
+  const liq = Number(process.env.SNIPER_MIN_LIQUIDITY_USD)
+  return {
+    minMcUsd: Number.isFinite(mc) && mc >= 0 ? mc : 5_000,
+    minLiqUsd: Number.isFinite(liq) && liq >= 0 ? liq : 2_000,
+  }
+}
+
 export function readSeenState(): Record<string, number> {
   try {
     const p = seenPath()
@@ -541,37 +554,86 @@ function unionCandidates(
   return [...byKey.values()]
 }
 
+export interface PrefilterResult {
+  kept: SniperEnrichedToken[]
+  skipped: number
+  unknownMc: number
+  unknownLiq: number
+}
+
+/**
+ * Pure discovery pre-filter. Removes only PROVEN junk: a known market cap
+ * below the floor or a known liquidity below the floor. UNKNOWN (null/zero)
+ * values are counted separately and passed through — the evaluator already
+ * treats them as unproven; this gate must not silently drop them.
+ */
+export function prefilterCandidates(
+  candidates: readonly SniperEnrichedToken[],
+  floors: { minMcUsd: number; minLiqUsd: number },
+): PrefilterResult {
+  const kept: SniperEnrichedToken[] = []
+  let skipped = 0
+  let unknownMc = 0
+  let unknownLiq = 0
+  for (const t of candidates) {
+    const mc = typeof t.marketCap === 'number' && Number.isFinite(t.marketCap) && t.marketCap > 0 ? t.marketCap : null
+    const liq = typeof t.liquidity === 'number' && Number.isFinite(t.liquidity) && t.liquidity > 0 ? t.liquidity : null
+    if (mc === null) unknownMc++
+    if (liq === null) unknownLiq++
+    if (mc !== null && mc < floors.minMcUsd) { skipped++; continue }
+    if (liq !== null && liq < floors.minLiqUsd) { skipped++; continue }
+    kept.push(t)
+  }
+  return { kept, skipped, unknownMc, unknownLiq }
+}
+
 async function discoverCombined(limit: number): Promise<SniperEnrichedToken[]> {
   const mode = discoverMode()
+  let candidates: SniperEnrichedToken[] = []
   // Wallet buys are the strongest intent signal we own: a classified wallet
   // already put real money in BEFORE any list ranks it. Runs first in wallet
   // mode and as an opportunistic union member in auto mode.
   if (mode === 'wallet' || mode === 'auto') {
     try {
       const buys = await discoverWalletBuys(limit)
-      if (buys.length > 0 && mode === 'wallet') return buys
-      if (buys.length > 0) {
+      if (buys.length > 0 && mode === 'wallet') {
+        candidates = buys
+      } else if (buys.length > 0) {
         const api = await discoverApiOnly(limit)
-        return unionCandidates(buys, api).slice(0, limit)
+        candidates = unionCandidates(buys, api)
       }
     } catch { /* wallet artifact is opportunistic — market lists fallback */ }
   }
   // Operator call-feed is the fastest attention signal: a token called by
   // 3+ independent channels is worth auditing before the API lists catch up.
-  if (mode === 'call-feed' || mode === 'auto') {
+  if (candidates.length === 0 && (mode === 'call-feed' || mode === 'auto')) {
     try {
       const feed = await discoverCallFeed(limit)
       if (feed.length > 0) {
-        if (mode === 'call-feed') return feed
-        // auto: union feed + API lists, feed-listed contracts first. An
-        // overlap is merged (feed evidence + API market snapshot), not
-        // dropped — the API row often carries the live m5 flow the feed lacks.
-        const api = await discoverApiOnly(limit)
-        return unionCandidates(feed, api).slice(0, limit)
+        if (mode === 'call-feed') {
+          candidates = feed
+        } else {
+          // auto: union feed + API lists, feed-listed contracts first. An
+          // overlap is merged (feed evidence + API market snapshot), not
+          // dropped — the API row often carries the live m5 flow the feed lacks.
+          const api = await discoverApiOnly(limit)
+          candidates = unionCandidates(feed, api)
+        }
       }
     } catch { /* feed is opportunistic — API lists are the fallback */ }
   }
-  return discoverApiOnly(limit)
+  if (candidates.length === 0) candidates = await discoverApiOnly(limit)
+
+  // Upstream spam gate: drop only PROVEN junk before audit/evaluation. A
+  // known MC/liquidity below the floor never reaches the evaluator, audit
+  // trail, or delivery log; null stays because UNKNOWN is the evaluator's
+  // job to score as unproven, not ours to delete.
+  const floors = sniperPrefilterFloors()
+  const pre = prefilterCandidates(candidates, floors)
+  console.log(
+    `[sniper] pre-filter: skipped=${pre.skipped} unknown-mc=${pre.unknownMc} unknown-liq=${pre.unknownLiq} kept=${pre.kept.length}`,
+  )
+  return pre.kept.slice(0, limit)
 }
 
 async function discoverApiOnly(limit: number): Promise<SniperEnrichedToken[]> {
