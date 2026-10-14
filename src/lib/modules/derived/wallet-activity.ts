@@ -43,6 +43,7 @@ import {
   parseSolanaTransaction,
   type NormalizedSwap,
 } from '@/lib/modules/derived/solana-harvest'
+import { normalizeSolMint } from '@/lib/modules/derived/solana-mint'
 import { gmgnFetch } from '@/lib/modules/meme/gmgn'
 
 export interface WalletActivityCoverage {
@@ -130,7 +131,7 @@ export function mapGmgnActivityToSwap(wallet: string, row: GmgnActivityRow, nowM
   }
   const event = (row.event_type ?? '').toLowerCase()
   const tokenMint = row.token?.address ?? ''
-  const quoteMint = row.quote_token?.token_address ?? row.quote_address ?? SOL_MINT
+  const quoteMint = normalizeSolMint(row.quote_token?.token_address ?? row.quote_address ?? SOL_MINT)
   const tokenAmount = num(row.token_amount)
   const quoteAmount = num(row.quote_amount)
 
