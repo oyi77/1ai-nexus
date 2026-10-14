@@ -27,15 +27,36 @@ interface SmartMoneySignal {
 
 interface TopWallet {
   address: string
+  chain?: string
   label: string
   type: string
   score: number
+  status?: string | null
+  confidence?: string | null
   pnl30d: number
   winRate: number
   tradeCount: number
+  sampleCount: number
   avgSize: number
   sparkline: number[]
   [key: string]: unknown
+}
+
+const STATUS_FILTER_TABS: readonly { label: string; value: string }[] = [
+  { label: 'All', value: 'all' },
+  { label: 'Smart Money', value: 'QUALIFIED_SMART_MONEY' },
+  { label: 'Whale', value: 'WHALE' },
+  { label: 'Provisional', value: 'PROVISIONAL' },
+  { label: 'Watchlist', value: 'WATCHLIST' },
+]
+
+const STATUS_BADGE_CLASSES: Record<string, string> = {
+  QUALIFIED_SMART_MONEY: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono px-1.5 py-0.5 rounded font-bold',
+  WHALE: 'bg-purple-500/20 text-purple-400 border border-purple-500/30 text-[10px] font-mono px-1.5 py-0.5 rounded font-bold',
+  WHALE_AND_SMART_MONEY: 'bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px] font-mono px-1.5 py-0.5 rounded font-bold',
+  WATCHLIST: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-[10px] font-mono px-1.5 py-0.5 rounded font-bold',
+  PROVISIONAL: 'bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-mono px-1.5 py-0.5 rounded font-bold',
+  DISQUALIFIED: 'bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-mono px-1.5 py-0.5 rounded font-bold',
 }
 
 export function SmartMoneyPageContent() {
@@ -65,32 +86,38 @@ function SmartMoneyPageInner() {
   const [cohortSignals, setCohortSignals] = useState<CohortSignal[]>([])
   const [feedStatus, setFeedStatus] = useState<'live' | 'stale' | 'error'>('live')
   const [filterAction, setFilterAction] = useState<string>('all')
+  const [selectedStatus, setSelectedStatus] = useState<string>('all')
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (selectedStatus = 'all') => {
+    const status = selectedStatus
     try {
       const [smRes, copyTradeRes, cohortRes] = await Promise.allSettled([
-        fetch('/api/v1/smart-money?pageSize=20').then(r => r.json()),
+        fetch('/api/v1/smart-money?pageSize=20' + (status !== 'all' ? '&status=' + status : '')).then(r => r.json()),
         fetch('/api/v1/copy-trade?limit=10').then(r => r.json()),
         fetch('/api/v1/cohorts').then(r => r.json()),
       ])
 
       if (smRes.status === 'fulfilled' && smRes.value?.data) {
         setTopWallets(smRes.value.data.map((w: Record<string, unknown>, i: number) => {
-          const wallet = w.wallet as Record<string, unknown> || {}
+          const wallet = (w.wallet as Record<string, unknown>) || {}
+          const sampleCount = (w.sampleCount as number) || (w.tradeCount as number) || 0
           return {
             address: (wallet.address as string || `wallet-${i}`).slice(0, 20),
+            chain: (wallet.chain as string) || undefined,
             label: (wallet.labels as string[])?.[0] || w.category as string || 'Smart Money',
             type: (w.category as string || 'unknown').toLowerCase(),
-            score: w.score as number || 0,
+            score: (w.score as number) || 0,
+            status: (w.status as string | null) ?? null,
+            confidence: (w.confidence as string | null) ?? null,
             pnl30d: (w.pnl30d as number) || 0,
             winRate: (w.winRate as number) || 0,
             tradeCount: (w.tradeCount as number) || 0,
+            sampleCount,
             avgSize: (w.avgTradeSize as number) || 0,
-            sparkline: Array.isArray(w.sparkline) ? w.sparkline as number[] : [],
+            sparkline: Array.isArray(w.sparkline) ? (w.sparkline as number[]) : [],
           }
         }))
       }
-
       if (copyTradeRes.status === 'fulfilled' && copyTradeRes.value?.data) {
         setSignals(copyTradeRes.value.data.map((s: Record<string, unknown>, i: number) => ({
           id: s.id as string || `sig-${i}`,
@@ -120,11 +147,13 @@ function SmartMoneyPageInner() {
   }, [])
 
   useEffect(() => {
-    const invoke = () => fetchData()
-    invoke()
-    const interval = setInterval(fetchData, 15_000)
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchData(selectedStatus)
+    const interval = setInterval(() => {
+      void fetchData(selectedStatus)
+    }, 15_000)
     return () => clearInterval(interval)
-  }, [fetchData])
+  }, [fetchData, selectedStatus])
 
   const filteredSignals = filterAction === 'all'
     ? signals
@@ -208,6 +237,20 @@ function SmartMoneyPageInner() {
       header: 'Address',
       width: 120,
       render: (row) => <span className="font-mono text-text-primary">{row.address}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      width: 130,
+      render: (row) => {
+        const status = row.status || 'UNKNOWN'
+        const badgeClass = STATUS_BADGE_CLASSES[status] || 'bg-zinc-700/30 text-zinc-400 text-[10px] font-mono px-1.5 py-0.5 rounded'
+        return (
+          <span className={badgeClass}>
+            {status}
+          </span>
+        )
+      },
     },
     {
       key: 'score',
@@ -299,11 +342,30 @@ function SmartMoneyPageInner() {
             liveStatus={feedStatus}
             maxHeight={500}
           >
+            <div className="px-3 py-2 border-b border-bg-border/60 flex flex-wrap items-center gap-1 text-xs font-mono">
+              <span className="text-text-muted text-[11px] mr-1">Status:</span>
+              {STATUS_FILTER_TABS.map(tab => (
+                <button
+                  key={tab.value}
+                  onClick={() => {
+                    setSelectedStatus(tab.value)
+                    void fetchData(tab.value)
+                  }}
+                  className={`px-2 py-0.5 rounded text-[11px] transition-colors ${
+                    selectedStatus === tab.value
+                      ? 'bg-teal-dim/30 text-teal-vivid font-bold'
+                      : 'text-text-muted hover:text-text-secondary hover:bg-bg-raised'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
             <DataTable
               columns={walletColumns}
               data={topWallets}
-            filterable
-            filterPlaceholder="Filter wallets…"
+              filterable
+              filterPlaceholder="Filter wallets…"
               sortable
               rowHeight={28}
               emptyState={<div className="text-text-muted text-xs p-4">Loading wallet rankings...</div>}

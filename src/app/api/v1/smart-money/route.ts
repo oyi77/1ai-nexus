@@ -7,7 +7,16 @@ import { apiError, apiPaginated } from "@/lib/api/response";
 
 import { checkRateLimit } from "@/lib/api/rate-limit";
 
-const SMART_MONEY_SORT_FIELDS = new Set(["score", "addedAt", "category"]);
+const SMART_MONEY_SORT_FIELDS = new Set([
+  "score",
+  "addedAt",
+  "category",
+  "pnl30d",
+  "winRate",
+  "status",
+  "sampleCount",
+  "classifiedAt",
+]);
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,6 +30,9 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1") || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "50") || 50));
     const category = searchParams.get("category");
+    const status = searchParams.get("status");
+    const chain = searchParams.get("chain");
+    const minScore = searchParams.get("minScore");
     const sort = searchParams.get("sort") || "score";
     const order = searchParams.get("order") || "desc";
 
@@ -29,7 +41,22 @@ export async function GET(request: NextRequest) {
 
     const where: Prisma.SmartMoneyWalletWhereInput = {};
     if (category) where.category = category;
-
+    if (status && status !== "all") {
+      if (status === "classified") {
+        where.status = { not: null };
+      } else {
+        where.status = status;
+      }
+    }
+    if (chain) {
+      where.wallet = { is: { chain } };
+    }
+    if (minScore) {
+      const parsed = parseFloat(minScore);
+      if (!Number.isNaN(parsed)) {
+        where.score = { gte: parsed };
+      }
+    }
     const [wallets, total] = await Promise.all([
       prisma.smartMoneyWallet.findMany({
         where,
