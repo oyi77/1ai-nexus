@@ -143,9 +143,6 @@ async function main() {
   }
 
   console.log(`[tidy-whale-sheet] total rows=${rows.length}`)
-  for (const [i, row] of rows.slice(0, 5).map(toSheetRow).entries()) {
-    console.log(`[tidy-whale-sheet] row ${i + 1}: ${JSON.stringify(row)}`)
-  }
 
   if (!writeEnabled) {
     console.log('[tidy-whale-sheet] dry-run — set TIDY_WHALE_SHEET_WRITE=true to write')

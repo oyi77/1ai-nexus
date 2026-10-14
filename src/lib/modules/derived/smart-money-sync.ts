@@ -22,6 +22,10 @@
 // block the Telegram alert path.
 // ─────────────────────────────────────────────────────────────
 
+import { execSync } from 'node:child_process'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { prisma } from '@/lib/db'
 
 /** The operator's spreadsheet ID (from the shared link). */
@@ -65,7 +69,6 @@ let gogPath: string | null | undefined
 function getGogPath(): string | null {
   if (gogPath !== undefined) return gogPath
   try {
-    const { execSync } = require('node:child_process') as typeof import('node:child_process')
     const result = execSync('which gog 2>/dev/null || echo ""', { encoding: 'utf8', timeout: 3000 }).trim()
     gogPath = result || null
   } catch {
@@ -139,11 +142,6 @@ async function getGogAccessToken(): Promise<string | null> {
 
   try {
     // Step 1: Decrypt keyring → get refresh token
-    const { execSync } = require('node:child_process') as typeof import('node:child_process')
-    const fs = require('node:fs') as typeof import('node:fs')
-    const os = require('node:os') as typeof import('node:os')
-    const path = require('node:path') as typeof import('node:path')
-
     // Write decrypt script to temp file (avoids shell escaping issues with -c)
     const scriptPath = path.join(os.tmpdir(), 'gog-keyring-decrypt.py')
     fs.writeFileSync(scriptPath, GOG_KEYRING_DECRYPT_SCRIPT, { mode: 0o600 })
@@ -214,6 +212,8 @@ export interface SheetsApi {
   get(range: string): Promise<string[][]>
   append(range: string, values: unknown[][]): Promise<boolean>
   update(range: string, values: unknown[][]): Promise<boolean>
+  /** Clear values in `range` (POST values:clear). Empty string clears all. */
+  clear(range: string): Promise<boolean>
   batchUpdate(requests: unknown[]): Promise<boolean>
 }
 
@@ -249,6 +249,13 @@ export async function getSheetsApi(): Promise<SheetsApi | null> {
       const res = await fetch(
         `${baseUrl}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,
         { method: 'PUT', headers, body: JSON.stringify({ values }) },
+      )
+      return res.ok
+    },
+    async clear(range: string): Promise<boolean> {
+      const res = await fetch(
+        `${baseUrl}/values/${encodeURIComponent(range)}:clear`,
+        { method: 'POST', headers },
       )
       return res.ok
     },
