@@ -51,6 +51,8 @@ import {
 } from '@/lib/modules/derived/candidate-trust'
 
 import { profilesForPhase } from '@/lib/modules/derived/sniper-criteria'
+import { toSniperGate, assessDevHistory, type DevHistoryVerdict } from '@/lib/modules/derived/dev-history'
+import { fetchDevTokenHistory } from '@/lib/modules/meme/solpump/dev-tokens'
 import { auditRugcheckToken } from '@/lib/modules/meme/rugcheck'
 import { auditBirdeyeToken } from '@/lib/modules/meme/birdeye'
 import { auditGmgnToken } from '@/lib/modules/meme/gmgn'
@@ -591,6 +593,12 @@ export interface SniperScanDeps {
    * at WATCHLIST via the evaluator's absent-evidence rule).
    */
   smartMoney?: (chain: string, contract: string) => Promise<SmartMoneyEvidence>
+  /**
+   * Developer deploy-history classifier (anti-rug). Injectable so tests
+   * stay offline; the default assesses via the solpump dev-tokens
+   * endpoint. Consulted only when SNIPER_DEV_HISTORY_GATE=true.
+   */
+  devHistory?: (chain: string, contract: string) => Promise<DevHistoryVerdict>
 }
 
 type DiscoverMode = 'auto' | 'api' | 'call-feed' | 'wallet'
@@ -598,6 +606,55 @@ type DiscoverMode = 'auto' | 'api' | 'call-feed' | 'wallet'
 function discoverMode(): DiscoverMode {
   const v = (process.env.SNIPER_DISCOVER_MODE || 'auto').toLowerCase()
   return v === 'api' || v === 'call-feed' || v === 'wallet' ? v : 'auto'
+}
+
+// ─── Dev-history gate (anti-rug, opt-in) ────────────────────────
+// SNIPER_DEV_HISTORY_GATE="true" turns the gate on; default OFF keeps the
+// existing pipeline byte-for-byte. The lookup (solpump dev-tokens endpoint)
+// is expensive per candidate, so verdicts are memoized per dev for 30 min
+// (max 500 entries, oldest evicted) — one dev minting 5 tokens in a scan
+// window costs ONE fetch, not five.
+
+const DEV_HISTORY_TTL_MS = 30 * 60_000
+const DEV_HISTORY_MAX_ENTRIES = 500
+const devHistoryMemo = new Map<string, { verdict: DevHistoryVerdict; at: number }>()
+
+/** Test hook: clear the in-memory dev-history memo cache. */
+export function __resetDevHistoryMemoForTests(): void {
+  devHistoryMemo.clear()
+}
+
+function devHistoryGateEnabled(): boolean {
+  return process.env.SNIPER_DEV_HISTORY_GATE === 'true'
+}
+
+/**
+ * Memoized verdict for the candidate's contract. Failure payloads
+ * ({ devAddress: null, tokens: [] }) are cached too — an endpoint outage
+ * must not multiply into one fetch per candidate per pass.
+ */
+async function memoizedDevHistory(
+  chain: string,
+  contract: string,
+  fetcher: (chain: string, contract: string) => Promise<DevHistoryVerdict>,
+): Promise<DevHistoryVerdict> {
+  const key = `${chain}:${contract}`
+  const hit = devHistoryMemo.get(key)
+  if (hit && Date.now() - hit.at < DEV_HISTORY_TTL_MS) return hit.verdict
+  const verdict = await fetcher(chain, contract)
+  if (devHistoryMemo.size >= DEV_HISTORY_MAX_ENTRIES) {
+    // Map preserves insertion order — the first key is the oldest entry.
+    const oldest = devHistoryMemo.keys().next().value
+    if (oldest !== undefined) devHistoryMemo.delete(oldest)
+  }
+  devHistoryMemo.set(key, { verdict, at: Date.now() })
+  return verdict
+}
+
+/** Live dep: classify via the solpump dev-tokens adapter (pure judge). */
+async function liveDevHistory(chain: string, contract: string): Promise<DevHistoryVerdict> {
+  const input = await fetchDevTokenHistory(chain, contract)
+  return assessDevHistory(input)
 }
 
 /**
@@ -774,6 +831,7 @@ const LIVE_DEPS: SniperScanDeps = {
   audit: collectAudits,
   deliver: (text: string, replyMarkup?: ContractButtons) => deliverSniperAlert(text, undefined, replyMarkup),
   smartMoney: liveSmartMoney,
+  devHistory: liveDevHistory,
 }
 
 export interface SniperScanDecision extends SniperDecision {
@@ -873,6 +931,50 @@ export async function runSniperScan(
 
   for (const token of candidates) {
     try {
+      // Anti-rug pre-gate (opt-in): a dev with a proven serial-rugger/
+      // suspect deploy history is rejected BEFORE the audit fan-out, so
+      // three upstream API calls are never spent on a doomed candidate.
+      // UNPROVEN passes — a brand-new dev is unjudged, not guilty; the
+      // security/momentum gates still judge the token itself.
+      let devHistoryRejection: string | null = null
+      if (devHistoryGateEnabled() && deps.devHistory) {
+        const verdict = await memoizedDevHistory(token.chain, token.contract, deps.devHistory)
+        const gate = toSniperGate(verdict)
+        if (!gate.ok) {
+          devHistoryRejection = `[dev-history] ${gate.rejection}: ${verdict.reasons[0]}`
+        }
+      }
+      if (devHistoryRejection) {
+        decisions.push({
+          status: 'REJECT',
+          rationale: devHistoryRejection,
+          rejections: [devHistoryRejection],
+          warnings: [],
+          metrics: {} as SniperDecision['metrics'],
+          alert: '',
+          contract: token.contract,
+          ticker: token.symbol,
+          deduped: false,
+          delivered: false,
+          auditsUsed: [],
+          tier: 'REJECT',
+          tierReasons: ['dev-history gate'],
+          tierMissing: [],
+          smartMoneyBuyers: 0,
+          smartMoneyStrongest: null,
+          smartMoneySource: 'none',
+          discoveryCategory: resolveCategory(token.discoveryEvidence),
+          discoveryEvidence: token.discoveryEvidence ?? [],
+          market: {
+            marketCapUsd: token.marketCap > 0 ? token.marketCap : null,
+            liquidityUsd: token.liquidity > 0 ? token.liquidity : null,
+            volume5mUsd: token.volume5m && token.volume5m > 0 ? token.volume5m : null,
+            priceUsd: token.price > 0 ? token.price : null,
+          },
+        })
+        console.log(`[sniper] dev-history reject: ${token.contract.slice(0, 8)} — ${devHistoryRejection}`)
+        continue
+      }
       const audits = await deps.audit(token.chain, token.contract)
       const { payload, warnings: identityWarnings, auditsAccepted } = toSniperPayload(token, audits)
       // Wallet-DB confirmation is evidence, never a substitute for security.
