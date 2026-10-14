@@ -37,6 +37,7 @@ import { discoverFomoTokens, auditFomoToken } from './fomo'
 import { auditToken as auditAxiomToken } from './axiom'
 import { discoverAlphTokens, auditAlphToken } from './alph'
 import { discoverAlphioTokens, auditAlphioToken, hasAlphioAuth } from './alphio'
+import { discoverSolpumpTokens } from './solpump'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -241,6 +242,9 @@ const alphioDiscovery = makeDiscoveryModule('alphio-meme', 'Alphio Meme Alpha', 
 const alphioAudit = makeAuditModule('alphio-meme-risk', 'Alphio Meme Risk Audit', (c, k) =>
   auditAlphioToken(c, k),
 )
+const solpumpDiscovery = makeDiscoveryModule('solpump-meme', 'Solpump X Meme Alpha', (limit) =>
+  discoverSolpumpTokens(limit),
+)
 
 // Blocked server-side (browser-session / Cloudflare) — disabled stubs so
 // pages/APIs can enumerate them without a live module.
@@ -398,6 +402,17 @@ const registry: Record<MemePlatform, MemePlatformEntry> = {
     auditModule: alphioAudit,
     ttlMs: MEME_TTL,
     enabled: hasAlphioAuth(),
+  },
+  // Solpump — X/Twitter KOL event feed (keyless public; opt-in via
+  // SOLPUMP_X_ENABLED="true"). Discovery: token-linked tweet events.
+  // No audit module — Solpump's twitter token object carries price/mcap
+  // but no rugcheck/honeypot data.
+  solpump: {
+    platform: 'solpump',
+    displayName: 'Solpump X',
+    discoveryModule: solpumpDiscovery,
+    ttlMs: MEME_TTL,
+    enabled: process.env.SOLPUMP_X_ENABLED === 'true',
   },
 }
 

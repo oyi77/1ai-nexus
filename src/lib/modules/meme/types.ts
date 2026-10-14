@@ -6,7 +6,7 @@
 //   2. Honeypot / rug audit  (risk scoring before you ape in)
 // ─────────────────────────────────────────────────────────────
 
-export type MemePlatform = 'bitget' | 'gate' | 'moby' | 'botx' | 'dexscreener' | 'birdeye' | 'rugcheck' | 'geckoterminal' | 'gmgn' | 'fomo' | 'photon' | 'nansen' | 'axiom' | 'alph' | 'alphio'
+export type MemePlatform = 'bitget' | 'gate' | 'moby' | 'botx' | 'dexscreener' | 'birdeye' | 'rugcheck' | 'geckoterminal' | 'gmgn' | 'fomo' | 'photon' | 'nansen' | 'axiom' | 'alph' | 'alphio' | 'solpump'
 
 export const MEME_PLATFORMS: MemePlatform[] = [
   'bitget',
@@ -36,6 +36,9 @@ export const MEME_PLATFORMS: MemePlatform[] = [
   // alphio — member API (api.alphio.ai, Bearer session); richer pre-computed
   // concentration/score rows than the keyless `alph` gateway. Self-gates.
   'alphio',
+  // solpump — X/Twitter KOL event feed (keyless public; opt-in via
+  // SOLPUMP_X_ENABLED="true"). Discovery: token-linked tweet events.
+  'solpump',
 ]
 
 /** Normalized new-token discovery row — shared across platforms. */
