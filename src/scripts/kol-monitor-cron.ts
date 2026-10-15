@@ -24,6 +24,10 @@
 //   */5 * * * * cd /home/openclaw/projects/1ai-tracker && npm run cron:kol-monitor >> /tmp/kol-monitor.log 2>&1
 //
 // Env:
+//   KOL_MONITOR_ENABLED — "true" to enable the cron at all (default OFF).
+//                          Mirrors SNIPER_CONFLUENCE_ENABLED / SNIPER_REALTIME_ENABLED:
+//                          the entire script (KOLScan + Axiom + Telegram) is a no-op
+//                          unless the literal "true".
 //   KOLSCAN_SESSION — kolscan.io session cookie (required for KOLScan feed)
 //   KOLSCAN_ENABLED — "true" to enable KOLScan source (default: false)
 // -------------------------------------------------------------
@@ -90,7 +94,26 @@ async function buildWinRateMap(): Promise<Map<string, number | null>> {
   return wrMap
 }
 
+/** Operator DM chain — mirrors reviewChatId() in confluence-cron.ts and
+ * paper-buy-cron.ts; deliberately does NOT fall back to the sale channel. */
+function reviewChatId(): string {
+  return (
+    process.env.SNIPER_REVIEW_CHAT_ID ||
+    process.env.HUB_TELEGRAM_OWNER_CHAT_ID ||
+    process.env.TELEGRAM_ADMIN_CHAT_ID ||
+    ''
+  )
+}
+
 async function main() {
+  // Master env gate (mirrors SNIPER_CONFLUENCE_ENABLED in confluence-cron.ts):
+  // the whole cron — KOLScan feed, Axiom scan, Telegram digest — is a no-op
+  // unless the literal "true". Nothing here may reach the sale channel unopted-in.
+  if (process.env.KOL_MONITOR_ENABLED !== 'true') {
+    console.log("[kol-monitor] disabled (KOL_MONITOR_ENABLED != 'true')")
+    return
+  }
+
   const dir = join(process.cwd(), 'data')
   await mkdir(dir, { recursive: true })
   const artifactPath = process.env.WALLET_BUYS_PATH || join(dir, 'wallet-buys-latest.json')
@@ -260,8 +283,13 @@ async function main() {
     })),
   })
   if (digest) {
-    const sent = await deliverSniperAlert(digest)
-    console.log(`[kol-monitor] telegram digest ${sent ? 'sent' : 'rejected/unconfigured'}`)
+    const chat = reviewChatId()
+    if (chat) {
+      const sent = await deliverSniperAlert(digest, chat)
+      console.log(`[kol-monitor] telegram digest ${sent ? 'sent' : 'rejected/unconfigured'} to review chat`)
+    } else {
+      console.log('[kol-monitor] telegram digest skipped (no review chat configured)')
+    }
   } else {
     console.log('[kol-monitor] no new gate passers — skipping telegram digest')
   }
