@@ -12,26 +12,27 @@ import 'dotenv/config'
 import { checkAllFeeds, checkFeedMarkup } from '@/lib/feed-health'
 import { prisma } from '@/lib/db'
 import { sendTelegramAlert } from '@/lib/telegram/bot'
+import { loadStateMeta, saveStateMeta } from '@/lib/modules/derived/db-state-meta'
 
 const ADMIN_CHAT = process.env.FEED_ALERT_CHAT_ID || process.env.TELEGRAM_ADMIN_CHAT_ID || ''
-const DATA_DIR = process.cwd() + '/data'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-mkdirSync(DATA_DIR, { recursive: true })
-const PREV_PATH = DATA_DIR + '/feed-health-prev.json'
 
 interface PrevReport { working: number; failedIds: string[] }
 
-function readPrev(): PrevReport | null {
-  try { return JSON.parse(readFileSync(PREV_PATH, 'utf8')) } catch { return null }
+const SCOPE = 'feed-health-prev'
+
+async function readPrev(): Promise<PrevReport | null> {
+  // DB-primary (2026-10-15): StateMeta first, legacy JSON fallback inside the store.
+  return loadStateMeta<PrevReport>(SCOPE)
 }
-function writePrev(r: { working: number; failedIds: string[] }) {
-  writeFileSync(PREV_PATH, JSON.stringify(r, null, 2))
+async function writePrev(r: { working: number; failedIds: string[] }): Promise<void> {
+  // Dual-write: DB row + JSON backup. Never throws.
+  await saveStateMeta(SCOPE, r)
 }
 
 async function main() {
   console.log('[feed-health] checking feeds...')
   const report = await checkAllFeeds()
-  const prev = readPrev()
+  const prev = await readPrev()
 
   // Markup leak spot-check on up to 6 feeds
   const sample = report.feeds.filter((f: { ok: boolean }) => f.ok).slice(0, 6)
@@ -69,7 +70,7 @@ async function main() {
     console.error('[feed-health] failed to persist health events:', e)
   }
 
-  writePrev({ working: report.working, failedIds })
+  await writePrev({ working: report.working, failedIds })
 
   // Alert on new failures
   if (newFailures.length && ADMIN_CHAT) {

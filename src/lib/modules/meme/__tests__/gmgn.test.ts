@@ -30,6 +30,9 @@ function mockFetchSequence(bodies: Array<{ status: number; body: unknown }>) {
 beforeEach(() => {
   // Ensure clean state - no real session cookie
   delete process.env.GMGN_SESSION_COOKIE
+  // Kill-switch: prevent the backfilled live DB SessionToken row from
+  // shadowing per-test temp session files. Mirrors SNIPER_SEEN_DB pattern.
+  process.env.SESSION_DB = 'off'
   // Reset rate limiter state before each test
   __resetGmgnRateLimiterForTests()
 })
@@ -39,7 +42,9 @@ afterEach(() => {
   __resetGmgnCookieForTests()
   __setGmgnCurlForTests(null)
   delete process.env.GMGN_SESSION_PATH
+  delete process.env.SESSION_DB
 })
+
 // ── FIXTURES ──
 
 const SOL_TRENDING_FIXTURE = {

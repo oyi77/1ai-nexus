@@ -20,11 +20,15 @@ beforeEach(() => {
   process.env.MOBY_SESSION_PATH = join(dir, 'session.json')
   delete process.env.MOBY_API_KEY
   delete process.env.MOBY_REFRESH_TOKEN
+  // Kill-switch: prevent the backfilled live DB SessionToken row from
+  // shadowing per-test temp session files. Mirrors SNIPER_SEEN_DB pattern.
+  process.env.SESSION_DB = 'off'
   resetMobySession()
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  delete process.env.SESSION_DB
   rmSync(dir, { recursive: true, force: true })
 })
 

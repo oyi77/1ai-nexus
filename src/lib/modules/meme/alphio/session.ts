@@ -17,11 +17,14 @@
 // Storage: data/alphio-session.json (plaintext, chmod 0600 — same
 // trust as data/moby-session.json; gitignored). Precedence:
 // env ALPHIO_API_KEY (raw AT) > file > null (module disabled).
+// DB-primary (2026-10-15): writes mirror to SessionToken; reads
+// try DB first via loadAlphioSessionAsync.
 // ─────────────────────────────────────────────────────────────
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { logger } from '@/lib/logger'
+import { loadSessionToken, mirrorSessionTokenSync } from '@/lib/modules/derived/db-session-store'
 
 export interface AlphioSessionShape {
   accessToken: string
@@ -74,6 +77,21 @@ function readSessionFile(): AlphioSessionShape | null {
   }
 }
 
+/**
+ * Async loader: DB first, JSON fallback. Public signatures of the
+ * sync resolve path are unchanged; this is used when callers can await.
+ * Never throws — returns null when neither layer has data.
+ */
+export async function loadAlphioSessionAsync(): Promise<AlphioSessionShape | null> {
+  try {
+    const db = await loadSessionToken<AlphioSessionShape>('alphio')
+    if (db?.accessToken) return db
+  } catch {
+    /* fall through to sync JSON */
+  }
+  return readSessionFile()
+}
+
 export function writeAlphioSession(s: AlphioSessionShape): void {
   const path = alphioSessionPath()
   mkdirSync(dirname(path), { recursive: true })
@@ -84,6 +102,10 @@ export function writeAlphioSession(s: AlphioSessionShape): void {
     /* best effort */
   }
   cached = s
+  // DB mirror (DB-primary, 2026-10-15): fire-and-forget upsert so the
+  // SessionToken row stays fresh alongside the JSON backup. Never throws.
+  const expMs = s.accessTokenExp > 0 ? s.accessTokenExp : (s.refreshTokenExp ?? 0)
+  mirrorSessionTokenSync('alphio', s, expMs > 0 ? new Date(expMs) : null)
 }
 
 /** Raw access token or null when unconfigured/expired. No network calls. */

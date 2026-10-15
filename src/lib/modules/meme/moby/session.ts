@@ -39,6 +39,7 @@
 import { readFileSync, writeFileSync, renameSync, mkdirSync, chmodSync, unlinkSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { logger } from '@/lib/logger'
+import { loadSessionToken, mirrorSessionTokenSync } from '@/lib/modules/derived/db-session-store'
 import { reauthenticateViaEmail } from './reauth'
 
 const PRIVY_APP_ID = 'cmg5m1dgg025kl20cusn1cypb'
@@ -113,10 +114,36 @@ function writeSessionFile(st: MobyStoreState, s: MobySession): void {
     try {
       chmodSync(sessionPath(st), 0o600) // tighten pre-existing files too
     } catch { /* best-effort */ }
+    // DB mirror (2026-10-15): fire-and-forget upsert after the atomic write.
+    mirrorToDb(st, s)
   } catch (e) {
     // Unwritable fs — in-memory cache serves until restart, but rotation
     // is then lost (env seeds take over). Make that loud.
     logger.warn(`moby ${st.env.label} session persist failed — next restart re-seeds from env`, 'moby', { err: String(e), path: sessionPath(st) })
+  }
+}
+
+/**
+ * DB-primary mirror (2026-10-15): after the atomic JSON write, upsert
+ * the session to SessionToken by provider. The provider label is
+ * derived from the store env (primary → 'moby', fallback → 'moby-fallback').
+ * Never throws — fire-and-forget.
+ */
+function mirrorToDb(st: MobyStoreState, s: MobySession): void {
+  const provider = st.env.label === 'fallback' ? 'moby-fallback' : 'moby'
+  const expMs = s.accessTokenExp > 0 ? s.accessTokenExp : 0
+  mirrorSessionTokenSync(provider, s, expMs > 0 ? new Date(expMs) : null)
+}
+
+/** DB-first session read for this account. Never throws; null when absent. */
+async function readSessionFromDb(st: MobyStoreState): Promise<MobySession | null> {
+  try {
+    const provider = st.env.label === 'fallback' ? 'moby-fallback' : 'moby'
+    const row = await loadSessionToken<MobySession>(provider)
+    if (row?.accessToken && row?.refreshToken) return row
+    return null
+  } catch {
+    return null
   }
 }
 
@@ -317,6 +344,15 @@ async function resolveStore(st: MobyStoreState, force = false): Promise<string> 
   if (!force) {
     const now = Date.now() + EXPIRY_SLACK_MS
     if (st.cached?.accessTokenExp && st.cached.accessTokenExp > now) return st.cached.accessToken
+    // DB-primary (2026-10-15): try SessionToken before the JSON file.
+    const fromDb = await readSessionFromDb(st)
+    if (fromDb) {
+      const exp = jwtExpMs(fromDb.accessToken)
+      if (exp > now) {
+        st.cached = { ...fromDb, accessTokenExp: exp }
+        return st.cached.accessToken
+      }
+    }
     const fromFile = readSessionFile(st)
     if (fromFile) {
       const exp = jwtExpMs(fromFile.accessToken)

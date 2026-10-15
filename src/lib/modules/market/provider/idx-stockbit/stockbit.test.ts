@@ -153,11 +153,15 @@ beforeEach(() => {
   process.env.STOCKBIT_SESSION_PATH = join(dir, 'session.json')
   delete process.env.STOCKBIT_ACCESS_TOKEN
   delete process.env.STOCKBIT_REFRESH_TOKEN
+  // Kill-switch: prevent the backfilled live DB SessionToken row from
+  // shadowing per-test temp session files. Mirrors SNIPER_SEEN_DB pattern.
+  process.env.SESSION_DB = 'off'
   resetStockbitSession()
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  delete process.env.SESSION_DB
   rmSync(dir, { recursive: true, force: true })
 })
 

@@ -1371,3 +1371,68 @@ model SniperReviewSeen {
 
   @@index([expiresAt])
 }
+
+// Telegram delivery observability (was data/sniper-delivery-log.json).
+// Append-only ring buffer; primary store is the DB, JSON is the crash-safe
+// dual-write backup. `deliveryKey` is the idempotent upsert key.
+model SniperDeliveryLog {
+  id                String   @id @default(cuid())
+  deliveryKey       String   @unique
+  contract          String?  // null for digest/batch messages
+  chain             String   @default("solana")
+  chatId            String?
+  messageTextPrefix String
+  ok                Boolean
+  status            Int?
+  error             String?
+  attemptCount      Int      @default(0)
+  truncated         Boolean  @default(false)
+  deliveredAt       DateTime
+  updatedAt         DateTime @updatedAt
+
+  @@index([contract])
+  @@index([deliveredAt(sort: Desc)])
+  @@index([chatId, deliveredAt(sort: Desc)])
+}
+
+// Per-contract accumulation phase verdicts (was data/sniper-phase.json).
+// One row per contract (latest verdict); UNKNOWN is never persisted.
+model SniperPhase {
+  id        String   @id @default(cuid())
+  contract  String   @unique
+  chain     String   @default("solana")
+  phase     String   // ACCUMULATION | DISTRIBUTION | MARKUP | ...
+  score     Int      @default(0)
+  readings  Int      @default(0)
+  reason    String?
+  at        DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([contract])
+  @@index([at(sort: Desc)])
+  @@index([phase, at(sort: Desc)])
+}
+
+// ─────────────────────────────────────────────────────────────
+// Session tokens + micro-meta (migrated from data/*.json, 2026-10-15)
+// One row per provider (alphio/gmgn/moby/moby-fallback/stockbit);
+// opaque `data` Json so provider shapes never need schema changes.
+// Micro-meta scopes: feed-health-prev, zero-issue-state.
+// ─────────────────────────────────────────────────────────────
+model SessionToken {
+  id String @id @default(cuid())
+  provider String @unique
+  data Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  expiresAt DateTime?
+  @@index([provider])
+}
+
+model StateMeta {
+  id String @id @default(cuid())
+  scope String @unique
+  data Json
+  updatedAt DateTime @updatedAt
+  @@index([scope])
+}

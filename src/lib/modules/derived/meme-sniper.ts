@@ -876,7 +876,7 @@ export async function deliverSniperAlert(
   const messageTextPrefix = (truncated ? text.slice(0, 4090) + '…' : text).slice(0, 80)
   const contract = extractContractFromAlert(text)
   const logEntry = (ok: boolean, status: number | null, error: string | null, attemptCount: number): void => {
-    appendSniperDeliveryLog({
+    const entry: SniperDeliveryLogEntry = {
       at: new Date().toISOString(),
       chatId: chat || null,
       contract,
@@ -886,7 +886,23 @@ export async function deliverSniperAlert(
       error,
       attemptCount,
       truncated,
-    })
+    }
+    appendSniperDeliveryLog(entry)
+    // DB-primary: upsert to Postgres via the DB store (fire-and-forget;
+    // saveDeliveryEntries never throws and logs its own DB errors). Dynamic
+    // import avoids a module-load cycle (db-delivery-store imports this
+    // module for its types). Skipped when SNIPER_DELIVERY_DB is off.
+    const deliveryDbOff =
+      process.env.SNIPER_DELIVERY_DB === 'off' ||
+      process.env.SNIPER_DELIVERY_DB === 'false' ||
+      process.env.SNIPER_DELIVERY_DB === '0'
+    if (!deliveryDbOff) {
+      void import('./db-delivery-store')
+        .then((m) => m.saveDeliveryEntries([entry]))
+        .catch(() => {
+          // best-effort: DB failure is logged inside saveDeliveryEntries
+        })
+    }
   }
 
   if (!token || !chat) {

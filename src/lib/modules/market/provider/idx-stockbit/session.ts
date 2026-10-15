@@ -26,6 +26,7 @@
 
 import { readFileSync, writeFileSync, renameSync, mkdirSync, chmodSync, existsSync } from 'node:fs'
 import { join, dirname } from 'node:path'
+import { loadSessionToken, mirrorSessionTokenSync } from '@/lib/modules/derived/db-session-store'
 
 const EXODUS = 'https://exodus.stockbit.com'
 
@@ -89,6 +90,9 @@ function writeSessionFile(s: StockbitSession): void {
   writeFileSync(tmp, JSON.stringify(s))
   chmodSync(tmp, 0o600)
   renameSync(tmp, sessionPath())
+  // DB mirror (2026-10-15): fire-and-forget upsert alongside the JSON file.
+  const expMs = s.accessTokenExp > 0 ? s.accessTokenExp : 0
+  mirrorSessionTokenSync('stockbit', s, expMs > 0 ? new Date(expMs) : null)
 }
 
 /** Structurally locate fresh tokens in the nested refresh envelope. */
@@ -234,6 +238,18 @@ export async function resolveStockbitAccessToken(force = false): Promise<string>
     return cached.accessToken
   }
   if (!force) {
+    // DB-primary (2026-10-15): try SessionToken before the JSON file.
+    try {
+      const dbRow = await loadSessionToken<StockbitSession>('stockbit')
+      if (dbRow?.accessToken && dbRow?.refreshToken) {
+        cached = dbRow
+        if (dbRow.accessTokenExp - EXPIRY_SLACK_MS > Date.now()) {
+          return dbRow.accessToken
+        }
+      }
+    } catch {
+      /* DB unavailable — fall through to file/env */
+    }
     const file = readSessionFile()
     if (file) {
       cached = file

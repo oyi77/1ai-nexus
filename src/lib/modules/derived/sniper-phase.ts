@@ -167,6 +167,22 @@ export function persistAccumulationPhases(
     } catch {
       // best-effort: an unwritable phase log must never fail a scan
     }
+    // DB-primary: upsert to Postgres via the DB store (fire-and-forget;
+    // savePhaseStates never throws and logs its own DB errors). The dynamic
+    // import avoids a module-load cycle (db-phase-store imports this module
+    // for its types). Skipped entirely when the SNIPER_PHASE_DB kill-switch
+    // is off (tests).
+    const phaseDbOff =
+      process.env.SNIPER_PHASE_DB === 'off' ||
+      process.env.SNIPER_PHASE_DB === 'false' ||
+      process.env.SNIPER_PHASE_DB === '0'
+    if (!phaseDbOff) {
+      void import('./db-phase-store')
+        .then((m) => m.savePhaseStates(fresh))
+        .catch(() => {
+          // best-effort: DB failure is logged inside savePhaseStates
+        })
+    }
   }
   return { log: next, phases, alerts }
 }

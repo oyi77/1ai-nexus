@@ -15,11 +15,9 @@
 
 import 'dotenv/config'
 import { execSync } from 'node:child_process'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
+import { loadStateMeta, saveStateMeta } from '@/lib/modules/derived/db-state-meta'
 
-const DATA_DIR = process.cwd() + '/data'
-mkdirSync(DATA_DIR, { recursive: true })
-const STATE_PATH = DATA_DIR + '/zero-issue-state.json'
 
 const BASE = process.env.ZERO_ISSUE_BASE || 'http://localhost:4400'
 const TIMEOUT_MS = 20_000
@@ -77,12 +75,12 @@ async function runChecks() {
     // Circuit breaker opens at 3 consecutive upstream failures; the registry
     // serves fallbacks, so a standing degraded count is steady state, not an
     // incident. Alert only when degraded RISES >3 above the learned baseline.
-    const prev0 = readState()
+    const prev0 = await readState()
     const baseline = prev0.degradedBaseline ?? m.degraded
     if (m.degraded > baseline + 3) throw new Error(`${m.degraded} degraded of ${m.total} (baseline ${baseline})`)
     if (m.degraded < baseline) {
       // upstreams recovered; rebase downward
-      writeState({ ...prev0, degradedBaseline: m.degraded })
+      await writeState({ ...prev0, degradedBaseline: m.degraded })
     }
     return `${m.total} modules, degraded=${m.degraded} (baseline ${baseline}, fallbacks active)`
   }))
@@ -158,11 +156,15 @@ async function runChecks() {
 
 interface AuditState { failures: string[]; lastOk?: string; lastAlert?: string; degradedBaseline?: number; lastFailures?: string[] }
 
-function readState(): AuditState {
-  try { return JSON.parse(readFileSync(STATE_PATH, 'utf8')) } catch { return { failures: [] } }
+const SCOPE = 'zero-issue-state'
+
+async function readState(): Promise<AuditState> {
+  // DB-primary (2026-10-15): StateMeta first, legacy JSON fallback inside the store.
+  return (await loadStateMeta<AuditState>(SCOPE)) ?? { failures: [] }
 }
-function writeState(s: AuditState) {
-  writeFileSync(STATE_PATH, JSON.stringify(s, null, 2))
+async function writeState(s: AuditState): Promise<void> {
+  // Dual-write: DB row + JSON backup. Never throws.
+  await saveStateMeta(SCOPE, s)
 }
 
 function loadHubEnv(): Record<string, string> {
@@ -205,11 +207,11 @@ async function main() {
   const t0 = Date.now()
   await runChecks()
   const failures = checks.filter(c => !c.ok)
-  const prev = readState()
+  const prev = await readState()
 
   const stamp = new Date().toISOString()
   if (failures.length === 0) {
-    writeState({ failures: [], lastOk: stamp })
+    await writeState({ failures: [], lastOk: stamp })
     console.log(`[zero-issue] ${stamp} ALL ${checks.length} CHECKS PASS (${Date.now() - t0}ms)`)
     return
   }
@@ -217,7 +219,7 @@ async function main() {
   const ids = failures.map(f => f.name)
   const newOnly = ids.filter(id => !prev.failures.includes(id))
 
-  writeState({
+  await writeState({
     failures: ids,
     lastAlert: stamp,
     lastFailures: failures.map(f => `${f.name}: ${f.detail}`),

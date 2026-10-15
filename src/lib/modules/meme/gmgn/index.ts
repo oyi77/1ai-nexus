@@ -13,15 +13,33 @@ import { logger } from '../../../logger'
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { loadSessionToken } from '@/lib/modules/derived/db-session-store'
 
 const GMGN_BASE = 'https://gmgn.ai/defi/quotation/v1'
 // ── Operator-supplied session cookie (Cloudflare hint) ──
-// Sources: env GMGN_SESSION_COOKIE, or file data/gmgn-session.json
-// ({ "cookie": "..." }) — file wins. GMGN_SESSION_PATH overrides the file path.
+// Sources (precedence): DB SessionToken row (provider 'gmgn', DB-primary
+// 2026-10-15) → env GMGN_SESSION_COOKIE → file data/gmgn-session.json
+// ({ "cookie": "..." }). GMGN_SESSION_PATH overrides the file path.
+// `gmgnSessionCookie()` stays sync for existing callers; the DB layer is
+// primed by `primeGmgnCookieFromDb()` (awaited once per gmgnFetch).
 let cachedCookie: string | null | undefined
 
 export function __resetGmgnCookieForTests(): void {
   cachedCookie = undefined
+}
+
+/**
+ * Prime the cookie cache from the DB SessionToken row. Never throws.
+ * No-op when a cookie is already cached or the DB has no row.
+ */
+export async function primeGmgnCookieFromDb(): Promise<void> {
+  if (cachedCookie !== undefined && cachedCookie !== null) return
+  try {
+    const row = await loadSessionToken<{ cookie?: string }>('gmgn')
+    if (row?.cookie) cachedCookie = row.cookie
+  } catch {
+    /* DB unavailable — sync path falls back to env/file */
+  }
 }
 
 function gmgnSessionCookie(): string | null {
@@ -258,6 +276,9 @@ export function __setGmgnCurlForTests(fn: typeof runCurl | null): void {
 
 export async function gmgnFetch<T>(endpoint: string, _signal?: AbortSignal): Promise<T> {
   await RATE_LIMITER.acquire()
+  // DB-primary (2026-10-15): prime cookie from SessionToken before the
+  // sync fallback. Never throws; no-op when already cached or DB empty.
+  await primeGmgnCookieFromDb()
   const cookie = gmgnSessionCookie()
   // Absolute URLs bypass the quotation base (the /vas/* holder endpoints
   // live at the host root, not under /defi/quotation/v1).
