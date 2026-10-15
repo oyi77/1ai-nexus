@@ -130,9 +130,12 @@ describe('clusterDataAvailable — default false, operator opt-in', () => {
   });
 });
 
-describe('swapToTransactionRow — verified Solana buy mapping', () => {
-  it('maps a complete historically-priced SOL→token buy', () => {
-    const row = swapToTransactionRow(swap({ transactionSignature: 'abc', inputUsd: 123.4 }), 'wallet-1');
+describe('swapToTransactionRow — verified Solana leg mapping (buy and sell)', () => {
+  it('maps a complete historically-priced SOL→token buy with fee and side', () => {
+    const row = swapToTransactionRow(
+      swap({ transactionSignature: 'abc', inputUsd: 123.4, feeUsd: 0.05 }),
+      'wallet-1',
+    );
     expect(row).not.toBeNull();
     expect(row).toMatchObject({
       walletId: 'wallet-1',
@@ -142,16 +145,54 @@ describe('swapToTransactionRow — verified Solana buy mapping', () => {
       amountUsd: 123.4,
       tokenSymbol: '', // unknown — never fabricated
       tokenAddress: 'MintA',
+      side: 'buy',
+      feeUsd: 0.05,
     });
     expect(row!.timestamp).toEqual(new Date(NOW - DAY));
   });
 
-  it('returns null for partial, missing-USD, current-price, or sell legs', () => {
+  it('maps a complete historically-priced token→SOL sell with side="sell" and tokenAddress=inputMint', () => {
+    const row = swapToTransactionRow(
+      swap({
+        transactionSignature: 'sell-1',
+        inputMint: 'MintTokenX',
+        outputMint: SOL_MINT,
+        inputUsd: 456.78,
+        feeUsd: 0.02,
+      }),
+      'wallet-2',
+    );
+    expect(row).not.toBeNull();
+    expect(row).toMatchObject({
+      walletId: 'wallet-2',
+      chain: 'solana',
+      txHash: 'sell-1',
+      value: 456.78,
+      amountUsd: 456.78,
+      tokenSymbol: '',
+      tokenAddress: 'MintTokenX',
+      side: 'sell',
+      feeUsd: 0.02,
+    });
+    expect(row!.timestamp).toEqual(new Date(NOW - DAY));
+  });
+
+  it('preserves null feeUsd when fee was unknown', () => {
+    const row = swapToTransactionRow(
+      swap({ transactionSignature: 'no-fee', inputUsd: 100, feeUsd: null }),
+      'wallet-1',
+    );
+    expect(row?.feeUsd).toBeNull();
+  });
+
+  it('returns null for unproven legs (partial, missing USD, stale price, token-to-token)', () => {
     expect(swapToTransactionRow(swap({ completeness: 'partial' }))).toBeNull();
     expect(swapToTransactionRow(swap({ inputUsd: null }))).toBeNull();
     expect(swapToTransactionRow(swap({ limitations: ['stalePrice-current-only'] }))).toBeNull();
-    expect(swapToTransactionRow(swap({ inputMint: 'MintA', outputMint: SOL_MINT }))).toBeNull();
-    expect(swapToTransactionRow(swap({ outputMint: SOL_MINT }))).toBeNull();
+    expect(swapToTransactionRow(swap({ limitations: ['historical-usd-unavailable'] }))).toBeNull();
+    // token→token (neither mint is SOL)
+    expect(swapToTransactionRow(swap({ inputMint: 'MintA', outputMint: 'MintB' }))).toBeNull();
     expect(swapToTransactionRow(swap({ timestamp: null }))).toBeNull();
+    expect(swapToTransactionRow(swap({ timestamp: 0 }))).toBeNull();
   });
 });

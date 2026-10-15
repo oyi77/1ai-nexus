@@ -137,11 +137,19 @@ model Transaction {
   isMEV         Boolean  @default(false)
   approval      Boolean  @default(false)
   timestamp     DateTime
+  // ── Solana wallet-intel legs (2026-10-16) ──
+  // side: "buy" (SOL→token) | "sell" (token→SOL). Default "buy": the only
+  // leg persisted before this change, so existing rows stay correct.
+  side          String   @default("buy")
+  // Trade-time fee in USD (GMGN gas_usd). Null = unknown → downstream
+  // episode builder derives feeKnown = (feeUsd != null).
+  feeUsd        Float?
 
   @@unique([chain, txHash])
   @@index([walletId, timestamp(sort: Desc)])
   @@index([chain, timestamp(sort: Desc)])
   @@index([amountUsd(sort: Desc)])
+  @@index([walletId, side])
 }
 
 model PredictionMarket {

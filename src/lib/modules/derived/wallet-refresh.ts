@@ -122,10 +122,16 @@ export function isTx7dTruncated(
 }
 
 /**
- * Pure Solana `Transaction` row mapping for ONE proven buy leg.
+ * Pure Solana `Transaction` row mapping for ONE proven swap leg.
  * Only COMPLETE swaps with non-null historical USD qualify; token symbols
  * are unknown from the parser, so they are deliberately '' (never invented).
  * Returns null for anything that cannot be proven.
+ *
+ * Both BUY (SOL→token) and SELL (token→SOL) legs are eligible: the harvest
+ * already produces both (GMGN wallet_activity maps sell legs too), and a
+ * sell leg is required to close a round-trip episode downstream. A buy has
+ * side="buy" + tokenAddress=outputMint; a sell has side="sell" +
+ * tokenAddress=inputMint (the token being sold).
  */
 export interface SolanaTransactionRow {
   walletId: string
@@ -136,6 +142,8 @@ export interface SolanaTransactionRow {
   tokenSymbol: string
   tokenAddress: string
   timestamp: Date
+  side: 'buy' | 'sell'
+  feeUsd: number | null
 }
 
 export function swapToTransactionRow(swap: NormalizedSwap, walletId = ''): SolanaTransactionRow | null {
@@ -143,25 +151,50 @@ export function swapToTransactionRow(swap: NormalizedSwap, walletId = ''): Solan
   // are not cost basis and partial legs cannot prove their size.
   if (swap.completeness !== 'complete') return null
   if (swap.inputUsd === null) return null
-  if (swap.inputMint !== SOL_MINT) return null
-  if (!swap.outputMint || swap.outputMint === SOL_MINT) return null
+  if (swap.timestamp === null || !Number.isFinite(swap.timestamp) || swap.timestamp <= 0) return null
   if (
     swap.limitations.includes('stalePrice-current-only') ||
     swap.limitations.includes('historical-usd-unavailable')
   ) {
     return null
   }
-  if (swap.timestamp === null || !Number.isFinite(swap.timestamp) || swap.timestamp <= 0) return null
-  return {
-    walletId,
-    chain: 'solana',
-    txHash: swap.transactionSignature,
-    value: swap.inputUsd,
-    amountUsd: swap.inputUsd,
-    tokenSymbol: '', // unknown from public RPC — never fabricated
-    tokenAddress: swap.outputMint,
-    timestamp: new Date(swap.timestamp),
+
+  // BUY: SOL/quote → token. The known leg's USD is the buy cost.
+  if (swap.inputMint === SOL_MINT) {
+    if (!swap.outputMint || swap.outputMint === SOL_MINT) return null
+    return {
+      walletId,
+      chain: 'solana',
+      txHash: swap.transactionSignature,
+      value: swap.inputUsd,
+      amountUsd: swap.inputUsd,
+      tokenSymbol: '', // unknown from public RPC — never fabricated
+      tokenAddress: swap.outputMint,
+      timestamp: new Date(swap.timestamp),
+      side: 'buy',
+      feeUsd: swap.feeUsd,
+    }
   }
+
+  // SELL: token → SOL/quote. The known leg's USD is the proceeds.
+  if (swap.outputMint === SOL_MINT) {
+    if (!swap.inputMint || swap.inputMint === SOL_MINT) return null
+    return {
+      walletId,
+      chain: 'solana',
+      txHash: swap.transactionSignature,
+      value: swap.inputUsd,
+      amountUsd: swap.inputUsd,
+      tokenSymbol: '',
+      tokenAddress: swap.inputMint,
+      timestamp: new Date(swap.timestamp),
+      side: 'sell',
+      feeUsd: swap.feeUsd,
+    }
+  }
+
+  // token→token swaps: not a SOL leg, skip (same as before).
+  return null
 }
 
 export function isSolanaTransactionPersistEnabled(): boolean {
@@ -171,14 +204,14 @@ export function isSolanaTransactionPersistEnabled(): boolean {
 export interface SolanaTransactionPersistResult {
   enabled: boolean
   dryRun: boolean
-  /** Proven buy legs eligible for a Transaction row. */
+  /** Proven swap legs eligible for a Transaction row (buy or sell). */
   eligible: number
   persisted: number
   failed: number
 }
 
 /**
- * Idempotent, failure-isolated ingest of verified Solana buy legs into the
+ * Idempotent, failure-isolated ingest of verified Solana swap legs into the
  * Transaction table. Gated behind PERSIST_SOLANA_TRANSACTIONS (default
  * false): without it, this is a dry-run that only reports what WOULD be
  * persisted. Upsert key = (chain, txHash) → re-runs never double-insert.
@@ -207,6 +240,8 @@ export async function persistSolanaTransactions(
           tokenAddress: row.tokenAddress,
           tokenSymbol: row.tokenSymbol,
           timestamp: row.timestamp,
+          side: row.side,
+          feeUsd: row.feeUsd,
         },
       })
       persisted++
