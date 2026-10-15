@@ -144,7 +144,23 @@ async function refreshWhaleAlert() {
     const { getCached } = await import('@/lib/api/server-cache')
     const { fetchWhaleAlerts } = await import('@/lib/modules/onchain/whale-alert/fetcher')
     const { data } = await getCached('whale-alert', 30_000, fetchWhaleAlerts)
-    logger.info(`whale-alert: ${data.length} alerts warmed`, "refresher")
+    // Bridge sightings → wallet-ingestion leads. Pure extraction always
+    // runs; the DB write is per-lead isolated and never throws, so a dead
+    // Wallet table degrades to "cache warmed, leads skipped".
+    const { extractWhaleAlertLeads, persistWhaleAlertLeads } = await import(
+      '@/lib/modules/onchain/whale-alert/leads'
+    )
+    const leads = extractWhaleAlertLeads(data)
+    const persisted = await persistWhaleAlertLeads(leads)
+    if (leads.length > 0) {
+      logger.info(
+        `whale-alert: ${data.length} alerts warmed, ${leads.length} lead(s) → Wallet ` +
+          `(created=${persisted.created} updated=${persisted.updated} failed=${persisted.failed})`,
+        'refresher',
+      )
+    } else {
+      logger.info(`whale-alert: ${data.length} alerts warmed (no address leads)`, 'refresher')
+    }
     whaleAlertFails = 0
     whaleAlertSkipUntil = 0
   } catch (e) {
