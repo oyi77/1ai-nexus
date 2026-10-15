@@ -26,12 +26,14 @@ let dir = ''
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'sniper-devgate-'))
   process.env.SNIPER_SEEN_PATH = join(dir, 'seen.json')
+  process.env.SNIPER_SEEN_DB = 'off'
   process.env.SNIPER_EXECUTE_ENABLED = 'true'
   delete process.env.SNIPER_DEV_HISTORY_GATE
 })
 
 afterEach(() => {
   delete process.env.SNIPER_SEEN_PATH
+  delete process.env.SNIPER_SEEN_DB
   delete process.env.SNIPER_EXECUTE_ENABLED
   delete process.env.SNIPER_DEV_HISTORY_GATE
   __resetDevHistoryMemoForTests()

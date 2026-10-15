@@ -34,7 +34,7 @@ import {
   shouldSend,
   type AccumulationOptions,
 } from '@/lib/modules/derived/accumulation-alert'
-import { markSent, pruneAccumulationState, readState, writeState } from '@/lib/modules/derived/accumulation-state'
+import { isAccumulationSeen, markAccumulationSeen, markSent, pruneAccumulationState, readState, writeState } from '@/lib/modules/derived/accumulation-state'
 import type { WalletBuyCandidate } from '@/lib/modules/derived/wallet-discovery'
 
 interface WalletBuysArtifact {
@@ -199,7 +199,7 @@ async function main() {
   let state = pruneAccumulationState(readState(), now)
 
   for (const event of events) {
-    if (!shouldSend(event, state, now, opts.cooldownMs)) {
+    if (!shouldSend(event, state, now, opts.cooldownMs) || (await isAccumulationSeen(event.token.contract))) {
       suppressed += 1
       console.log(`[accumulation-alert] suppressed (cooldown) ${event.token.contract}`)
       continue
@@ -210,6 +210,7 @@ async function main() {
     if (ok) {
       sent += 1
       state = markSent(state, event.token.contract, now)
+      await markAccumulationSeen(event.token.contract, opts.cooldownMs)
       console.log(`[accumulation-alert] sent ${event.token.contract} (${event.buyers.length} buyer(s), $${event.totalBuyUsd.toFixed(2)})`)
     } else {
       deliveryFailures += 1

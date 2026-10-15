@@ -157,21 +157,33 @@ export function accumulationReadings(
 }
 
 /**
- * Record one scan pass. Entries are newest-first and capped; the previous
- * evaluation of each contract is looked up in the ALREADY-STORED trail, so
- * the change label is computed against real history, not this batch.
+ * Pure-ish: the fresh audit entries for one scan pass, newest-first, with the
+ * change label computed against the ALREADY-STORED trail (not this batch).
+ * Reads the existing trail for the previous-per-contract lookup.
  */
-export function appendSniperAudit(result: Pick<SniperScanResultLike, 'decisions'>): SniperAudit {
+export function buildAuditEntries(
+  result: Pick<SniperScanResultLike, 'decisions'>,
+  existing: SniperAudit = readSniperAudit(),
+): AuditEntry[] {
   const at = new Date().toISOString()
-  const log = readSniperAudit()
   const previous = new Map<string, AuditEntry>()
-  for (const e of log.entries) {
+  for (const e of existing.entries) {
     if (!previous.has(e.contract)) previous.set(e.contract, e) // newest-first
   }
-  const fresh = result.decisions.map((d) => toEntry(d, at, previous.get(d.contract) ?? null))
+  return result.decisions.map((d) => toEntry(d, at, previous.get(d.contract) ?? null))
+}
+
+/**
+ * Prepend already-classified entries to the JSON trail (newest-first, capped).
+ * Best-effort: an unwritable audit file must never fail a scan.
+ */
+export function appendAuditEntries(
+  entries: AuditEntry[],
+  existing: SniperAudit = readSniperAudit(),
+): SniperAudit {
   const next: SniperAudit = {
-    entries: [...fresh, ...log.entries].slice(0, MAX_ENTRIES),
-    updatedAt: at,
+    entries: [...entries, ...existing.entries].slice(0, MAX_ENTRIES),
+    updatedAt: entries[0]?.at ?? new Date().toISOString(),
   }
   try {
     const path = auditPath()
@@ -181,6 +193,16 @@ export function appendSniperAudit(result: Pick<SniperScanResultLike, 'decisions'
     // best-effort: an unwritable audit file must never fail a scan
   }
   return next
+}
+
+/**
+ * Record one scan pass. Entries are newest-first and capped; the previous
+ * evaluation of each contract is looked up in the ALREADY-STORED trail, so
+ * the change label is computed against real history, not this batch.
+ */
+export function appendSniperAudit(result: Pick<SniperScanResultLike, 'decisions'>): SniperAudit {
+  const existing = readSniperAudit()
+  return appendAuditEntries(buildAuditEntries(result, existing), existing)
 }
 /** Contracts whose last evaluation changed — the re-review set.
  *  A first sighting (NEW) counts: it is new information by definition. */

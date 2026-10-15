@@ -1276,16 +1276,13 @@ model FeedHealthEvent {
 // Meme Sniper — State & Audit Tables (migrated from data/*.json)
 // ─────────────────────────────────────────────────────────────
 
-// @deprecated — not written by any code; live path is data/sniper-log.json
-// via src/lib/modules/derived/sniper-log.ts. Do not insert rows here.
-// Revisit if JSON→DB migration is approved.
 model SniperScanDecision {
   id              String   @id @default(cuid())
   contract        String
-  chain           String
+  chain           String   @default("solana")
   symbol          String
-  name            String
-  status          String   // APPROVED, REJECTED, WATCHLISTED, UNKNOWN
+  name            String   @default("")
+  status          String   // SIGNAL, WATCHLIST, REJECT
   stage           String?
   tier            String?
   reasons         String[]
@@ -1303,58 +1300,69 @@ model SniperScanDecision {
   @@index([chain, scannedAt(sort: Desc)])
 }
 
-// @deprecated — not written by any code; live path is data/sniper-audit.json
-// via src/lib/modules/derived/sniper-audit.ts. Do not insert rows here.
-// Revisit if JSON→DB migration is approved.
 model SniperAuditEntry {
   id              String   @id @default(cuid())
   contract        String
-  chain           String
-  symbol          String
-  marketCapUsd    Float
-  liquidityUsd    Float
+  chain           String   @default("solana")
+  symbol          String   @default("")
+  status          String?
+  tier            String?
+  delivered       Boolean? @default(false)
+  deduped         Boolean? @default(false)
+  change          String?  // NEW, UNCHANGED, MATERIAL
+  rejectionCount  Int?     @default(0)
+  previousStatus  String?
+  marketCapUsd    Float?
+  liquidityUsd    Float?
   volume1hUsd     Float?
   volume24hUsd    Float?
   holderCount     Int?
   top10HoldersPct Float?
+  distribution    Json?
   observedAt      DateTime @default(now())
 
   @@index([contract, chain, observedAt(sort: Desc)])
   @@index([observedAt(sort: Desc)])
 }
 
-// @deprecated — not written by any code; live path is data/sniper-outcomes.json
-// via src/lib/modules/derived/sniper-outcomes.ts. Do not insert rows here.
-// Revisit if JSON→DB migration is approved.
 model SniperSignalOutcome {
-  id              String    @id @default(cuid())
-  signalId        String    @unique
-  contract        String
-  chain           String
-  symbol          String
-  source          String?
-  stage           String?
-  tier            String?
-  alertPriceUsd   Float
-  highestPriceUsd Float     @default(0)
-  lowestPriceUsd  Float     @default(0)
-  currentPriceUsd Float?
-  currentMcapUsd  Float?
-  status          String
-  hitMultiple     Float?
-  roiPct          Float?
-  closedAt        DateTime?
-  alertedAt       DateTime
-  updatedAt       DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  signalId          String    @unique
+  contract          String
+  chain             String    @default("solana")
+  symbol            String
+  source            String?
+  stage             String?
+  tier              String?
+  alertPriceUsd     Float     @default(0)
+  highestPriceUsd   Float     @default(0)
+  lowestPriceUsd    Float     @default(0)
+  currentPriceUsd   Float?
+  currentMcapUsd    Float?
+  status            String    @default("PENDING")
+  hitMultiple       Float?
+  roiPct            Float?
+  closedAt          DateTime?
+  alertedAt         DateTime
+  updatedAt         DateTime  @updatedAt
+
+  horizonHours      Int?      @default(24)
+  dueAt             DateTime?
+  returnPct         Float?
+  verdict           String?   @default("PENDING")
+  scoredAt          DateTime?
+  profileIds        String[]
+  profileBreaches   String[]
+  entryMarketCapUsd Float?
+  exitMarketCapUsd  Float?
 
   @@index([contract, chain])
   @@index([status, alertedAt(sort: Desc)])
   @@index([alertedAt(sort: Desc)])
 }
-
-// @deprecated — not written by any code; live path is data/sniper-review-seen.json
-// via src/lib/modules/derived/sniper-review.ts. Do not insert rows here.
-// Revisit if JSON→DB migration is approved.
+// Unified TTL seen/dedup store for every scanner namespace (review, scan,
+// ticker, confluence, accumulation, kolscan). Primary store; the JSON files
+// under data/ remain as crash-safe dual-write backups only.
 model SniperReviewSeen {
   id        String   @id @default(cuid())
   key       String   @unique

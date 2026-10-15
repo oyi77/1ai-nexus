@@ -16,6 +16,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
+import {
+  isAccumulationSeen as isAccumulationSeenDb,
+  markAccumulationSeen as markAccumulationSeenDb,
+} from './db-seen-store'
+export { isAccumulationSeenDb as isAccumulationSeen, markAccumulationSeenDb as markAccumulationSeen }
 export type AccumulationState = Record<string, number>
 
 const STATE_TTL_MS = 7 * 24 * 60 * 60 * 1000

@@ -15,6 +15,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { KolscanScreenedTx } from './index'
+import { filterUnseenSignatures, markSignaturesSeen } from '@/lib/modules/derived/db-seen-store'
 
 export const KOLSCAN_SEEN_TTL_MS = 6 * 60 * 60_000
 
@@ -51,10 +52,11 @@ function writeSeen(map: Map<string, number>): void {
     // dedup state is best-effort
   }
 }
-
 /**
- * Drop transactions whose signature is already in the seen store.
- * Returns only the unseen survivors (order preserved).
+ * Synchronous JSON-backed dedup (backwards compatible): drop transactions
+ * whose signature is already in data/kolscan-seen.json. Pure sync callers
+ * and unit tests use this; the DB-first path lives in
+ * `filterUnseenTransactionsDb` / `markTransactionsSeenDb`.
  */
 export function filterUnseenTransactions(txs: KolscanScreenedTx[]): KolscanScreenedTx[] {
   const seen = readSeen()
@@ -62,8 +64,28 @@ export function filterUnseenTransactions(txs: KolscanScreenedTx[]): KolscanScree
 }
 
 /**
- * Record signatures with the current epoch ms. Prunes expired entries on
- * the read that precedes the merge, so the file stays bounded.
+ * DB-first filter: consults SniperReviewSeen (`kolscan:<signature>`) and
+ * unions with the JSON backup, so a signature marked on a previous run —
+ * whether the DB or only the JSON caught it — still dedupes. Never throws;
+ * on DB failure degrades to the synchronous JSON filter.
+ */
+export async function filterUnseenTransactionsDb(txs: KolscanScreenedTx[]): Promise<KolscanScreenedTx[]> {
+  if (txs.length === 0) return []
+  const jsonSeen = readSeen()
+  let dbFiltered: string[]
+  try {
+    dbFiltered = await filterUnseenSignatures(txs.map((tx) => tx.signature))
+  } catch {
+    return txs.filter((tx) => !jsonSeen.has(tx.signature))
+  }
+  const dbUnseen = new Set(dbFiltered.map((key) => key.slice('kolscan:'.length)))
+  return txs.filter((tx) => dbUnseen.has(tx.signature) && !jsonSeen.has(tx.signature))
+}
+
+/**
+ * Synchronous JSON-backed marker (backwards compatible): record signatures
+ * with the current epoch ms. Pure sync callers and unit tests use this;
+ * the DB-first path lives in `markTransactionsSeenDb` below.
  */
 export function markTransactionsSeen(txs: Array<Pick<KolscanScreenedTx, 'signature'>>): void {
   if (txs.length === 0) return
@@ -71,4 +93,15 @@ export function markTransactionsSeen(txs: Array<Pick<KolscanScreenedTx, 'signatu
   const now = Date.now()
   for (const tx of txs) seen.set(tx.signature, now)
   writeSeen(seen)
+}
+
+/**
+ * DB-first marker: dual-writes to SniperReviewSeen (`kolscan:<signature>`)
+ * AND the JSON backup via `markSignaturesSeen`. Never throws — callers can
+ * await it for the cron receipt (proves DB persistence before folding).
+ */
+export async function markTransactionsSeenDb(txs: Array<Pick<KolscanScreenedTx, 'signature'>>): Promise<void> {
+  if (txs.length === 0) return
+  markTransactionsSeen(txs)
+  await markSignaturesSeen(txs.map((tx) => tx.signature))
 }

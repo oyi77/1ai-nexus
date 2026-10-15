@@ -17,17 +17,8 @@
 // -------------------------------------------------------------
 
 import { runSniperScan } from '@/lib/modules/derived/sniper-scan'
-import { appendSniperScan } from '@/lib/modules/derived/sniper-log'
-import { DEFAULT_DELIVERY_POLICY, type DeliveryPolicy } from '@/lib/modules/derived/signal-tier'
-
-import { pushReviewDigest } from '@/lib/modules/derived/sniper-review'
-import { appendSniperAudit, materiallyChanged } from '@/lib/modules/derived/sniper-audit'
-import { persistAccumulationPhases } from '@/lib/modules/derived/sniper-phase'
-import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
-import { escapeSignalHtml } from '@/lib/modules/derived/signal-tier'
+import { saveScanDecisions, saveAuditEntries, loadOutcomeLog, saveOutcomes } from '@/lib/modules/derived/db-stores'
 import {
-  readOutcomes,
-  writeOutcomes,
   registerDeliveries,
   sweepOutcomes,
   summariseOutcomes,
@@ -35,6 +26,13 @@ import {
   summariseByProfile,
   type PriceObservation,
 } from '@/lib/modules/derived/sniper-outcomes'
+import { DEFAULT_DELIVERY_POLICY, type DeliveryPolicy } from '@/lib/modules/derived/signal-tier'
+
+import { pushReviewDigest } from '@/lib/modules/derived/sniper-review'
+import { buildAuditEntries, materiallyChanged } from '@/lib/modules/derived/sniper-audit'
+import { persistAccumulationPhases } from '@/lib/modules/derived/sniper-phase'
+import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
+import { escapeSignalHtml } from '@/lib/modules/derived/signal-tier'
 import { calibrateTiers, demotionSummary } from '@/lib/modules/derived/tier-calibration'
 import { resolveAdaptivePolicy } from '@/lib/modules/derived/adaptive-policy'
 
@@ -77,20 +75,20 @@ async function main() {
   )
   // Adaptive policy reads PRE-EXISTING outcome history (before this pass
   // registers new, unproven signals) so adaptation reflects real evidence.
-  const priorByTier = summariseByTier(readOutcomes().signals)
+  const priorOutcomeLog = await loadOutcomeLog()
+  const priorByTier = summariseByTier(priorOutcomeLog.signals)
   const res = await runSniperScan({
     limit: LIMIT,
     deliver: DELIVER,
     deliveryPolicy: deliveryPolicy(priorByTier),
   })
-  appendSniperScan(res)
+  await saveScanDecisions(res.decisions, res)
 
   // Phase 7: compute what materially changed BEFORE persisting this pass, so
   // the label compares against real history; then open the digest for those
   // contracts even inside the seen-TTL.
   const forceReReview = materiallyChanged(res)
-  appendSniperAudit(res)
-
+  await saveAuditEntries(buildAuditEntries(res))
   // Near-miss review digest: REJECTs with real 5m flow go to the operator's
   // private review chat, never to the sale channel. Off unless the review
   // chat is configured.
@@ -155,7 +153,7 @@ async function main() {
     observedAt,
   }))
   let outcomeLog = registerDeliveries(
-    readOutcomes(),
+    await loadOutcomeLog(),
     res.decisions.map((d) => ({
       contract: d.contract,
       ticker: d.ticker,
@@ -167,7 +165,8 @@ async function main() {
     })),
     observedAt,
   )
-  outcomeLog = writeOutcomes(sweepOutcomes(outcomeLog, prices))
+  outcomeLog = sweepOutcomes(outcomeLog, prices)
+  await saveOutcomes(outcomeLog)
   const stats = summariseOutcomes(outcomeLog.signals)
   if (stats.scored > 0 || stats.pending > 0) {
     const hit = stats.hitRatePct === null ? 'n/a' : `${stats.hitRatePct.toFixed(0)}%`

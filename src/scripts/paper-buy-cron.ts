@@ -31,7 +31,7 @@ import {
   renderPaperSummary,
   summarisePaperPositions,
 } from '@/lib/modules/derived/paper-buy'
-import { readOutcomes } from '@/lib/modules/derived/sniper-outcomes'
+import { loadOutcomeLog } from '@/lib/modules/derived/db-stores'
 import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
 
 const DEFAULT_NOTIONAL_USD = 100
@@ -57,7 +57,7 @@ function sendSummary(): boolean {
 }
 
 async function main() {
-  const signals = readOutcomes().signals
+  const signals = (await loadOutcomeLog()).signals
   const positions = buildPaperPositions(signals, notionalUsd())
   const summary = summarisePaperPositions(positions)
 

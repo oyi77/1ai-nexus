@@ -24,15 +24,8 @@
 
 import { setTimeout as sleep } from 'node:timers/promises'
 import { escapeHtml } from './meme-sniper'
-import {
-  readOutcomes,
-  sweepOutcomes,
-  writeOutcomes,
-  type OutcomeLog,
-  type OutcomeVerdict,
-  type PriceObservation,
-  type SignalOutcome,
-} from './sniper-outcomes'
+import { sweepOutcomes, type OutcomeLog, type OutcomeVerdict, type PriceObservation, type SignalOutcome } from './sniper-outcomes'
+import { loadOutcomeLog, saveOutcomes } from './db-stores'
 import { JUP_PRICE_URL } from './solana-harvest'
 
 /** Delay between Jupiter calls — keeps the public endpoint polite. */
@@ -112,9 +105,9 @@ export async function observeSignalOutcomes(): Promise<ObserveResult> {
 
   let log: OutcomeLog
   try {
-    log = readOutcomes()
+    log = await loadOutcomeLog()
   } catch (e) {
-    return { checked: 0, closed: 0, updated: 0, errors: [`readOutcomes failed: ${errorMessage(e)}`] }
+    return { checked: 0, closed: 0, updated: 0, errors: [`loadOutcomeLog failed: ${errorMessage(e)}`] }
   }
 
   const beforeVerdict = new Map(log.signals.map((s) => [s.contract, s.verdict]))
@@ -148,10 +141,10 @@ export async function observeSignalOutcomes(): Promise<ObserveResult> {
     const verdictChanged = updatedLog.signals.some((s) => beforeVerdict.get(s.contract) !== s.verdict)
     if (verdictChanged) {
       try {
-        writeOutcomes(updatedLog)
+        await saveOutcomes(updatedLog)
         updated = 1
       } catch (e) {
-        errors.push(`writeOutcomes failed: ${errorMessage(e)}`)
+        errors.push(`saveOutcomes failed: ${errorMessage(e)}`)
       }
     }
   }

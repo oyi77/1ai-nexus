@@ -33,10 +33,12 @@ let dir: string
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'kolscan-seen-'))
   process.env.KOLSCAN_SEEN_PATH = join(dir, 'seen.json')
+  process.env.SNIPER_SEEN_DB = 'off'
 })
 
 afterEach(() => {
   delete process.env.KOLSCAN_SEEN_PATH
+  delete process.env.SNIPER_SEEN_DB
   rmSync(dir, { recursive: true, force: true })
 })
 

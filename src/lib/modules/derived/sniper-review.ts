@@ -19,6 +19,7 @@ import { deliverSniperAlert } from './meme-sniper'
 import type { SniperScanDecision } from './sniper-scan'
 import { escapeSignalHtml, rejectionId } from './signal-tier'
 import { SNIPER_LIMITS } from './meme-sniper'
+import { isReviewSeen as isReviewSeenDb, markReviewSeen as markReviewSeenDb } from '@/lib/modules/derived/db-seen-store'
 
 export const REVIEW_VOLMC_FLOOR = Number(process.env.SNIPER_REVIEW_VOLMC_FLOOR) || 0.5
 
@@ -264,6 +265,14 @@ export async function pushReviewDigest(
   const max = opts.limit ?? 10
   const shown = picks.slice(0, max)
   const seen = readReviewSeen()
+  // DB is the primary store: merge its live rows into the JSON map before
+  // the pure selector runs, so a row the backup has not caught up with
+  // still suppresses a duplicate digest. Force-re-review still wins.
+  for (const d of shown) {
+    if (seen[d.contract] === undefined && (await isReviewSeenDb(d.contract))) {
+      seen[d.contract] = Date.now()
+    }
+  }
   // A contract whose verdict/failures/market materially changed is re-reviewed
   // even inside the seen-TTL — that is the whole point of the audit trail.
   const force = opts.forceContracts ?? new Set<string>()
@@ -291,7 +300,10 @@ export async function pushReviewDigest(
     if (!ok) return { candidates: fresh.length, sent: false, skipped: 'telegram rejected' }
   }
   const now = Date.now()
-  for (const d of fresh) seen[d.contract] = now
+  for (const d of fresh) {
+    seen[d.contract] = now
+    await markReviewSeenDb(d.contract)
+  }
   markReviewSeen(seen)
   return { candidates: fresh.length, sent: true, skipped: null, messages: messages.length }
 }

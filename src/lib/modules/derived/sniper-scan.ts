@@ -50,15 +50,24 @@ import {
   collapseDuplicateCandidatesByTrust,
   normalizeTickerForDedup,
 } from '@/lib/modules/derived/candidate-trust'
-
+import type { MemePlatform } from '@/lib/modules/meme/types'
+import { readConfluenceArtifact } from '@/lib/modules/derived/confluence-state'
 import { profilesForPhase } from '@/lib/modules/derived/sniper-criteria'
 import { toSniperGate, assessDevHistory, type DevHistoryVerdict } from '@/lib/modules/derived/dev-history'
 import { fetchDevTokenHistory } from '@/lib/modules/meme/solpump/dev-tokens'
 import { auditRugcheckToken } from '@/lib/modules/meme/rugcheck'
 import { auditBirdeyeToken } from '@/lib/modules/meme/birdeye'
 import { auditGmgnToken } from '@/lib/modules/meme/gmgn'
+import {
+  isScanSeen as isScanSeenDb,
+  markScanSeen as markScanSeenDb,
+  isTickerSeen as isTickerSeenDb,
+  markTickerSeen as markTickerSeenDb,
+} from '@/lib/modules/derived/db-seen-store'
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { saveScanDecisions, saveAuditEntries } from '@/lib/modules/derived/db-stores'
+import { buildAuditEntries } from '@/lib/modules/derived/sniper-audit'
 
 const DEXS = 'https://api.dexscreener.com'
 const GECKO = 'https://api.geckoterminal.com'
@@ -136,6 +145,23 @@ export function markSeenState(map: Record<string, number>): void {
     mkdirSync(dirname(p), { recursive: true })
     writeFileSync(p, JSON.stringify(map))
   } catch { /* dedupe state is best-effort */ }
+}
+/**
+ * Dual-write a scan key to DB + the JSON backup map. The JSON update stays
+ * in the caller's map so `markSeenState` persists everything once per pass.
+ */
+async function trackScanSeen(map: Record<string, number>, chain: string, contract: string): Promise<void> {
+  map[candidateKey(chain, contract)] = Date.now()
+  await markScanSeenDb(chain, contract)
+}
+
+/**
+ * Dual-write a delivered ticker to DB + the JSON backup map. Never throws.
+ */
+async function trackTickerSeen(map: Record<string, number>, chain: string, normalizedTicker: string): Promise<void> {
+  markTickerSeen(map, normalizedTicker)
+  if (normalizedTicker.length === 0) return
+  await markTickerSeenDb(chain, normalizedTicker)
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -570,6 +596,43 @@ async function discoverWalletBuys(limit: number): Promise<SniperEnrichedToken[]>
   return out
 }
 
+/**
+ * Smart-money confluence discovery (Fase 4).
+ * Reads data/confluence-latest.json (written by confluence-cron from >=2 qualified
+ * buyers in a 15-minute sliding window). Hydrates each valid Solana mint from Dexscreener.
+ */
+export async function discoverConfluenceCandidates(limit: number): Promise<SniperEnrichedToken[]> {
+  const rows = await readConfluenceArtifact()
+  const out: SniperEnrichedToken[] = []
+  for (const r of rows) {
+    if (out.length >= limit) break
+    // Same base58 guard as wallet buys: only valid Solana base58 mints
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(r.contract)) continue
+    const live = await hydrateFromDexscreener('solana', r.contract)
+    if (!live) continue // unlisted pair → not snipeable, never faked
+    out.push({
+      ...live,
+      id: `confluence:${r.contract}`,
+      provenance: {
+        sourceType: 'operator-feed',
+        provider: 'smart-money-confluence' as unknown as MemePlatform,
+        note: `confluence: ${r.buyers.length} qualified buyers`,
+      },
+      discoveryEvidence: [
+        {
+          provider: 'smart-money-confluence',
+          category: 'WHALE_ACTIVITY',
+          discoveredAt: r.lastBuyAt || Date.now(),
+          note: `confluence: ${r.buyers.length} qualified buyers (${r.buyers.slice(0, 3).join(', ')}) | $${Math.round(r.totalBuyUsd).toLocaleString()}`,
+          buyers: r.buyers,
+          confluence: r.buyers.length,
+        } as CandidateEvidence,
+      ],
+    })
+  }
+  return out
+}
+
 
 /** Per-contract audit fan-out — every source isolated. */
 async function collectAudits(chain: string, contract: string): Promise<MemeRiskAudit[]> {
@@ -602,13 +665,12 @@ export interface SniperScanDeps {
   devHistory?: (chain: string, contract: string) => Promise<DevHistoryVerdict>
 }
 
-type DiscoverMode = 'auto' | 'api' | 'call-feed' | 'wallet'
+type DiscoverMode = 'auto' | 'api' | 'call-feed' | 'wallet' | 'confluence'
 
 function discoverMode(): DiscoverMode {
   const v = (process.env.SNIPER_DISCOVER_MODE || 'auto').toLowerCase()
-  return v === 'api' || v === 'call-feed' || v === 'wallet' ? v : 'auto'
+  return v === 'api' || v === 'call-feed' || v === 'wallet' || v === 'confluence' ? v : 'auto'
 }
-
 // ─── Dev-history gate (anti-rug, opt-in) ────────────────────────
 // SNIPER_DEV_HISTORY_GATE="true" turns the gate on; default OFF keeps the
 // existing pipeline byte-for-byte. The lookup (solpump dev-tokens endpoint)
@@ -730,22 +792,42 @@ export function prefilterCandidates(
   return { kept, skipped, unknownMc, unknownLiq }
 }
 
-async function discoverCombined(limit: number): Promise<SniperEnrichedToken[]> {
+export async function discoverCombined(limit: number): Promise<SniperEnrichedToken[]> {
   const mode = discoverMode()
   let candidates: SniperEnrichedToken[] = []
   // Wallet buys are the strongest intent signal we own: a classified wallet
   // already put real money in BEFORE any list ranks it. Runs first in wallet
   // mode and as an opportunistic union member in auto mode.
-  if (mode === 'wallet' || mode === 'auto') {
+  if (mode === 'confluence') {
     try {
-      const buys = await discoverWalletBuys(limit)
-      if (buys.length > 0 && mode === 'wallet') {
-        candidates = buys
-      } else if (buys.length > 0) {
-        const api = await discoverApiOnly(limit)
-        candidates = unionCandidates(buys, api)
-      }
+      const conf = await discoverConfluenceCandidates(limit)
+      if (conf.length > 0) candidates = conf
+    } catch { /* confluence artifact is opportunistic — market lists fallback */ }
+  } else if (mode === 'wallet') {
+    try {
+      const [confRes, buysRes] = await Promise.allSettled([
+        discoverConfluenceCandidates(limit),
+        discoverWalletBuys(limit),
+      ])
+      const conf = confRes.status === 'fulfilled' ? confRes.value : []
+      const buys = buysRes.status === 'fulfilled' ? buysRes.value : []
+      const whale = conf.length > 0 && buys.length > 0 ? unionCandidates(conf, buys) : (conf.length > 0 ? conf : buys)
+      if (whale.length > 0) candidates = whale
     } catch { /* wallet artifact is opportunistic — market lists fallback */ }
+  } else if (mode === 'auto') {
+    try {
+      const [confRes, buysRes] = await Promise.allSettled([
+        discoverConfluenceCandidates(limit),
+        discoverWalletBuys(limit),
+      ])
+      const conf = confRes.status === 'fulfilled' ? confRes.value : []
+      const buys = buysRes.status === 'fulfilled' ? buysRes.value : []
+      const whale = conf.length > 0 && buys.length > 0 ? unionCandidates(conf, buys) : (conf.length > 0 ? conf : buys)
+      if (whale.length > 0) {
+        const api = await discoverApiOnly(limit)
+        candidates = unionCandidates(whale, api)
+      }
+    } catch { /* whale/confluence artifacts are opportunistic — market lists fallback */ }
   }
   // Operator call-feed is the fastest attention signal: a token called by
   // 3+ independent channels is worth auditing before the API lists catch up.
@@ -906,16 +988,24 @@ export interface SniperScanResult {
   categories: Record<string, number>
 }
 
-/** One scan pass: discover → audit → evaluate → (optionally) deliver. */
+/**
+ * One scan pass: discover → audit → evaluate → (optionally) deliver.
+ *
+ * `persist` writes this pass to the DB-primary stores (scan decisions +
+ * audit trail). It is opt-in so the pure scan stays testable and so callers
+ * that need the pre-persist audit comparison (sniper-cron's materiallyChanged)
+ * keep full control of ordering.
+ */
 export async function runSniperScan(
-  opts: { limit?: number; deliver?: boolean; deliveryPolicy?: DeliveryPolicy } = {},
+  opts: { limit?: number; deliver?: boolean; deliveryPolicy?: DeliveryPolicy; persist?: boolean } = {},
   deps: SniperScanDeps = LIVE_DEPS,
 ): Promise<SniperScanResult> {
   const limit = Math.min(Math.max(opts.limit ?? 3, 1), 10)
   const errors: string[] = []
   let candidates: SniperEnrichedToken[] = []
   try {
-    candidates = await deps.discover(limit)
+    const discoverFn = deps?.discover ?? LIVE_DEPS.discover
+    candidates = await discoverFn(limit)
   } catch (err) {
     errors.push(`discovery: ${err instanceof Error ? err.message : String(err)}`)
   }
@@ -937,7 +1027,7 @@ export async function runSniperScan(
       `[sniper] ticker dedup: dropped ${collapse.dropped.length} copycat mints across ${dupTickers.size} duplicate tickers`,
     )
     for (const d of collapse.dropped) {
-      seen[candidateKey(d.candidate.chain, d.candidate.contract)] = Date.now()
+      await trackScanSeen(seen, d.candidate.chain, d.candidate.contract)
     }
   }
 
@@ -1019,7 +1109,8 @@ export async function runSniperScan(
       })
 
       const key = candidateKey(token.chain, token.contract)
-      const contractSeen = seen[key] !== undefined
+      const contractSeen =
+        seen[key] !== undefined || (await isScanSeenDb(token.chain, token.contract))
       const normTicker = normalizeTickerForDedup(payload.ticker)
       const priorTickerSeen = tickerSeenUnderDifferentContract(
         seen,
@@ -1027,7 +1118,9 @@ export async function runSniperScan(
         token.chain,
         token.contract,
       )
-      const deduped = contractSeen || priorTickerSeen !== null
+      const priorTickerSeenDb =
+        normTicker.length > 0 ? await isTickerSeenDb(token.chain, normTicker) : false
+      const deduped = contractSeen || priorTickerSeen !== null || priorTickerSeenDb
       let wasDelivered = false
       // Only push deliverable tiers, and never re-push a seen contract or a
       // copycat sharing a ticker already delivered under another contract.
@@ -1049,7 +1142,7 @@ export async function runSniperScan(
         wasDelivered = await deps.deliver(formatted.text, formatted.replyMarkup)
         if (wasDelivered) {
           delivered++
-          markTickerSeen(seen, normTicker)
+          await trackTickerSeen(seen, token.chain, normTicker)
         }
       }
       // Only a non-REJECT outcome is worth remembering. Marking a REJECT seen
@@ -1058,7 +1151,7 @@ export async function runSniperScan(
       // past the threshold (measured 2026-10-11: rejected calls later ran
       // +274%/+683%/+1383%). REJECT rows stay eligible; they are cheap to
       // re-audit and cached.
-      if (decision.status !== 'REJECT') seen[key] = Date.now()
+      if (decision.status !== 'REJECT') await trackScanSeen(seen, token.chain, token.contract)
       decisions.push({
         ...decision,
         contract: token.contract,
@@ -1100,8 +1193,7 @@ export async function runSniperScan(
     }
   }
   markSeenState(seen)
-
-  return {
+  const result: SniperScanResult = {
     scanned: candidates.length,
     screened: decisions.filter((d) => d.status === 'SIGNAL').length,
     watchlisted: decisions.filter((d) => d.status === 'WATCHLIST').length,
@@ -1115,4 +1207,18 @@ export async function runSniperScan(
       return acc
     }, {}),
   }
+
+  // DB-primary persistence is opt-in. sniper-cron persists explicitly (it
+  // needs the pre-persist audit comparison via materiallyChanged), so the
+  // default remains a pure scan with no side effects.
+  if (opts.persist === true) {
+    try {
+      await saveScanDecisions(result.decisions, result)
+      await saveAuditEntries(buildAuditEntries({ decisions: result.decisions }))
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err)
+      result.errors.push(`persist failed: ${reason}`)
+    }
+  }
+  return result
 }

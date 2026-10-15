@@ -33,7 +33,7 @@ import {
   summariseHorizons,
   walletQualityFromStrongest,
 } from '@/lib/modules/derived/outcome-horizons'
-import { readOutcomes } from '@/lib/modules/derived/sniper-outcomes'
+import { loadOutcomeLog } from '@/lib/modules/derived/db-stores'
 
 const LOG_PATH = process.env.SNIPER_LOG_PATH ?? join(process.cwd(), 'data', 'sniper-log.json')
 
@@ -93,13 +93,13 @@ function fmtHorizonPct(value: number | null): string {
 }
 
 async function main() {
-  const before = readOutcomes()
+  const before = await loadOutcomeLog()
   const result = await observeSignalOutcomes()
   console.log(
     `[meme-price-observer] checked=${result.checked} closed=${result.closed} updated=${result.updated} errors=${result.errors.length}`,
   )
 
-  const signals = readOutcomes().signals
+  const signals = (await loadOutcomeLog()).signals
   const scored = signals.filter((s) => s.verdict === 'TARGET' || s.verdict === 'STOPPED' || s.verdict === 'FLAT')
   if (scored.length > 0) {
     const observations = priceHistoryByContract()
@@ -119,7 +119,7 @@ async function main() {
   }
 
   if (result.updated === 1) {
-    const notifications = buildCloseNotifications(before, readOutcomes())
+    const notifications = buildCloseNotifications(before, await loadOutcomeLog())
     for (const text of notifications) {
       const sent = await deliverSniperAlert(text)
       if (!sent) console.error('[meme-price-observer] close notification not delivered (Telegram unconfigured or rejected)')

@@ -114,6 +114,7 @@ data/wallet-buys-latest.json
 data/sniper-outcomes.json
 data/accumulation-alert-state.json
 data/confluence-seen.json
+data/confluence-latest.json
 data/kolscan-seen.json
 
 # GMGN tag inventory sweep (runtime artifact, regenerated on demand)

@@ -17,10 +17,11 @@
 //   SNIPER_LOG_PATH        — override scan-log path
 // ─────────────────────────────────────────────────────────────
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import type { AuditEntry } from '@/lib/modules/derived/sniper-audit'
+import { loadAuditTrail, loadRecentDecisions } from '@/lib/modules/derived/db-stores'
 import {
   buildBacktestRow,
   summariseBacktest,
@@ -45,7 +46,7 @@ interface SniperLogEntry {
 }
 
 function maxContracts(): number {
-  const raw = process.env.BACKTEST_MAX_CONTRACTS
+   const raw = process.env.BACKTEST_MAX_CONTRACTS
   const parsed = raw === undefined ? Number.NaN : Number.parseInt(raw, 10)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 30
 }
@@ -55,35 +56,25 @@ function errorMessage(e: unknown): string {
 }
 
 /**
- * Read the audit trail for the script. Missing/corrupt reads as empty and
- * exits 0 (matching the shared module's never-throw contract). Only a real
- * read failure (EACCES, EISDIR, …) is fatal.
+ * Read the audit trail for the script (DB-primary). Missing/corrupt reads as
+ * empty and exits 0 (matching the shared module's never-throw contract).
+ * Only a real read failure (EACCES, transport) is fatal.
  */
-function readAuditEntries(): { entries: AuditEntry[]; fatal: string | null } {
-  if (!existsSync(AUDIT_PATH)) return { entries: [], fatal: null }
-  let raw: string
+async function readAuditEntries(): Promise<{ entries: AuditEntry[]; fatal: string | null }> {
   try {
-    raw = readFileSync(AUDIT_PATH, 'utf8')
+    const entries = await loadAuditTrail()
+    return { entries, fatal: null }
   } catch (e) {
-    return { entries: [], fatal: `cannot read audit file ${AUDIT_PATH}: ${errorMessage(e)}` }
-  }
-  try {
-    const parsed = JSON.parse(raw) as { entries?: AuditEntry[] }
-    if (!Array.isArray(parsed.entries)) return { entries: [], fatal: null }
-    return { entries: parsed.entries, fatal: null }
-  } catch {
-    return { entries: [], fatal: null }
+    return { entries: [], fatal: `cannot load audit trail: ${errorMessage(e)}` }
   }
 }
 
 /** Latest (newest-first) rejections per contract from the scan ring buffer. */
-function readRejectionsByContract(): Map<string, string[]> {
+async function readRejectionsByContract(): Promise<Map<string, string[]>> {
   const map = new Map<string, string[]>()
-  if (!existsSync(LOG_PATH)) return map
   try {
-    const parsed = JSON.parse(readFileSync(LOG_PATH, 'utf8')) as { entries?: SniperLogEntry[] }
-    if (!Array.isArray(parsed.entries)) return map
-    for (const entry of parsed.entries) {
+    const entries = await loadRecentDecisions()
+    for (const entry of entries) {
       const contract = entry?.contract
       if (typeof contract !== 'string' || contract.length === 0) continue
       if (map.has(contract)) continue
@@ -180,7 +171,7 @@ function compactLines(rows: BacktestRow[], summary: BacktestSummary): string[] {
 }
 
 async function main(): Promise<void> {
-  const { entries, fatal } = readAuditEntries()
+  const { entries, fatal } = await readAuditEntries()
   if (fatal !== null) {
     console.error(`[audit-backtest] ${fatal}`)
     process.exit(1)
@@ -196,7 +187,7 @@ async function main(): Promise<void> {
   }
 
   const selected = selectContracts(auditEntries, maxContracts())
-  const rejectionsByContract = readRejectionsByContract()
+  const rejectionsByContract = await readRejectionsByContract()
 
   const inputs: BacktestRowInput[] = []
   for (const entry of selected) {

@@ -17,12 +17,18 @@
 // ─────────────────────────────────────────────────────────────
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import {
   CONFLUENCE_DEFAULTS,
   type ConfluenceSignal,
 } from './smart-money-confluence';
 import { escapeHtml } from './meme-sniper';
+import {
+  isConfluenceSeen as isConfluenceSeenDb,
+  markConfluenceSeen as markConfluenceSeenDb,
+} from './db-seen-store';
+export { isConfluenceSeenDb as isConfluenceSeen, markConfluenceSeenDb as markConfluenceSeen };
 
 export type ConfluenceSeenState = Record<string, number>;
 
@@ -91,7 +97,10 @@ export function markConfluenceSent(
   return { ...state, [mint]: atMs };
 }
 
-/** Persist the state; prunes stale entries and creates the directory. */
+/**
+ * Persist the JSON state as before (pruned, directory created). Callers
+ * must ALSO call `markConfluenceSeen` per sent mint for the DB primary.
+ */
 export function writeConfluenceSeenState(
   state: ConfluenceSeenState,
 ): ConfluenceSeenState {
@@ -179,3 +188,123 @@ export function alertFitsBudget(text: string): boolean {
 
 /** Re-export so the cron passes detector defaults without another import. */
 export { CONFLUENCE_DEFAULTS };
+/**
+ * Confluence artifact persistence & discovery contracts (Fase 4).
+ * Mirror of wallet-buys-latest.json discipline:
+ *   - missing/corrupt file reads as empty, never throws
+ *   - signals older than maxAgeMin (default 120 min) are stale and dropped
+ *   - formatted for sniper discovery hydration
+ */
+export interface ConfluenceArtifactSignal {
+  contract: string;
+  chain: string;
+  buyers: string[];
+  totalBuyUsd: number;
+  firstBuyAt: number;
+  lastBuyAt: number;
+}
+
+export interface ConfluenceArtifactFile {
+  generated_at: string;
+  window_min: number;
+  signals: ConfluenceArtifactSignal[];
+}
+
+export function confluenceArtifactPath(): string {
+  return (
+    process.env.CONFLUENCE_LATEST_PATH ??
+    join(process.cwd(), 'data', 'confluence-latest.json')
+  );
+}
+
+export interface WriteConfluenceArtifactOptions {
+  windowMin?: number;
+  filePath?: string;
+  generatedAt?: string;
+}
+
+/**
+ * Write summary artifact data/confluence-latest.json for sniper scan discovery.
+ * Pure formatted serialization + idempotent directory creation.
+ */
+export function writeConfluenceArtifact(
+  signals: Array<ConfluenceSignal | ConfluenceArtifactSignal>,
+  options?: WriteConfluenceArtifactOptions,
+): ConfluenceArtifactFile {
+  const p = options?.filePath ?? confluenceArtifactPath();
+  const windowMin = options?.windowMin ?? 15;
+  const generatedAt = options?.generatedAt ?? new Date().toISOString();
+
+  const formattedSignals: ConfluenceArtifactSignal[] = signals.map((s) => {
+    const contract = 'tokenMint' in s ? s.tokenMint : s.contract;
+    const buyers = 'qualifiedBuyers' in s ? s.qualifiedBuyers : s.buyers;
+    const chain = 'chain' in s && s.chain ? s.chain : 'solana';
+    return {
+      contract,
+      chain,
+      buyers: Array.isArray(buyers) ? buyers : [],
+      totalBuyUsd: typeof s.totalBuyUsd === 'number' ? s.totalBuyUsd : 0,
+      firstBuyAt: typeof s.firstBuyAt === 'number' ? s.firstBuyAt : 0,
+      lastBuyAt: typeof s.lastBuyAt === 'number' ? s.lastBuyAt : 0,
+    };
+  });
+
+  const payload: ConfluenceArtifactFile = {
+    generated_at: generatedAt,
+    window_min: windowMin,
+    signals: formattedSignals,
+  };
+
+  mkdirSync(dirname(p), { recursive: true });
+  writeFileSync(p, JSON.stringify(payload, null, 2), 'utf8');
+  return payload;
+}
+
+export interface ReadConfluenceArtifactOptions {
+  filePath?: string;
+  nowMs?: number;
+  maxAgeMin?: number;
+}
+
+/**
+ * Read confluence artifact for sniper scan discovery.
+ * Missing, corrupted, or stale (>maxAgeMin) artifacts return empty array. Never throws.
+ */
+export async function readConfluenceArtifact(
+  optionsOrPath?: string | ReadConfluenceArtifactOptions,
+): Promise<ConfluenceArtifactSignal[]> {
+  try {
+    const p =
+      typeof optionsOrPath === 'string'
+        ? optionsOrPath
+        : optionsOrPath?.filePath ?? confluenceArtifactPath();
+    const nowMs =
+      typeof optionsOrPath === 'object' && optionsOrPath?.nowMs !== undefined
+        ? optionsOrPath.nowMs
+        : Date.now();
+    const maxAge =
+      typeof optionsOrPath === 'object' && optionsOrPath?.maxAgeMin !== undefined
+        ? optionsOrPath.maxAgeMin
+        : Number(process.env.CONFLUENCE_MAX_AGE_MIN) || 120;
+
+    const raw = JSON.parse(await readFile(p, 'utf8')) as ConfluenceArtifactFile;
+    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.signals)) {
+      return [];
+    }
+    const ageMin = (nowMs - Date.parse(raw.generated_at)) / 60_000;
+    if (!Number.isFinite(ageMin) || ageMin > maxAge || ageMin < -5) {
+      return []; // stale or unparseable timestamp
+    }
+    return raw.signals.filter(
+      (s): s is ConfluenceArtifactSignal =>
+        Boolean(
+          s &&
+            typeof s === 'object' &&
+            typeof s.contract === 'string' &&
+            Array.isArray(s.buyers),
+        ),
+    );
+  } catch {
+    return []; // artifact missing/unparseable → no confluence candidates
+  }
+}

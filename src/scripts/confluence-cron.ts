@@ -35,8 +35,13 @@ import {
   renderConfluenceAlert,
   shouldSendConfluence,
   writeConfluenceSeenState,
+  writeConfluenceArtifact,
   type ConfluenceWalletRow,
 } from '@/lib/modules/derived/confluence-state';
+import {
+  isConfluenceSeen,
+  markConfluenceSeen,
+} from '@/lib/modules/derived/db-seen-store';
 import { prisma } from '@/lib/db';
 
 /** Operator DM chain — same fallback ladder as the other crons; deliberately
@@ -118,6 +123,13 @@ async function main(): Promise<void> {
   console.log(
     `[confluence] detector: buyLegsCounted=${result.stats.buyLegsCounted} tokensScanned=${result.stats.tokensScanned} signals=${result.signals.length}`,
   );
+  if (result.signals.length > 0) {
+    writeConfluenceArtifact(result.signals);
+    console.log(
+      `[confluence] wrote ${result.signals.length} confluence signal(s) → data/confluence-latest.json`,
+    );
+  }
+
 
   const walletRows = await loadWalletRows();
   let state = pruneConfluenceSeenState(readConfluenceSeenState(), now);
@@ -126,7 +138,7 @@ async function main(): Promise<void> {
   const chat = reviewChatId();
 
   for (const signal of result.signals) {
-    if (!shouldSendConfluence(signal, state, now, cooldownMs)) {
+    if (!shouldSendConfluence(signal, state, now, cooldownMs) || (await isConfluenceSeen(signal.tokenMint))) {
       suppressed += 1;
       console.log(`[confluence] suppressed (cooldown) ${signal.tokenMint}`);
       continue;
@@ -143,6 +155,7 @@ async function main(): Promise<void> {
     if (ok) {
       sent += 1;
       state = markConfluenceSent(state, signal.tokenMint, now);
+      await markConfluenceSeen(signal.tokenMint);
       console.log(
         `[confluence] sent ${signal.tokenMint} (${signal.qualifiedBuyers.length} buyer(s), $${signal.totalBuyUsd.toFixed(2)})`,
       );

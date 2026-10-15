@@ -14,6 +14,8 @@ let dir = ''
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'sniper-seen-'))
   process.env.SNIPER_SEEN_PATH = join(dir, 'seen.json')
+  // Kill-switch: prevent test fixtures (GOOD/REAL/COPYCAT) from polluting live DB
+  process.env.SNIPER_SEEN_DB = 'off'
   // These tests exercise the scan pipeline (discover → audit → deliver), not
   // the execution gate, so open the gate and let the pipeline run.
   process.env.SNIPER_EXECUTE_ENABLED = 'true'
@@ -21,6 +23,7 @@ beforeEach(() => {
 
 afterEach(() => {
     delete process.env.SNIPER_SEEN_PATH
+  delete process.env.SNIPER_SEEN_DB
   rmSync(dir, { recursive: true, force: true })
 })
 

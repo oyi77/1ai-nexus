@@ -38,7 +38,7 @@ import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { fetchKolscanFeed, screenKolscanTransactions, KOLSCAN_THRESHOLDS, type KolscanScreenedTx } from '@/lib/modules/meme/kolscan'
 import { kolscanTxToNormalizedSwap } from '@/lib/modules/meme/kolscan/adapter'
-import { filterUnseenTransactions, markTransactionsSeen } from '@/lib/modules/meme/kolscan/seen'
+import { filterUnseenTransactionsDb, markTransactionsSeenDb } from '@/lib/modules/meme/kolscan/seen'
 import { fetchAxiomWallets, type AxiomWallet } from '@/lib/modules/meme/axiom-monitor'
 import { listGmgnWalletRank } from '@/lib/modules/meme/gmgn'
 import {
@@ -143,7 +143,7 @@ async function main() {
 
       // Dedup by signature BEFORE folding — the same buy must never be
       // re-counted on the next 5-minute run.
-      const unseen = filterUnseenTransactions(screened)
+      const unseen = await filterUnseenTransactionsDb(screened)
       kolscanUnseen = unseen.length
       console.log(`[kol-monitor] KOLScan unseen: ${unseen.length}/${screened.length} txs`)
       unseenScreenedTxs.push(...unseen)
@@ -227,7 +227,7 @@ async function main() {
 
         // Mark seen only AFTER the merge succeeds — a crash mid-merge can
         // still re-fold the same buys on the next run.
-        markTransactionsSeen(unseen)
+        await markTransactionsSeenDb(unseen)
       }
     } catch (err) {
       console.error(`[kol-monitor] KOLScan failed: ${err instanceof Error ? err.message : String(err)}`)
