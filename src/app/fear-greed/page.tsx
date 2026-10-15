@@ -17,23 +17,29 @@ const scoreColor = (s: number) => s <= 25 ? 'text-data-bear' : s <= 45 ? 'text-d
 const scoreLabel = (s: number) => s <= 25 ? 'Extreme Fear' : s <= 45 ? 'Fear' : s <= 55 ? 'Neutral' : s <= 75 ? 'Greed' : 'Extreme Greed'
 
 // ponytail: normalize covers known shapes only ({composite},{composition},{data:{...}}); add when API adds new envelope.
+// Loose JSON envelopes: unknown until the runtime shape is checked below.
+type JsonRecord = Record<string, unknown>
+
 function normalize(raw: unknown): FearGreedResponse {
-  const r = (raw ?? {}) as Record<string, any>
-  const inner = r?.data?.data ?? r?.data ?? r
-  const src = (inner?.composite ?? inner?.composition ?? {}) as Record<string, any>
+  const r = (raw ?? {}) as JsonRecord
+  const inner = ((r?.data as JsonRecord | undefined)?.data ?? r?.data ?? r) as JsonRecord
+  const src = (inner?.composite ?? inner?.composition ?? {}) as JsonRecord
   const n = Number(src?.score)
   const score = Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 50
-  const cats = inner?.categories ?? inner?.composition?.categories ?? []
+  const composition = (inner?.composition ?? {}) as JsonRecord
+  const cats = (inner?.categories ?? composition?.categories ?? []) as unknown
   const categories = Array.isArray(cats)
     ? cats
     : typeof cats === 'object' && cats !== null
       ? Object.entries(cats).map(([name, cat]) => ({ name, ...((cat ?? {}) as { score: number; weight: number }) }))
       : []
+  const regime = inner?.regime as FearGreedResponse['regime']
+  const historyRaw = inner?.history as unknown
   return {
     composite: { score, label: typeof src?.label === 'string' ? src.label : scoreLabel(score) },
     categories,
-    regime: inner?.regime,
-    history: Array.isArray(inner?.history) ? inner.history : [],
+    regime: regime?.state != null && regime?.stance != null ? regime : undefined,
+    history: Array.isArray(historyRaw) ? (historyRaw as FearGreedResponse['history']) : [],
   }
 }
 

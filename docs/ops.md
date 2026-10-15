@@ -687,3 +687,86 @@ to weight 1.0.
 > regenerated every 6 hours by cron and should not be committed. Add it to
 > `.gitignore` before staging (see `data/call-feed-latest.json` pattern at
 > line 111 of `.gitignore` for reference).
+
+## Sniper Environment Variables
+
+The Vilona Sniper pipeline (cron `*/5 * * * *`, see `src/scripts/sniper-cron.ts`)
+is driven entirely by environment variables. The crontab line already sets
+`SNIPER_SCAN_LIMIT`, `SNIPER_DISCOVER_MODE`, and `SNIPER_DELIVER`; the rest
+are optional overrides. Every variable below is safe to leave unset — the
+defaults keep the pipeline inert (no sale-channel delivery unless a bot token
+is staged) and defensive (unproven candidates are always REJECTED).
+
+### Delivery & Chat Targets
+
+| Variable | Type | Default | Purpose | Safety |
+|---|---|---|---|---|
+| `SNIPER_DELIVER` | boolean (`'false'` disables) | `true` | Master switch for Telegram delivery of actionable tiers during a scan pass. Any value other than `'false'` leaves delivery ON. | When `false`, no signal is ever pushed — useful for dry-run scans. When a bot token is present and this is unset, delivery is live. |
+| `SNIPER_DELIVER_WATCHLIST` | boolean (`'true'` enables) | `false` (off) | Whether WATCHLIST candidates are delivered in addition to HIGH_CONVICTION signals. Default OFF keeps the product channel noise-free. | Turning ON floods the sale channel with unconfirmed candidates — only use in a staging/review channel. |
+| `SNIPER_TELEGRAM_BOT_TOKEN` | string | empty | Bot token used to push sniper alerts. Falls back to `HUB_TELEGRAM_BOT_TOKEN` then `TELEGRAM_BOT_TOKEN`. | **Secret.** Must never be committed. Without a token, `deliverSniperAlert` is a no-op (returns `false`, never throws). |
+| `SNIPER_DELIVER_CHAT_ID` | string | empty | Target chat for delivered signals. Falls back to `HUB_TELEGRAM_OWNER_CHAT_ID` → `TELEGRAM_ALERT_CHAT_ID` → `TELEGRAM_ADMIN_CHAT_ID`. | Points alerts at the sale/operator channel. A wrong ID leaks signals to the wrong audience. |
+| `SNIPER_REVIEW_CHAT_ID` | string | empty | Separate chat for the near-miss review digest. Falls back to `HUB_TELEGRAM_OWNER_CHAT_ID` / `TELEGRAM_ADMIN_CHAT_ID` — **never** to the sale channel. | A review digest is never a signal; this separation prevents it from leaking into the product surface. |
+
+### Discovery & Scan Cadence
+
+| Variable | Type | Default | Purpose | Safety |
+|---|---|---|---|---|
+| `SNIPER_DISCOVER_MODE` | enum: `auto`, `api`, `call-feed`, `wallet`, `confluence` | `auto` | Controls which discovery source(s) feed the scan. `auto` unions API pairs + call-feed + wallet-buys + confluence; the others restrict to one source. | Restricting to a single source narrows coverage but never weakens the safety gates — every candidate still passes the full audit + evaluator. |
+| `SNIPER_SCAN_LIMIT` | number | `5` | Maximum candidates evaluated per scan pass. Higher = more RPC/API calls per cron slot. | A value too high for the 5-min window risks overlapping cron runs; the process is single-pass and stateless, but API rate limits may trigger. |
+| `SNIPER_DISCOVER_API_CANDIDATES` | number | (internal default) | Caps the number of fresh API (dexscreener/gecko) candidates fetched before union with other sources. | Bounds upstream API cost; does not affect gate strictness. |
+| `SNIPER_SCAN_CONCURRENCY` | number | (internal default) | Per-pass audit fan-out concurrency across rugcheck/birdeye/gmgn sources. | Higher concurrency speeds the pass but may trip per-source rate limits. Sources are individually isolated — one failure never blocks the others. |
+
+### Dev-History Gate
+
+| Variable | Type | Default | Purpose | Safety |
+|---|---|---|---|---|
+| `SNIPER_DELIVER_DEV_HISTORY_FAIL` | boolean | (off) | When the dev-history lookup fails (endpoint outage), this controls whether the candidate is still deliverable. Default behavior is to treat an unreachable verdict as UNPROVEN (not a pass). | Leaving off is the safe default: an endpoint outage must never open a hole for a serial rugger. |
+| `SNIPER_DEV_HISTORY_GATE` | boolean (`'true'` enables) | `false` (off) | Opt-in anti-rug gate. When ON, each candidate's deployer history is fetched (solpump dev-tokens endpoint) and a SERIAL_RUGGER verdict forces REJECT. | OFF keeps the pipeline byte-for-byte identical to pre-gate behavior. The lookup is memoized per-contract for 30 min (max 500 entries). |
+| `SNIPER_TRACE_WALLETS` | boolean (`'false'` disables) | `true` (on) | Whether on-chain buyer tracing runs when the DB has no smart-money evidence. Setting `'false'` restricts evidence to the DB only. | Disabling tracing reduces RPC cost but may leave a candidate unconfirmed (WATCHLIST) instead of SIGNAL — a conservative outcome, never a false positive. |
+
+### Realtime Bridge (opt-in firehose)
+
+| Variable | Type | Default | Purpose | Safety |
+|---|---|---|---|---|
+| `SNIPER_REALTIME_ENABLED` | boolean (`'true'` enables) | `false` (off) | Master switch for the realtime WebSocket token bridge. Inert until flipped. | Default OFF. When ON, three guards (rate limit, per-contract cooldown, seen-state) prevent a live firehose from becoming spam. |
+| `SNIPER_REALTIME_MAX_EVENTS_PER_MIN` | number | `4` | Sliding-window rate limit for realtime events. Over-limit events are DROPPED, never queued. | Lower = quieter. A stale hype event is worthless minutes later, so dropping is correct. |
+| `SNIPER_REALTIME_COOLDOWN_MS` | number | `900000` (15 min) | Per-contract cooldown enforced through the pipeline's seen-state. | Prevents the same contract from re-firing within the window. |
+
+### Tuning & Persistence Paths
+
+| Variable | Type | Default | Purpose | Safety |
+|---|---|---|---|---|
+| `SNIPER_STALE_AFTER_MINUTES` | number | `120` | A candidate older than this (by pool age) is considered stale and filtered before evaluation. | Tightening raises the floor for "fresh" but never weakens the evaluator. |
+| `SNIPER_SEEN_TTL_MS` | number | `3600000` (1 h) | TTL for the per-contract seen-state that prevents repeat deliveries. | Shorter TTL = more re-deliveries of the same contract; the evaluator still screens every one. |
+| `SNIPER_REVIEW_VOLMC_FLOOR` | number | `0.5` | Minimum volume/market-cap ratio for a candidate to appear in the review digest. | Only affects the review channel, never the sale channel. |
+| `SNIPER_REVIEW_SEEN_TTL_MS` | number | `21600000` (6 h) | TTL for review-digest dedup (one near-miss per contract per window). | Bounds review noise; does not affect signal delivery. |
+| `SNIPER_DELIVERY_COOLDOWN_MS` | number | `0` (off) | Optional per-contract delivery cooldown in the delivery log. `0` = no cooldown (the seen-state already dedupes). | A non-zero value adds a second layer of suppression — safe, only more conservative. |
+| `SNIPER_MIN_MARKET_CAP_USD` | number | `5000` | Pre-filter floor: candidates below this market cap are dropped before audit. | Raising the floor only removes smaller (riskier) candidates. |
+| `SNIPER_MIN_LIQUIDITY_USD` | number | `2000` | Pre-filter floor: candidates below this liquidity are dropped before audit. | Same — a conservative tightening. |
+| `SNIPER_ADAPTIVE_POLICY` | boolean (`'true'` enables) | `false` (off) | When ON, tier thresholds adapt to measured outcome hit-rates from prior signals. | Default OFF. Uses pre-existing outcome history so adaptation reflects real evidence, not the current pass. |
+| `SNIPER_ADAPTIVE_POLICY_DRY_RUN` | boolean (`'true'` enables) | `false` (off) | Logs what the adaptive policy *would* do without applying it. | Safe observability mode — never mutates delivery. |
+| `SNIPER_TRENCHES_DISCOVERY` | boolean (`'true'` enables) | `false` (off) | Additive trenches source (bonding-curve sweet-spot rows). Requires `SOLPUMP_TRENCHES_ENABLED=true` as well. | Additive only — overlaps merge into one candidate; never bypasses the gates. |
+
+### DB Kill-Switches (JSON fallback)
+
+These switch a given store from PostgreSQL (primary) to JSON-file-only. They
+exist for hermetic test isolation and emergency DB-outage fallback. In
+production they should remain **unset** (DB-primary). Setting any to `off`,
+`false`, or `0` bypasses Prisma and reads/writes the JSON file only.
+
+| Variable | Default (unset) | JSON fallback path |
+|---|---|---|
+| `SNIPER_SEEN_DB` | DB-primary | `data/sniper-seen.json` (or `SNIPER_SEEN_PATH`) |
+| `SNIPER_DELIVERY_DB` | DB-primary | `data/sniper-delivery-log.json` (or `SNIPER_DELIVERY_LOG_PATH`) |
+| `SNIPER_PHASE_DB` | DB-primary | `data/sniper-phase.json` (or `SNIPER_PHASE_PATH`) |
+
+### File-Path Overrides (all default to `data/` under `cwd`)
+
+| Variable | Default |
+|---|---|
+| `SNIPER_SEEN_PATH` | `data/sniper-seen.json` |
+| `SNIPER_REVIEW_SEEN_PATH` | `data/sniper-review-seen.json` |
+| `SNIPER_DELIVERY_LOG_PATH` | `data/sniper-delivery-log.json` |
+| `SNIPER_PHASE_PATH` | `data/sniper-phase.json` |
+| `SNIPER_AUDIT_PATH` | `data/sniper-audit.json` |
+| `SNIPER_LOG_PATH` | `data/sniper-log.json` |

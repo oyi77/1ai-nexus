@@ -9,7 +9,7 @@
 //   5. Push deliverable tiers to Telegram (deduped within the seen TTL)
 //   5. Log stats; exit non-zero when the scan itself broke
 //
-// Cron: */10 * * * * (every 10 min) — pairs are short-lived, so a
+// Cron: */5 * * * * (every 5 min) — pairs are short-lived, so a
 // tight cadence matters more than depth; the seen-TTL prevents repeat
 // pushes for the same contract.
 //
