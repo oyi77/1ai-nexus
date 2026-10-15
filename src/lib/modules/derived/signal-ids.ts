@@ -59,8 +59,8 @@ export function rejectionId(s: string): string {
     'Status honeypot belum terbukti — keamanan sisi jual tidak diketahui',
   )
   out = out.replace(
-    /^LP burn\/lock unproven \(must be 100% burnt or locked\)$/,
-    'LP burn/lock belum terbukti — harus 100% burnt atau locked',
+    /^LP burn\/lock unproven — no source measured it \(not a breach, but never a pass\)$/,
+    'LP burn/lock belum terbukti — tidak ada sumber yang mengukurnya (bukan pelanggaran, tapi tidak pernah lolos)',
   )
   out = out.replace(/^Top-10 concentration unproven$/, 'Konsentrasi top-10 belum terbukti')
   out = out.replace(/^Insider share unproven$/, 'Porsi insider belum terbukti')

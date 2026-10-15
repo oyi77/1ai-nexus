@@ -122,8 +122,11 @@ export function classifySignalTier(input: TierInput): TierResult {
     )
   }
 
-  // 5. HIGH_CONVICTION only when nothing essential is missing.
-  if (confirmed && missing.length === 0) {
+  // 5. HIGH_CONVICTION requires a clean SIGNAL — a WATCHLIST decision
+  //    (e.g. LP burn/lock unmeasured by any source, i.e. UNKNOWN) must
+  //    never be promoted to top-signal delivery on missing data. The
+  //    operator policy: UNKNOWN ≠ PASS, UNKNOWN ≠ BREACH.
+  if (decision.status === 'SIGNAL' && confirmed && missing.length === 0) {
     reasons.push(
       `clean screen at ${decision.metrics.volMcRatio.toFixed(2)}x volume`,
       `${confirmedBuyers} confirmed buyer(s), strongest=${smartMoney?.strongest}`,
@@ -155,9 +158,22 @@ export interface DeliveryPolicy {
   allowWatchlist: boolean
 }
 
+/**
+ * Lazily-evaluated policy so the operator opt-in (`SNIPER_DELIVER_WATCHLIST`)
+ * is read fresh on every access — never frozen from the ambient env at
+ * import time. Spreading this object copies the CURRENT value, which is
+ * exactly what the cron, realtime bridge, and tests want: they read the
+ * env at THEIR call time, not when some barrel was first imported.
+ */
 export const DEFAULT_DELIVERY_POLICY: DeliveryPolicy = {
   allowTopSignal: true,
-  allowWatchlist: false, // policy D: watchlist is opt-in, never mixed in
+  // policy D: watchlist is opt-in, never mixed in. The getter reads the env
+  // on every access so SNIPER_DELIVER_WATCHLIST=true unlocks every path that
+  // falls back to this policy (cron, realtime bridge, API routes), while a
+  // test can delete the var and immediately see the opt-in base again.
+  get allowWatchlist() {
+    return process.env.SNIPER_DELIVER_WATCHLIST === 'true'
+  },
 }
 
 /** Should this tier be delivered under the given policy? Pure. */

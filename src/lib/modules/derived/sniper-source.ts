@@ -4,16 +4,16 @@
 // Takes a live discovery row (any platform) plus the same token's risk
 // audits, and builds the evaluator's SniperPayload. Honest mapping rules:
 //   - a field is only set when an upstream source reports it; missing
-//     means null ("unproven"), which the evaluator treats as a breach —
-//     never as safe.
+//     means null ("unproven"), which the evaluator treats as UNKNOWN —
+//     never as safe. Security unknowns reject or cap (see securityBreaches).
 //   - bundlerSoldPercent comes from GMGN's top-buyer cohort exit ratio
 //     (statusNow.holding_rate); no other source reports exit proof yet.
 //   - 5m volume comes from dexscreener `volume.m5` when the discovery row
 //     carries it (raw passthrough), else null (dead momentum → REJECT).
 //   - LP burn/lock: rugcheck USD-weighted locked fraction is a LOCKED
 //     fraction, never a burn claim; burnt stays null unless a source proves
-//     it (conservative: an unlocked-but-unburnt LP is a breach anyway when
-//     locked+burnt < 100%).
+//     it. A null burn is UNKNOWN (no source measured it), not a breach —
+//     the evaluator caps the verdict at WATCHLIST on missing data.
 //   - top-1-3 taint kinds default to 'holder' only for GMGN-provided top
 //     wallets — taint itself must come from a label source (dev address
 //     match). Without labels, listing them only feeds the size check; the
@@ -230,7 +230,7 @@ function mergeAudits(audits: MemeRiskAudit[]): {
   return {
     mintable,
     freezeAuthority: freeze,
-    lpBurnedPercent: null, // no source proves burn yet — unproven, never assumed
+    lpBurnedPercent: null, // no source proves burn — UNKNOWN (not a breach), caps at WATCHLIST
     lpLockedPercent: lpLocked,
     honeypot,
     devPercent: dev,

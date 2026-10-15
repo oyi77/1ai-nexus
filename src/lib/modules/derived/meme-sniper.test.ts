@@ -66,12 +66,15 @@ describe('meme-sniper hard filters', () => {
     expect(d.status).toBe('SIGNAL')
   })
 
-  it('accepts 100% locked with burn unproven, and rejects fully-unproven LP', () => {
+  it('accepts 100% locked with burn unproven; caps fully-unproven LP at WATCHLIST (UNKNOWN)', () => {
     const lockedOnly = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: 100 } }), { smartMoney: CONFIRMED })
     expect(lockedOnly.status).toBe('SIGNAL')
-    const neither = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: null } }))
-    expect(neither.status).toBe('REJECT')
-    expect(neither.rejections.join(' ')).toContain('LP burn/lock unproven')
+    // Neither burn nor lock proven by any source → UNKNOWN, not BREACH.
+    // The token is not rejected, but it can never become SIGNAL (UNKNOWN ≠ PASS).
+    const neither = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: null } }), { smartMoney: CONFIRMED })
+    expect(neither.status).toBe('WATCHLIST')
+    expect(neither.rejections).toEqual([])
+    expect(neither.warnings.some((w) => w.includes('LP burn/lock unproven'))).toBe(true)
   })
 
   it('rejects a honeypot outright', () => {
@@ -225,20 +228,25 @@ describe('meme-sniper hard filters', () => {
     expect(d.rejections.join(' ')).not.toContain('LP')
   })
 
-  it('rejects an unproven LP (neither burn nor lock reported)', () => {
+  it('caps an unproven LP (neither burn nor lock reported) at WATCHLIST, not REJECT', () => {
     const d = evaluateSniper(clean({
       security: { ...clean().security, lpLockedPercent: null, lpBurnedPercent: null },
     }), { smartMoney: CONFIRMED })
-    expect(d.status).toBe('REJECT')
-    expect(d.rejections.join(' ')).toContain('LP burn/lock unproven')
+    // No source measured either LP leg → UNKNOWN. Not a breach (the token
+    // survives), but never a pass (it cannot reach SIGNAL).
+    expect(d.status).toBe('WATCHLIST')
+    expect(d.rejections).toEqual([])
+    expect(d.warnings.some((w) => w.includes('LP burn/lock unproven'))).toBe(true)
   })
 
-  it('rejects a partially-locked LP with an unproven burn leg', () => {
+  it('rejects a partially-locked LP with an unproven burn leg (lock < 99.5% is a breach)', () => {
     const d = evaluateSniper(clean({
       security: { ...clean().security, lpLockedPercent: 60, lpBurnedPercent: null },
     }), { smartMoney: CONFIRMED })
+    // Lock is proven but insufficient; the un-burnt remainder is pullable,
+    // so this IS a breach even though burn itself was never measured.
     expect(d.status).toBe('REJECT')
-    expect(d.rejections.join(' ')).toContain('burn unproven')
+    expect(d.rejections.join(' ')).toContain('LP lock only 60%')
   })
 })
 

@@ -88,8 +88,9 @@ function pctOrNull(v: unknown): number | null {
 
 // ── Hard gates ────────────────────────────────────────────────
 
-function securityBreaches(p: SniperPayload): string[] {
-  const out: string[] = []
+function securityBreaches(p: SniperPayload): { breaches: string[]; unknowns: string[] } {
+  const breaches: string[] = []
+  const unknowns: string[] = []
   const raw = p.security
   // Normalize once: any malformed fact becomes its unproven twin, so the
   // gates below only ever see boolean | null and finite number | null.
@@ -103,14 +104,14 @@ function securityBreaches(p: SniperPayload): string[] {
   }
 
   if (s.mintable !== false) {
-    out.push(
+    breaches.push(
       s.mintable === null
         ? 'Mint authority unproven (must be disabled)'
         : 'Mint authority ENABLED — dev can inflate',
     )
   }
   if (s.freezeAuthority !== false) {
-    out.push(
+    breaches.push(
       s.freezeAuthority === null
         ? 'Freeze authority unproven (must be disabled)'
         : 'Freeze authority ENABLED — holders can be frozen',
@@ -118,38 +119,60 @@ function securityBreaches(p: SniperPayload): string[] {
   }
   // UNKNOWN is not safe: a honeypot whose status was never proven must not
   // pass a gate the operator treats as a hard sell-side guarantee.
-  if (s.honeypot === true) out.push('Honeypot: sells are blocked')
+  if (s.honeypot === true) breaches.push('Honeypot: sells are blocked')
   else if (s.honeypot !== false) {
-    out.push('Honeypot status unproven (sell-side safety unknown)')
+    breaches.push('Honeypot status unproven (sell-side safety unknown)')
   }
 
   // LP legs are distinct facts — lock, burn, and "unavailable" are NOT the
   // same. A null leg means that leg was never proven; it must never be read
-  // as 0 nor silently skipped. The rule: burn+lock must cover ~100%, and if
-  // the burn leg is unproven while the lock leg is proven 100%, that is
-  // exit-safe (a locked LP cannot be pulled). Any other unproven leg is a
-  // breach, because the operator's method (materi 07) requires MINT/FREEZE
-  // off + LP fully burned or locked before entry.
+  // as 0 nor silently skipped.
+  //
+  // Burn data is source-dependent: RugCheck reports LP LOCK but never LP
+  // BURN, so lpBurnedPercent is null for the majority of real tokens — not
+  // because burn didn't happen, but because no source measured it. Treating
+  // that null as a breach (the old behavior) killed ~53 of ~903 tokens on
+  // "LP burn/lock unproven" alone — false rejections on missing DATA, not
+  // missing SAFETY.
+  //
+  // Operator-approved three-state policy:
+  //   BREACH   — a source CONFIRMED lpBurnedPercent === 0 AND lock is
+  //              insufficient (< 99.5%): exit liquidity is genuinely exposed.
+  //   UNKNOWN  — no source proved burn (lpBurnedPercent == null). The token
+  //              is NOT killed; it continues through the other gates. But
+  //              UNKNOWN is never PASS: it caps the verdict at WATCHLIST
+  //              (handled in evaluateSniper) so it can never become a
+  //              top-signal delivery on missing data.
+  //   PASS     — burn proven sufficient, or lock proven >= 99.5% (a locked
+  //              LP cannot be pulled, so exit safety is proven without burn).
   const burnedKnown = s.lpBurnedPercent != null
   const lockedKnown = s.lpLockedPercent != null
   const burned = s.lpBurnedPercent ?? 0
   const locked = s.lpLockedPercent ?? 0
-  if (!burnedKnown && !lockedKnown) {
-    out.push('LP burn/lock unproven (must be 100% burnt or locked)')
-  } else if (!burnedKnown && locked >= 99.5) {
-    // Locked 100% proves exit safety without the burn leg.
-  } else if (!burnedKnown) {
-    out.push(
-      `LP lock only ${fmtPct(locked)}% and burn unproven — exit liquidity exposed`,
-    )
-  } else if (!lockedKnown) {
-    out.push(
-      `LP burn only ${fmtPct(burned)}% and lock unproven — exit liquidity exposed`,
-    )
-  } else if (burned + locked < 99.5) {
-    out.push(`LP only ${fmtPct(burned + locked)}% burnt+locked — exit liquidity exposed`)
+  if (burnedKnown && lockedKnown) {
+    if (burned + locked < 99.5) {
+      breaches.push(`LP only ${fmtPct(burned + locked)}% burnt+locked — exit liquidity exposed`)
+    }
+  } else if (burnedKnown) {
+    // Burn proven, lock unknown. If burn alone covers ~100%, exit-safe.
+    if (burned < 99.5) {
+      breaches.push(`LP burn only ${fmtPct(burned)}% — exit liquidity exposed`)
+    }
+  } else if (lockedKnown) {
+    // Lock proven, burn unknown. Lock >= 99.5% proves exit safety (a locked
+    // LP cannot be pulled) without needing the burn leg. Partial lock is a
+    // BREACH — the un-burnt remainder is pullable.
+    if (locked < 99.5) {
+      breaches.push(`LP lock only ${fmtPct(locked)}% — exit liquidity exposed`)
+    }
+  } else {
+    // Neither leg proven by any source. This is the 53-rejection case:
+    // not "burn didn't happen" but "no source measured it". UNKNOWN, not
+    // BREACH — the token continues through other gates but can never
+    // become a top signal on missing data.
+    unknowns.push('LP burn/lock unproven — no source measured it (not a breach, but never a pass)')
   }
-  return out
+  return { breaches, unknowns }
 }
 
 // ── Distribution gates ────────────────────────────────────────
@@ -451,15 +474,23 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
   ]
 
   const momentum = momentumBreaches(payload, stage)
+  const secGates = securityBreaches(payload)
   const rejections = [
-    ...securityBreaches(payload),
+    ...secGates.breaches,
     ...distributionBreaches(payload),
     ...momentum.breaches,
   ]
 
   const warnings: string[] = []
   if (opts.extraWarnings?.length) warnings.push(...opts.extraWarnings)
-
+  // Security UNKNOWNs (e.g. LP burn unmeasured by any source) are non-fatal
+  // advisories: they do NOT reject, but they cap the verdict at WATCHLIST
+  // (handled below) so the token can never become a top-signal delivery on
+  // missing data. The operator policy: UNKNOWN ≠ PASS, UNKNOWN ≠ BREACH.
+  const securityUnknowns = secGates.unknowns
+  for (const u of securityUnknowns) {
+    if (!warnings.includes(u)) warnings.push(u)
+  }
   // No execution inputs are read here on purpose: SNIPER_EXECUTE_ENABLED,
   // positionSizeUsd and circuitLocked are trade-dex concerns and must not
   // reappear. Screening answers "is it clean?" — nothing more.
@@ -562,6 +593,13 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
   } else if (pnlAssessment === 'dump-risk') {
     status = 'WATCHLIST'
     rationale = `Setup is clean and volume is live (${metrics.volMcRatio.toFixed(2)}x), but top holders sit on +${fmtPct(payload.momentum.top5AvgPnlPercent)}% — wait for the flush before entry`
+  } else if (securityUnknowns.length > 0) {
+    // UNKNOWN is a third state, not a pass: a token whose LP burn/lock was
+    // never measured cannot become a SIGNAL (which the tier classifier would
+    // promote to a top-signal delivery). It is not rejected either — it
+    // continues as a WATCHLIST so the operator can still see it and decide.
+    status = 'WATCHLIST'
+    rationale = `Screening passed but security evidence is incomplete — ${securityUnknowns[0]} (not a rejection, but never a top signal on missing data)`
   } else if (smartMoneyConfirmed) {
     status = 'SIGNAL'
     rationale =

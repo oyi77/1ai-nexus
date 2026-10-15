@@ -323,13 +323,18 @@ export async function auditBirdeyeToken(chain: string, contract: string): Promis
       top10HolderPercent = asFrac(audit.data?.top10Holders) ?? 0
       const dev = asFrac(audit.data?.dev)
       const sniper = asFrac(audit.data?.snipper)
-      const bundler = asFrac(audit.data?.bundler)
+      // Birdeye's audit.data.bundler is a WALLET COUNT (or count-based share),
+      // NOT a percentage of token supply: a value like 74.67 means 75 bundler
+      // wallets, not 75% of the supply. Downstream meme-sniper-eval treats
+      // bundlerPercent as a supply concentration gate (max 5%), so passing
+      // Birdeye's wallet count here causes false "Bundler holding > 5%"
+      // rejections across nearly every token. We drop it here; true supply
+      // share must come from an exit-ratio or supply-held source.
       const insider = asFrac(audit.data?.insider)
-      if (dev !== undefined || sniper !== undefined || bundler !== undefined || insider !== undefined) {
+      if (dev !== undefined || sniper !== undefined || insider !== undefined) {
         distribution = {
           devPercent: dev,
           sniperPercent: sniper,
-          bundlerPercent: bundler,
           insiderPercent: insider,
         }
       }
