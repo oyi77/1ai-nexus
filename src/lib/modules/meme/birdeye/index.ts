@@ -310,12 +310,15 @@ export async function auditBirdeyeToken(chain: string, contract: string): Promis
       const audit = await curlReq<BirdeyeAudit>(
         'GET', `/overview/audit?address=${encodeURIComponent(contract)}`,
       )
-      // Birdeye percentage scale is inconsistent: 0..1 fraction for some
-      // tokens, 0..100 percent for others. Normalize to a 0..1 fraction.
+      // Birdeye `percentage` is always on a 0..100 scale (live-proven 2026-10-15:
+      // Diy4Q5ai reports dev 6.55 / sniper 6.55 / bundler 74.67 / top10 20.32 —
+      // all > 1, all true percents. A sub-1.0 value such as MIM sniper 0.5147 is
+      // a REAL 0.51%, not a 0..1 fraction; the old `pct > 1 ? /100` heuristic
+      // left it as 0.5147, which downstream read as 51.48% (100x amplification).
       const asFrac = (g?: BirdeyeAuditGroup): number | undefined => {
         if (!g || g.percentage === undefined) return undefined
         const pct = toNum(g.percentage)
-        return pct > 1 ? pct / 100 : pct
+        return pct / 100
       }
       top10HolderPercent = asFrac(audit.data?.top10Holders) ?? 0
       const dev = asFrac(audit.data?.dev)

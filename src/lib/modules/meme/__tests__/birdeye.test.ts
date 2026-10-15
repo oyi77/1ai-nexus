@@ -120,7 +120,7 @@ describe('auditBirdeyeToken', () => {
         ],
       },
     }
-    const auditRes = { success: true, data: { top10Holders: { percentage: 0.35, wallets: 10 } } }
+    const auditRes = { success: true, data: { top10Holders: { percentage: 35, wallets: 10 } } }
     mockCurl([
       { status: 200, body: JSON.stringify(security) },
       { status: 200, body: JSON.stringify(auditRes) },
@@ -135,7 +135,7 @@ describe('auditBirdeyeToken', () => {
     // identical 61 rows for a renounced-mint token vs a fresh pump token) —
     // row presence proves nothing, so authority flags stay false here.
     expect(result!.canMint).toBe(false)
-    expect(result!.top10HolderPercent).toBe(0.35)
+    expect(result!.top10HolderPercent).toBeCloseTo(0.35)
   })
 
   it('returns null when security endpoint fails', async () => {
