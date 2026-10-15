@@ -20,9 +20,8 @@
 // -------------------------------------------------------------
 
 import 'dotenv/config'
-import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { prisma } from '@/lib/db'
+import { loadWalletBuys } from '@/lib/modules/derived/db-wallet-buys'
 import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
 import { contractButtons } from '@/lib/modules/derived/signal-tier'
 import {
@@ -37,13 +36,6 @@ import {
 import { isAccumulationSeen, markAccumulationSeen, markSent, pruneAccumulationState, readState, writeState } from '@/lib/modules/derived/accumulation-state'
 import type { WalletBuyCandidate } from '@/lib/modules/derived/wallet-discovery'
 
-interface WalletBuysArtifact {
-  generated_at?: string
-  min_usd?: number
-  window_min?: number
-  candidates?: Array<Partial<WalletBuyCandidate>>
-}
-
 interface MarketRow {
   marketCapUsd: number | null
   liquidityUsd: number | null
@@ -57,19 +49,18 @@ function numEnv(name: string, fallback: number): number {
   return Number.isFinite(n) && n >= 0 ? n : fallback
 }
 
-function artifactPath(): string {
-  return process.env.WALLET_BUYS_PATH ?? join(process.cwd(), 'data', 'wallet-buys-latest.json')
-}
-
-function readArtifactCandidates(): WalletBuyCandidate[] | null {
-  const path = artifactPath()
-  if (!existsSync(path)) return null
+/**
+ * Load wallet-buy candidates DB-first (WalletBuySignal), falling back to the
+ * JSON artifact inside loadWalletBuys when the DB is empty/unreachable. The
+ * same per-row validation discipline as the legacy file reader is preserved:
+ * a row without a finite buyVolumeUsd or a non-empty buyers list is dropped,
+ * never coerced into a signal.
+ */
+async function readArtifactCandidates(): Promise<WalletBuyCandidate[] | null> {
   try {
-    const raw = JSON.parse(readFileSync(path, 'utf8')) as WalletBuysArtifact
-    const candidates = raw.candidates
-    if (!Array.isArray(candidates) || candidates.length === 0) return null
+    const rows = await loadWalletBuys()
     const out: WalletBuyCandidate[] = []
-    for (const c of candidates) {
+    for (const c of rows) {
       if (
         typeof c.contract !== 'string' ||
         typeof c.buyVolumeUsd !== 'number' ||
@@ -79,13 +70,14 @@ function readArtifactCandidates(): WalletBuyCandidate[] | null {
       ) {
         continue
       }
+      const buyers = c.buyers.filter((b): b is string => typeof b === 'string')
       out.push({
         contract: c.contract,
         chain: 'solana',
-        discoveredBy: typeof c.discoveredBy === 'string' ? c.discoveredBy : c.buyers[0],
-        buyers: c.buyers.filter((b): b is string => typeof b === 'string'),
+        discoveredBy: buyers[0],
+        buyers,
         buyVolumeUsd: c.buyVolumeUsd,
-        buyCount: typeof c.buyCount === 'number' ? c.buyCount : c.buyers.length,
+        buyCount: typeof c.buyCount === 'number' ? c.buyCount : buyers.length,
         firstBuyAt: typeof c.firstBuyAt === 'number' ? c.firstBuyAt : 0,
         lastBuyAt: typeof c.lastBuyAt === 'number' ? c.lastBuyAt : 0,
         discoveryEvidence: [],
@@ -93,7 +85,7 @@ function readArtifactCandidates(): WalletBuyCandidate[] | null {
     }
     return out.length > 0 ? out : null
   } catch (err) {
-    console.error(`[accumulation-alert] artifact read failed: ${err instanceof Error ? err.message : String(err)}`)
+    console.error(`[accumulation-alert] candidate load failed: ${err instanceof Error ? err.message : String(err)}`)
     return null
   }
 }
@@ -177,7 +169,7 @@ async function main() {
       `cooldownMs=${opts.cooldownMs} windowMs=${opts.aggregationWindowMs}`,
   )
 
-  const candidates = readArtifactCandidates()
+  const candidates = await readArtifactCandidates()
   if (candidates === null) {
     console.log('[accumulation-alert] no wallet-buy candidates — no data, no alert')
     process.exit(0)

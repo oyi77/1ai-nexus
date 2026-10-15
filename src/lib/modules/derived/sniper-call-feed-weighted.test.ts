@@ -24,6 +24,7 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), `sniper-callfeed-${run}-`))
   process.env.SNIPER_SEEN_PATH = join(dir, 'seen.json')
   process.env.SNIPER_SEEN_DB = 'off'
+  process.env.CALL_FEED_DB = 'off'
   process.env.CALL_FEED_PATH = join(dir, 'call-feed.json')
   process.env.CALL_FEED_MAX_AGE_MIN = '999999'
   process.env.SNIPER_DISCOVER_MODE = 'call-feed'
@@ -36,6 +37,7 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env.SNIPER_SEEN_PATH
   delete process.env.SNIPER_SEEN_DB
+  delete process.env.CALL_FEED_DB
   delete process.env.CALL_FEED_PATH
   delete process.env.CALL_FEED_MAX_AGE_MIN
   delete process.env.SNIPER_DISCOVER_MODE

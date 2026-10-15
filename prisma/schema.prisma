@@ -1436,3 +1436,79 @@ model StateMeta {
   updatedAt DateTime @updatedAt
   @@index([scope])
 }
+
+// ─────────────────────────────────────────────────────────────
+// Cross-process state buses (migrated from data/*.json, 2026-10-16)
+// File-only artifacts that sat outside Postgres visibility — TS crons
+// clobbered them between passes. Each model below is DB-primary with
+// JSON dual-write fallback + env kill switch (see db-*-store.ts).
+// ─────────────────────────────────────────────────────────────
+
+// Tracked-wallet fresh buys (was data/wallet-buys-latest.json).
+// Written by wallet-refresh-cron + kol-monitor-cron; read by
+// sniper-scan discoverWalletBuys + accumulation-alert-cron.
+model WalletBuySignal {
+  id            String   @id @default(cuid())
+  contract      String   @unique
+  chain         String   @default("solana")
+  buyVolumeUsd  Float    @default(0)
+  buyCount      Int      @default(0)
+  firstBuyAt    DateTime?
+  lastBuyAt     DateTime?
+  buyers        Json
+  source        String   @default("wallet-refresh")
+  addedAt       DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([addedAt(sort: Desc)])
+  @@index([chain, addedAt(sort: Desc)])
+}
+
+// Smart-money confluence prefetch (was data/confluence-latest.json).
+// Written by confluence-cron writeConfluenceArtifact; read by
+// sniper-scan discoverConfluenceCandidates. Prefetch artifact, not
+// dedup state (dedup is SniperReviewSeen).
+model ConfluencePrefetch {
+  id        String   @id @default(cuid())
+  contract  String   @unique
+  chain     String   @default("solana")
+  signals   Json
+  updatedAt DateTime @updatedAt
+  @@index([updatedAt(sort: Desc)])
+}
+
+// Operator call-channel harvest (was data/call-feed-latest.json).
+// Python (call-feed.py) owns the SQLite dedup + writes the JSON artifact;
+// a TS sync step (call-feed-sync-db.ts) upserts rows here so sniper-scan
+// can query DB-first. Read by sniper-scan discoverCallFeed.
+model CallFeed {
+  id            String   @id @default(cuid())
+  contract      String   @unique
+  chain         String   @default("solana")
+  ticker        String   @default("")
+  marketCapUsd  Float?
+  mentionCount  Int      @default(0)
+  lastSeenAt    DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([lastSeenAt(sort: Desc)])
+  @@index([chain, lastSeenAt(sort: Desc)])
+}
+
+// BotX rotating API keys (was data/botx-keys.sqlite via node:sqlite).
+// Mirrors the full rotation semantics: health, rate-limit, request/error
+// counters. DB-primary with SQLite fallback (the credential-manager keeps
+// its synchronous path for getNextKey which must never await).
+model BotXKey {
+  id           String   @id @default(cuid())
+  apiKey       String   @unique
+  email        String   @default("")
+  createdAt    DateTime @default(now())
+  lastUsed     DateTime @default(now())
+  lastChecked  DateTime @default(now())
+  isHealthy    Boolean  @default(true)
+  rateLimited  Boolean  @default(false)
+  errorCount   Int      @default(0)
+  requestCount Int      @default(0)
+  updatedAt    DateTime @updatedAt
+  @@index([isHealthy, rateLimited])
+  @@index([createdAt])
+}

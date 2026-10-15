@@ -9,8 +9,8 @@
 
 import type { DatabaseSync } from 'node:sqlite'
 import { randomBytes, createHash } from 'node:crypto'
+import { saveBotXKeys } from '@/lib/modules/derived/db-botx-keys'
 import { join } from 'node:path'
-
 // Lazy-import node:sqlite at first use: a top-level value import
 // breaks vite-node/vitest externalization (rewrites node:sqlite →
 // bare sqlite, which never resolves). ponytail: move back to a
@@ -150,6 +150,28 @@ export class CredentialManager {
     this.db = openDb(path)
     this.initDb()
     this.loadKeys()
+    this.mirrorToDb()
+  }
+
+  /**
+   * Fire-and-forget mirror of the full key set to Postgres (BotXKey).
+   * SQLite stays the synchronous source of truth; the DB mirror gives
+   * cross-process visibility. Never throws — saveBotXKeys wraps all DB
+   * ops and falls through silently on failure.
+   */
+  private mirrorToDb(): void {
+    void saveBotXKeys(this.keys.map((k) => ({
+      id: k.id,
+      apiKey: k.apiKey,
+      email: k.email,
+      createdAt: k.createdAt,
+      lastUsed: k.lastUsed,
+      lastChecked: k.lastChecked,
+      isHealthy: k.isHealthy,
+      rateLimited: k.rateLimited,
+      errorCount: k.errorCount,
+      requestCount: k.requestCount,
+    })))
   }
 
   private initDb(): void {
@@ -216,7 +238,7 @@ export class CredentialManager {
     this.db.prepare(`UPDATE botx_keys SET last_used = ? WHERE id = ?`).run(Date.now(), key.id)
     key.lastUsed = Date.now()
     key.requestCount++
-
+    this.mirrorToDb()
     return key
   }
 
@@ -227,6 +249,7 @@ export class CredentialManager {
       key.rateLimited = true
       key.errorCount++
     }
+    this.mirrorToDb()
   }
 
   markHealthy(keyId: string): void {
@@ -237,6 +260,7 @@ export class CredentialManager {
       key.rateLimited = false
       key.lastChecked = Date.now()
     }
+    this.mirrorToDb()
   }
 
   markUnhealthy(keyId: string): void {
@@ -246,6 +270,7 @@ export class CredentialManager {
       key.isHealthy = false
       key.lastChecked = Date.now()
     }
+    this.mirrorToDb()
   }
 
   addKey(apiKey: string, email: string): BotXKey {
@@ -273,12 +298,14 @@ export class CredentialManager {
       .run(id, apiKey, email, now, now, now)
 
     this.keys.push(key)
+    this.mirrorToDb()
     return key
   }
 
   removeKey(keyId: string): void {
     this.db.prepare(`DELETE FROM botx_keys WHERE id = ?`).run(keyId)
     this.keys = this.keys.filter((k) => k.id !== keyId)
+    this.mirrorToDb()
   }
 
   getAllKeys(): BotXKey[] {

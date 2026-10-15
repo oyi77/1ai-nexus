@@ -9,10 +9,9 @@
 // -------------------------------------------------------------
 
 import 'dotenv/config'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { runWalletRefreshBatch } from '@/lib/modules/derived/wallet-refresh'
 import { foldWalletBuys } from '@/lib/modules/derived/wallet-discovery'
+import { saveWalletBuys } from '@/lib/modules/derived/db-wallet-buys'
 import type { NormalizedSwap } from '@/lib/modules/derived/solana-harvest'
 
 /**
@@ -20,6 +19,9 @@ import type { NormalizedSwap } from '@/lib/modules/derived/solana-harvest'
  * the RPC cost, so discovery reads this artifact instead of re-harvesting.
  * A wallet with no complete buy simply contributes nothing — never a
  * fabricated row.
+ *
+ * DB-primary via saveWalletBuys (WalletBuySignal upsert by contract) with
+ * the JSON artifact as a crash-safe dual-write backup. Never throws.
  */
 async function writeWalletBuysArtifact(
   swapsByWallet: Array<{ wallet: string; swaps: unknown[] }>,
@@ -30,13 +32,8 @@ async function writeWalletBuysArtifact(
     swapsByWallet.map((w) => ({ wallet: w.wallet, swaps: w.swaps as NormalizedSwap[] })),
     { now, sinceMs: now - windowMin * 60_000 },
   )
-  const dir = join(process.cwd(), 'data')
-  await mkdir(dir, { recursive: true })
-  const out = {
-    generated_at: new Date(now).toISOString(),
-    min_usd: Number(process.env.WALLET_DISCOVERY_MIN_USD) || 2_000,
-    window_min: windowMin,
-    candidates: candidates.map((c) => ({
+  await saveWalletBuys(
+    candidates.map((c) => ({
       contract: c.contract,
       chain: c.chain,
       buyers: c.buyers,
@@ -45,10 +42,10 @@ async function writeWalletBuysArtifact(
       firstBuyAt: c.firstBuyAt,
       lastBuyAt: c.lastBuyAt,
     })),
-  }
-  const p = process.env.WALLET_BUYS_PATH || join(dir, 'wallet-buys-latest.json')
-  await writeFile(p, JSON.stringify(out, null, 2))
-  console.log(`[wallet-refresh] wrote ${candidates.length} wallet-buy candidate(s) → ${p}`)
+    'wallet-refresh',
+    windowMin,
+  )
+  console.log(`[wallet-refresh] persisted ${candidates.length} wallet-buy candidate(s)`)
 }
 
 async function main() {

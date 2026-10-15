@@ -33,9 +33,8 @@
 // -------------------------------------------------------------
 
 import 'dotenv/config'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
+import { saveWalletBuys, loadWalletBuys, type WalletBuyRow } from '@/lib/modules/derived/db-wallet-buys'
 import { fetchKolscanFeed, screenKolscanTransactions, KOLSCAN_THRESHOLDS, type KolscanScreenedTx } from '@/lib/modules/meme/kolscan'
 import { kolscanTxToNormalizedSwap } from '@/lib/modules/meme/kolscan/adapter'
 import { filterUnseenTransactionsDb, markTransactionsSeenDb } from '@/lib/modules/meme/kolscan/seen'
@@ -51,30 +50,6 @@ import { exportGatePassersToSheet } from '@/lib/modules/meme/sheet-export'
 import { foldWalletBuys } from '@/lib/modules/derived/wallet-discovery'
 import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
 import type { NormalizedSwap } from '@/lib/modules/derived/solana-harvest'
-
-interface WalletBuysArtifact {
-  generated_at: string
-  min_usd: number
-  window_min: number
-  candidates: Array<{
-    contract: string
-    chain: string
-    buyers: string[]
-    buyVolumeUsd: number
-    buyCount: number
-    firstBuyAt: number
-    lastBuyAt: number
-  }>
-}
-
-async function readExistingArtifact(path: string): Promise<WalletBuysArtifact | null> {
-  try {
-    const raw = await readFile(path, 'utf8')
-    return JSON.parse(raw) as WalletBuysArtifact
-  } catch {
-    return null
-  }
-}
 
 async function buildWinRateMap(): Promise<Map<string, number | null>> {
   const wrMap = new Map<string, number | null>()
@@ -113,10 +88,6 @@ async function main() {
     console.log("[kol-monitor] disabled (KOL_MONITOR_ENABLED != 'true')")
     return
   }
-
-  const dir = join(process.cwd(), 'data')
-  await mkdir(dir, { recursive: true })
-  const artifactPath = process.env.WALLET_BUYS_PATH || join(dir, 'wallet-buys-latest.json')
 
   console.log(`[kol-monitor] ${new Date().toISOString()} — starting`)
 
@@ -179,12 +150,12 @@ async function main() {
           minBuyUsd: KOLSCAN_THRESHOLDS.minPurchaseUsd,
         })
 
-        // Merge with existing artifact candidates (dedup by contract).
-        const existing = await readExistingArtifact(artifactPath)
-        const byContract = new Map<string, WalletBuysArtifact['candidates'][number]>()
+        // Merge with existing candidates (DB-first, dedup by contract).
+        const existing = await loadWalletBuys()
+        const byContract = new Map<string, WalletBuyRow>()
 
         if (existing) {
-          for (const c of existing.candidates) {
+          for (const c of existing) {
             byContract.set(c.contract, c)
           }
         }
@@ -200,8 +171,8 @@ async function main() {
               buyers: [...buyers],
               buyVolumeUsd: hit.buyVolumeUsd + c.buyVolumeUsd,
               buyCount: hit.buyCount + c.buyCount,
-              firstBuyAt: Math.min(hit.firstBuyAt, c.firstBuyAt),
-              lastBuyAt: Math.max(hit.lastBuyAt, c.lastBuyAt),
+              firstBuyAt: Math.min(hit.firstBuyAt ?? 0, c.firstBuyAt),
+              lastBuyAt: Math.max(hit.lastBuyAt ?? 0, c.lastBuyAt),
             })
           } else {
             byContract.set(c.contract, {
@@ -216,14 +187,8 @@ async function main() {
           }
         }
 
-        const out: WalletBuysArtifact = {
-          generated_at: new Date(now).toISOString(),
-          min_usd: KOLSCAN_THRESHOLDS.minPurchaseUsd,
-          window_min: windowMin,
-          candidates: [...byContract.values()],
-        }
-        await writeFile(artifactPath, JSON.stringify(out, null, 2))
-        console.log(`[kol-monitor] wrote ${candidates.length} new candidate(s) → ${artifactPath} (total: ${byContract.size})`)
+        await saveWalletBuys([...byContract.values()], 'kol-monitor', windowMin)
+        console.log(`[kol-monitor] persisted ${candidates.length} new candidate(s) (total: ${byContract.size})`)
 
         // Mark seen only AFTER the merge succeeds — a crash mid-merge can
         // still re-fold the same buys on the next run.

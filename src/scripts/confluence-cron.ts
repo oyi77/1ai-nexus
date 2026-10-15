@@ -38,6 +38,7 @@ import {
   writeConfluenceArtifact,
   type ConfluenceWalletRow,
 } from '@/lib/modules/derived/confluence-state';
+import { saveConfluencePrefetch } from '@/lib/modules/derived/db-confluence-prefetch'
 import {
   isConfluenceSeen,
   markConfluenceSeen,
@@ -125,8 +126,18 @@ async function main(): Promise<void> {
   );
   if (result.signals.length > 0) {
     writeConfluenceArtifact(result.signals);
+    await saveConfluencePrefetch(
+      result.signals.map((s) => ({
+        contract: s.tokenMint,
+        chain: 'solana',
+        buyers: s.qualifiedBuyers,
+        totalBuyUsd: s.totalBuyUsd,
+        firstBuyAt: s.firstBuyAt,
+        lastBuyAt: s.lastBuyAt,
+      })),
+    );
     console.log(
-      `[confluence] wrote ${result.signals.length} confluence signal(s) → data/confluence-latest.json`,
+      `[confluence] wrote ${result.signals.length} confluence signal(s) → DB + data/confluence-latest.json`,
     );
   }
 

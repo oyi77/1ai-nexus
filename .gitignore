@@ -114,6 +114,8 @@ data/accumulation-alert-state.json
 data/confluence-seen.json
 data/confluence-latest.json
 data/kolscan-seen.json
+data/call-feed-state.sqlite
+data/botx-keys.sqlite
 
 # GMGN tag inventory sweep (runtime artifact, regenerated on demand)
 data/gmgn-tag-inventory.json

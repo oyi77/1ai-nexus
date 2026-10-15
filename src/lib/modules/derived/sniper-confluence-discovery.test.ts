@@ -24,7 +24,9 @@ beforeEach(() => {
   process.env.CONFLUENCE_MAX_AGE_MIN = '120'
   process.env.SNIPER_SEEN_PATH = join(dir, 'seen.json')
   process.env.SNIPER_SEEN_DB = 'off'
-  process.env.SNIPER_MIN_MARKET_CAP_USD = '0'
+  process.env.CONFLUENCE_PREFETCH_DB = 'off'
+  process.env.CALL_FEED_DB = 'off'
+  process.env.WALLET_BUYS_DB = 'off'
   process.env.SNIPER_MIN_LIQUIDITY_USD = '0'
 })
 
@@ -33,6 +35,9 @@ afterEach(() => {
   delete process.env.CONFLUENCE_MAX_AGE_MIN
   delete process.env.SNIPER_SEEN_PATH
   delete process.env.SNIPER_SEEN_DB
+  delete process.env.CONFLUENCE_PREFETCH_DB
+  delete process.env.CALL_FEED_DB
+  delete process.env.WALLET_BUYS_DB
   delete process.env.SNIPER_MIN_MARKET_CAP_USD
   delete process.env.SNIPER_MIN_LIQUIDITY_USD
   delete process.env.SNIPER_DISCOVER_MODE

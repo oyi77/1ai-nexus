@@ -14,7 +14,9 @@ import {
   mergeEvidence,
   type CandidateEvidence,
 } from '@/lib/modules/derived/unified-candidate'
-import { readConfluenceArtifact } from '@/lib/modules/derived/confluence-state'
+import { loadConfluencePrefetch } from '@/lib/modules/derived/db-confluence-prefetch'
+import { loadWalletBuys } from '@/lib/modules/derived/db-wallet-buys'
+import { loadCallFeed } from '@/lib/modules/derived/db-call-feed'
 
 const DEXS = 'https://api.dexscreener.com'
 const GECKO = 'https://api.geckoterminal.com'
@@ -246,11 +248,6 @@ interface CallFeedCandidate {
   caller_weights?: Record<string, number>
 }
 
-interface CallFeedArtifact {
-  generated_at: string
-  window_min: number
-  candidates: CallFeedCandidate[]
-}
 
 async function discoverCallFeed(limit: number): Promise<SniperEnrichedToken[]> {
   const rows = await readCallFeedArtifact()
@@ -353,18 +350,23 @@ async function hydrateFromDexscreener(chain: string, contract: string): Promise<
 }
 
 async function readCallFeedArtifact(): Promise<CallFeedCandidate[]> {
-  try {
-    const { readFile } = await import('node:fs/promises')
-    const { join } = await import('node:path')
-    const p = process.env.CALL_FEED_PATH || join(process.cwd(), 'data', 'call-feed-latest.json')
-    const raw = JSON.parse(await readFile(p, 'utf8')) as CallFeedArtifact
-    const ageMin = (Date.now() - Date.parse(raw.generated_at)) / 60_000
-    const maxAge = Number(process.env.CALL_FEED_MAX_AGE_MIN) || 180
-    if (!Number.isFinite(ageMin) || ageMin > maxAge) return [] // stale feed ≠ candidates
-    return (raw.candidates ?? []).filter((c) => c.source_count >= 1)
-  } catch {
-    return [] // artifact missing/unparseable → no feed candidates
-  }
+  const rows = await loadCallFeed()
+  return rows.map((r) => ({
+    contract: r.contract,
+    chain: r.chain,
+    source_count: r.sourceCount,
+    mentions: r.mentions,
+    kinds: r.kinds,
+    sources: r.sources,
+    first_seen: r.firstSeen,
+    last_seen: r.lastSeen,
+    ...(typeof r.weightedScore === 'number' && Number.isFinite(r.weightedScore) && {
+      weighted_score: r.weightedScore,
+    }),
+    ...(r.callerWeights !== undefined &&
+      typeof r.callerWeights === 'object' &&
+      r.callerWeights !== null && { caller_weights: r.callerWeights }),
+  }))
 }
 
 
@@ -388,18 +390,16 @@ interface WalletBuyFile {
 }
 
 async function readWalletBuyArtifact(): Promise<WalletBuyFile['candidates']> {
-  try {
-    const { readFile } = await import('node:fs/promises')
-    const { join } = await import('node:path')
-    const p = process.env.WALLET_BUYS_PATH || join(process.cwd(), 'data', 'wallet-buys-latest.json')
-    const raw = JSON.parse(await readFile(p, 'utf8')) as WalletBuyFile
-    const ageMin = (Date.now() - Date.parse(raw.generated_at)) / 60_000
-    const maxAge = Number(process.env.WALLET_BUYS_MAX_AGE_MIN) || 120
-    if (!Number.isFinite(ageMin) || ageMin > maxAge) return [] // stale ≠ candidates
-    return raw.candidates ?? []
-  } catch {
-    return [] // artifact missing/unparseable → no wallet candidates
-  }
+  const rows = await loadWalletBuys()
+  return rows.map((r) => ({
+    contract: r.contract,
+    chain: r.chain,
+    buyers: r.buyers,
+    buyVolumeUsd: r.buyVolumeUsd,
+    buyCount: r.buyCount,
+    firstBuyAt: r.firstBuyAt ?? 0,
+    lastBuyAt: r.lastBuyAt ?? 0,
+  }))
 }
 
 async function discoverWalletBuys(limit: number): Promise<SniperEnrichedToken[]> {
@@ -433,7 +433,7 @@ async function discoverWalletBuys(limit: number): Promise<SniperEnrichedToken[]>
  * buyers in a 15-minute sliding window). Hydrates each valid Solana mint from Dexscreener.
  */
 export async function discoverConfluenceCandidates(limit: number): Promise<SniperEnrichedToken[]> {
-  const rows = await readConfluenceArtifact()
+  const rows = await loadConfluencePrefetch()
   const out: SniperEnrichedToken[] = []
   for (const r of rows) {
     if (out.length >= limit) break
