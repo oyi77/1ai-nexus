@@ -6,6 +6,7 @@ import { DataTable, type Column } from "@/components/shell/DataTable";
 import { LiveDot } from "@/components/primitives/LiveDot";
 import { csrfFetch } from "@/lib/csrf";
 import type { MemeRiskAudit } from "@/lib/modules/meme/types";
+import type { DevHistoryVerdict } from "@/lib/modules/derived/dev-history";
 import {
   RefreshCw,
   ExternalLink,
@@ -41,6 +42,10 @@ type Entry = {
   deduped: boolean;
   delivered: boolean;
   auditsUsed: string[];
+  devHistory?: DevHistoryVerdict | null;
+  bondingCurve?: { progressPct: number; state?: string } | null;
+  discoveryCategory?: string;
+  discoveryEvidence?: Array<{ provider?: string; category?: string; note?: string }>;
 };
 
 type Payload = {
@@ -58,6 +63,46 @@ const statusClass: Record<Status, string> = {
 
 const pct = (v: number | null) => (v === null || v === undefined ? "n/a" : `${Math.round(v * 10) / 10}%`);
 const shortAddr = (a: string) => (a.length > 12 ? `${a.slice(0, 4)}…${a.slice(-4)}` : a);
+
+type DevRiskTier = "CLEAN" | "UNPROVEN" | "SUSPECT" | "SERIAL RUGGER";
+
+const devRiskBadgeStyles: Record<DevRiskTier, string> = {
+  CLEAN: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  UNPROVEN: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
+  SUSPECT: "bg-amber-500/15 text-amber-400 border-amber-500/30",
+  "SERIAL RUGGER": "bg-rose-500/15 text-rose-400 border-rose-500/30",
+};
+
+function resolveDevRisk(r: Entry): { tier: DevRiskTier; detail?: string } | null {
+  if (r.devHistory?.tier) {
+    const t = r.devHistory.tier;
+    if (t === "SERIAL_RUGGER") return { tier: "SERIAL RUGGER", detail: `${r.devHistory.ruggedCount} rug` };
+    if (t === "SUSPECT") return { tier: "SUSPECT", detail: `${Math.round((r.devHistory.migrationRate ?? 0) * 100)}% mig` };
+    if (t === "UNPROVEN") return { tier: "UNPROVEN", detail: "first deploy" };
+    if (t === "CLEAN") return { tier: "CLEAN", detail: `${r.devHistory.migrations}/${r.devHistory.previousTokens} mig` };
+  }
+  const text = (r.rationale + " " + r.rejections.join(" ") + " " + r.warnings.join(" ")).toLowerCase();
+  if (text.includes("serial rugger") || text.includes("serial_rugger")) return { tier: "SERIAL RUGGER" };
+  if (text.includes("[dev-history]") && text.includes("suspect")) return { tier: "SUSPECT" };
+  if (text.includes("[dev-history]") && text.includes("unproven")) return { tier: "UNPROVEN" };
+  if (text.includes("[dev-history]") && text.includes("clean")) return { tier: "CLEAN" };
+  if (r.rejections.some((s) => /honeypot|mintable|freeze/i.test(s))) return { tier: "SERIAL RUGGER", detail: "security" };
+  if (r.auditsUsed?.length > 0) {
+    if (r.status === "SIGNAL") return { tier: "CLEAN", detail: `${r.auditsUsed.length} audits` };
+    if (r.status === "WATCHLIST") return { tier: "UNPROVEN", detail: `${r.auditsUsed.length} audits` };
+    if (r.status === "REJECT") return { tier: "SUSPECT", detail: "audit warnings" };
+  }
+  return null;
+}
+
+function isTrenchCandidate(e: Entry): boolean {
+  if (e.contract.toLowerCase().endsWith("pump")) return true;
+  if (e.discoveryCategory === "BONDING") return true;
+  if (e.discoveryEvidence?.some((ev) => ev.provider?.includes("trenches") || ev.provider?.includes("solpump") || ev.note?.includes("bonding"))) return true;
+  if (e.metrics.stage === "bonding" || e.metrics.stageLabel?.toLowerCase().includes("bonding")) return true;
+  const full = (e.rationale + " " + e.rejections.join(" ") + " " + e.warnings.join(" ")).toLowerCase();
+  return full.includes("trenches") || full.includes("bonding");
+}
 
 type AuditVerdict = "Passed" | "Caution" | "High Risk";
 
@@ -110,10 +155,38 @@ const columns: Column<Entry>[] = [
     accessor: (r) => r.ticker,
     render: (r) => (
       <div className="min-w-0">
-        <div className="text-text-primary truncate">{r.ticker}</div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-text-primary truncate">{r.ticker}</span>
+          {isTrenchCandidate(r) && (
+            <span
+              className="text-[9px] px-1 py-0.2 rounded bg-purple-500/15 text-purple-300 font-mono border border-purple-500/30"
+              title="Solpump Trenches / PumpFun"
+            >
+              trenches
+            </span>
+          )}
+        </div>
         <div className="text-[10px] text-text-muted font-mono">{shortAddr(r.contract)}</div>
       </div>
     ),
+  },
+  {
+    key: "devRisk",
+    header: "Dev / Risk",
+    width: 110,
+    accessor: (r) => resolveDevRisk(r)?.tier ?? "",
+    render: (r) => {
+      const risk = resolveDevRisk(r);
+      if (!risk) return <span className="text-text-muted text-[10px] font-mono">—</span>;
+      return (
+        <span
+          className={`inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-medium rounded border ${devRiskBadgeStyles[risk.tier]}`}
+          title={risk.detail ? `${risk.tier}: ${risk.detail}` : risk.tier}
+        >
+          {risk.tier}
+        </span>
+      );
+    },
   },
   {
     key: "stage",
@@ -215,7 +288,8 @@ export function MemeSniperPageContent() {
   const [status, setStatus] = useState<"live" | "stale" | "error">("stale");
   const [scanning, setScanning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Status | "all">("all");
+  type FilterType = Status | "all" | "trenches";
+  const [filter, setFilter] = useState<FilterType>("all");
 
   // Live Pulse / auto-refresh state
   const [pollInterval, setPollInterval] = useState<"10s" | "60s">("60s");
@@ -396,7 +470,13 @@ export function MemeSniperPageContent() {
     ? new Date(payload.updatedAt).toLocaleTimeString()
     : "never";
 
-  const rows = payload ? (filter === "all" ? payload.entries : payload.entries.filter((e) => e.status === filter)) : [];
+  const rows = payload
+    ? filter === "all"
+      ? payload.entries
+      : filter === "trenches"
+      ? payload.entries.filter(isTrenchCandidate)
+      : payload.entries.filter((e) => e.status === filter)
+    : [];
 
   return (
     <div className="space-y-4">
@@ -481,13 +561,21 @@ export function MemeSniperPageContent() {
 
         <Panel title="Decisions" subtitle={`${payload?.counts.total ?? 0} logged`} className="min-w-[240px]">
           <div className="px-3 py-2 flex items-center gap-3 text-xs font-mono">
-            {(["all", "SIGNAL", "WATCHLIST", "REJECT"] as const).map((k) => (
+            {([
+              { id: "all" as const, label: `all ${payload?.counts.total ?? 0}` },
+              { id: "SIGNAL" as const, label: `signals ${payload?.counts.SIGNAL ?? 0}` },
+              { id: "WATCHLIST" as const, label: `watchlist ${payload?.counts.WATCHLIST ?? 0}` },
+              { id: "REJECT" as const, label: `rejected ${payload?.counts.REJECT ?? 0}` },
+              { id: "trenches" as const, label: `trenches ${payload ? payload.entries.filter(isTrenchCandidate).length : 0}` },
+            ]).map((t) => (
               <button
-                key={k}
-                onClick={() => setFilter(k)}
-                className={`px-1.5 py-0.5 rounded ${filter === k ? "bg-bg-raised text-text-primary" : "text-text-muted hover:text-text-secondary"}`}
+                key={t.id}
+                onClick={() => setFilter(t.id)}
+                className={`px-1.5 py-0.5 rounded transition-colors ${
+                  filter === t.id ? "bg-bg-raised text-text-primary font-semibold" : "text-text-muted hover:text-text-secondary"
+                }`}
               >
-                {k === "all" ? `all ${payload?.counts.total ?? 0}` : `${k.toLowerCase()} ${payload?.counts[k as Status] ?? 0}`}
+                {t.label}
               </button>
             ))}
           </div>
@@ -613,87 +701,37 @@ export function MemeSniperPageContent() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
             <div className="bg-bg-base/70 p-2 rounded border border-bg-border/60">
-              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">
-                Risk Level
-              </div>
-              <div
-                className={`font-mono text-sm font-medium mt-0.5 ${
-                  auditResult.riskLevel >= 3
-                    ? "text-rose-400"
-                    : auditResult.riskLevel === 2
-                    ? "text-amber-400"
-                    : "text-emerald-400"
-                }`}
-              >
+              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">Risk Level</div>
+              <div className={`font-mono text-sm font-medium mt-0.5 ${auditResult.riskLevel >= 3 ? "text-rose-400" : auditResult.riskLevel === 2 ? "text-amber-400" : "text-emerald-400"}`}>
                 {auditResult.riskLevel}/3
               </div>
             </div>
-
             <div className="bg-bg-base/70 p-2 rounded border border-bg-border/60">
-              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">
-                Mint Auth
-              </div>
-              <div
-                className={`font-mono text-sm font-medium mt-0.5 ${
-                  auditResult.canMint ? "text-amber-400" : "text-emerald-400"
-                }`}
-              >
+              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">Mint Auth</div>
+              <div className={`font-mono text-sm font-medium mt-0.5 ${auditResult.canMint ? "text-amber-400" : "text-emerald-400"}`}>
                 {auditResult.canMint ? "Enabled" : "Renounced"}
               </div>
             </div>
-
             <div className="bg-bg-base/70 p-2 rounded border border-bg-border/60">
-              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">
-                Freeze Auth
-              </div>
-              <div
-                className={`font-mono text-sm font-medium mt-0.5 ${
-                  auditResult.canFreeze ? "text-rose-400" : "text-emerald-400"
-                }`}
-              >
+              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">Freeze Auth</div>
+              <div className={`font-mono text-sm font-medium mt-0.5 ${auditResult.canFreeze ? "text-rose-400" : "text-emerald-400"}`}>
                 {auditResult.canFreeze ? "Enabled" : "Disabled"}
               </div>
             </div>
-
             <div className="bg-bg-base/70 p-2 rounded border border-bg-border/60">
-              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">
-                Top 10 Holders %
-              </div>
-              <div
-                className={`font-mono text-sm font-medium mt-0.5 ${
-                  auditResult.top10Percent !== null &&
-                  (auditResult.top10Percent > 1 ? auditResult.top10Percent : auditResult.top10Percent * 100) > 30
-                    ? "text-amber-400"
-                    : "text-text-primary"
-                }`}
-              >
+              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">Top 10 Holders %</div>
+              <div className={`font-mono text-sm font-medium mt-0.5 ${auditResult.top10Percent !== null && (auditResult.top10Percent > 1 ? auditResult.top10Percent : auditResult.top10Percent * 100) > 30 ? "text-amber-400" : "text-text-primary"}`}>
                 {formatMetricPct(auditResult.top10Percent)}
               </div>
             </div>
-
             <div className="bg-bg-base/70 p-2 rounded border border-bg-border/60">
-              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">
-                LP Locked %
-              </div>
-              <div
-                className={`font-mono text-sm font-medium mt-0.5 ${
-                  auditResult.lpLockedPercent !== null && auditResult.lpLockedPercent >= 0
-                    ? (auditResult.lpLockedPercent > 1
-                        ? auditResult.lpLockedPercent >= 80
-                        : auditResult.lpLockedPercent >= 0.8)
-                      ? "text-emerald-400"
-                      : "text-amber-400"
-                    : "text-text-muted"
-                }`}
-              >
+              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">LP Locked %</div>
+              <div className={`font-mono text-sm font-medium mt-0.5 ${auditResult.lpLockedPercent !== null && auditResult.lpLockedPercent >= 0 ? ((auditResult.lpLockedPercent > 1 ? auditResult.lpLockedPercent >= 80 : auditResult.lpLockedPercent >= 0.8) ? "text-emerald-400" : "text-amber-400") : "text-text-muted"}`}>
                 {formatMetricPct(auditResult.lpLockedPercent)}
               </div>
             </div>
-
             <div className="bg-bg-base/70 p-2 rounded border border-bg-border/60">
-              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">
-                Buy / Sell Tax
-              </div>
+              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">Buy / Sell Tax</div>
               <div className="font-mono text-sm font-medium mt-0.5 text-text-primary">
                 {formatTax(auditResult.buyTax)} / {formatTax(auditResult.sellTax)}
               </div>

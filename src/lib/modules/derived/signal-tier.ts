@@ -194,6 +194,7 @@ export function tierLabel(tier: SignalTier): string {
 // ─────────────────────────────────────────────────────────────
 
 import type { SniperPayload } from './meme-sniper'
+import type { DevHistoryVerdict } from '@/lib/modules/derived/dev-history'
 
 export interface SignalFormatInput {
   payload: SniperPayload
@@ -213,6 +214,10 @@ export interface SignalFormatInput {
    * source is a single point of failure and MUST read as one.
    */
   auditSources?: string[]
+  /** Developer history classification (anti-rug lifecycle). */
+  devHistory?: DevHistoryVerdict | null
+  /** Bonding curve progress & lifecycle state (Solpump trenches / PumpFun). */
+  bondingCurve?: { progressPct: number; state?: string } | null
   /** Known risks / invalidation conditions, operator-facing. */
   risks?: string[]
   /** Attach inline BUY/chart buttons under the message. Defaults true. */
@@ -235,6 +240,9 @@ export interface PotentialCoinSignalInput {
   volumeUsd?: number | null
   /** Price change percent; null-safe rendered as n/a. */
   priceChangePct?: number | null
+  auditSources?: string[]
+  devHistory?: DevHistoryVerdict | null
+  bondingCurve?: { progressPct: number; state?: string } | null
   risks?: string[]
   /** Verification timestamp; string/Date/epoch are all accepted, else n/a. */
   verifiedAt?: string | Date | number | null
@@ -362,6 +370,8 @@ function renderMarketSection(
 function renderSafetySection(
   sec: SniperPayload['security'],
   auditSources?: string[],
+  devHistory?: DevHistoryVerdict | null,
+  bondingCurve?: { progressPct: number; state?: string } | null,
 ): string[] {
   const L: string[] = []
   L.push('🛡️ <b>Safety:</b>')
@@ -393,6 +403,24 @@ function renderSafetySection(
     }
   } else if (auditSources !== undefined) {
     L.push('• Audits: ⚠️ No confirmed audit sources')
+  }
+
+  if (devHistory) {
+    if (devHistory.tier === 'CLEAN') {
+      L.push(`• Dev History: ✅ CLEAN (${devHistory.migrations}/${devHistory.previousTokens} migrated)`)
+    } else if (devHistory.tier === 'UNPROVEN') {
+      L.push('• Dev History: ℹ️ UNPROVEN (first deploy)')
+    } else if (devHistory.tier === 'SUSPECT') {
+      const rate = Math.round((devHistory.migrationRate ?? 0) * 100)
+      L.push(`• Dev History: ⚠️ SUSPECT (${devHistory.migrations}/${devHistory.previousTokens} migrated, rate ${rate}%)`)
+    } else if (devHistory.tier === 'SERIAL_RUGGER') {
+      L.push(`• Dev History: 🚨 SERIAL RUGGER (${devHistory.ruggedCount} rugged / ${devHistory.previousTokens} deployed)`)
+    }
+  }
+
+  if (bondingCurve) {
+    const stateLabel = escapeSignalHtml(bondingCurve.state || 'Graduating')
+    L.push(`• Bonding Curve: 🚀 ${bondingCurve.progressPct.toFixed(1)}% (${stateLabel})`)
   }
 
   return L
@@ -552,7 +580,7 @@ export function formatTieredSignal(input: SignalFormatInput): FormattedSignal {
   L.push('')
 
   // Safety
-  L.push(...renderSafetySection(sec, input.auditSources))
+  L.push(...renderSafetySection(sec, input.auditSources, input.devHistory, input.bondingCurve))
   L.push('')
 
   // Distribution
@@ -630,7 +658,7 @@ export function formatPotentialCoinSignal(input: PotentialCoinSignalInput): Form
   L.push('')
 
   // Safety
-  L.push(...renderSafetySection(sec))
+  L.push(...renderSafetySection(sec, input.auditSources, input.devHistory, input.bondingCurve))
   L.push('')
 
   // Distribution

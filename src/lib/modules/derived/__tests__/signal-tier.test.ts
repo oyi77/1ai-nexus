@@ -1,5 +1,6 @@
 // ─────────────────────────────────────────────────────────────
-// Signal tier tests — policy A–F ordering, delivery gating, labels.
+// Signal tier tests — policy A–F ordering, delivery gating, labels,
+// dev-history reputation, and trenches bonding curve formatting.
 // Pure; no I/O.
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest';
@@ -7,11 +8,15 @@ import {
   classifySignalTier,
   shouldDeliver,
   tierLabel,
+  formatTieredSignal,
+  formatPotentialCoinSignal,
   DEFAULT_DELIVERY_POLICY,
   type TierInput,
+  type SignalFormatInput,
 } from '../signal-tier';
-import type { SniperDecision } from '../meme-sniper';
+import type { SniperDecision, SniperPayload } from '../meme-sniper';
 import type { SmartMoneyEvidence } from '../smart-money-provider';
+import type { DevHistoryVerdict } from '../dev-history';
 
 function decision(over: Partial<SniperDecision> = {}): SniperDecision {
   return {
@@ -64,6 +69,37 @@ function evidence(over: Partial<SmartMoneyEvidence> = {}): SmartMoneyEvidence {
     bullishHoldingUsd: 5000,
     ttlMs: 1000,
     source: 'wallet-db:smartMoneyWallet',
+    ...over,
+  };
+}
+
+function payload(over: Partial<SniperPayload> = {}): SniperPayload {
+  return {
+    ticker: 'TEST',
+    contract: 'So11111111111111111111111111111111111111112',
+    chain: 'solana',
+    ageMinutes: 30,
+    security: {
+      mintable: false,
+      freezeAuthority: false,
+      honeypot: false,
+      lpBurnedPercent: 100,
+      lpLockedPercent: null,
+    },
+    distribution: { top10Percent: 12, devPercent: 0, sniperPercent: 3, bundlerPercent: 2, insiderPercent: 0 },
+    momentum: { marketCap: 250_000, volume5m: 60_000 },
+    ...over,
+  } as SniperPayload;
+}
+
+function formatInput(over: Partial<SignalFormatInput> = {}): SignalFormatInput {
+  return {
+    payload: payload(),
+    tier: 'HIGH_CONVICTION',
+    tierReasons: [],
+    tierMissing: [],
+    smartMoney: null,
+    marketCapUsd: 250_000,
     ...over,
   };
 }
@@ -171,5 +207,107 @@ describe('tierLabel', () => {
     expect(tierLabel('CANDIDATE')).toContain('not a top signal');
     expect(tierLabel('WATCHLIST')).toContain('not a top signal');
     expect(tierLabel('HIGH_CONVICTION')).not.toContain('not a top signal');
+  });
+});
+
+describe('formatTieredSignal — devHistory and bondingCurve', () => {
+  it('devHistory: CLEAN renders the correct dev history line', () => {
+    const devClean: DevHistoryVerdict = {
+      tier: 'CLEAN',
+      previousTokens: 5,
+      migrations: 3,
+      migrationRate: 0.6,
+      ruggedCount: 0,
+      reasons: ['3 of 5 tokens migrated, no rugs detected'],
+    };
+    const out = formatTieredSignal(formatInput({ devHistory: devClean }));
+    expect(out.text).toContain('• Dev History: ✅ CLEAN (3/5 migrated)');
+  });
+
+  it('devHistory: SERIAL_RUGGER renders serial rugger warning', () => {
+    const devRugger: DevHistoryVerdict = {
+      tier: 'SERIAL_RUGGER',
+      previousTokens: 8,
+      migrations: 0,
+      migrationRate: 0,
+      ruggedCount: 4,
+      reasons: ['4 tokens rugged'],
+    };
+    const out = formatTieredSignal(formatInput({ devHistory: devRugger }));
+    expect(out.text).toContain('• Dev History: 🚨 SERIAL RUGGER (4 rugged / 8 deployed)');
+  });
+
+  it('devHistory: UNPROVEN renders first deploy note', () => {
+    const devUnproven: DevHistoryVerdict = {
+      tier: 'UNPROVEN',
+      previousTokens: 0,
+      migrations: 0,
+      migrationRate: null,
+      ruggedCount: 0,
+      reasons: ['first deploy'],
+    };
+    const out = formatTieredSignal(formatInput({ devHistory: devUnproven }));
+    expect(out.text).toContain('• Dev History: ℹ️ UNPROVEN (first deploy)');
+  });
+
+  it('devHistory: SUSPECT renders suspect warning with migration rate', () => {
+    const devSuspect: DevHistoryVerdict = {
+      tier: 'SUSPECT',
+      previousTokens: 4,
+      migrations: 1,
+      migrationRate: 0.25,
+      ruggedCount: 0,
+      reasons: ['low migration rate'],
+    };
+    const out = formatTieredSignal(formatInput({ devHistory: devSuspect }));
+    expect(out.text).toContain('• Dev History: ⚠️ SUSPECT (1/4 migrated, rate 25%)');
+  });
+
+  it('devHistory: null/undefined does not render dev history line (backward-compatible)', () => {
+    const outNull = formatTieredSignal(formatInput({ devHistory: null }));
+    expect(outNull.text).not.toContain('Dev History:');
+
+    const outUndef = formatTieredSignal(formatInput({ devHistory: undefined }));
+    expect(outUndef.text).not.toContain('Dev History:');
+
+    const outDefault = formatTieredSignal(formatInput());
+    expect(outDefault.text).not.toContain('Dev History:');
+  });
+
+  it('bondingCurve renders bonding curve progress percentage and state', () => {
+    const out = formatTieredSignal(
+      formatInput({ bondingCurve: { progressPct: 88.5, state: 'Graduating' } }),
+    );
+    expect(out.text).toContain('• Bonding Curve: 🚀 88.5% (Graduating)');
+  });
+
+  it('bondingCurve uses Graduating fallback when state is omitted', () => {
+    const out = formatTieredSignal(
+      formatInput({ bondingCurve: { progressPct: 92.4 } }),
+    );
+    expect(out.text).toContain('• Bonding Curve: 🚀 92.4% (Graduating)');
+  });
+
+  it('formatPotentialCoinSignal also renders devHistory and bondingCurve correctly', () => {
+    const out = formatPotentialCoinSignal({
+      payload: payload(),
+      tier: 'CANDIDATE',
+      tierReasons: ['passed prefilter'],
+      tierMissing: ['wallet confirmation'],
+      smartMoney: null,
+      marketCapUsd: 100_000,
+      liquidityUsd: 25_000,
+      devHistory: {
+        tier: 'CLEAN',
+        previousTokens: 3,
+        migrations: 2,
+        migrationRate: 0.67,
+        ruggedCount: 0,
+        reasons: ['clean history'],
+      },
+      bondingCurve: { progressPct: 89.1, state: 'Sweet-Spot' },
+    });
+    expect(out.text).toContain('• Dev History: ✅ CLEAN (2/3 migrated)');
+    expect(out.text).toContain('• Bonding Curve: 🚀 89.1% (Sweet-Spot)');
   });
 });
