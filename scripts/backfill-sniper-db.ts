@@ -195,7 +195,7 @@ async function main() {
   const afterOutcome = await prisma.sniperSignalOutcome.count()
 
   console.log('[backfill] after:  scan=%d audit=%d outcome=%d', afterScan, afterAudit, afterOutcome)
-  console.log('[backfill] delta:  scan=%+d audit=%+d outcome=%+d', afterScan - beforeScan, afterAudit - beforeAudit, afterOutcome - beforeOutcome)
+  console.log('[backfill] delta:  scan=+%d audit=+%d outcome=+%d', afterScan - beforeScan, afterAudit - beforeAudit, afterOutcome - beforeOutcome)
   console.log('[backfill] done.')
   process.exit(0)
 }
