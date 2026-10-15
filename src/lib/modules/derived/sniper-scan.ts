@@ -21,6 +21,7 @@ import {
   toSniperPayload,
   type SniperEnrichedToken,
 } from '@/lib/modules/derived/sniper-source'
+import { discoverTrenches, trenchesGateOn } from '@/lib/modules/derived/discover-trenches'
 import type { MemeRiskAudit } from '@/lib/modules/meme/types'
 import { traceTokenBuyers } from '@/lib/modules/derived/wallet-tracer'
 import {
@@ -780,13 +781,24 @@ async function discoverApiOnly(limit: number): Promise<SniperEnrichedToken[]> {
   // launches, boosts catches promotion-driven flow. Each is error-isolated
   // (one dead endpoint must not blank the scan) and the union is merged by
   // chain-aware identity so an overlap is one candidate with two evidence rows.
-  const [fresh, boosts] = await Promise.allSettled([
+  // Trenches is additive (opt-in, SNIPER_TRENCHES_DISCOVERY + the shared
+  // SOLPUMP_TRENCHES_ENABLED fetch flag): bonding-curve sweet-spot rows join
+  // the same union — an overlap with an API row merges into ONE candidate
+  // carrying the trenches lifecycle evidence plus the live market snapshot,
+  // which is exactly the row the momentum gates need.
+  const [fresh, boosts, trenches] = await Promise.allSettled([
     discoverGeckoNewPools(limit),
     discoverYoungPairs(limit),
+    discoverTrenches(limit),
   ])
   const a = fresh.status === 'fulfilled' ? fresh.value : []
   const b = boosts.status === 'fulfilled' ? boosts.value : []
-  return unionCandidates(a, b)
+  const t = trenches.status === 'fulfilled' ? trenches.value : []
+  const apiUnion = unionCandidates(a, b)
+  console.log(
+    `[sniper] trenches discovery: ${t.length} sweet-spot candidates (gate ${trenchesGateOn() ? 'on' : 'off'})`,
+  )
+  return unionCandidates(apiUnion, t)
 }
 
 /** No-wallet-evidence shape: empty, never a fabricated bullish row. */
