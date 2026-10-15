@@ -612,9 +612,12 @@ function discoverMode(): DiscoverMode {
 // ─── Dev-history gate (anti-rug, opt-in) ────────────────────────
 // SNIPER_DEV_HISTORY_GATE="true" turns the gate on; default OFF keeps the
 // existing pipeline byte-for-byte. The lookup (solpump dev-tokens endpoint)
-// is expensive per candidate, so verdicts are memoized per dev for 30 min
-// (max 500 entries, oldest evicted) — one dev minting 5 tokens in a scan
-// window costs ONE fetch, not five.
+// is expensive per candidate, so verdicts are memoized per CONTRACT for 30
+// min (max 500 entries, oldest evicted). Per-contract is the correctness-
+// safe key (a verdict describes one token, not its dev); the trade-off is
+// that different contracts from the same dev still fetch separately. And
+// because cron spawns a fresh process every pass, the 30-min TTL is
+// effectively per-pass — it only dedupes repeated candidates within one scan.
 
 const DEV_HISTORY_TTL_MS = 30 * 60_000
 const DEV_HISTORY_MAX_ENTRIES = 500
