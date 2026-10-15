@@ -163,7 +163,11 @@ async function recomputeSector(): Promise<SectorPersistCells> {
     FROM pairs GROUP BY 1`
   if (rows.length === 0) return FALLBACK_SECTOR
   const by = Object.fromEntries(rows.map((r) => [r.side, { n: Number(r.n), hits: Number(r.hits) }]))
-  if (!by.top || !by.bottom) return FALLBACK_SECTOR
+  // Sparse live data (e.g. 3 persistence pairs per side) is statistically
+  // meaningless and must not masquerade as "measured" — fall back to the
+  // baked backtest cells (n=115/101) until live accrual reaches the same
+  // minimum sample threshold used by fundingUnwind (n>=20 per side).
+  if (!by.top || !by.bottom || by.top.n < 20 || by.bottom.n < 20) return FALLBACK_SECTOR
   return { asOf: new Date().toISOString().slice(0, 10), top: by.top, bottom: by.bottom }
 }
 
@@ -206,7 +210,11 @@ export async function getFundingCells(): Promise<FundingUnwindCells> {
 export async function getSectorCells(): Promise<SectorPersistCells> {
   try {
     const { data } = await getCached<SectorPersistCells>('brief-calib:sector', DAY_MS, recomputeSector)
-    return data.top && data.bottom ? data : FALLBACK_SECTOR
+    // Reject sparse live cells even when served from cache (Redis TTL 24h can
+    // pin a stale n=3 recompute). Same n>=20 threshold as recomputeSector —
+    // statistically meaningless cells fall back to the baked backtest.
+    if (!data.top || !data.bottom || data.top.n < 20 || data.bottom.n < 20) return FALLBACK_SECTOR
+    return data
   } catch {
     return FALLBACK_SECTOR
   }
