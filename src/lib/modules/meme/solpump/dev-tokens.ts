@@ -1,3 +1,4 @@
+import { solpumpFetch } from './solpump-fetch'
 // ─────────────────────────────────────────────────────────────
 // Module: Solpump — Developer token history (anti-rug adapter)
 // sourceType: public-api
@@ -37,6 +38,14 @@ import {
 } from '@/lib/modules/derived/dev-history'
 const SOLPUMP_BASE = 'https://trade.solpump.io/api/v2/token'
 const FETCH_TIMEOUT_MS = 8_000
+
+// The pipeline's canonical chain label is 'solana' (normalizeChainId), but
+// this endpoint only serves the short upstream label — live-proven
+// 2026-10-15: /SOL/<mint>/dev-tokens → 200, /solana/<mint>/dev-tokens → 400.
+// Every 400 in the cron logs was this, not a rate limit (the same bursts
+// replay 200 from curl and from Node one-at-a-time). Mirrors alph.ts's
+// ALPH_UPSTREAM_CHAIN reverse map.
+const SOLPUMP_UPSTREAM_CHAIN: Record<string, string> = { solana: 'SOL' }
 
 export interface FetchDevTokenHistoryOpts {
   /** Per-request timeout in ms (default 8_000). */
@@ -91,27 +100,29 @@ export async function fetchDevTokenHistory(
   if (!cachedEnabled) return { devAddress: null, tokens: [] }
 
   const timeoutMs = opts.timeoutMs ?? FETCH_TIMEOUT_MS
-  const url = `${SOLPUMP_BASE}/${encodeURIComponent(chain)}/${encodeURIComponent(tokenAddress)}/dev-tokens`
+  const upstreamChain = SOLPUMP_UPSTREAM_CHAIN[chain.toLowerCase()] ?? chain.toUpperCase()
+  const url = `${SOLPUMP_BASE}/${encodeURIComponent(upstreamChain)}/${encodeURIComponent(tokenAddress)}/dev-tokens`
 
-  try {
-    const res = await fetch(url, {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'Mozilla/5.0',
-      },
-      signal: AbortSignal.timeout(timeoutMs),
-    })
-    if (!res.ok) {
+  const res = await solpumpFetch(url, {
+    headers: {
+      Accept: 'application/json',
+      'User-Agent': 'Mozilla/5.0',
+    },
+  }, { timeoutMs }).catch(() => null)
+  if (!res || !res.ok) {
+    if (res) {
       logger.warn(
         `Solpump dev-tokens non-200: ${res.status} ${res.statusText}`,
         'meme:solpump',
       )
-      return { devAddress: null, tokens: [] }
     }
+    return { devAddress: null, tokens: [] }
+  }
+  try {
     return parseDevTokensResponse(await res.json())
   } catch (err) {
     logger.warn(
-      `Solpump dev-tokens fetch failed: ${err instanceof Error ? err.message : String(err)}`,
+      `Solpump dev-tokens parse failed: ${err instanceof Error ? err.message : String(err)}`,
       'meme:solpump',
     )
     return { devAddress: null, tokens: [] }

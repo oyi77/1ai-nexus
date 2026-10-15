@@ -29,6 +29,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { logger } from '@/lib/logger'
+import { solpumpFetch } from './solpump-fetch'
 
 const SOLPUMP_TRENCHES_BASE =
   'https://trade.solpump.io/api/v2/scanner/trenches'
@@ -123,11 +124,12 @@ export async function fetchSolpumpTrenches(
   const collected: SolpumpTrenchToken[] = []
   let cursor: string | undefined = opts.cursor
 
-  try {
-    for (let page = 0; page < maxPages; page++) {
-      const body: Record<string, string> = cursor ? { cursor } : {}
+  for (let page = 0; page < maxPages; page++) {
+    const body: Record<string, string> = cursor ? { cursor } : {}
 
-      const res = await fetch(`${SOLPUMP_TRENCHES_BASE}/${phase}`, {
+    const res = await solpumpFetch(
+      `${SOLPUMP_TRENCHES_BASE}/${phase}`,
+      {
         method: 'POST',
         headers: {
           Accept: 'application/json',
@@ -135,30 +137,34 @@ export async function fetchSolpumpTrenches(
           'User-Agent': 'Mozilla/5.0',
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(timeoutMs),
-      })
-      if (!res.ok) {
-        logger.warn(
-          `Solpump trenches ${phase} non-200: ${res.status} ${res.statusText}`,
-          'meme:solpump',
-        )
-        return []
-      }
-
-      const bodyJson: unknown = await res.json()
-      const parsed = parseTrenchesResponse(bodyJson)
-      if (parsed.tokens.length === 0) break
-
-      collected.push(...parsed.tokens)
-      if (!parsed.nextCursor) break
-      cursor = parsed.nextCursor
+      },
+      { timeoutMs },
+    ).catch(() => null)
+    if (!res) return []
+    if (!res.ok) {
+      logger.warn(
+        `Solpump trenches ${phase} non-200: ${res.status} ${res.statusText}`,
+        'meme:solpump',
+      )
+      return []
     }
-  } catch (err) {
-    logger.warn(
-      `Solpump trenches ${phase} fetch failed: ${err instanceof Error ? err.message : String(err)}`,
-      'meme:solpump',
-    )
-    return []
+
+    let bodyJson: unknown
+    try {
+      bodyJson = await res.json()
+    } catch (err) {
+      logger.warn(
+        `Solpump trenches ${phase} parse failed: ${err instanceof Error ? err.message : String(err)}`,
+        'meme:solpump',
+      )
+      return []
+    }
+    const parsed = parseTrenchesResponse(bodyJson)
+    if (parsed.tokens.length === 0) break
+
+    collected.push(...parsed.tokens)
+    if (!parsed.nextCursor) break
+    cursor = parsed.nextCursor
   }
 
   return collected

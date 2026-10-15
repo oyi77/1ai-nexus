@@ -10,6 +10,7 @@ import {
   parseDevTokensResponse,
   __resetSolpumpDevTokensForTests,
 } from '../dev-tokens'
+import { __resetSolpumpFetchForTests } from '../solpump-fetch'
 
 // ── Helpers ──
 
@@ -29,6 +30,13 @@ function mockFetchSequence(bodies: Array<{ status: number; body: unknown }>) {
 
 beforeEach(() => {
   delete process.env.SOLPUMP_TRENCHES_ENABLED
+  delete process.env.SOLPUMP_REQUEST_GAP_MS
+  delete process.env.SOLPUMP_MAX_RETRIES
+  // Unit tests assert single-response semantics, not transport pacing —
+  // zero gap + zero retries keeps them fast without changing behavior.
+  process.env.SOLPUMP_REQUEST_GAP_MS = '0'
+  process.env.SOLPUMP_MAX_RETRIES = '0'
+  __resetSolpumpFetchForTests()
   __resetSolpumpDevTokensForTests()
 })
 
