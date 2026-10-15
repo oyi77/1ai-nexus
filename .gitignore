@@ -42,6 +42,8 @@ secrets/
 /home/
 
 # scratch research artifacts (large scraped dumps — must not be scanned by tailwind or committed)
+# botx_docs.html: BotX docs dump with curl auth headers + API keys (gitleaks 35 hits), never commit
+botx_docs.html
 /local/
 /home/
 
@@ -79,12 +81,8 @@ data/crossex/
 # BotX key store (runtime SQLite — contains API keys, never commit)
 data/*.sqlite
 data/*-journal
-data/moby-session.json
-data/gmgn-session.json
-data/fomo-session.json
-data/nansen-session.json
-data/stockbit-session.json
-data/alphio-session.json
+# Platform session cookies/tokens (live credentials, never commit)
+data/*-session.json
 
 # gamification rollback snapshot (large prod pg_dump — must NOT be committed)
 /backup_before_gamification.sql
