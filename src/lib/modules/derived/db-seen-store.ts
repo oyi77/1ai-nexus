@@ -28,6 +28,8 @@ export const TICKER_SEEN_TTL_MS = 60 * 60_000
 export const CONFLUENCE_SEEN_TTL_MS = 6 * 60 * 60_000
 export const ACCUMULATION_SEEN_TTL_MS = 6 * 60 * 60_000
 export const KOLSCAN_SEEN_TTL_MS = 6 * 60 * 60_000
+/** Whale-buy scanner: one token = one emission per cooldown window. */
+export const WHALE_BUY_SEEN_TTL_MS = 6 * 60 * 60_000
 /**
  * Kill-switch: when `SNIPER_SEEN_DB` is 'off'/'false'/'0', ALL prisma calls
  * are skipped — reads go straight to the JSON namespace file, writes go only
@@ -45,6 +47,7 @@ const NAMESPACE_TTL_MS: Record<string, number> = {
   confluence: CONFLUENCE_SEEN_TTL_MS,
   accumulation: ACCUMULATION_SEEN_TTL_MS,
   kolscan: KOLSCAN_SEEN_TTL_MS,
+  whalebuy: WHALE_BUY_SEEN_TTL_MS,
 }
 
 function getJsonPath(namespace: string): string {
@@ -312,4 +315,15 @@ export function markSignaturesSeen(
     signatures.map((signature) => `kolscan:${signature}`),
     ttlMs,
   )
+}
+
+export function isWhaleBuySeen(chain: string, contract: string): Promise<boolean> {
+  return isKeySeen(`whalebuy:${chainContractKey(chain, contract)}`)
+}
+export function markWhaleBuySeen(
+  chain: string,
+  contract: string,
+  ttlMs: number = WHALE_BUY_SEEN_TTL_MS,
+): Promise<void> {
+  return markKeySeen(`whalebuy:${chainContractKey(chain, contract)}`, ttlMs)
 }

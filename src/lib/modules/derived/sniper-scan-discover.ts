@@ -16,6 +16,7 @@ import {
 } from '@/lib/modules/derived/unified-candidate'
 import { loadConfluencePrefetch } from '@/lib/modules/derived/db-confluence-prefetch'
 import { loadWalletBuys } from '@/lib/modules/derived/db-wallet-buys'
+import { loadWhaleBuys } from '@/lib/modules/derived/whale-buy-store'
 import { loadCallFeed } from '@/lib/modules/derived/db-call-feed'
 
 const DEXS = 'https://api.dexscreener.com'
@@ -428,6 +429,48 @@ async function discoverWalletBuys(limit: number): Promise<SniperEnrichedToken[]>
 }
 
 /**
+ * Autonomous whale-buy discovery (token-first scanner).
+ * Reads the whale-buy-scanner store (source='whale-buy-scanner' in
+ * WalletBuySignal) — written by whale-buy-scan-cron. Hydrates each
+ * Solana mint from Dexscreener, same base58 guard as wallet buys.
+ */
+async function discoverWhaleBuys(limit: number): Promise<SniperEnrichedToken[]> {
+  let rows: Array<{
+    contract: string
+    chain: string
+    buyers: string[]
+    buyVolumeUsd: number
+    buyCount: number
+    firstBuyAt: number | null
+    lastBuyAt: number | null
+  }> = []
+  try {
+    rows = await loadWhaleBuys()
+  } catch {
+    return [] // store is opportunistic — never throw
+  }
+  const out: SniperEnrichedToken[] = []
+  for (const r of rows) {
+    if (out.length >= limit) break
+    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(r.contract)) continue
+    const live = await hydrateFromDexscreener(r.chain, r.contract)
+    if (!live) continue
+    out.push({
+      ...live,
+      discoveryEvidence: [
+        {
+          provider: 'whale-buy-scanner',
+          category: 'WHALE_ACTIVITY',
+          discoveredAt: r.lastBuyAt ?? Date.now(),
+          note: `whale scan: ${r.buyers.length} buyer(s) | $${Math.round(r.buyVolumeUsd).toLocaleString()} across ${r.buyCount} legs`,
+        } as CandidateEvidence,
+      ],
+    })
+  }
+  return out
+}
+
+/**
  * Smart-money confluence discovery (Fase 4).
  * Reads data/confluence-latest.json (written by confluence-cron from >=2 qualified
  * buyers in a 15-minute sliding window). Hydrates each valid Solana mint from Dexscreener.
@@ -553,24 +596,30 @@ export async function discoverCombined(limit: number): Promise<SniperEnrichedTok
     } catch { /* confluence artifact is opportunistic — market lists fallback */ }
   } else if (mode === 'wallet') {
     try {
-      const [confRes, buysRes] = await Promise.allSettled([
+      const [confRes, buysRes, whaleRes] = await Promise.allSettled([
         discoverConfluenceCandidates(limit),
         discoverWalletBuys(limit),
+        discoverWhaleBuys(limit),
       ])
       const conf = confRes.status === 'fulfilled' ? confRes.value : []
       const buys = buysRes.status === 'fulfilled' ? buysRes.value : []
-      const whale = conf.length > 0 && buys.length > 0 ? unionCandidates(conf, buys) : (conf.length > 0 ? conf : buys)
+      const wlbuys = whaleRes.status === 'fulfilled' ? whaleRes.value : []
+      const unionedBuys = buys.length > 0 && wlbuys.length > 0 ? unionCandidates(buys, wlbuys) : (buys.length > 0 ? buys : wlbuys)
+      const whale = conf.length > 0 && unionedBuys.length > 0 ? unionCandidates(conf, unionedBuys) : (conf.length > 0 ? conf : unionedBuys)
       if (whale.length > 0) candidates = whale
     } catch { /* wallet artifact is opportunistic — market lists fallback */ }
   } else if (mode === 'auto') {
     try {
-      const [confRes, buysRes] = await Promise.allSettled([
+      const [confRes, buysRes, whaleRes] = await Promise.allSettled([
         discoverConfluenceCandidates(limit),
         discoverWalletBuys(limit),
+        discoverWhaleBuys(limit),
       ])
       const conf = confRes.status === 'fulfilled' ? confRes.value : []
       const buys = buysRes.status === 'fulfilled' ? buysRes.value : []
-      const whale = conf.length > 0 && buys.length > 0 ? unionCandidates(conf, buys) : (conf.length > 0 ? conf : buys)
+      const wlbuys = whaleRes.status === 'fulfilled' ? whaleRes.value : []
+      const unionedBuys = buys.length > 0 && wlbuys.length > 0 ? unionCandidates(buys, wlbuys) : (buys.length > 0 ? buys : wlbuys)
+      const whale = conf.length > 0 && unionedBuys.length > 0 ? unionCandidates(conf, unionedBuys) : (conf.length > 0 ? conf : unionedBuys)
       if (whale.length > 0) {
         const api = await discoverApiOnly(limit)
         candidates = unionCandidates(whale, api)
@@ -580,20 +629,40 @@ export async function discoverCombined(limit: number): Promise<SniperEnrichedTok
   // Operator call-feed is the fastest attention signal: a token called by
   // 3+ independent channels is worth auditing before the API lists catch up.
   if (candidates.length === 0 && (mode === 'call-feed' || mode === 'auto')) {
+    let feed: SniperEnrichedToken[] = []
     try {
-      const feed = await discoverCallFeed(limit)
-      if (feed.length > 0) {
-        if (mode === 'call-feed') {
-          candidates = feed
-        } else {
-          // auto: union feed + API lists, feed-listed contracts first. An
-          // overlap is merged (feed evidence + API market snapshot), not
-          // dropped — the API row often carries the live m5 flow the feed lacks.
-          const api = await discoverApiOnly(limit)
-          candidates = unionCandidates(feed, api)
-        }
-      }
-    } catch { /* feed is opportunistic — API lists are the fallback */ }
+      feed = await discoverCallFeed(limit)
+    } catch { /* feed is opportunistic — confluence/wallet/API still run */ }
+    if (mode === 'call-feed') {
+      // call-feed + confluence + wallet: the same whale union as auto mode,
+      // merged with the feed so confluence signals from data/confluence-latest.json
+      // are never dead in this mode. An overlap merges evidence; a feed-only
+      // or confluence-only token still enters the audit pipeline.
+      try {
+        const [confRes, buysRes, whaleRes] = await Promise.allSettled([
+          discoverConfluenceCandidates(limit),
+          discoverWalletBuys(limit),
+          discoverWhaleBuys(limit),
+        ])
+        const conf = confRes.status === 'fulfilled' ? confRes.value : []
+        const buys = buysRes.status === 'fulfilled' ? buysRes.value : []
+        const wlbuys = whaleRes.status === 'fulfilled' ? whaleRes.value : []
+        const unionedBuys = buys.length > 0 && wlbuys.length > 0 ? unionCandidates(buys, wlbuys) : (buys.length > 0 ? buys : wlbuys)
+        const whale = conf.length > 0 && unionedBuys.length > 0 ? unionCandidates(conf, unionedBuys) : (conf.length > 0 ? conf : unionedBuys)
+        const combined = feed.length > 0 && whale.length > 0
+          ? unionCandidates(feed, whale)
+          : (feed.length > 0 ? feed : whale)
+        if (combined.length > 0) candidates = combined
+      } catch { /* confluence/wallet are opportunistic — API lists are the fallback */ }
+    } else if (feed.length > 0) {
+      // auto: union feed + API lists, feed-listed contracts first. An
+      // overlap is merged (feed evidence + API market snapshot), not
+      // dropped — the API row often carries the live m5 flow the feed lacks.
+      try {
+        const api = await discoverApiOnly(limit)
+        candidates = unionCandidates(feed, api)
+      } catch { /* API lists are opportunistic */ }
+    }
   }
   if (candidates.length === 0) candidates = await discoverApiOnly(limit)
 
