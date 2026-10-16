@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 // -------------------------------------------------------------
 // Whale accumulation alert cron.
-//
-// Reads data/wallet-buys-latest.json (written by wallet-refresh-cron /
-// kol-monitor-cron via foldWalletBuys), cross-references the classified
-// SmartMoneyWallet rows, and emits ONE telegram alert per token per
-// cooldown when a bullish-classified wallet made a confirmed buy of
+// Reads wallet-buy candidates (WalletBuySignal DB / JSON artifact),
+// classifies each buyer under the 4-category taxonomy (fresh_wallet / kol /
+// other_coin_whale / smart_money), and emits ONE telegram alert per token
+// per cooldown when at least one tagged buyer made a confirmed buy of
 // >= minBuyUsd on a token with verified market cap < maxMarketCapUsd.
 //
 // Safe: no data, no alert; delivery failure logs and exits 0.
@@ -25,13 +24,13 @@ import { loadWalletBuys } from '@/lib/modules/derived/db-wallet-buys'
 import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
 import { contractButtons } from '@/lib/modules/derived/signal-tier'
 import {
-  ACCUMULATION_BUYER_STATUSES,
   ACCUMULATION_DEFAULTS,
   buildAccumulationEvents,
   dedupeEventsByContract,
   renderAccumulationAlert,
   shouldSend,
   type AccumulationOptions,
+  type BuyerFacts,
 } from '@/lib/modules/derived/accumulation-alert'
 import { isAccumulationSeen, markAccumulationSeen, markSent, pruneAccumulationState, readState, writeState } from '@/lib/modules/derived/accumulation-state'
 import type { WalletBuyCandidate } from '@/lib/modules/derived/wallet-discovery'
@@ -90,34 +89,45 @@ async function readArtifactCandidates(): Promise<WalletBuyCandidate[] | null> {
   }
 }
 
-async function loadBuyerStatus(): Promise<
-  Map<string, { status: string; alias: string | null; winRate?: number | null; pnl?: number | null }>
-> {
-  const map = new Map<
-    string,
-    { status: string; alias: string | null; winRate?: number | null; pnl?: number | null }
-  >()
+/**
+ * Load buyer facts (Wallet labels/alias + SmartMoneyWallet status) for the
+ * addresses referenced by the candidates. Unlike the old gate this queries
+ * EVERY buyer address — including never-classified wallets — so that
+ * fresh_wallet and kol tags surface. Never throws: on DB failure returns an
+ * empty map (every buyer then classifies as fresh_wallet via the missing-
+ * entry fallback in the builder).
+ */
+async function loadBuyerStatus(addresses: string[]): Promise<Map<string, BuyerFacts>> {
+  const map = new Map<string, BuyerFacts>()
+  if (addresses.length === 0) return map
   try {
-    const rows = await prisma.smartMoneyWallet.findMany({
-      where: { status: { in: [...ACCUMULATION_BUYER_STATUSES] } },
+    // Wallet carries labels + alias (KOL/FIRST_SEEN signals). SmartMoneyWallet
+    // is a 1:1 relation carrying the classifier status/winRate/pnl. A wallet
+    // with no SMW row (never classified) still returns — status stays null.
+    const wallets = await prisma.wallet.findMany({
+      where: { address: { in: addresses } },
       select: {
-        status: true,
-        winRate: true,
-        pnl30d: true,
-        wallet: { select: { address: true, alias: true } },
+        address: true,
+        alias: true,
+        labels: true,
+        smartMoneyWallet: {
+          select: { status: true, winRate: true, pnl30d: true },
+        },
       },
     })
-    for (const row of rows) {
-      map.set(row.wallet.address, {
-        status: row.status ?? 'UNKNOWN',
-        alias: row.wallet.alias ?? null,
-        winRate: row.winRate ?? null,
-        pnl: row.pnl30d ?? null,
+    for (const w of wallets) {
+      const smw = w.smartMoneyWallet
+      map.set(w.address, {
+        status: smw?.status ?? null,
+        alias: w.alias ?? null,
+        labels: w.labels ?? [],
+        winRate: smw?.winRate ?? null,
+        pnl: smw?.pnl30d ?? null,
       })
     }
   } catch (err) {
     console.error(
-      `[accumulation-alert] smartMoneyWallet query failed: ${
+      `[accumulation-alert] wallet query failed: ${
         err instanceof Error ? err.message : String(err)
       }`,
     )
@@ -176,9 +186,10 @@ async function main() {
   }
   console.log(`[accumulation-alert] artifact: ${candidates.length} candidate(s)`)
 
-  const buyerStatus = await loadBuyerStatus()
+  const buyerAddresses = [...new Set(candidates.flatMap((c) => c.buyers))]
+  const buyerStatus = await loadBuyerStatus(buyerAddresses)
   const markets = await loadMarkets(candidates)
-  console.log(`[accumulation-alert] classified bullish wallets: ${buyerStatus.size}`)
+  console.log(`[accumulation-alert] buyer facts loaded: ${buyerStatus.size}/${buyerAddresses.length}`)
 
   const events = dedupeEventsByContract(
     buildAccumulationEvents({ candidates, buyerStatus, market: markets, opts }),
@@ -191,6 +202,11 @@ async function main() {
   let state = pruneAccumulationState(readState(), now)
 
   for (const event of events) {
+    const tagSummary = event.categories.join('+')
+    console.log(
+      `[accumulation-alert] event ${event.token.contract} tier=${event.tier} ` +
+        `categories=${tagSummary} buyers=${event.buyers.length} $${event.totalBuyUsd.toFixed(2)}`,
+    )
     if (!shouldSend(event, state, now, opts.cooldownMs) || (await isAccumulationSeen(event.token.contract))) {
       suppressed += 1
       console.log(`[accumulation-alert] suppressed (cooldown) ${event.token.contract}`)

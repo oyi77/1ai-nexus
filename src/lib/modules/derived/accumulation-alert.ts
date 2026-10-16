@@ -27,7 +27,7 @@
 
 import type { WalletBuyCandidate } from './wallet-discovery'
 
-/** Statuses that count as a whale/smart-money buyer. */
+/** Statuses that count as a whale/smart-money buyer (legacy gate, retained for callers). */
 export const ACCUMULATION_BUYER_STATUSES = [
   'WHALE_AND_SMART_MONEY',
   'QUALIFIED_SMART_MONEY',
@@ -35,6 +35,72 @@ export const ACCUMULATION_BUYER_STATUSES = [
 ] as const
 
 export type AccumulationBuyerStatus = (typeof ACCUMULATION_BUYER_STATUSES)[number]
+
+/**
+ * Buyer taxonomy for the accumulation alert (operator spec, 4 categories).
+ *
+ * Replaces the old single gate (buyer must be WHALE / QUALIFIED_SMART_MONEY /
+ * WHALE_AND_SMART_MONEY) with a 4-way classification. A pure smart-money gate
+ * silently dropped every large buy made by an unclassified or KOL wallet —
+ * the operator wants to see those buys too, clearly labelled as to how much
+ * track record stands behind them.
+ *
+ *   fresh_wallet     no SmartMoneyWallet row / status NULL|UNKNOWN, or the
+ *                    wallet carries the FIRST_SEEN label -> lowest trust.
+ *   kol              Wallet.labels contains 'kol' (case-insensitive, so
+ *                    'kolscan'/'kol-monitor' match) OR the alias says KOL.
+ *   other_coin_whale SmartMoneyWallet.status = WHALE (not smart money).
+ *   smart_money      status in {QUALIFIED_SMART_MONEY, WHALE_AND_SMART_MONEY}.
+ *
+ * Categories are ORTHOGONAL: a wallet can be both KOL and whale. The builder
+ * keeps ALL applicable tags on the buyer so the operator sees "whale + KOL",
+ * never one tag silently replacing the other.
+ */
+export const BUYER_CATEGORIES = [
+  'fresh_wallet',
+  'kol',
+  'other_coin_whale',
+  'smart_money',
+] as const
+
+export type BuyerCategory = (typeof BUYER_CATEGORIES)[number]
+
+/** Per-category trust tier (operator spec). */
+export type BuyerTier = 'low' | 'medium' | 'high' | 'highest'
+
+export const BUYER_CATEGORY_TIER: Record<BuyerCategory, BuyerTier> = {
+  fresh_wallet: 'low',
+  kol: 'medium',
+  other_coin_whale: 'high',
+  smart_money: 'highest',
+}
+
+/**
+ * Per-category disclaimer, rendered next to the buyer line. smart_money is
+ * the incumbent verified gate, so it carries no disclaimer; every other
+ * category says plainly what it is NOT.
+ */
+export const BUYER_CATEGORY_DISCLAIMER: Record<BuyerCategory, string | null> = {
+  fresh_wallet: 'fresh wallet - no track record',
+  kol: 'KOL/influencer buy - not necessarily smart money',
+  other_coin_whale: 'whale buyer - large position, cross-token',
+  smart_money: null,
+}
+
+/** Human label for each category, for the rendered tag. */
+export const BUYER_CATEGORY_LABEL: Record<BuyerCategory, string> = {
+  fresh_wallet: 'Fresh wallet',
+  kol: 'KOL',
+  other_coin_whale: 'Whale',
+  smart_money: 'Smart money',
+}
+
+/** Statuses that mean verified smart money (highest tier). */
+export const SMART_MONEY_STATUSES = ['QUALIFIED_SMART_MONEY', 'WHALE_AND_SMART_MONEY'] as const
+
+/** The label the whale pipeline writes for a never-classified wallet. */
+export const FIRST_SEEN_LABEL = 'FIRST_SEEN'
+
 
 export const ACCUMULATION_DEFAULTS = {
   /** Minimum aggregate verified buy USD for a candidate to be an event. */
@@ -54,10 +120,20 @@ export interface AccumulationBuyer {
   status: string
   /** Status label is authoritative; fallback text is separate. */
   classification: string
+  /** Every taxonomy tag that applies (orthogonal — e.g. 'kol'+'other_coin_whale'). */
+  categories: BuyerCategory[]
+  /** Highest-trust tag, used for the event-level tier and tag ordering. */
+  primaryCategory: BuyerCategory
+  /** Trust tier of primaryCategory. */
+  tier: BuyerTier
+  /** Per-category disclaimers for the tags that carry one (smart_money: none). */
+  disclaimers: string[]
   /** Per-buyer USD is NOT in the artifact; kept null rather than invented. */
   buyValueUsd: number | null
   stale: boolean
   alias: string | null
+  /** Raw Wallet.labels, carried for provenance/rendering. */
+  labels: string[]
   winRate?: number | null
   pnl?: number | null
 }
@@ -73,6 +149,14 @@ export interface AccumulationToken {
 export interface AccumulationEvent {
   token: AccumulationToken
   buyers: AccumulationBuyer[]
+  /** Every category present among the buyers (union, tier-ordered). */
+  categories: BuyerCategory[]
+  /** Highest-trust category present — drives the alert header emoji. */
+  primaryCategory: BuyerCategory
+  /** Trust tier of primaryCategory. */
+  tier: BuyerTier
+  /** Unique per-category disclaimers (smart_money carries none). */
+  disclaimers: string[]
   totalBuyUsd: number
   windowStartAt: string
   windowEndAt: string
@@ -88,10 +172,22 @@ export interface AccumulationOptions {
   aggregationWindowMs: number
 }
 
+/** Caller-supplied wallet facts for one buyer address. */
+export interface BuyerFacts {
+  /** SmartMoneyWallet.status, or null when the wallet was never classified. */
+  status: string | null
+  /** Wallet.alias (operator watch-list name). */
+  alias: string | null
+  /** Wallet.labels — carries koi signals ('kolscan', 'kol-monitor', 'FIRST_SEEN'). */
+  labels: string[]
+  winRate?: number | null
+  pnl?: number | null
+}
+
 export interface AccumulationSourceInput {
   candidates: WalletBuyCandidate[]
-  /** Buyer classification by address. Caller builds it from SmartMoneyWallet. */
-  buyerStatus: Map<string, { status: string; alias: string | null; winRate?: number | null; pnl?: number | null }>
+  /** Buyer facts by address. Caller builds it from Wallet + SmartMoneyWallet. */
+  buyerStatus: Map<string, BuyerFacts>
   /** Verified market data by contract. MC null = unverified (flagged). */
   market?: Map<string, { marketCapUsd: number | null; liquidityUsd: number | null; symbol: string | null }>
   opts?: Partial<AccumulationOptions>
@@ -130,15 +226,88 @@ export function escapeHtml(s: string | null | undefined): string {
 }
 
 /**
- * Build verified whale-accumulation events. A candidate becomes an event
- * only when:
+ * Classify a buyer into ALL applicable taxonomy tags (orthogonal).
+ *
+ * The tags are NOT mutually exclusive — a KOL that is also a wallet-level
+ * whale carries both tags. Tags are returned in descending trust order so
+ * the first element is the primaryCategory:
+ *   smart_money > other_coin_whale > kol > fresh_wallet
+ *
+ * 'fresh_wallet' is the catch-all: it applies when the wallet has no usable
+ * track record (no SMW row, UNKNOWN status, or the FIRST_SEEN label). A
+ * wallet with DISQUALIFIED status is NOT a fresh_wallet — it has a negative
+ * record, so it only emits when it ALSO carries kol/whale/smart_money; a
+ * pure-DISQUALIFIED wallet emits nothing (the gate below skips it).
+ */
+export function classifyBuyer(facts: BuyerFacts): BuyerCategory[] {
+  const tags: BuyerCategory[] = []
+
+  const status = facts.status ?? null
+  const statusUpper = typeof status === 'string' ? status.toUpperCase() : ''
+  const labels = facts.labels ?? []
+  const hasFirstSeen = labels.some((l) => l === FIRST_SEEN_LABEL)
+
+  // 1. smart_money — verified qualified smart money (highest trust).
+  if ((SMART_MONEY_STATUSES as readonly string[]).includes(statusUpper)) {
+    tags.push('smart_money')
+  }
+
+  // 2. other_coin_whale — wallet-level whale (not smart money). WHALE_AND_SMART_MONEY
+  //    already tagged smart_money above; a pure WHALE status lands here.
+  if (statusUpper === 'WHALE') {
+    tags.push('other_coin_whale')
+  }
+
+  // 3. kol — orthogonal: a KOL/influencer label on the Wallet (kolscan,
+  //    kol-monitor, etc.) OR an alias that says KOL. Checked regardless of
+  //    SMW status because the operator wants KOL as a separate signal.
+  const aliasLower = (facts.alias ?? '').toLowerCase()
+  const isKol = labels.some((l) => l.toLowerCase().includes('kol')) || aliasLower.includes('kol')
+  if (isKol) {
+    tags.push('kol')
+  }
+
+  // 4. fresh_wallet — no usable track record. NULL/UNKNOWN status, or no
+  //    SMW row at all (status null), or the FIRST_SEEN label. DISQUALIFIED
+  //    is a *negative* record, not a fresh wallet, so it is excluded here.
+  const isFresh =
+    status === null ||
+    statusUpper === 'UNKNOWN' ||
+    statusUpper === '' ||
+    hasFirstSeen
+  if (isFresh) {
+    tags.push('fresh_wallet')
+  }
+
+  // Descending trust order so tags[0] is the primaryCategory.
+  const ORDER: Record<BuyerCategory, number> = {
+    smart_money: 0,
+    other_coin_whale: 1,
+    kol: 2,
+    fresh_wallet: 3,
+  }
+  tags.sort((a, b) => ORDER[a] - ORDER[b])
+  return tags
+}
+
+/**
+ * Build accumulation events under the 4-category buyer taxonomy.
+ * A candidate becomes an event only when:
  *   - chain is in SUPPORTED_CHAINS
  *   - buyVolumeUsd >= minBuyUsd
- *   - at least one buyer is classified in a bullish status
+ *   - at least one buyer carries a taxonomy tag after the fresh-wallet
+ *     volume floor (see below)
  *   - verified market cap (when supplied) is < maxMarketCapUsd
  * A null market cap never excludes the event; it is reported in `missing`
  * so the caller can apply its own suppression policy. This module never
  * fabricates a market cap, a per-buyer amount, or a tx signature.
+ *
+ * Fresh-wallet discipline (operator spec): a `fresh_wallet` buyer only emits
+ * when the CANDIDATE's aggregate buy volume is >= minBuyUsd (the same floor
+ * every other category passes) — large fresh buys are interesting, small
+ * ones are noise. kol / other_coin_whale / smart_money emit with no extra
+ * floor. A buyer with no tags at all (e.g. pure-DISQUALIFIED with no KOL or
+ * whale tag) never emits.
  */
 export function buildAccumulationEvents(input: AccumulationSourceInput): AccumulationEvent[] {
   const opts = { ...ACCUMULATION_DEFAULTS, ...(input.opts ?? {}) }
@@ -151,20 +320,40 @@ export function buildAccumulationEvents(input: AccumulationSourceInput): Accumul
     const buyers: AccumulationBuyer[] = []
     const missing: string[] = []
     for (const address of c.buyers) {
-      const cls = input.buyerStatus.get(address)
-      if (!cls || !(ACCUMULATION_BUYER_STATUSES as readonly string[]).includes(cls.status)) continue
+      // A missing map entry = no SMW row = never-classified wallet.
+      const facts: BuyerFacts = input.buyerStatus.get(address) ?? {
+        status: null,
+        alias: null,
+        labels: [],
+      }
+      const tags = classifyBuyer(facts)
+      if (tags.length === 0) continue
+      const primary = tags[0]
+      // Fresh wallets have no track record: require an aggregate buy at
+      // least 2x the candidate floor before they are interesting. Verified
+      // categories emit with no extra floor.
+      if (primary === 'fresh_wallet' && c.buyVolumeUsd < opts.minBuyUsd * 2) continue
+      const disclaimers = tags
+        .map((t) => BUYER_CATEGORY_DISCLAIMER[t])
+        .filter((d): d is string => d !== null)
+      const status = facts.status ?? 'UNCLASSIFIED'
       buyers.push({
         address,
-        status: cls.status,
-        classification: BUYER_CLASSIFICATION[cls.status] ?? cls.status,
+        status,
+        classification: BUYER_CLASSIFICATION[status] ?? BUYER_CATEGORY_LABEL[primary],
+        categories: tags,
+        primaryCategory: primary,
+        tier: BUYER_CATEGORY_TIER[primary],
+        disclaimers,
         buyValueUsd: null,
         stale: false,
-        alias: cls.alias,
-        winRate: cls.winRate ?? null,
-        pnl: cls.pnl ?? null,
+        alias: facts.alias,
+        labels: facts.labels ?? [],
+        winRate: facts.winRate ?? null,
+        pnl: facts.pnl ?? null,
       })
     }
-    if (buyers.length === 0) continue // a random wallet's buy is not a whale event
+    if (buyers.length === 0) continue // no tagged buyer, no event
 
     const market = input.market?.get(c.contract) ?? null
     const marketCapUsd = market?.marketCapUsd ?? null
@@ -181,9 +370,29 @@ export function buildAccumulationEvents(input: AccumulationSourceInput): Accumul
     if (liquidityUsd === null) risks.push('liquidity unverified')
     if (c.buyCount < c.buyers.length) risks.push('buy count below buyer count')
 
+    // Event-level tags: union of buyer tags, tier-ordered; primary is the
+    // highest-trust tag present; disclaimers are unique across buyers.
+    const tagSet = new Set<BuyerCategory>()
+    for (const b of buyers) for (const t of b.categories) tagSet.add(t)
+    const TIER_ORDER: Record<BuyerCategory, number> = {
+      smart_money: 0,
+      other_coin_whale: 1,
+      kol: 2,
+      fresh_wallet: 3,
+    }
+    const categories = [...tagSet].sort((a, b) => TIER_ORDER[a] - TIER_ORDER[b])
+    const primaryCategory = categories[0]
+    const disclaimers = categories
+      .map((t) => BUYER_CATEGORY_DISCLAIMER[t])
+      .filter((d): d is string => d !== null)
+
     out.push({
       token: { chain: c.chain, contract: c.contract, symbol, marketCapUsd, liquidityUsd },
       buyers,
+      categories,
+      primaryCategory,
+      tier: BUYER_CATEGORY_TIER[primaryCategory],
+      disclaimers,
       totalBuyUsd: c.buyVolumeUsd,
       windowStartAt: toIso(c.firstBuyAt),
       windowEndAt: toIso(c.lastBuyAt),
@@ -221,10 +430,12 @@ function formatWindow(startIso: string, endIso: string): string {
 }
 
 /**
- * Render the operator-facing HTML alert. Exact title `WHALE ACCUMULATION
- * DETECTED`; includes token/mint, MC + liquidity + total buy,
- * per-buyer status/classification, evidence, risks, missing, and an
- * explicit footer. Under 4096 chars: buyer lines are
+ * Render the operator-facing HTML alert. Keeps the exact title `WHALE
+ * ACCUMULATION DETECTED` so existing suppressions/pinned assertions keep
+ * working; the buyer taxonomy is surfaced through a category banner line,
+ * per-buyer tags, and per-buyer disclaimer lines. Includes token/mint, MC +
+ * liquidity + total buy, per-buyer status/classification, evidence, risks,
+ * missing, and an explicit footer. Under 4096 chars: buyer lines are
  * truncated first, then the whole text is sliced for Telegram.
  */
 export function renderAccumulationAlert(event: AccumulationEvent): string {
@@ -238,8 +449,21 @@ export function renderAccumulationAlert(event: AccumulationEvent): string {
   const total = `$${Math.round(event.totalBuyUsd).toLocaleString('en-US')}`
   const windowStr = formatWindow(event.windowStartAt, event.windowEndAt)
 
+  // Event taxonomy banner: every category present (tier-ordered), plus the
+  // disclaimers of the tags that carry one. Back-compat classes/readers
+  // that construct events by hand may omit these fields — default to whale.
+  const categories: BuyerCategory[] = event.categories ?? ['other_coin_whale']
+  const disclaimers: string[] = event.disclaimers ?? []
+  const tagLabels = categories.map((cat) => BUYER_CATEGORY_LABEL[cat]).join(' + ')
+
   const lines: string[] = [
     `🐋 <b>WHALE ACCUMULATION DETECTED</b>`,
+    `🏷 <b>Signal:</b> ${escapeHtml(tagLabels)}`,
+  ]
+  for (const d of disclaimers) {
+    lines.push(`⚠️ <i>${escapeHtml(d)}</i>`)
+  }
+  lines.push(
     `━━━━━━━━━━━━━━━━━━━━━━━━━`,
     `🪙 <b>Token:</b> ${symbol}`,
     `📋 <b>CA:</b> <code>${escapeHtml(t.contract)}</code> <i>(tap to copy)</i>`,
@@ -249,15 +473,21 @@ export function renderAccumulationAlert(event: AccumulationEvent): string {
     `📊 <b>Market Cap:</b> ${mc}  |  💧 <b>Liquidity:</b> ${liquidity}`,
     `⏱ <b>Window:</b> ${windowStr}`,
     ``,
-    `👤 <b>Accumulating Whales (${event.buyers.length}):</b>`,
-  ]
+    `👤 <b>Accumulating Buyers (${event.buyers.length}):</b>`,
+  )
 
   for (const b of event.buyers) {
     const name = b.alias && b.alias.trim() !== ''
       ? escapeHtml(b.alias.trim())
       : `${escapeHtml(b.address.slice(0, 6))}…${escapeHtml(b.address.slice(-4))}`
 
+    // Back-compat: hand-built buyers in older callers lack tags — surface
+    // their classification as-is.
+    const tags: BuyerCategory[] = b.categories ?? []
+    const buyerTagLabels = tags.map((cat) => BUYER_CATEGORY_LABEL[cat]).join(' + ')
+
     const badgeParts: string[] = []
+    if (buyerTagLabels !== '') badgeParts.push(escapeHtml(buyerTagLabels))
     const statusLabel = b.status || b.classification || 'WHALE'
     badgeParts.push(escapeHtml(statusLabel))
 
@@ -294,6 +524,10 @@ export function renderAccumulationAlert(event: AccumulationEvent): string {
 
     lines.push(`• <b>${name}</b> ${badge}`)
     lines.push(`  └ Bought: <b>${boughtAmount}</b> · Wallet: <code>${escapeHtml(b.address)}</code>`)
+    const buyerDisclaimers: string[] = b.disclaimers ?? []
+    for (const d of buyerDisclaimers) {
+      lines.push(`  └ ⚠️ <i>${escapeHtml(d)}</i>`)
+    }
   }
 
   // Evidence (concise, compact)
