@@ -56,7 +56,8 @@
     "cron:caller-scores": "python3 scripts/fetch-caller-scores.py",
     "sync:call-feed": "tsx src/scripts/call-feed-sync-db.ts",
     "bot:sniper": "tsx src/scripts/sniper-bot-cron.ts",
-    "cron:whale-buy-scan": "tsx src/scripts/whale-buy-scan-cron.ts"
+    "cron:whale-buy-scan": "tsx src/scripts/whale-buy-scan-cron.ts",
+    "cron:token-holdings": "tsx src/scripts/token-holdings-cron.ts"
   },
   "dependencies": {
     "@1ai/payment": "file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",

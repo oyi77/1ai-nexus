@@ -614,6 +614,7 @@ background harvesters, scanners, and pipelines. Key entries:
 | `0 3 * * *` | `npm run cron:wallet-refresh` | `/tmp/wallet-refresh.log` | Wallet refresh |
 | `30 3 * * *` | `npm run harvest:whales` | `/tmp/whale-harvester.log` | Whale harvest |
 | `0 4 * * *` | `npm run bootstrap:gmgn` | `/tmp/gmgn-bootstrap.log` | GMGN session bootstrap |
+| `*/30 * * * *` | `npm run cron:token-holdings` | `/tmp/token-holdings.log` | Populate TokenHolding from GMGN holder data (cross-token whale context). OFF unless `TOKEN_HOLDINGS_ENABLED="true"`. |
 | `*/20 * * * *` | `npm run harvest:crossex` | `/tmp/crossex-harvest.log` | CrossEx funding harvest |
 | `0 3 * * *` | `scripts/backup-db.sh` | `/tmp/nexus-db-backup.log` | PostgreSQL backup |
 | `17 */6 * * *` | `npm run harvest:idx-universe` | `/tmp/idx-universe-harvest.log` | IDX universe harvest |
