@@ -19,6 +19,9 @@ beforeEach(() => {
   // These tests exercise the scan pipeline (discover → audit → deliver), not
   // the execution gate, so open the gate and let the pipeline run.
   process.env.SNIPER_EXECUTE_ENABLED = 'true'
+  // Policy D: default tests run under production default (watchlist is opt-in, blocked).
+  // Explicitly delete so an ambient .env loaded by @/lib/db cannot leak.
+  delete process.env.SNIPER_DELIVER_WATCHLIST
 })
 
 afterEach(() => {

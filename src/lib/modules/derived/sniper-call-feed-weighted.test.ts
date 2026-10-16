@@ -27,11 +27,20 @@ beforeEach(() => {
   process.env.CALL_FEED_DB = 'off'
   process.env.CALL_FEED_PATH = join(dir, 'call-feed.json')
   process.env.CALL_FEED_MAX_AGE_MIN = '999999'
+  // call-feed mode also unions confluence + wallet buys (A2 fix), so both
+  // artifacts must be isolated from the repo's live data/ files.
+  process.env.CONFLUENCE_LATEST_PATH = join(dir, 'confluence-latest.json')
+  process.env.CONFLUENCE_PREFETCH_DB = 'off'
+  process.env.WALLET_BUYS_PATH = join(dir, 'wallet-buys-latest.json')
+  process.env.WALLET_BUYS_DB = 'off'
+  // whale-buy-scanner is a SECOND store (whale-buy-store.ts) with its own
+  // env names; without this the loader reads the live DB and injects its
+  // rows into the union, breaking every scanned-count assertion.
+  process.env.WHALE_BUYS_PATH = join(dir, 'whale-buys-latest.json')
+  process.env.WHALE_BUYS_DB = 'off'
   process.env.SNIPER_DISCOVER_MODE = 'call-feed'
-  // Pre-filter floors to 0 so the fixtures cannot break if the defaults
-  // ever tighten.
-  process.env.SNIPER_MIN_MARKET_CAP_USD = '0'
-  process.env.SNIPER_MIN_LIQUIDITY_USD = '0'
+  // DEFAULT_DELIVERY_POLICY reads this lazily; delete so ambient .env cannot leak.
+  delete process.env.SNIPER_DELIVER_WATCHLIST
 })
 
 afterEach(() => {
@@ -41,6 +50,12 @@ afterEach(() => {
   delete process.env.CALL_FEED_PATH
   delete process.env.CALL_FEED_MAX_AGE_MIN
   delete process.env.SNIPER_DISCOVER_MODE
+  delete process.env.CONFLUENCE_LATEST_PATH
+  delete process.env.CONFLUENCE_PREFETCH_DB
+  delete process.env.WALLET_BUYS_PATH
+  delete process.env.WALLET_BUYS_DB
+  delete process.env.WHALE_BUYS_PATH
+  delete process.env.WHALE_BUYS_DB
   delete process.env.SNIPER_MIN_MARKET_CAP_USD
   delete process.env.SNIPER_MIN_LIQUIDITY_USD
   vi.restoreAllMocks()

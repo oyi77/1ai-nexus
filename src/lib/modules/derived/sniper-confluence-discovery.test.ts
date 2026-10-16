@@ -27,6 +27,11 @@ beforeEach(() => {
   process.env.CONFLUENCE_PREFETCH_DB = 'off'
   process.env.CALL_FEED_DB = 'off'
   process.env.WALLET_BUYS_DB = 'off'
+  // whale-buy-scanner (whale-buy-store.ts) is a SECOND store with its own
+  // env; without this the loader reads the live DB and injects rows into
+  // auto/call-feed wallet unions, breaking candidate-count assertions.
+  process.env.WHALE_BUYS_PATH = join(dir, 'whale-buys-latest.json')
+  process.env.WHALE_BUYS_DB = 'off'
   process.env.SNIPER_MIN_LIQUIDITY_USD = '0'
 })
 
@@ -38,6 +43,8 @@ afterEach(() => {
   delete process.env.CONFLUENCE_PREFETCH_DB
   delete process.env.CALL_FEED_DB
   delete process.env.WALLET_BUYS_DB
+  delete process.env.WHALE_BUYS_PATH
+  delete process.env.WHALE_BUYS_DB
   delete process.env.SNIPER_MIN_MARKET_CAP_USD
   delete process.env.SNIPER_MIN_LIQUIDITY_USD
   delete process.env.SNIPER_DISCOVER_MODE
@@ -303,6 +310,27 @@ describe('discoverCombined integration with confluence', () => {
     const candidates = await discoverCombined(5)
     expect(candidates.length).toBeGreaterThanOrEqual(1)
     expect(candidates[0].contract).toBe(MINT_1)
+  })
+
+  it('includes confluence candidates in call-feed mode when the artifact exists', async () => {
+    process.env.SNIPER_DISCOVER_MODE = 'call-feed'
+    // Empty call feed: no feed rows, so the call-feed branch must still pick
+    // up fresh confluence signals (the A2 landmine: call-feed mode never
+    // read the confluence artifact, leaving confluence-cron output dead).
+    process.env.CALL_FEED_PATH = join(dir, 'call-feed.json')
+    process.env.CALL_FEED_MAX_AGE_MIN = '999999'
+    mockDexscreenerHydration({
+      [MINT_1]: { symbol: 'CONF_FEED', priceUsd: '0.05' },
+    })
+    writeConfluenceArtifact([sampleSignal({ contract: MINT_1 })])
+
+    const candidates = await discoverCombined(5)
+    expect(candidates).toHaveLength(1)
+    expect(candidates[0].contract).toBe(MINT_1)
+    expect(candidates[0].provenance?.provider).toBe('smart-money-confluence')
+
+    delete process.env.CALL_FEED_PATH
+    delete process.env.CALL_FEED_MAX_AGE_MIN
   })
 
   it('runs runSniperScan end-to-end with confluence candidates', async () => {

@@ -198,6 +198,20 @@ describe('shouldDeliver', () => {
   });
 
   it('default policy keeps watchlist opt-in', () => {
+    delete process.env.SNIPER_DELIVER_WATCHLIST;
+    expect(DEFAULT_DELIVERY_POLICY.allowWatchlist).toBe(false);
+  });
+
+  it('enables WATCHLIST delivery when SNIPER_DELIVER_WATCHLIST=true', () => {
+    process.env.SNIPER_DELIVER_WATCHLIST = 'true';
+    // The policy reads the env lazily, so the already-imported const sees it.
+    expect(DEFAULT_DELIVERY_POLICY.allowWatchlist).toBe(true);
+    expect(shouldDeliver('WATCHLIST')).toBe(true);
+    expect(shouldDeliver('CANDIDATE')).toBe(true);
+    // HIGH_CONVICTION stays deliverable; junk tiers stay blocked.
+    expect(shouldDeliver('HIGH_CONVICTION')).toBe(true);
+    expect(shouldDeliver('REJECT')).toBe(false);
+    delete process.env.SNIPER_DELIVER_WATCHLIST;
     expect(DEFAULT_DELIVERY_POLICY.allowWatchlist).toBe(false);
   });
 });
