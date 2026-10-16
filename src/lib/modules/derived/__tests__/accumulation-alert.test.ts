@@ -6,6 +6,8 @@ import {
   classifyBuyer,
   dedupeEventsByContract,
   renderAccumulationAlert,
+  resolveBuyerContext,
+  resolveCrossTokenContext,
   shouldSend,
   type AccumulationEvent,
   type BuyerCategory,
@@ -430,5 +432,163 @@ describe('buildAccumulationEvents — buyer taxonomy emission', () => {
     const all = classifyBuyer({ status: 'QUALIFIED_SMART_MONEY', alias: 'KOL Sharp', labels: ['kolscan', 'FIRST_SEEN'] })
     expect(all[0]).toBe('smart_money')
     expect(all).toEqual(['smart_money', 'kol', 'fresh_wallet'])
+  })
+})
+
+describe('resolveCrossTokenContext — cross-token whale semantics (GAP-1)', () => {
+  const OTHER_TOKEN = 'Other11111111111111111111111111111111111111'
+  const whale: BuyerFacts = { status: 'WHALE', alias: 'Big', labels: [], alertTokenContract: MINT }
+
+  it('returns unknown when no holdings are provided (fallback to wallet-global)', () => {
+    const r = resolveCrossTokenContext({ ...whale })
+    expect(r.context).toBe('unknown')
+    expect(r.holdingUsd).toBeNull()
+  })
+
+  it('returns cross_token when a holding on a DIFFERENT contract >= $50k', () => {
+    const r = resolveCrossTokenContext({
+      ...whale,
+      walletHoldings: [
+        { tokenAddress: OTHER_TOKEN, usdValue: 120_000 },
+      ],
+    })
+    expect(r.context).toBe('cross_token')
+    expect(r.holdingUsd).toBe(120_000)
+  })
+
+  it('returns same_token when the only large holding IS the alert token', () => {
+    const r = resolveCrossTokenContext({
+      ...whale,
+      walletHoldings: [
+        { tokenAddress: MINT, usdValue: 80_000 },
+      ],
+    })
+    expect(r.context).toBe('same_token')
+    expect(r.holdingUsd).toBe(80_000)
+  })
+
+  it('cross_token wins over same_token when both apply (migration is the stronger signal)', () => {
+    const r = resolveCrossTokenContext({
+      ...whale,
+      walletHoldings: [
+        { tokenAddress: MINT, usdValue: 90_000 },
+        { tokenAddress: OTHER_TOKEN, usdValue: 200_000 },
+      ],
+    })
+    expect(r.context).toBe('cross_token')
+    expect(r.holdingUsd).toBe(200_000)
+  })
+
+  it('returns unknown when holdings exist but all are below $50k threshold', () => {
+    const r = resolveCrossTokenContext({
+      ...whale,
+      walletHoldings: [
+        { tokenAddress: OTHER_TOKEN, usdValue: 49_999 },
+        { tokenAddress: MINT, usdValue: 30_000 },
+      ],
+    })
+    expect(r.context).toBe('unknown')
+    expect(r.holdingUsd).toBeNull()
+  })
+
+  it('returns unknown when alertTokenContract is missing (cannot distinguish same vs cross)', () => {
+    const r = resolveCrossTokenContext({
+      status: 'WHALE',
+      alias: 'Big',
+      labels: [],
+      walletHoldings: [{ tokenAddress: OTHER_TOKEN, usdValue: 100_000 }],
+    })
+    expect(r.context).toBe('cross_token')
+  })
+
+  it('preserves Solana base58 case-sensitivity (different-case mint is a different token)', () => {
+    const r = resolveCrossTokenContext({
+      ...whale,
+      // Same chars, different case — Solana treats these as different mints.
+      walletHoldings: [{ tokenAddress: MINT.toUpperCase(), usdValue: 100_000 }],
+    })
+    expect(r.context).toBe('cross_token')
+  })
+})
+
+describe('resolveBuyerContext — categories + cross-token (GAP-1)', () => {
+  const OTHER_TOKEN = 'Other11111111111111111111111111111111111111'
+
+  it('does not compute cross-token context for a non-whale buyer', () => {
+    const r = resolveBuyerContext({ status: 'QUALIFIED_SMART_MONEY', alias: 'Sharp', labels: [] })
+    expect(r.categories).toEqual(['smart_money'])
+    expect(r.crossTokenContext).toBeUndefined()
+  })
+
+  it('computes cross_token context for a whale with cross-token holdings', () => {
+    const r = resolveBuyerContext({
+      status: 'WHALE',
+      alias: 'Big',
+      labels: [],
+      alertTokenContract: MINT,
+      walletHoldings: [{ tokenAddress: OTHER_TOKEN, usdValue: 150_000 }],
+    })
+    expect(r.categories).toEqual(['other_coin_whale'])
+    expect(r.crossTokenContext).toBe('cross_token')
+    expect(r.crossTokenHoldingUsd).toBe(150_000)
+  })
+})
+
+describe('buildAccumulationEvents — cross-token disclaimer wiring (GAP-1)', () => {
+  const OTHER_TOKEN = 'Other11111111111111111111111111111111111111'
+
+  function whaleWithHoldings(holdings: Array<{ tokenAddress: string; usdValue: number }>): Map<string, BuyerFacts> {
+    return new Map([
+      [WHALE, { status: 'WHALE', alias: 'Kang Rug', labels: [], walletHoldings: holdings }],
+    ])
+  }
+
+  it('renders cross-token migration disclaimer when whale holds $50k+ on a different token', () => {
+    const out = buildAccumulationEvents({
+      candidates: [candidate()],
+      buyerStatus: whaleWithHoldings([{ tokenAddress: OTHER_TOKEN, usdValue: 120_000 }]),
+      market: market(500_000),
+    })
+    expect(out).toHaveLength(1)
+    const b = out[0].buyers[0]
+    expect(b.crossTokenContext).toBe('cross_token')
+    expect(b.crossTokenHoldingUsd).toBe(120_000)
+    expect(b.disclaimers).toContain('whale buyer - cross-token migration (holds $120K on other tokens)')
+    const text = renderAccumulationAlert(out[0])
+    expect(text).toContain('cross-token migration')
+    expect(text).toContain('$120K')
+  })
+
+  it('renders accumulating-position disclaimer when whale holds the alert token itself', () => {
+    const out = buildAccumulationEvents({
+      candidates: [candidate()],
+      buyerStatus: whaleWithHoldings([{ tokenAddress: MINT, usdValue: 75_000 }]),
+      market: market(500_000),
+    })
+    const b = out[0].buyers[0]
+    expect(b.crossTokenContext).toBe('same_token')
+    expect(b.disclaimers).toContain('whale buyer - accumulating existing position')
+  })
+
+  it('falls back to the original disclaimer when no holdings data (unknown)', () => {
+    const out = buildAccumulationEvents({
+      candidates: [candidate()],
+      buyerStatus: whaleStatus(),
+      market: market(500_000),
+    })
+    const b = out[0].buyers[0]
+    expect(b.crossTokenContext).toBe('unknown')
+    expect(b.crossTokenHoldingUsd).toBeNull()
+    expect(b.disclaimers).toContain(BUYER_CATEGORY_DISCLAIMER.other_coin_whale)
+  })
+
+  it('falls back to unknown when holdings are below $50k', () => {
+    const out = buildAccumulationEvents({
+      candidates: [candidate()],
+      buyerStatus: whaleWithHoldings([{ tokenAddress: OTHER_TOKEN, usdValue: 40_000 }]),
+      market: market(500_000),
+    })
+    expect(out[0].buyers[0].crossTokenContext).toBe('unknown')
+    expect(out[0].buyers[0].disclaimers).toContain(BUYER_CATEGORY_DISCLAIMER.other_coin_whale)
   })
 })

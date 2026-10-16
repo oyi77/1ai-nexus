@@ -90,12 +90,17 @@ async function readArtifactCandidates(): Promise<WalletBuyCandidate[] | null> {
 }
 
 /**
- * Load buyer facts (Wallet labels/alias + SmartMoneyWallet status) for the
- * addresses referenced by the candidates. Unlike the old gate this queries
- * EVERY buyer address — including never-classified wallets — so that
- * fresh_wallet and kol tags surface. Never throws: on DB failure returns an
- * empty map (every buyer then classifies as fresh_wallet via the missing-
- * entry fallback in the builder).
+ * Load buyer facts (Wallet labels/alias + SmartMoneyWallet status +
+ * TokenHolding rows) for the addresses referenced by the candidates. Unlike
+ * the old gate this queries EVERY buyer address — including never-classified
+ * wallets — so that fresh_wallet and kol tags surface. Never throws: on DB
+ * failure returns an empty map (every buyer then classifies as fresh_wallet
+ * via the missing-entry fallback in the builder).
+ *
+ * The TokenHolding lookup is ONE batched query keyed on wallet address (no
+ * N+1) and is fully optional: when a wallet has no holdings the field stays
+ * an empty array, and the cross-token refinement degrades to the
+ * wallet-global meaning it always had.
  */
 async function loadBuyerStatus(addresses: string[]): Promise<Map<string, BuyerFacts>> {
   const map = new Map<string, BuyerFacts>()
@@ -115,6 +120,41 @@ async function loadBuyerStatus(addresses: string[]): Promise<Map<string, BuyerFa
         },
       },
     })
+
+    // Cross-token evidence (GAP-1): the wallet's known holdings, batched in
+    // ONE query filtered by the SAME address set. Only wallets that have
+    // TokenHolding rows appear; everyone else stays with holdings = [].
+    const holdingsByAddress = new Map<string, Array<{ tokenAddress: string; usdValue: number }>>()
+    try {
+      const holdings = await prisma.tokenHolding.findMany({
+        where: { wallet: { address: { in: addresses } } },
+        select: {
+          wallet: { select: { address: true } },
+          token: { select: { address: true } },
+          usdValue: true,
+        },
+      })
+      for (const h of holdings) {
+        const addr = h.wallet?.address
+        const tokenAddress = h.token?.address
+        if (!addr || !tokenAddress) continue
+        let arr = holdingsByAddress.get(addr)
+        if (!arr) {
+          arr = []
+          holdingsByAddress.set(addr, arr)
+        }
+        arr.push({ tokenAddress, usdValue: h.usdValue })
+      }
+    } catch (err) {
+      // Holdings are strictly additive evidence; a failed lookup must not
+      // drop the wallet rows we already loaded.
+      console.error(
+        `[accumulation-alert] TokenHolding query failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      )
+    }
+
     for (const w of wallets) {
       const smw = w.smartMoneyWallet
       map.set(w.address, {
@@ -123,6 +163,7 @@ async function loadBuyerStatus(addresses: string[]): Promise<Map<string, BuyerFa
         labels: w.labels ?? [],
         winRate: smw?.winRate ?? null,
         pnl: smw?.pnl30d ?? null,
+        walletHoldings: holdingsByAddress.get(w.address) ?? [],
       })
     }
   } catch (err) {

@@ -115,6 +115,24 @@ export const ACCUMULATION_DEFAULTS = {
 
 export const SUPPORTED_CHAINS = ['solana'] as const
 
+/**
+ * Cross-token semantics for an `other_coin_whale` buyer (operator GAP-1).
+ *
+ *   cross_token  — the wallet holds >= $50k of a token OTHER than the alert
+ *                  token (TokenHolding.usdValue on a different contract).
+ *                  Highest confidence: "a whale known for coin A is now
+ *                  buying coin B".
+ *   same_token   — the wallet already holds the alert token itself; the buy
+ *                  is accumulation of an existing position, not migration.
+ *   unknown      — no usable TokenHolding data for this wallet; the tag
+ *                  falls back to the wallet-global (status-only) meaning it
+ *                  has always had.
+ */
+export type CrossTokenContext = 'cross_token' | 'same_token' | 'unknown'
+
+/** Minimum TokenHolding.usdValue for a holding to count as "large". */
+export const CROSS_TOKEN_MIN_USD = 50_000
+
 export interface AccumulationBuyer {
   address: string
   status: string
@@ -136,6 +154,13 @@ export interface AccumulationBuyer {
   labels: string[]
   winRate?: number | null
   pnl?: number | null
+  /**
+   * Cross-token refinement for this buyer (present only when the buyer
+   * carries the other_coin_whale tag). 'unknown' = fallback classification.
+   */
+  crossTokenContext?: CrossTokenContext
+  /** Largest holding on a DIFFERENT contract (USD), when computed. */
+  crossTokenHoldingUsd?: number | null
 }
 
 export interface AccumulationToken {
@@ -182,6 +207,20 @@ export interface BuyerFacts {
   labels: string[]
   winRate?: number | null
   pnl?: number | null
+  /**
+   * The contract address of the token that triggered this alert, lowercased
+   * for EVM, preserved as-is for Solana base58. Optional — callers that do
+   * not query TokenHolding leave this and `walletHoldings` undefined, and
+   * the cross-token refinement falls back to wallet-global (current behavior).
+   */
+  alertTokenContract?: string
+  /**
+   * Wallet's known token holdings from the TokenHolding table (tokenAddress +
+   * usdValue). Used to distinguish a true cross-token whale (large holding on
+   * a DIFFERENT contract) from same-token accumulation. Undefined = no
+   * holding data queried → fallback to status-only classification.
+   */
+  walletHoldings?: Array<{ tokenAddress: string; usdValue: number }>
 }
 
 export interface AccumulationSourceInput {
@@ -223,6 +262,116 @@ const BUYER_CLASSIFICATION: Record<string, string> = {
 export function escapeHtml(s: string | null | undefined): string {
   if (typeof s !== 'string') return ''
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * Contract equality across chains. EVM 0x addresses are case-insensitive;
+ * Solana base58 mints are CASE-SENSITIVE (same rule as gmgn's
+ * mapGmgnRowToToken / unified-candidate.ts). Defensive: also treat two
+ * strings as equal when they differ only by case AND both look like 0x hex,
+ * so a caller that lowercased an EVM contract still compares correctly.
+ */
+function contractsEqual(a: string, b: string): boolean {
+  if (a === b) return true
+  const isEvm = (s: string) => s.length === 42 && s.startsWith('0x')
+  if (isEvm(a) && isEvm(b)) return a.toLowerCase() === b.toLowerCase()
+  return false
+}
+
+/**
+ * Resolve the cross-token context for a whale buyer (operator GAP-1). Pure.
+ *
+ *   cross_token — the wallet holds >= CROSS_TOKEN_MIN_USD on a contract
+ *                 OTHER than the alert token: a whale known for coin A is
+ *                 now buying coin B.
+ *   same_token  — the wallet's large holding IS the alert token: the buy is
+ *                 accumulation of an existing position, not migration.
+ *   unknown     — no usable TokenHolding data (none queried, no rows, or
+ *                 every holding below the threshold) -> the caller keeps the
+ *                 wallet-global (status-only) meaning.
+ *
+ * Cross-token wins over same-token when both apply: migration is the
+ * stronger signal, and the wallet holds a different large position too.
+ */
+export function resolveCrossTokenContext(facts: BuyerFacts): {
+  context: CrossTokenContext
+  holdingUsd: number | null
+} {
+  const holdings = facts.walletHoldings
+  if (!holdings || holdings.length === 0) return { context: 'unknown', holdingUsd: null }
+
+  const alertContract = (facts.alertTokenContract ?? '').trim()
+  let maxCrossTokenUsd: number | null = null
+  let maxSameTokenUsd: number | null = null
+
+  for (const h of holdings) {
+    const addr = typeof h?.tokenAddress === 'string' ? h.tokenAddress.trim() : ''
+    if (addr === '') continue
+    if (!Number.isFinite(h.usdValue) || h.usdValue <= 0) continue // never invent USD
+    const isAlertToken = alertContract !== '' && contractsEqual(addr, alertContract)
+    if (isAlertToken) {
+      if (maxSameTokenUsd === null || h.usdValue > maxSameTokenUsd) maxSameTokenUsd = h.usdValue
+    } else if (maxCrossTokenUsd === null || h.usdValue > maxCrossTokenUsd) {
+      maxCrossTokenUsd = h.usdValue
+    }
+  }
+
+  if (maxCrossTokenUsd !== null && maxCrossTokenUsd >= CROSS_TOKEN_MIN_USD) {
+    return { context: 'cross_token', holdingUsd: maxCrossTokenUsd }
+  }
+  if (maxSameTokenUsd !== null && maxSameTokenUsd >= CROSS_TOKEN_MIN_USD) {
+    return { context: 'same_token', holdingUsd: maxSameTokenUsd }
+  }
+  return { context: 'unknown', holdingUsd: null }
+}
+
+/** classifyBuyer result plus the cross-token refinement (GAP-1). */
+export interface BuyerClassification {
+  categories: BuyerCategory[]
+  /**
+   * Present only when the buyer carries `other_coin_whale`. 'unknown' means
+   * the fallback (wallet-global) meaning applies.
+   */
+  crossTokenContext?: CrossTokenContext
+  /** Largest qualifying holding (USD) used to decide the context; null = none. */
+  crossTokenHoldingUsd?: number | null
+}
+
+/**
+ * classifyBuyer plus the cross-token refinement. Kept SEPARATE from
+ * classifyBuyer so the long-standing `classifyBuyer(facts) => BuyerCategory[]`
+ * contract (and its tests) stays byte-identical.
+ *
+ * The cross-token check runs ONLY for the other_coin_whale tag — a
+ * smart-money or KOL buyer keeps its existing classification with no
+ * holding lookup.
+ */
+export function resolveBuyerContext(facts: BuyerFacts): BuyerClassification {
+  const categories = classifyBuyer(facts)
+  if (!categories.includes('other_coin_whale')) return { categories }
+  const { context, holdingUsd } = resolveCrossTokenContext(facts)
+  return { categories, crossTokenContext: context, crossTokenHoldingUsd: holdingUsd }
+}
+
+/**
+ * Per-buyer disclaimer for the other_coin_whale tag, context-aware.
+ * cross_token / same_token are distinct, actionable statements; 'unknown'
+ * keeps the original wallet-global wording verbatim.
+ */
+function otherCoinWhaleDisclaimer(
+  context: CrossTokenContext | undefined,
+  holdingUsd: number | null | undefined,
+): string {
+  if (context === 'cross_token') {
+    const amount = holdingUsd !== null && holdingUsd !== undefined && Number.isFinite(holdingUsd)
+      ? formatCompactUsd(holdingUsd)
+      : 'a large position'
+    return `whale buyer - cross-token migration (holds ${amount} on other tokens)`
+  }
+  if (context === 'same_token') {
+    return 'whale buyer - accumulating existing position'
+  }
+  return BUYER_CATEGORY_DISCLAIMER.other_coin_whale ?? 'whale buyer - large position, cross-token'
 }
 
 /**
@@ -326,13 +475,14 @@ export function buildAccumulationEvents(input: AccumulationSourceInput): Accumul
     const buyers: AccumulationBuyer[] = []
     const missing: string[] = []
     for (const address of c.buyers) {
-      // A missing map entry = no SMW row = never-classified wallet.
-      const facts: BuyerFacts = input.buyerStatus.get(address) ?? {
-        status: null,
-        alias: null,
-        labels: [],
-      }
-      const tags = classifyBuyer(facts)
+      // A missing map entry = no SMW row = never-classified wallet. Carry the
+      // alert contract so a WHALE buyer's cross-token context can be resolved
+      // against its TokenHolding rows.
+      const base = input.buyerStatus.get(address)
+      const facts: BuyerFacts = base
+        ? { ...base, alertTokenContract: base.alertTokenContract ?? c.contract }
+        : { status: null, alias: null, labels: [], alertTokenContract: c.contract }
+      const { categories: tags, crossTokenContext, crossTokenHoldingUsd } = resolveBuyerContext(facts)
       if (tags.length === 0) continue
       const primary = tags[0]
       // Fresh wallets have no track record: require an aggregate buy at
@@ -340,7 +490,11 @@ export function buildAccumulationEvents(input: AccumulationSourceInput): Accumul
       // categories emit with no extra floor.
       if (primary === 'fresh_wallet' && c.buyVolumeUsd < opts.minBuyUsd * 2) continue
       const disclaimers = tags
-        .map((t) => BUYER_CATEGORY_DISCLAIMER[t])
+        .map((t) =>
+          t === 'other_coin_whale'
+            ? otherCoinWhaleDisclaimer(crossTokenContext, crossTokenHoldingUsd)
+            : BUYER_CATEGORY_DISCLAIMER[t],
+        )
         .filter((d): d is string => d !== null)
       const status = facts.status ?? 'UNCLASSIFIED'
       buyers.push({
@@ -357,6 +511,8 @@ export function buildAccumulationEvents(input: AccumulationSourceInput): Accumul
         labels: facts.labels ?? [],
         winRate: facts.winRate ?? null,
         pnl: facts.pnl ?? null,
+        crossTokenContext,
+        crossTokenHoldingUsd: crossTokenHoldingUsd ?? null,
       })
     }
     if (buyers.length === 0) continue // no tagged buyer, no event
@@ -388,9 +544,7 @@ export function buildAccumulationEvents(input: AccumulationSourceInput): Accumul
     }
     const categories = [...tagSet].sort((a, b) => TIER_ORDER[a] - TIER_ORDER[b])
     const primaryCategory = categories[0]
-    const disclaimers = categories
-      .map((t) => BUYER_CATEGORY_DISCLAIMER[t])
-      .filter((d): d is string => d !== null)
+    const disclaimers = [...new Set(buyers.flatMap((b) => b.disclaimers))]
 
     out.push({
       token: { chain: c.chain, contract: c.contract, symbol, marketCapUsd, liquidityUsd },
