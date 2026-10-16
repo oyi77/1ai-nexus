@@ -35,7 +35,7 @@
 import 'dotenv/config'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { saveWalletBuys, loadWalletBuys, type WalletBuyRow } from '@/lib/modules/derived/db-wallet-buys'
-import { fetchKolscanFeed, screenKolscanTransactions, KOLSCAN_THRESHOLDS, type KolscanScreenedTx } from '@/lib/modules/meme/kolscan'
+import { fetchKolscanFeed, screenKolscanTransactions, resolveKolscanThresholds, type KolscanScreenedTx } from '@/lib/modules/meme/kolscan'
 import { kolscanTxToNormalizedSwap } from '@/lib/modules/meme/kolscan/adapter'
 import { filterUnseenTransactionsDb, markTransactionsSeenDb } from '@/lib/modules/meme/kolscan/seen'
 import { fetchAxiomWallets, type AxiomWallet } from '@/lib/modules/meme/axiom-monitor'
@@ -108,7 +108,15 @@ async function main() {
       const winRates = await buildWinRateMap()
       console.log(`[kol-monitor] GMGN win-rate map: ${winRates.size} wallets`)
 
-      const screened = screenKolscanTransactions(feed.transactions, { winRates })
+      // Operator-overridable thresholds (KOLSCAN_MIN_PURCHASE_USD /
+      // KOLSCAN_MIN_WINRATE); defaults to KOLSCAN_THRESHOLDS when unset.
+      const thresholds = resolveKolscanThresholds()
+
+      const screened = screenKolscanTransactions(feed.transactions, {
+        winRates,
+        minPurchaseUsd: thresholds.minPurchaseUsd,
+        minWinRate: thresholds.minWinRate,
+      })
       kolscanScreened = screened.length
       console.log(`[kol-monitor] KOLScan screened: ${screened.length} txs passed gate`)
 
@@ -147,7 +155,7 @@ async function main() {
         const candidates = foldWalletBuys(allSwaps, {
           now,
           sinceMs: now - windowMin * 60_000,
-          minBuyUsd: KOLSCAN_THRESHOLDS.minPurchaseUsd,
+          minBuyUsd: thresholds.minPurchaseUsd,
         })
 
         // Merge with existing candidates (DB-first, dedup by contract).

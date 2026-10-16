@@ -246,6 +246,32 @@ export const KOLSCAN_THRESHOLDS = {
   coordAmountCount: 3,
 } as const
 
+/**
+ * Resolve the operator-overridable KOLScan thresholds from env, with the
+ * hardcoded `KOLSCAN_THRESHOLDS` as fallback. Accepts an arbitrary env
+ * record s unit testso can pass inline objects without mutating process.env.
+ *
+ * Honors:
+ *   KOLSCAN_MIN_PURCHASE_USD — positive number (default 1000)
+ *   KOLSCAN_MIN_WINRATE      — fraction 0..1 (default 0.6); 0 is honored
+ *
+ * Invalid/empty values fall back to the defaults — never NaN.
+ */
+export function resolveKolscanThresholds(
+  env: Record<string, string | undefined> = process.env,
+): { minPurchaseUsd: number; minWinRate: number } {
+  const usdRaw = env.KOLSCAN_MIN_PURCHASE_USD
+  const wrRaw = env.KOLSCAN_MIN_WINRATE
+
+  const usd = usdRaw !== undefined && usdRaw !== '' ? Number(usdRaw) : NaN
+  const wr = wrRaw !== undefined && wrRaw !== '' ? Number(wrRaw) : NaN
+
+  return {
+    minPurchaseUsd: !isNaN(usd) && usd > 0 ? usd : KOLSCAN_THRESHOLDS.minPurchaseUsd,
+    minWinRate: !isNaN(wr) && wr >= 0 && wr <= 1 ? wr : KOLSCAN_THRESHOLDS.minWinRate,
+  }
+}
+
 export interface KolscanScreenedTx extends KolscanTransaction {
   /** Human-readable reason this transaction survived the screen. */
   screenReason: string

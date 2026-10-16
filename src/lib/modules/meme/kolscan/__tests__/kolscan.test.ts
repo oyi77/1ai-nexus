@@ -3,6 +3,7 @@ import {
   parseKolscanWallets,
   parseKolscanTransactions,
   screenKolscanTransactions,
+  resolveKolscanThresholds,
   KOLSCAN_THRESHOLDS,
   type KolscanTransaction,
 } from '../index'
@@ -154,5 +155,67 @@ describe('screenKolscanTransactions', () => {
   it('exposes the operator defaults', () => {
     expect(KOLSCAN_THRESHOLDS.minPurchaseUsd).toBe(1000)
     expect(KOLSCAN_THRESHOLDS.minWinRate).toBe(0.6)
+  })
+})
+
+describe('resolveKolscanThresholds', () => {
+  it('returns hardcoded defaults when env is empty', () => {
+    const t = resolveKolscanThresholds({})
+    expect(t.minPurchaseUsd).toBe(1000)
+    expect(t.minWinRate).toBe(0.6)
+  })
+
+  it('honors KOLSCAN_MIN_PURCHASE_USD override', () => {
+    const t = resolveKolscanThresholds({ KOLSCAN_MIN_PURCHASE_USD: '500' })
+    expect(t.minPurchaseUsd).toBe(500)
+    expect(t.minWinRate).toBe(0.6)
+  })
+
+  it('honors KOLSCAN_MIN_WINRATE override', () => {
+    const t = resolveKolscanThresholds({ KOLSCAN_MIN_WINRATE: '0.75' })
+    expect(t.minPurchaseUsd).toBe(1000)
+    expect(t.minWinRate).toBe(0.75)
+  })
+
+  it('honors win rate of 0 (disable win-rate filter)', () => {
+    const t = resolveKolscanThresholds({ KOLSCAN_MIN_WINRATE: '0' })
+    expect(t.minWinRate).toBe(0)
+  })
+
+  it('falls back to defaults for invalid values', () => {
+    const t = resolveKolscanThresholds({
+      KOLSCAN_MIN_PURCHASE_USD: 'abc',
+      KOLSCAN_MIN_WINRATE: 'not-a-number',
+    })
+    expect(t.minPurchaseUsd).toBe(1000)
+    expect(t.minWinRate).toBe(0.6)
+  })
+
+  it('falls back for negative purchase USD', () => {
+    const t = resolveKolscanThresholds({ KOLSCAN_MIN_PURCHASE_USD: '-100' })
+    expect(t.minPurchaseUsd).toBe(1000)
+  })
+
+  it('falls back for win rate > 1', () => {
+    const t = resolveKolscanThresholds({ KOLSCAN_MIN_WINRATE: '1.5' })
+    expect(t.minWinRate).toBe(0.6)
+  })
+
+  it('honors both overrides simultaneously', () => {
+    const t = resolveKolscanThresholds({
+      KOLSCAN_MIN_PURCHASE_USD: '2500',
+      KOLSCAN_MIN_WINRATE: '0.55',
+    })
+    expect(t.minPurchaseUsd).toBe(2500)
+    expect(t.minWinRate).toBe(0.55)
+  })
+
+  it('treats empty string as unset', () => {
+    const t = resolveKolscanThresholds({
+      KOLSCAN_MIN_PURCHASE_USD: '',
+      KOLSCAN_MIN_WINRATE: '',
+    })
+    expect(t.minPurchaseUsd).toBe(1000)
+    expect(t.minWinRate).toBe(0.6)
   })
 })
