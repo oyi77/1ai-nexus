@@ -31,7 +31,7 @@ import {
 
 // ─── Config ──────────────────────────────────────────────────
 const REFRESH_WINDOW_DAYS = 30
-const BATCH_SIZE = 5
+const BATCH_SIZE = 20
 // Per-wallet signature cap. 1000 @ 650ms ≈ 11 min/wallet (measured
 // 2026-10-12), so a full batch could never finish one run; 200 keeps
 // each wallet ~4-5 min and still yields 10-30 trades to classify.
