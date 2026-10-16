@@ -21,7 +21,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import {
-  discoverGmgnTokens,
+  discoverEstablishedGmgnTokens,
   listGmgnTokenHolders,
   type GmgnHolderRow,
 } from '@/lib/modules/meme/gmgn'
@@ -117,11 +117,17 @@ async function loadClassifiedWallets(
  * Scan candidate tokens for whale-sized buys.
  *
  * Flow:
- *   1. discoverGmgnTokens → candidate token list
+ *   1. discoverEstablishedGmgnTokens → established token list (age > 24h,
+ *      volume ≥ $100k — tokens GMGN has indexed holders for)
  *   2. per token: listGmgnTokenHolders → top holders with PnL
  *   3. per holder: fetchWalletActivity → recent swaps
  *   4. collect all swaps for the token, run detectWhaleBuys
  *   5. classify all buying wallets via SmartMoneyWallet DB
+ *
+ * Uses established-token discovery instead of the trending feed because
+ * GMGN's trending tokens are ultra-fresh pump.fun launches that GMGN
+ * hasn't indexed holders for yet (6/10 return 400, 4/10 return empty).
+ * The volume-sorted feed surfaces tokens with real holder data.
  *
  * Per-source isolation: one token failure → logged + continue. One
  * wallet failure → logged + continue. Never throws.
@@ -134,10 +140,11 @@ export async function scanWhaleBuys(
   const swapLimit = opts.swapLimit ?? 25
   const config = opts.config
 
-  // 1. Discover candidate tokens.
+  // 1. Discover established candidate tokens (age > 24h, volume ≥ $100k).
+  //    Falls back to trending internally if the volume-sorted endpoint fails.
   let tokens: Array<{ contract: string; chain: string; symbol: string }> = []
   try {
-    const discovered = await discoverGmgnTokens(Math.min(tokenLimit, 20))
+    const discovered = await discoverEstablishedGmgnTokens(Math.min(tokenLimit, 20))
     tokens = discovered
       .filter((t) => t.contract && t.chain === 'solana')
       .slice(0, tokenLimit)

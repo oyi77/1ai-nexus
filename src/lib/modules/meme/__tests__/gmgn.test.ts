@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
   discoverGmgnTokens,
+  discoverEstablishedGmgnTokens,
   auditGmgnToken,
   __resetGmgnRateLimiterForTests,
   __resetGmgnCookieForTests,
@@ -190,7 +191,7 @@ describe('discoverGmgnTokens', () => {
     const tokens = await discoverGmgnTokens(5)
     const t = tokens.find((x) => x.symbol === 'RNK')
     expect(t).toBeDefined()
-    expect(t!.contract).toBe('rank1addr')
+    expect(t!.contract).toBe('RANK1addr')
     expect(t!.price).toBeCloseTo(0.5, 6)
     expect(t!.volume24h).toBe(900000)
     expect(t!.marketCap).toBe(5000000)
@@ -212,7 +213,7 @@ describe('discoverGmgnTokens', () => {
     expect(tokens).toBeInstanceOf(Array)
     expect(tokens.length).toBeGreaterThanOrEqual(2)
 
-    const solToken = tokens.find((t) => t.contract.toLowerCase() === 'so11111111111111111111111111111111111111112')
+    const solToken = tokens.find((t) => t.contract === 'So11111111111111111111111111111111111111112')
     expect(solToken).toBeDefined()
     if (solToken) {
       expect(solToken.platform).toBe('gmgn')
@@ -402,6 +403,216 @@ describe('discoverGmgnTokens', () => {
   })
 })
 
+
+describe('discoverEstablishedGmgnTokens', () => {
+  // Helper: build a rank-row fixture with controllable age + volume.
+  function rankRow(addr: string, symbol: string, openTsSec: number, volume: number): Record<string, unknown> {
+    return {
+      address: addr,
+      symbol,
+      name: symbol,
+      chain: 'sol',
+      price: 0.5,
+      price_change_percent: 10,
+      volume,
+      market_cap: 5_000_000,
+      liquidity: 200_000,
+      holder_count: 4200,
+      open_timestamp: openTsSec,
+      top_10_holder_rate: 0.3,
+    }
+  }
+
+  it('requests the volume-sorted endpoint (orderby=volume)', async () => {
+    const seenUrls: string[] = []
+    __setGmgnCurlForTests((args) => {
+      const url = args[args.length - 1]
+      seenUrls.push(String(url))
+      return `${JSON.stringify({ data: { rank: [] } })}\nCURL_STATUS:200`
+    })
+
+    await discoverEstablishedGmgnTokens(20)
+
+    // First request (sol chain) must include orderby=volume&direction=desc
+    expect(seenUrls.length).toBeGreaterThan(0)
+    expect(seenUrls[0]).toContain('orderby=volume')
+    expect(seenUrls[0]).toContain('direction=desc')
+  })
+
+  it('filters out tokens younger than 24h', async () => {
+    const nowSec = Math.floor(Date.now() / 1000)
+    const freshToken = rankRow('Fresh11111111111111111111111111111111111111', 'FRESH', nowSec - 10, 500_000) // 10s old
+    const oldToken = rankRow('Old111111111111111111111111111111111111111', 'OLD', nowSec - 48 * 3600, 500_000) // 48h old
+
+    // sol returns mix; other chains return empty (3 more mock responses)
+    mockFetchSequence([
+      { status: 200, body: { data: { rank: [freshToken, oldToken] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+    ])
+
+    const tokens = await discoverEstablishedGmgnTokens(20)
+    const symbols = tokens.map((t) => t.symbol)
+
+    expect(symbols).not.toContain('FRESH')
+    expect(symbols).toContain('OLD')
+  })
+
+  it('filters out tokens below min volume', async () => {
+    const nowSec = Math.floor(Date.now() / 1000)
+    const oldTs = nowSec - 48 * 3600
+    const lowVol = rankRow('Low1111111111111111111111111111111111111111', 'LOWVOL', oldTs, 50_000) // < 100k
+    const okVol = rankRow('Ok11111111111111111111111111111111111111111', 'OKVOL', oldTs, 250_000) // ≥ 100k
+
+    mockFetchSequence([
+      { status: 200, body: { data: { rank: [lowVol, okVol] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+    ])
+
+    const tokens = await discoverEstablishedGmgnTokens(20)
+    const symbols = tokens.map((t) => t.symbol)
+
+    expect(symbols).not.toContain('LOWVOL')
+    expect(symbols).toContain('OKVOL')
+  })
+
+  it('keeps tokens with null createdAt (age unknown != too young)', async () => {
+    const noAge = {
+      address: 'Null1111111111111111111111111111111111111111',
+      symbol: 'NULLAGE',
+      name: 'NullAge',
+      chain: 'sol',
+      price: 0.5,
+      volume: 500_000,
+      market_cap: 5_000_000,
+      liquidity: 200_000,
+      holder_count: 4200,
+      // no open_timestamp — createdAt will be null
+    }
+
+    mockFetchSequence([
+      { status: 200, body: { data: { rank: [noAge] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+    ])
+
+    const tokens = await discoverEstablishedGmgnTokens(20)
+    expect(tokens.some((t) => t.symbol === 'NULLAGE')).toBe(true)
+  })
+
+  it('sorts results by volume descending', async () => {
+    const nowSec = Math.floor(Date.now() / 1000)
+    const oldTs = nowSec - 48 * 3600
+
+    mockFetchSequence([
+      {
+        status: 200,
+        body: {
+          data: {
+            rank: [
+              rankRow('A11111111111111111111111111111111111111111', 'LOWV', oldTs, 150_000),
+              rankRow('B11111111111111111111111111111111111111111', 'HIGHV', oldTs, 900_000),
+              rankRow('C11111111111111111111111111111111111111111', 'MIDV', oldTs, 400_000),
+            ],
+          },
+        },
+      },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+    ])
+
+    const tokens = await discoverEstablishedGmgnTokens(20)
+    expect(tokens.length).toBe(3)
+    expect(tokens[0].volume24h).toBeGreaterThanOrEqual(tokens[1].volume24h)
+    expect(tokens[1].volume24h).toBeGreaterThanOrEqual(tokens[2].volume24h)
+  })
+
+  it('falls back to trending feed when volume-sorted endpoint fails', async () => {
+    const nowSec = Math.floor(Date.now() / 1000)
+    const oldTs = nowSec - 48 * 3600
+
+    // sol: first call (volume-sorted) 403, second call (trending fallback) succeeds with old token
+    // other chains: all 403 (fallback also fails → continue)
+    let callIdx = 0
+    __setGmgnCurlForTests(() => {
+      callIdx++
+      if (callIdx === 1) {
+        // sol volume-sorted → 403
+        return `${JSON.stringify({ error: { msg: 'Cloudflare' } })}\nCURL_STATUS:403`
+      }
+      if (callIdx === 2) {
+        // sol trending fallback → success with an old established token
+        return `${JSON.stringify({ data: { rank: [rankRow('Fb1111111111111111111111111111111111111111', 'FB', oldTs, 300_000)] } })}\nCURL_STATUS:200`
+      }
+      // remaining chains (eth, base, bsc, blastr) — volume-sorted 403 + trending 403 each = 8 calls
+      return `${JSON.stringify({ error: { msg: 'Cloudflare' } })}\nCURL_STATUS:403`
+    })
+    vi.useFakeTimers()
+    const run = discoverEstablishedGmgnTokens(20).then((t) => {
+      vi.useRealTimers()
+      return t
+    })
+    let settled = false
+    run.then(() => (settled = true), () => (settled = true))
+    for (let i = 0; i < 40 && !settled; i++) await vi.advanceTimersByTimeAsync(10_000)
+    const tokens = await run
+
+    const solTokens = tokens.filter((t) => t.chain === 'solana')
+    expect(solTokens.some((t) => t.symbol === 'FB')).toBe(true)
+  })
+
+  it('respects limitPerChain after filtering', async () => {
+    const nowSec = Math.floor(Date.now() / 1000)
+    const oldTs = nowSec - 48 * 3600
+
+    // 10 established tokens on sol, request limit=3
+    const rows = Array.from({ length: 10 }, (_, i) =>
+      rankRow(`L${i.toString().padStart(43, '1')}`, `TKN${i}`, oldTs, 200_000 + i * 10_000),
+    )
+
+    mockFetchSequence([
+      { status: 200, body: { data: { rank: rows } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+    ])
+
+    const tokens = await discoverEstablishedGmgnTokens(3)
+    const solTokens = tokens.filter((t) => t.chain === 'solana')
+    expect(solTokens.length).toBe(3)
+  })
+
+  it('preserves Solana mint case (GMGN holder endpoint rejects lowercased mints)', async () => {
+    const nowSec = Math.floor(Date.now() / 1000)
+    const oldTs = nowSec - 48 * 3600
+    const mixedCase = 'A7bDiYdS5GjqGFtxf17ppRHtDKPkkRqbKtR27dxvQXaS'
+
+    mockFetchSequence([
+      { status: 200, body: { data: { rank: [rankRow(mixedCase, 'CS', oldTs, 500_000)] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+      { status: 200, body: { data: { rank: [] } } },
+    ])
+
+    const tokens = await discoverEstablishedGmgnTokens(20)
+    const cs = tokens.find((t) => t.symbol === 'CS')
+    expect(cs).toBeDefined()
+    // Solana base58 is case-sensitive — contract must reach the holder
+    // endpoint verbatim (live-proven: lowercased → 400 INVALID_ARGUMENT).
+    expect(cs!.contract).toBe(mixedCase)
+  })
+})
 describe('auditGmgnToken (top_buyers contract)', () => {
   it('maps exit ratio, sniper rate, concentration and holder PnL', async () => {
     mockFetchSequence([

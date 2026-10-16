@@ -323,7 +323,60 @@ export async function gmgnFetch<T>(endpoint: string, _signal?: AbortSignal): Pro
 
 // ── Discovery ----
 
-// ── Discovery ----
+/** Min volume (USD) for established-token discovery — filters junk micro-caps. */
+const ESTABLISHED_MIN_VOLUME_USD = 100_000
+
+/**
+ * Map a single GMGN rank/legacy row to a normalized MemeAlphaToken.
+ * Shared by both trending and established discovery paths so shape
+ * handling stays in one place.
+ */
+function mapGmgnRowToToken(info: GmgnRankRow, chainId: string): MemeAlphaToken | null {
+  if (!info?.address) return null
+  const normChain = normalizeChainId(chainId)
+  // Solana mints are case-sensitive base58 (live-proven 2026-10-16:
+  // GMGN /vas/token_holders/sol/<lowercased> returns 400
+  // P_GMGN_WEB_INVALID_ARGUMENT). EVM hex addresses are case-insensitive
+  // → lowercase for stable dedup. This matches the repo-wide convention
+  // (unified-candidate.ts: "Solana base58 mints are CASE-SENSITIVE").
+  const isSolana = normChain === 'solana'
+  const contract = isSolana ? info.address : info.address.toLowerCase()
+  const id = `${normChain}:${contract}`
+  return {
+    id,
+    platform: 'gmgn',
+    chain: normChain,
+    contract,
+    symbol: info.symbol || '',
+    name: info.name || '',
+    price: info.price ?? (info as { priceUsd?: number }).priceUsd ?? 0,
+    change24h: info.price_change_percent ?? (info as { priceChange24h?: number }).priceChange24h ?? 0,
+    volume24h: info.volume ?? (info as { volume24h?: number }).volume24h ?? 0,
+    marketCap: info.market_cap ?? (info as { marketCap?: number }).marketCap ?? 0,
+    liquidity: info.liquidity ?? 0,
+    createdAt: info.open_timestamp
+      ? normalizeTimestamp(info.open_timestamp)
+      : ((info as { createdAt?: number }).createdAt
+        ? normalizeTimestamp((info as { createdAt?: number }).createdAt!)
+        : null),
+    riskLevel: 1,
+    holders: info.holder_count ?? (info as { holders?: number }).holders ?? 0,
+    top10HolderPercent: Math.min(1, Math.max(0, info.top_10_holder_rate ?? 0)),
+    social: {
+      twitter: info.twitter_username ? `https://x.com/${info.twitter_username}` : undefined,
+      telegram: info.telegram || undefined,
+      site: info.website || undefined,
+    },
+    audited: false,
+    provenance: {
+      sourceType: 'public-api',
+      provider: 'gmgn',
+      experimental: true,
+      note: 'GMGN public rank endpoint; discovery feed, not a security audit',
+    },
+    riskKnown: false,
+  }
+}
 
 /** Discover trending tokens across supported chains */
 export async function discoverGmgnTokens(limitPerChain = 20): Promise<MemeAlphaToken[]> {
@@ -331,14 +384,13 @@ export async function discoverGmgnTokens(limitPerChain = 20): Promise<MemeAlphaT
   const allTokens: MemeAlphaToken[] = []
   const seen = new Set<string>()
 
-    for (const chainKey of chains) {
+  for (const chainKey of chains) {
     const config = CHAIN_CONFIG[chainKey]
     const endpoint = `/rank/${config.path}/swaps/24h`
     const chainId = config.chainId
 
     try {
       const raw = await retryWithBackoff(() => gmgnFetch<GmgnTrendingResponse>(endpoint))
-      // Live rank rows first; the legacy list[].tokenInfo shape as fallback.
       const rankRows = raw.data?.rank ?? []
       const legacyRows = (raw.data?.list ?? []).map((item) => item.tokenInfo).filter((v): v is NonNullable<typeof v> => !!v)
       const items: GmgnRankRow[] = rankRows.length > 0 ? rankRows : legacyRows
@@ -346,48 +398,10 @@ export async function discoverGmgnTokens(limitPerChain = 20): Promise<MemeAlphaT
 
       for (const info of items) {
         if (count >= limitPerChain) break
-        if (!info?.address) continue
-
-        const normChain = normalizeChainId(chainId)
-        const id = `${normChain}:${info.address.toLowerCase()}`
-        if (seen.has(id)) continue
-        seen.add(id)
-
-        const token: MemeAlphaToken = {
-          id,
-          platform: 'gmgn',
-          chain: normChain,
-          contract: info.address.toLowerCase(),
-          symbol: info.symbol || '',
-          name: info.name || '',
-          // Live rank rows use `price`; the legacy shape used `priceUsd`.
-          price: info.price ?? (info as { priceUsd?: number }).priceUsd ?? 0,
-          change24h: info.price_change_percent ?? (info as { priceChange24h?: number }).priceChange24h ?? 0,
-          volume24h: info.volume ?? (info as { volume24h?: number }).volume24h ?? 0,
-          marketCap: info.market_cap ?? (info as { marketCap?: number }).marketCap ?? 0,
-          liquidity: info.liquidity ?? 0,
-          createdAt: info.open_timestamp
-            ? normalizeTimestamp(info.open_timestamp)
-            : ((info as { createdAt?: number }).createdAt ? normalizeTimestamp((info as { createdAt?: number }).createdAt!) : null),
-          riskLevel: 1,
-          holders: info.holder_count ?? (info as { holders?: number }).holders ?? 0,
-          top10HolderPercent: Math.min(1, Math.max(0, info.top_10_holder_rate ?? 0)),
-          social: {
-            twitter: info.twitter_username ? `https://x.com/${info.twitter_username}` : undefined,
-            telegram: info.telegram || undefined,
-            site: info.website || undefined,
-          },
-          audited: false,
-          provenance: {
-            sourceType: 'public-api',
-            provider: 'gmgn',
-            experimental: true,
-            note: 'GMGN public rank endpoint; discovery feed, not a security audit',
-          },
-          // Discovery rows carry no audit — riskLevel 1 is a placeholder.
-          riskKnown: false,
-        }
-
+        const token = mapGmgnRowToToken(info, chainId)
+        if (!token) continue
+        if (seen.has(token.id)) continue
+        seen.add(token.id)
         allTokens.push(token)
         count++
       }
@@ -398,8 +412,113 @@ export async function discoverGmgnTokens(limitPerChain = 20): Promise<MemeAlphaT
     }
   }
 
-  // Sort by market cap descending
   allTokens.sort((a, b) => b.marketCap - a.marketCap)
+
+  return allTokens
+}
+
+/** Options for established-token discovery. */
+export interface GmgnEstablishedOpts {
+  /** Min token age in hours (default 24). Filters brand-new pump.fun launches. */
+  minAgeHours?: number
+  /** Min 24h volume in USD (default 100_000). Filters micro-caps worth no scan. */
+  minVolumeUsd?: number
+}
+
+/**
+ * Discover established tokens that GMGN has indexed holders for.
+ *
+ * The trending feed (`/rank/sol/swaps/24h`) returns both ultra-fresh
+ * pump.fun launches (13h old — GMGN has no holder data → 400/empty) and
+ * established tokens (1588h+ — 20 holders returned). The same endpoint
+ * supports `?orderby=volume&direction=desc` which surfaces high-volume
+ * established tokens first (live-proven 2026-10-16).
+ *
+ * This function requests the volume-sorted feed and filters to age > 24h
+ * AND volume ≥ $100k — tokens GMGN has actually indexed. Falls back to
+ * the trending feed (then age-filters its results) if the volume-sorted
+ * request fails.
+ */
+export async function discoverEstablishedGmgnTokens(
+  limitPerChain = 20,
+  opts: GmgnEstablishedOpts = {},
+): Promise<MemeAlphaToken[]> {
+  const minAgeMs = (opts.minAgeHours ?? 24) * 60 * 60 * 1000
+  const minVol = opts.minVolumeUsd ?? ESTABLISHED_MIN_VOLUME_USD
+  const now = Date.now()
+
+  const chains = Object.keys(CHAIN_CONFIG)
+  const allTokens: MemeAlphaToken[] = []
+  const seen = new Set<string>()
+
+  for (const chainKey of chains) {
+    const config = CHAIN_CONFIG[chainKey]
+    const chainId = config.chainId
+
+    // Volume-sorted established endpoint — surfaces high-volume tokens first.
+    const establishedEndpoint = `/rank/${config.path}/swaps/24h?orderby=volume&direction=desc`
+    let items: GmgnRankRow[] = []
+
+    try {
+      const raw = await retryWithBackoff(() => gmgnFetch<GmgnTrendingResponse>(establishedEndpoint))
+      const rankRows = raw.data?.rank ?? []
+      const legacyRows = (raw.data?.list ?? []).map((item) => item.tokenInfo).filter((v): v is NonNullable<typeof v> => !!v)
+      items = rankRows.length > 0 ? rankRows : legacyRows
+    } catch (err) {
+      // Fallback: trending feed (no volume sort) then we'll age-filter it.
+      logger.warn(
+        `GMGN established discovery (volume-sorted) failed for ${chainId}, falling back to trending: ${err}`,
+        'gmgn',
+        { chain: chainId, error: String(err) },
+      )
+      try {
+        const raw = await retryWithBackoff(() => gmgnFetch<GmgnTrendingResponse>(`/rank/${config.path}/swaps/24h`))
+        const rankRows = raw.data?.rank ?? []
+        const legacyRows = (raw.data?.list ?? []).map((item) => item.tokenInfo).filter((v): v is NonNullable<typeof v> => !!v)
+        items = rankRows.length > 0 ? rankRows : legacyRows
+      } catch (fallbackErr) {
+        logger.error(`GMGN established fallback also failed for ${chainId}: ${fallbackErr}`, 'gmgn', { chain: chainId, error: String(fallbackErr) })
+        continue
+      }
+    }
+
+    let count = 0
+    let skippedAge = 0
+    let skippedVol = 0
+
+    for (const info of items) {
+      if (count >= limitPerChain) break
+      const token = mapGmgnRowToToken(info, chainId)
+      if (!token) continue
+      if (seen.has(token.id)) continue
+
+      // Age filter — skip tokens younger than minAgeHours.
+      // Tokens with null createdAt are kept (age unknown ≠ too young).
+      if (token.createdAt !== null && now - token.createdAt < minAgeMs) {
+        skippedAge++
+        continue
+      }
+
+      // Volume filter — skip tokens below minVolumeUsd.
+      if (token.volume24h < minVol) {
+        skippedVol++
+        continue
+      }
+
+      seen.add(token.id)
+      allTokens.push(token)
+      count++
+    }
+
+    logger.info(
+      `GMGN established discovery ${chainId}: ${count} tokens (skipped ${skippedAge} too-young, ${skippedVol} low-volume)`,
+      'gmgn',
+      { chain: chainId, count, skippedAge, skippedVol, total: allTokens.length },
+    )
+  }
+
+  // Volume-descending (established discovery prioritizes volume, not mcap).
+  allTokens.sort((a, b) => b.volume24h - a.volume24h)
 
   return allTokens
 }
