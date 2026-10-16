@@ -320,10 +320,12 @@ export interface WhalePersistWallet {
 
 /**
  * Build the persistable Wallet row. Labels are
- * `[sourcePrefix, verification, 'whale-verification']` for GMGN rows
- * (verification ∈ {whale, quality, unverified}), or
- * `[sourcePrefix, 'whale-harvest']` for KOLScan rows; alias reuses the
- * sheet name.
+ * `[sourcePrefix, verification, 'whale-verification', tag]` for GMGN rows
+ * (verification ∈ {whale, quality, unverified}; tag = the GMGN leaderboard
+ * tag that first found the wallet, e.g. 'smart_degen', 'kol', 'sniper'),
+ * or `[sourcePrefix, 'whale-harvest']` for KOLScan rows; alias reuses the
+ * sheet name. The trailing tag preserves the discovery tag so downstream
+ * classifiers (e.g. accumulation-alert's KOL check) can see it.
  */
 export function toPersistWallet(w: HarvestedWallet): WhalePersistWallet {
   const source = w.source.toLowerCase() === 'kolscan' ? 'kolscan' : 'gmgn'
@@ -333,7 +335,7 @@ export function toPersistWallet(w: HarvestedWallet): WhalePersistWallet {
       address: w.address,
       chain: 'solana',
       alias: toSheetRow(w).name || null,
-      labels: [source, verification, 'whale-verification'],
+      labels: [source, verification, 'whale-verification', w.source],
     }
   }
   return {

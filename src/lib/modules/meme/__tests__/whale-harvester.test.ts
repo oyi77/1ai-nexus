@@ -203,13 +203,13 @@ describe('toPersistWallet', () => {
     )
     expect(persisted.address).toBe('A'.repeat(40))
     expect(persisted.chain).toBe('solana')
-    expect(persisted.labels).toEqual(['gmgn', 'whale', 'whale-verification'])
+    expect(persisted.labels).toEqual(['gmgn', 'whale', 'whale-verification', 'smart_degen'])
     expect(persisted.alias).toBe('GMGN-WHALE wr=64% pnl=+30%')
   })
 
   it('maps unverified gmgn rows to unverified labels', () => {
     const persisted = toPersistWallet(wallet({ source: 'smart_degen', winRate30d: 0.64, pnl30d: 0.3 }))
-    expect(persisted.labels).toEqual(['gmgn', 'unverified', 'whale-verification'])
+    expect(persisted.labels).toEqual(['gmgn', 'unverified', 'whale-verification', 'smart_degen'])
     expect(persisted.alias).toBe('GMGN-UNVERIFIED wr=64% pnl=+30%')
   })
 

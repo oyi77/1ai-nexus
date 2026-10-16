@@ -259,10 +259,16 @@ export function classifyBuyer(facts: BuyerFacts): BuyerCategory[] {
   }
 
   // 3. kol — orthogonal: a KOL/influencer label on the Wallet (kolscan,
-  //    kol-monitor, etc.) OR an alias that says KOL. Checked regardless of
-  //    SMW status because the operator wants KOL as a separate signal.
+  //    kol-monitor, etc.) OR the alias that says KOL, OR the GMGN
+  //    'smart_degen' tag (high-winrate trader proxy — KOLScan is inert,
+  //    so smart_degen is the live source for "known profitable trader").
+  //    Checked regardless of SMW status because the operator wants KOL
+  //    as a separate signal.
   const aliasLower = (facts.alias ?? '').toLowerCase()
-  const isKol = labels.some((l) => l.toLowerCase().includes('kol')) || aliasLower.includes('kol')
+  const isKol =
+    labels.some((l) => l.toLowerCase().includes('kol')) ||
+    labels.some((l) => l.toLowerCase() === 'smart_degen') ||
+    aliasLower.includes('kol')
   if (isKol) {
     tags.push('kol')
   }

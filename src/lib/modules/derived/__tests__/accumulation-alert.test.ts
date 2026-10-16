@@ -367,6 +367,10 @@ describe('classifyBuyer — 4-category taxonomy', () => {
     expect(classifyBuyer({ ...base, status: null, labels: ['Kol-Monitor'] })).toContain('kol')
     expect(classifyBuyer({ ...base, status: null, alias: 'SuperKOL' })).toContain('kol')
   })
+  it('treats the GMGN smart_degen tag as a KOL proxy (known profitable trader)', () => {
+    expect(classifyBuyer({ ...base, status: null, labels: ['gmgn', 'whale', 'whale-verification', 'smart_degen'] })).toContain('kol')
+    expect(classifyBuyer({ ...base, status: 'WHALE', labels: ['gmgn', 'whale', 'whale-verification', 'smart_degen'] })).toEqual(['other_coin_whale', 'kol'])
+  })
 })
 
 describe('buildAccumulationEvents — buyer taxonomy emission', () => {
