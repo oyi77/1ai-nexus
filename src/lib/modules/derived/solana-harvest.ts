@@ -377,14 +377,30 @@ export function validateSwap(s: NormalizedSwap, seen: Set<string>): { ok: boolea
   return { ok: reasons.length === 0, reasons };
 }
 
-/** Full read-only harvest: sigs → tx → parse → validate → coverage. No DB writes. */
+/**
+ * Full read-only harvest: sigs → tx → parse → validate → coverage. No DB writes.
+ *
+ * Cursor pagination (added 2026-10-17): when `before` is passed, the
+ * signature fetch starts at that cursor instead of the newest signature,
+ * so a caller can walk OLDER history page-by-page. The returned
+ * `lastSignature` is the oldest signature actually fetched this call
+ * (the cursor to forward for the next page) — null ONLY when the page was
+ * empty (no older history to walk). Backward compatible: existing callers
+ * that destructure only `{ swaps, coverage }` keep working.
+ */
+export interface WalletHarvest {
+  swaps: NormalizedSwap[];
+  coverage: HarvestCoverage;
+  lastSignature: string | null;
+}
+
 export async function harvestWallet(
   wallet: string,
-  opts: { limit?: number; days?: number; withUsd?: boolean; throttleMs?: number } = {},
-): Promise<{ swaps: NormalizedSwap[]; coverage: HarvestCoverage }> {
+  opts: { limit?: number; days?: number; withUsd?: boolean; throttleMs?: number; before?: string } = {},
+): Promise<WalletHarvest> {
   const days = opts.days ?? 30;
   const cutoff = Date.now() - days * 86_400_000;
-  const { sigs, truncated } = await fetchSignatures(wallet, { limit: opts.limit ?? 1000, throttleMs: opts.throttleMs });
+  const { sigs, truncated } = await fetchSignatures(wallet, { limit: opts.limit ?? 1000, throttleMs: opts.throttleMs, before: opts.before });
   const gaps: string[] = [];
   if (truncated) gaps.push('pagination-truncated-limit-reached');
   const swaps: NormalizedSwap[] = [];
@@ -463,6 +479,13 @@ export async function harvestWallet(
   }
   if (opts.withUsd) await fillCurrentUsd(swaps);
   const complete30d = !truncated && gaps.filter((g) => g.startsWith('fetch-fail') || g.startsWith('tx-null')).length === 0;
+  // Cursor for the next page: the OLDEST signature actually fetched.
+  // `fetchSignatures` returns `truncated: true` when it hit the per-call
+  // cap mid-page — but every sig it pushed is a REAL sig, so the last one
+  // is still a valid `before` cursor for the next (older) page. Null ONLY
+  // when the page was empty (no older history to walk). Callers must treat
+  // `truncated` as "more history exists", not as "cursor unusable".
+  const lastSignature = sigs.length > 0 ? sigs[sigs.length - 1].signature : null;
   return {
     swaps,
     coverage: {
@@ -473,5 +496,6 @@ export async function harvestWallet(
       truncated,
       signatures: sigs,
     },
+    lastSignature,
   };
 }

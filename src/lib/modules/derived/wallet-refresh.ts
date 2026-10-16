@@ -16,6 +16,7 @@ import {
   type HarvestCoverage,
   type NormalizedSwap,
   type RpcSig,
+  type WalletHarvest,
 } from '@/lib/modules/derived/solana-harvest'
 import { fetchWalletActivity } from '@/lib/modules/derived/wallet-activity'
 import { fetchHistoricalTokenUsd } from '@/lib/modules/derived/historical-price'
@@ -36,6 +37,16 @@ const BATCH_SIZE = 20
 // 2026-10-12), so a full batch could never finish one run; 200 keeps
 // each wallet ~4-5 min and still yields 10-30 trades to classify.
 const HARVEST_LIMIT = 200
+// Cursor-pagination bounds (2026-10-17). When a wallet's first harvest yields
+// too few closed episodes to classify (the sample gate needs n>=15 AFTER the
+// single-giant drop), walk OLDER history page-by-page. Each page costs ~4-5
+// min/wallet at HARVEST_LIMIT, so the page count is hard-capped to bound a
+// single cron slot; runtime worst case is PAGINATION_MAX_PAGES * HARVEST_LIMIT
+// signatures.
+const PAGINATION_MAX_PAGES = 4
+// Stop paginating once the accumulated CLOSED episodes clear the gate's raw
+// threshold (the classifier drops one giant below n<20, so aim one above).
+const EPISODE_TARGET = SMART_MONEY_DEFAULTS.minEpisodes + 1
 const THROTTLE_MS = 650
 const STALE_MS = 24 * 60 * 60 * 1000 // reclassify after 24h
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000
@@ -521,6 +532,32 @@ async function fillHistoricalUsdForSwaps(swaps: NormalizedSwap[]): Promise<void>
     applyHistoricalUsdToSwap(swap, price.usd)
   }
 }
+/**
+ * Pure pagination decision (2026-10-17). Given how many raw swaps we have
+ * accumulated so far and how many pages we have already fetched, decide
+ * whether to fetch ANOTHER older page. Extracted so it is unit-testable
+ * without RPC or DB.
+ *
+ * `episodes` is the count of CLOSED episodes after folding the swaps — the
+ * quantity the classifier actually gates on. We stop when it clears
+ * EPISODE_TARGET (minEpisodes + 1, to survive the single-giant drop) or when
+ * we hit PAGINATION_MAX_PAGES. A null cursor means no older history.
+ */
+export function shouldFetchOlderPage(input: {
+  closedEpisodes: number
+  pagesFetched: number
+  cursor: string | null
+}): boolean {
+  if (input.cursor === null) return false
+  if (input.pagesFetched >= PAGINATION_MAX_PAGES) return false
+  return input.closedEpisodes < EPISODE_TARGET
+}
+
+/** Count closed episodes for the pagination gate (open positions excluded). */
+function closedEpisodeCount(swaps: NormalizedSwap[]): number {
+  const { episodes } = buildEpisodes(swaps)
+  return episodes.filter((e) => e.openFrac <= SMART_MONEY_DEFAULTS.openPositionUnsoldFrac).length
+}
 
 // ─── Refresh one wallet ──────────────────────────────────────
 
@@ -528,11 +565,12 @@ export async function refreshOneWallet(candidate: WalletRefreshCandidate): Promi
   try {
     const source = resolveWalletActivitySource()
     let swaps: NormalizedSwap[]
-    let coverage: { sigsSeen: number; validEvents: number; rejectedEvents: number; gaps: string[]; complete30d: boolean; truncated?: boolean; signatures?: RpcSig[] }
+    let coverage: { sigsSeen: number; validEvents: number; rejectedEvents: number; gaps: string[]; complete30d: boolean; truncated?: boolean; signatures?: RpcSig[]; fromTs?: number | null; toTs?: number | null }
     let sigs: RpcSig[]
 
     if (source === 'rpc') {
-      const harvested = await harvestWallet(candidate.address, {
+      // First page: newest HARVEST_LIMIT signatures.
+      const first = await harvestWallet(candidate.address, {
         days: REFRESH_WINDOW_DAYS,
         // Per-wallet cap (see HARVEST_LIMIT): measured 1.6-2.4s/signature
         // live, so 200 sigs ≈ 4-5 min/wallet — enough trades to classify
@@ -541,31 +579,113 @@ export async function refreshOneWallet(candidate: WalletRefreshCandidate): Promi
         withUsd: true,
         throttleMs: THROTTLE_MS,
       })
-      swaps = harvested.swaps
-      coverage = harvested.coverage
-      sigs = harvested.coverage.signatures
+      swaps = first.swaps
+      coverage = first.coverage
+      sigs = first.coverage.signatures
+      let cursor = first.lastSignature
+      let pagesFetched = 1
+
+      // Cursor pagination (2026-10-17): a single 200-sig window often yields
+      // too few closed episodes to classify. Walk OLDER history until the
+      // sample gate is satisfiable or the bounds are hit. Each page is
+      // failure-isolated: a bad page keeps the prior pages' swaps.
+      while (shouldFetchOlderPage({ closedEpisodes: closedEpisodeCount(swaps), pagesFetched, cursor })) {
+        let next: WalletHarvest | null = null
+        try {
+          next = await harvestWallet(candidate.address, {
+            days: REFRESH_WINDOW_DAYS,
+            limit: HARVEST_LIMIT,
+            withUsd: true,
+            throttleMs: THROTTLE_MS,
+            before: cursor ?? undefined,
+          })
+        } catch (e) {
+          coverage.gaps.push(`page-fail:${e instanceof Error ? e.message.slice(0, 40) : 'err'}`)
+          break
+        }
+        pagesFetched++
+        if (next.swaps.length === 0) break // reached oldest history
+        swaps = swaps.concat(next.swaps)
+        sigs = sigs.concat(next.coverage.signatures)
+        coverage.sigsSeen += next.coverage.sigsSeen
+        coverage.validEvents += next.coverage.validEvents
+        coverage.rejectedEvents += next.coverage.rejectedEvents
+        coverage.gaps = coverage.gaps.concat(next.coverage.gaps)
+        // Preserve the widest window seen across pages.
+        if (next.coverage.fromTs !== null) {
+          const curFrom = coverage.fromTs ?? null
+          coverage.fromTs = curFrom === null ? next.coverage.fromTs : Math.min(curFrom, next.coverage.fromTs)
+        }
+        if (next.coverage.toTs !== null) {
+          const curTo = coverage.toTs ?? null
+          coverage.toTs = curTo === null ? next.coverage.toTs : Math.max(curTo, next.coverage.toTs)
+        }
+        coverage.complete30d = coverage.complete30d && next.coverage.complete30d
+        cursor = next.lastSignature
+      }
+      // Record how far the harvest walked, for the audit trail.
+      if (pagesFetched > 1) {
+        coverage.gaps.push(`paginated:${pagesFetched}-pages`)
+      }
     } else {
       // Preferred: keyless GMGN wallet activity — real timestamps, mints and
       // trade-time USD. Falls back to the public-RPC harvest (inside
       // fetchWalletActivity) only when GMGN returns no usable swaps, so a
       // wallet with an empty GMGN feed still gets its legacy harvest.
-      const activity = await fetchWalletActivity(candidate.address, { limit: HARVEST_LIMIT })
-      if (activity.source === 'gmgn' && activity.swaps.length > 0) {
-        // GMGN rows are COMPLETE but may still carry a null trade-time USD
-        // (or a current-only fill from upstream). Fill the SOL leg with the
-        // keyless GeckoTerminal OHLCV oracle — and only clear the stale flag
-        // when that oracle returns a real number.
-        await fillHistoricalUsdForSwaps(activity.swaps)
+      const firstActivity = await fetchWalletActivity(candidate.address, { limit: HARVEST_LIMIT })
+      if (firstActivity.source === 'gmgn' && firstActivity.swaps.length > 0) {
+        await fillHistoricalUsdForSwaps(firstActivity.swaps)
       }
-      swaps = activity.swaps
+      swaps = firstActivity.swaps
       coverage = {
-        sigsSeen: activity.coverage.sigsSeen,
-        validEvents: activity.coverage.validEvents,
-        rejectedEvents: Math.max(0, activity.coverage.sigsSeen - activity.coverage.validEvents),
-        gaps: activity.coverage.gaps,
-        complete30d: activity.coverage.complete,
+        sigsSeen: firstActivity.coverage.sigsSeen,
+        validEvents: firstActivity.coverage.validEvents,
+        rejectedEvents: Math.max(0, firstActivity.coverage.sigsSeen - firstActivity.coverage.validEvents),
+        gaps: [...firstActivity.coverage.gaps],
+        complete30d: firstActivity.coverage.complete,
       }
       sigs = []
+
+      // Cursor pagination (added 2026-10-17): walk older GMGN activity pages
+      // when the wallet has fewer than EPISODE_TARGET closed episodes.
+      // Live-proven: GMGN returns `data.next`, forwarded as `&cursor=<next>`.
+      let gmgnCursor = firstActivity.coverage.nextCursor ?? null
+      let gmgnPages = 1
+      while (
+        firstActivity.source === 'gmgn' &&
+        shouldFetchOlderPage({ closedEpisodes: closedEpisodeCount(swaps), pagesFetched: gmgnPages, cursor: gmgnCursor })
+      ) {
+        try {
+          const nextAct = await fetchWalletActivity(candidate.address, {
+            limit: HARVEST_LIMIT,
+            cursor: gmgnCursor,
+          })
+          gmgnPages += 1
+          if (nextAct.swaps.length === 0) break
+          await fillHistoricalUsdForSwaps(nextAct.swaps)
+          // Dedup swaps by tx hash + timestamp (GMGN pages may overlap at the boundary).
+          const seenTx = new Set(swaps.map((s) => `${s.transactionSignature}|${s.timestamp}`))
+          for (const s of nextAct.swaps) {
+            const k = `${s.transactionSignature}|${s.timestamp}`
+            if (!seenTx.has(k)) {
+              seenTx.add(k)
+              swaps.push(s)
+            }
+          }
+          coverage.sigsSeen += nextAct.coverage.sigsSeen
+          coverage.validEvents += nextAct.coverage.validEvents
+          coverage.rejectedEvents += Math.max(0, nextAct.coverage.sigsSeen - nextAct.coverage.validEvents)
+          coverage.gaps = coverage.gaps.concat(nextAct.coverage.gaps)
+          coverage.complete30d = coverage.complete30d && nextAct.coverage.complete
+          gmgnCursor = nextAct.coverage.nextCursor ?? null
+        } catch (e) {
+          coverage.gaps.push(`pagination-fail:page-${gmgnPages + 1}:${e instanceof Error ? e.message.slice(0, 48) : 'err'}`)
+          break
+        }
+      }
+      if (gmgnPages > 1) {
+        coverage.gaps.push(`paginated:${gmgnPages}-pages`)
+      }
     }
 
     const built = buildEpisodes(swaps)

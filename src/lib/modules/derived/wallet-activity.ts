@@ -51,6 +51,8 @@ export interface WalletActivityCoverage {
   validEvents: number
   complete: boolean
   gaps: string[]
+  /** GMGN `data.next` cursor for the next (older) page. Null when the feed has no older rows, or for non-GMGN sources. */
+  nextCursor?: string | null
 }
 
 export interface WalletActivityResult {
@@ -211,18 +213,32 @@ async function fetchGmgnActivity(
   wallet: string,
   limit: number,
   minBlockTime?: number,
+  cursor?: string | null,
 ): Promise<{ swaps: NormalizedSwap[]; coverage: WalletActivityCoverage }> {
   const gaps: string[] = []
   let rows: GmgnActivityRow[] = []
+  let nextCursor: string | null = null
   try {
+    // Cursor pagination (live-proven 2026-10-17): GMGN's wallet_activity
+    // endpoint returns `data.next` after each page. The cursor MUST be
+    // forwarded as `&cursor=<next>` (NOT `&offset=` — that returns the
+    // SAME first page, verified live). Each page chains to the next 50
+    // older activities.
+    const params = new URLSearchParams({
+      wallet,
+      limit: String(Math.min(Math.max(limit, 1), 50)),
+      cost: '10',
+    })
+    if (cursor) params.set('cursor', cursor)
     const res = await gmgnFetch<GmgnActivityResponse>(
-      `${GMGN_ACTIVITY_BASE}/sol?wallet=${encodeURIComponent(wallet)}&limit=${Math.min(Math.max(limit, 1), 50)}&cost=10`,
+      `${GMGN_ACTIVITY_BASE}/sol?${params.toString()}`,
     )
     if (res.code !== 0) {
       gaps.push(`gmgn-code:${String(res.code)}`)
     } else {
       rows = res.data?.activities ?? []
       if (rows.length === 0) gaps.push('gmgn-empty-activity-page')
+      nextCursor = typeof res.data?.next === 'string' && res.data.next.length > 0 ? res.data.next : null
     }
   } catch (err) {
     gaps.push(`gmgn-fetch-fail:${err instanceof Error ? err.message.slice(0, 48) : 'err'}`)
@@ -247,6 +263,7 @@ async function fetchGmgnActivity(
       validEvents,
       complete: validEvents > 0 && out.length === rows.length,
       gaps,
+      nextCursor,
     },
   }
 }
@@ -333,13 +350,13 @@ async function fetchHeliusActivity(
  */
 export async function fetchWalletActivity(
   address: string,
-  opts: { limit?: number; minBlockTime?: number } = {},
+  opts: { limit?: number; minBlockTime?: number; cursor?: string | null } = {},
 ): Promise<WalletActivityResult> {
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100)
   const minBlockTime = opts.minBlockTime
 
   // 1) GMGN keyless wallet activity — real timestamps + mints + trade-time USD.
-  const gmgn = await fetchGmgnActivity(address, limit, minBlockTime)
+  const gmgn = await fetchGmgnActivity(address, limit, minBlockTime, opts.cursor)
   if (gmgn.swaps.length > 0) {
     return {
       source: 'gmgn',
