@@ -28,7 +28,9 @@
 //                          Mirrors SNIPER_CONFLUENCE_ENABLED / SNIPER_REALTIME_ENABLED:
 //                          the entire script (KOLScan + Axiom + Telegram) is a no-op
 //                          unless the literal "true".
-//   KOLSCAN_SESSION — kolscan.io session cookie (required for KOLScan feed)
+//   KOLSCAN_SESSION — optional kolscan.io session cookie; NOT required.
+//                      The live feed reads KOLScan's public Supabase REST
+//                      keyless, so this cookie never gates the source.
 //   KOLSCAN_ENABLED — "true" to enable KOLScan source (default: false)
 // -------------------------------------------------------------
 
@@ -93,14 +95,13 @@ async function main() {
 
   // ── Source 1: KOLScan live feed ──
   const kolscanEnabled = process.env.KOLSCAN_ENABLED === 'true'
-  const kolscanSession = process.env.KOLSCAN_SESSION
   let kolscanScreened = 0
   let kolscanUnseen = 0
   let kolscanPersisted = 0
   let kolscanPersistFailed = 0
   const unseenScreenedTxs: KolscanScreenedTx[] = []
 
-  if (kolscanEnabled && kolscanSession) {
+  if (kolscanEnabled) {
     try {
       const feed = await fetchKolscanFeed()
       console.log(`[kol-monitor] KOLScan: ${feed.wallets.length} wallets, ${feed.transactions.length} txs`)
@@ -206,7 +207,7 @@ async function main() {
       console.error(`[kol-monitor] KOLScan failed: ${err instanceof Error ? err.message : String(err)}`)
     }
   } else {
-    console.log('[kol-monitor] KOLScan disabled (set KOLSCAN_ENABLED=true + KOLSCAN_SESSION)')
+    console.log('[kol-monitor] KOLScan disabled (set KOLSCAN_ENABLED=true; no cookie needed)')
   }
 
   // ── Source 2: Axiom wallet list ──
