@@ -19,7 +19,9 @@
 //   WHALE_HARVEST_SHEET_ENABLED — 'false' to skip the sheet append (default 'true')
 //   WHALE_HARVEST_KOLSCAN       — 'false' to skip KOLScan (default 'true')
 //   WHALE_HARVEST_WINDOWS       — comma-separated GMGN windows (default '1d,7d,30d')
-//   KOLSCAN_SESSION             — kolscan.io session cookie (feed empty without it)
+//   KOLSCAN_SESSION             — optional kolscan.io session cookie; NOT required.
+//                                 The roster reads KOLScan's public Supabase REST
+//                                 keyless, so this cookie never gates the source.
 //
 // Run: npm run harvest:whales
 // ─────────────────────────────────────────────────────────────
