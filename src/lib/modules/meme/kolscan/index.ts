@@ -1,17 +1,20 @@
 // ─────────────────────────────────────────────────────────────
 // KOLScan — Solana KOL wallet monitor.
-// Source: kolscan.io (Next.js app; wallet feed embedded in RSC payload).
+// Source: kolscan.io (Next.js app) + its public Supabase backend.
 //
-// This module scrapes KOLScan's homepage RSC (React Server Component)
-// payload to extract:
-//   1. KOL wallet roster: 500+ verified KOL wallets with names, Twitter,
-//      Telegram, and EVM addresses.
-//   2. Live transaction feed: latest KOL buys with wallet address, SOL
-//      amount spent, token symbol/address/amount, DEX, timestamp.
+// RE-VERIFIED 2026-10-17 (passive GET only): the `user-session` cookie is
+// NOT required. The public browser anon key is embedded in the client bundle
+// and both datasets are openly readable with it:
+//   1. Wallet roster   GET {SUPABASE}/rest/v1/wallets?select=*  (564 rows)
+//   2. Live tx feed    GET {SUPABASE}/rest/v1/transactions_realtime
+// A keyless GET of kolscan.io/ also returns the same roster+feed embedded in
+// its Next.js RSC payload (409 wallets / 10 tx) — a fake cookie yields a
+// byte-identical result, so the cookie never gated anything.
 //
-// Authentication: session cookie `user-session` (KOLSCAN_SESSION env var).
-// The session cookie is required; without it the RSC payload returns
-// a bare shell without the wallet feed.
+// This module therefore tries the keyless Supabase REST path FIRST. The RSC
+// HTML scrape is ALWAYS fetched for evm_address enrichment (the public
+// Supabase `wallets` table does not expose evm_address). KOLSCAN_SESSION is
+// optional: when non-empty it is merely sent as a cookie and never gates.
 //
 // Filtering (applied downstream by smart-money-sync):
 //   - Purchase amount > $1000 (sol_change * SOL price)
@@ -25,6 +28,7 @@
 //     at fixed intervals are flagged as bot-like
 //   - Transactions with identical out_amount across >3 wallets in the same
 //     block window are treated as coordinated/bot activity
+
 // ─────────────────────────────────────────────────────────────
 
 const KOLSCAN_BASE = 'https://kolscan.io'
@@ -33,7 +37,9 @@ function getSession(): string {
   return process.env.KOLSCAN_SESSION || ''
 }
 
+
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36'
+
 
 export interface KolscanWallet {
   address: string
@@ -65,6 +71,132 @@ export interface KolscanFeed {
   wallets: KolscanWallet[]
   transactions: KolscanTransaction[]
   fetchedAt: string
+}
+// ── Keyless source (RE-verified 2026-10-17) ─────────────────────
+//
+// KOLScan's own Supabase project, read through the public browser anon key
+// shipped in their client chunk `/_next/static/chunks/99-*.js`
+// (`createClient(SUPABASE_URL, ANON_KEY)`). The anon key is a read-scoped
+// client credential — RLS exposes exactly the public `wallets` roster and
+// `transactions_realtime` feed the site renders.
+
+const KOLSCAN_SUPABASE_URL = 'https://odllxoobvwycaojooxvl.supabase.co'
+const KOLSCAN_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kbGx4b29idnd5Y2Fvam9veHZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg0MDYyNTcsImV4cCI6MjA2Mzk4MjI1N30.p8yssMZkn-TwOEkCRgO668egOlYBZuVJT0TRmqRzoqk'
+
+/** Raw row shape from the public Supabase `wallets` table (snake_case). */
+interface KolscanSupaWallet {
+  wallet_address?: string | null
+  name?: string | null
+  twitter?: string | null
+  telegram?: string | null
+  evm_address?: string | null
+  pfp?: string | null
+}
+
+/** Raw row shape from the public Supabase `transactions_realtime` table. */
+interface KolscanSupaTx {
+  signature?: string | null
+  wallet_address?: string | null
+  name?: string | null
+  timestamp?: number | null
+  sol_change?: number | null
+  out_token_symbol?: string | null
+  out_token_address?: string | null
+  out_amount?: number | null
+  in_token_symbol?: string | null
+  in_token_address?: string | null
+  in_amount?: number | null
+  dex?: string | null
+}
+
+/**
+ * Fetch the full wallet roster from the public Supabase `wallets` table.
+ * Returns [] (never throws) on any failure.
+ */
+export async function fetchKolscanWalletsKeyless(): Promise<KolscanWallet[]> {
+  try {
+    const res = await fetch(`${KOLSCAN_SUPABASE_URL}/rest/v1/wallets?select=*&limit=1000`, {
+      headers: {
+        'apikey': KOLSCAN_SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${KOLSCAN_SUPABASE_ANON_KEY}`,
+        'User-Agent': UA,
+        'Accept': 'application/json',
+      },
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (!res.ok) return []
+    const rows = (await res.json()) as KolscanSupaWallet[]
+    if (!Array.isArray(rows)) return []
+    const seen = new Set<string>()
+    const out: KolscanWallet[] = []
+    for (const r of rows) {
+      const address = typeof r.wallet_address === 'string' ? r.wallet_address : ''
+      if (!address || seen.has(address)) continue
+      seen.add(address)
+      out.push({
+        address,
+        name: r.name ?? '',
+        twitter: r.twitter ?? null,
+        telegram: r.telegram ?? null,
+        evmAddress: r.evm_address ?? null,
+        pfp: r.pfp ?? null,
+      })
+    }
+    return out
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Fetch the latest trades from the public Supabase `transactions_realtime`
+ * table (newest first). `usd_change` is deliberately ignored — the adapter
+ * chain prices via the canonical `usdValue = solChange * solPrice` SOL path.
+ * Returns [] (never throws) on any failure.
+ */
+export async function fetchKolscanTxsKeyless(
+  limit = 200,
+): Promise<Omit<KolscanTransaction, 'usdValue'>[]> {
+  try {
+    const n = Math.max(1, Math.min(1000, Math.floor(limit)))
+    const res = await fetch(
+      `${KOLSCAN_SUPABASE_URL}/rest/v1/transactions_realtime?select=*&order=timestamp.desc&limit=${n}`,
+      {
+        headers: {
+          'apikey': KOLSCAN_SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${KOLSCAN_SUPABASE_ANON_KEY}`,
+          'User-Agent': UA,
+          'Accept': 'application/json',
+        },
+        signal: AbortSignal.timeout(15_000),
+      },
+    )
+    if (!res.ok) return []
+    const rows = (await res.json()) as KolscanSupaTx[]
+    if (!Array.isArray(rows)) return []
+    const out: Omit<KolscanTransaction, 'usdValue'>[] = []
+    for (const r of rows) {
+      if (!r.signature || !r.wallet_address || typeof r.timestamp !== 'number') continue
+      out.push({
+        signature: r.signature,
+        walletAddress: r.wallet_address,
+        kolName: r.name ?? '',
+        timestamp: r.timestamp,
+        solChange: r.sol_change ?? 0,
+        outTokenSymbol: r.out_token_symbol ?? '',
+        outTokenAddress: r.out_token_address ?? '',
+        outAmount: r.out_amount ?? 0,
+        inTokenSymbol: r.in_token_symbol || null,
+        inTokenAddress: r.in_token_address || null,
+        inAmount: r.in_amount ?? 0,
+        dex: r.dex ?? '',
+      })
+    }
+    return out
+  } catch {
+    return []
+  }
 }
 
 /** SOL price in USD, from a lightweight public endpoint. Cached 5 minutes. */
@@ -107,43 +239,88 @@ export async function fetchSolPriceUsd(): Promise<number | null> {
 }
 
 /**
- * Fetch the KOLScan homepage and parse the embedded RSC payload for
- * the KOL wallet roster and live transaction feed.
+ * Fetch the KOLScan roster + live transaction feed, keyless-first.
  *
- * Returns empty lists (never throws) when session is missing or the
- * site is unreachable — callers fall back to the GMGN/Sheet sources.
+ * Sources (all attempted, failures isolated per leg):
+ *   1. Public Supabase REST — keyless wallet roster + transaction feed.
+ *   2. kolscan.io RSC HTML — always fetched, because `evm_address` exists ONLY
+ *      in the SSR payload, never in the exposed Supabase `wallets` table.
+ *
+ * `KOLSCAN_SESSION` is optional: when non-empty it is sent as a `user-session`
+ * cookie, but the request is never gated on it (a keyless GET is byte-identical).
+ *
+ * Both sources are merged (dedup by address / signature) and USD valuation runs
+ * through a single `fetchSolPriceUsd()` call per invocation. Returns empty lists
+ * (never throws) only when BOTH sources yield nothing.
  */
 export async function fetchKolscanFeed(): Promise<KolscanFeed> {
   const empty: KolscanFeed = { wallets: [], transactions: [], fetchedAt: new Date().toISOString() }
-  const session = getSession()
-  if (!session) return empty
 
+  const [keylessWallets, keylessTxs] = await Promise.all([
+    fetchKolscanWalletsKeyless(),
+    fetchKolscanTxsKeyless(),
+  ])
+
+  let htmlWallets: KolscanWallet[] = []
+  let htmlTxs: Omit<KolscanTransaction, 'usdValue'>[] = []
   try {
-    const res = await fetch(KOLSCAN_BASE, {
-      headers: {
-        'Cookie': `user-session=${session}`,
-        'User-Agent': UA,
-        'Accept': 'text/html,application/xhtml+xml',
-      },
-      signal: AbortSignal.timeout(15_000),
-    })
-    if (!res.ok) return empty
-    const html = await res.text()
+    const session = getSession()
+    const headers: Record<string, string> = {
+      'User-Agent': UA,
+      'Accept': 'text/html,application/xhtml+xml',
+    }
+    if (session) headers['Cookie'] = `user-session=${session}`
 
-    const wallets = parseKolscanWallets(html)
-    const rawTxs = parseKolscanTransactions(html)
-    if (wallets.length === 0 && rawTxs.length === 0) return empty
-
-    const solPrice = await fetchSolPriceUsd()
-    const transactions: KolscanTransaction[] = rawTxs.map((tx) => ({
-      ...tx,
-      usdValue: solPrice !== null ? tx.solChange * solPrice : null,
-    }))
-
-    return { wallets, transactions, fetchedAt: new Date().toISOString() }
-  } catch {
-    return empty
+    const res = await fetch(KOLSCAN_BASE, { headers, signal: AbortSignal.timeout(15_000) })
+    if (res.ok) {
+      const html = await res.text()
+      htmlWallets = parseKolscanWallets(html)
+      htmlTxs = parseKolscanTransactions(html)
+    } else {
+      console.warn(`[kolscan] html leg HTTP ${res.status}`)
+    }
+  } catch (err) {
+    console.warn(`[kolscan] html leg failed: ${err instanceof Error ? err.message : String(err)}`)
   }
+
+  // Merge wallets: keyless is the base, HTML overlays non-null fields
+  // (notably evmAddress, which only the RSC payload provides).
+  const wallets = new Map<string, KolscanWallet>()
+  for (const w of keylessWallets) wallets.set(w.address, w)
+  for (const w of htmlWallets) {
+    const existing = wallets.get(w.address)
+    if (!existing) {
+      wallets.set(w.address, w)
+      continue
+    }
+    wallets.set(w.address, {
+      ...existing,
+      name: existing.name || w.name,
+      twitter: existing.twitter ?? w.twitter,
+      telegram: existing.telegram ?? w.telegram,
+      evmAddress: existing.evmAddress ?? w.evmAddress,
+      pfp: existing.pfp ?? w.pfp,
+    })
+  }
+
+  // Merge txs: dedup by signature, keyless wins.
+  const seenSignatures = new Set<string>()
+  const rawTxs: Omit<KolscanTransaction, 'usdValue'>[] = []
+  for (const tx of [...keylessTxs, ...htmlTxs]) {
+    if (seenSignatures.has(tx.signature)) continue
+    seenSignatures.add(tx.signature)
+    rawTxs.push(tx)
+  }
+
+  if (wallets.size === 0 && rawTxs.length === 0) return empty
+
+  const solPrice = await fetchSolPriceUsd()
+  const transactions: KolscanTransaction[] = rawTxs.map((tx) => ({
+    ...tx,
+    usdValue: solPrice !== null ? tx.solChange * solPrice : null,
+  }))
+
+  return { wallets: [...wallets.values()], transactions, fetchedAt: new Date().toISOString() }
 }
 
 /** Unescape the Next.js RSC payload (array of ["1", "<escaped>"] chunks) into raw text. */

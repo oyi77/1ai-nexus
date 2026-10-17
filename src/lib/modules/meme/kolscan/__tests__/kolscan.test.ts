@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import {
   parseKolscanWallets,
   parseKolscanTransactions,
@@ -217,5 +217,191 @@ describe('resolveKolscanThresholds', () => {
     })
     expect(t.minPurchaseUsd).toBe(1000)
     expect(t.minWinRate).toBe(0.6)
+  })
+})
+
+// `fetchSolPriceUsd` memoises a 5-minute SOL price at module scope, so a static
+// `fetchKolscanFeed` import would leak that cache across cases. Each case
+// therefore reloads a fresh module registry via `await import('../index')`
+// (this also picks up per-test `process.env` stubs). Static import cannot work.
+describe('fetchKolscanFeed', () => {
+  const SOL_MINT = 'So11111111111111111111111111111111111111112'
+  const ADDR_A = 'A'.repeat(40)
+  const ADDR_B = 'B'.repeat(40)
+  const MINT_X = 'X'.repeat(40)
+  const EVM_A = `0x${'b'.repeat(40)}`
+  const HTM_SIG = '3'.repeat(64)
+
+  type FetchInit = { headers?: Record<string, string> }
+  type FetchLike = (url: string, init?: FetchInit) => Promise<unknown>
+
+  const calls: Array<{ url: string; init?: FetchInit }> = []
+  let fetchMock: Mock<FetchLike>
+
+  function jsonRes(body: unknown, ok = true) {
+    return { ok, status: ok ? 200 : 500, json: async () => body, text: async () => JSON.stringify(body) }
+  }
+
+  function htmlRes(html: string, ok = true) {
+    return { ok, status: ok ? 200 : 500, text: async () => html, json: async () => ({}) }
+  }
+
+  function walletJson(address: string, name: string, evm: string | null): string {
+    return (
+      `{"wallet_address":"${address}","name":"${name}",` +
+      `"twitter":null,"telegram":null,` +
+      `"evm_address":${evm === null ? 'null' : `"${evm}"`},` +
+      `"pfp":"https://img/${address}","transactions":[`
+    )
+  }
+
+  function txJson(signature: string, address: string, solChange: number, kolName: string): string {
+    return (
+      `{"signature":"${signature}","wallet_address":"${address}",` +
+      `"timestamp":1700000000,"sol_change":${solChange},` +
+      `"out_token_symbol":"TOK","out_token_address":"${MINT_X}","out_amount":1000,` +
+      `"in_token_symbol":"SOL","in_token_address":"${SOL_MINT}","in_amount":${solChange},` +
+      `"dex":"Pump.fun","name":"${kolName}","pfp":"https://img/x"}`
+    )
+  }
+
+  const supaWalletRows = [
+    { wallet_address: ADDR_A, name: 'Alice', twitter: null, telegram: null, evm_address: null, pfp: null },
+  ]
+
+  function supaTxRow(signature: string, solChange: number) {
+    return {
+      signature,
+      wallet_address: ADDR_A,
+      name: 'Alice',
+      timestamp: 1700000000,
+      sol_change: solChange,
+      out_token_symbol: 'TOK',
+      out_token_address: MINT_X,
+      out_amount: 1000,
+      in_token_symbol: 'SOL',
+      in_token_address: SOL_MINT,
+      in_amount: solChange,
+      dex: 'Pump.fun',
+    }
+  }
+
+  beforeEach(() => {
+    delete process.env.KOLSCAN_SESSION
+    calls.length = 0
+    fetchMock = vi.fn(async (url: string, init?: FetchInit) => {
+      calls.push({ url, init })
+      return htmlRes('')
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+    vi.resetModules()
+    delete process.env.KOLSCAN_SESSION
+  })
+
+  it('reads the keyless Supabase roster + feed and prices txs in USD from one SOL price', async () => {
+    fetchMock.mockImplementation(async (url: string, init?: FetchInit) => {
+      calls.push({ url, init })
+      if (url.includes('/rest/v1/wallets')) return jsonRes(supaWalletRows)
+      if (url.includes('/rest/v1/transactions_realtime')) {
+        // Same signature twice: the merge must dedupe to a single tx.
+        return jsonRes([supaTxRow('SIG_ONE', 2), supaTxRow('SIG_ONE', 2)])
+      }
+      if (url.includes('lite-api.jup.ag')) return jsonRes({ [SOL_MINT]: { usdPrice: 150 } })
+      if (url.includes('kolscan.io')) return htmlRes(rscHtml(''))
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    const { fetchKolscanFeed: feed } = await import('../index')
+    const result = await feed()
+
+    expect(result.wallets).toHaveLength(1)
+    expect(result.wallets[0].address).toBe(ADDR_A)
+    expect(result.transactions).toHaveLength(1)
+    expect(result.transactions[0].signature).toBe('SIG_ONE')
+    expect(result.transactions[0].usdValue).toBe(300)
+    expect(Number.isNaN(Date.parse(result.fetchedAt))).toBe(false)
+  })
+
+  it('falls back to the RSC HTML payload when Supabase is unavailable', async () => {
+    const html = rscHtml(walletJson(ADDR_B, 'Bob', null) + txJson(HTM_SIG, ADDR_B, 1, 'Bob'))
+    fetchMock.mockImplementation(async (url: string, init?: FetchInit) => {
+      calls.push({ url, init })
+      if (url.includes('/rest/v1/')) return jsonRes([], false)
+      if (url.includes('lite-api.jup.ag')) return jsonRes({ [SOL_MINT]: { usdPrice: 150 } })
+      if (url.includes('kolscan.io')) return htmlRes(html)
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    const { fetchKolscanFeed: feed } = await import('../index')
+    const result = await feed()
+
+    expect(result.wallets.map((w) => w.address)).toEqual([ADDR_B])
+    expect(result.transactions).toHaveLength(1)
+    expect(result.transactions[0].signature).toBe(HTM_SIG)
+    expect(result.transactions[0].usdValue).toBe(150)
+  })
+
+  it('sends no Cookie header without KOLSCAN_SESSION, and sends it when set', async () => {
+    fetchMock.mockImplementation(async (url: string, init?: FetchInit) => {
+      calls.push({ url, init })
+      if (url.includes('/rest/v1/')) return jsonRes([])
+      if (url.includes('lite-api.jup.ag')) return jsonRes({ [SOL_MINT]: { usdPrice: 150 } })
+      if (url.includes('kolscan.io')) return htmlRes(rscHtml(walletJson(ADDR_A, 'Alice', null)))
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    const { fetchKolscanFeed: feed } = await import('../index')
+
+    delete process.env.KOLSCAN_SESSION
+    await feed()
+    const keyless = calls.find((c) => c.url.includes('kolscan.io'))
+    expect(keyless).toBeDefined()
+    expect(keyless?.init?.headers?.Cookie).toBeUndefined()
+
+    calls.length = 0
+    process.env.KOLSCAN_SESSION = 'tok-123'
+    await feed()
+    const withCookie = calls.find((c) => c.url.includes('kolscan.io'))
+    expect(withCookie?.init?.headers?.Cookie).toBe('user-session=tok-123')
+  })
+
+  it('merges keyless + HTML wallets by address, taking evmAddress from the RSC payload', async () => {
+    const html = rscHtml(walletJson(ADDR_A, '', EVM_A))
+    fetchMock.mockImplementation(async (url: string, init?: FetchInit) => {
+      calls.push({ url, init })
+      if (url.includes('/rest/v1/wallets')) return jsonRes(supaWalletRows)
+      if (url.includes('/rest/v1/transactions_realtime')) return jsonRes([])
+      if (url.includes('lite-api.jup.ag')) return jsonRes({ [SOL_MINT]: { usdPrice: 150 } })
+      if (url.includes('kolscan.io')) return htmlRes(html)
+      throw new Error(`unexpected fetch: ${url}`)
+    })
+
+    const { fetchKolscanFeed: feed } = await import('../index')
+    const result = await feed()
+
+    expect(result.wallets).toHaveLength(1)
+    expect(result.wallets[0].address).toBe(ADDR_A)
+    expect(result.wallets[0].name).toBe('Alice')
+    expect(result.wallets[0].evmAddress).toBe(EVM_A)
+    expect(result.wallets[0].pfp).toBe(`https://img/${ADDR_A}`)
+  })
+
+  it('returns the empty feed shape only when every source fails', async () => {
+    fetchMock.mockImplementation(async () => {
+      throw new Error('network down')
+    })
+
+    const { fetchKolscanFeed: feed } = await import('../index')
+    const result = await feed()
+
+    expect(result.wallets).toEqual([])
+    expect(result.transactions).toEqual([])
+    expect(Number.isNaN(Date.parse(result.fetchedAt))).toBe(false)
   })
 })
