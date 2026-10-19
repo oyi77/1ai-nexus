@@ -115,6 +115,7 @@ data/accumulation-alert-state.json
 data/confluence-seen.json
 data/confluence-latest.json
 data/kolscan-seen.json
+data/smartmoney-seen.json
 data/call-feed-state.sqlite
 data/botx-keys.sqlite
 
@@ -123,3 +124,6 @@ data/gmgn-tag-inventory.json
 
 # nightly DB dumps (large, regenerated — never commit)
 backups/
+
+# autoresearch / cron bench logs (regenerated on every run, never commit)
+/logs/

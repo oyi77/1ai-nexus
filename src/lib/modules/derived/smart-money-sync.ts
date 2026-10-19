@@ -28,6 +28,12 @@ import os from 'node:os'
 import path from 'node:path'
 import { prisma } from '@/lib/db'
 import { contractButtons } from './signal-tier'
+import {
+  isKeySeen,
+  markKeySeen,
+  smartMoneyAlertKey,
+  SMART_MONEY_SEEN_TTL_MS,
+} from './db-seen-store'
 
 /** The operator's spreadsheet ID (from the shared link). */
 export const SPREADSHEET_ID = '14Kr-P8-DByM-jAw4ydo2x29YAp_LPc9uivHMidP6-78'
@@ -655,6 +661,18 @@ export async function sendSmartMoneyAlerts(trades: SmartMoneyTrade[]): Promise<n
 
   let sent = 0
   for (const t of trades) {
+    // The 5-minute cron re-queries a 1-hour window, so the same trade would
+    // alert up to 12 times without this guard. Mark seen only after a
+    // successful send so a transient Telegram failure still retries.
+    const dedupKey = smartMoneyAlertKey(
+      t.chain,
+      t.tokenAddress,
+      t.walletAddress,
+      t.action,
+      t.timestamp.getTime(),
+    )
+    if (await isKeySeen(dedupKey)) continue
+
     const text = renderSmartMoneyAlert(t)
     const buttons = contractButtons(t.tokenAddress, t.chain)
     const replyMarkup = buttons.inline_keyboard.length > 0 ? buttons : undefined
@@ -675,8 +693,10 @@ export async function sendSmartMoneyAlerts(trades: SmartMoneyTrade[]): Promise<n
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      if (res.ok) sent++
-      else {
+      if (res.ok) {
+        sent++
+        await markKeySeen(dedupKey, SMART_MONEY_SEEN_TTL_MS)
+      } else {
         const body = await res.text().catch(() => '')
         console.error(`[smart-money-sync] Telegram send failed: ${res.status} ${body.slice(0, 200)}`)
       }

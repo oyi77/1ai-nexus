@@ -233,4 +233,55 @@ describe('scanWhaleBuys', () => {
     expect(result.detections[0].walletClass).toBe('WHALE')
     expect(result.detections[0].isFirstSeen).toBe(false)
   })
+
+  it('skips already-seen tokens and rotates to fresh candidates (filterSeen)', async () => {
+    const TOKEN2 = 'FreshMintBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB'
+    mockDiscoverEstablishedGmgnTokens.mockResolvedValue([
+      { contract: TOKEN, chain: 'solana', symbol: 'SEEN' },
+      { contract: TOKEN2, chain: 'solana', symbol: 'FRESH' },
+    ])
+    mockListGmgnTokenHolders.mockResolvedValue([holderRow(WALLET_A)])
+    mockFetchWalletActivity.mockResolvedValue({
+      source: 'gmgn',
+      swaps: [nswap({ outputMint: TOKEN2, inputUsd: 50_000 })],
+      coverage: { sigsSeen: 1, validEvents: 1, complete: true, gaps: [] },
+      note: 'gmgn',
+    })
+
+    const result = await scanWhaleBuys({
+      tokenLimit: 5,
+      holderLimit: 5,
+      config: { minUsd: 10_000 },
+      filterSeen: async (chain, contract) => chain === 'solana' && contract === TOKEN,
+    })
+
+    // Deeper pool requested so rotation has candidates beyond the top 10.
+    expect(mockDiscoverEstablishedGmgnTokens).toHaveBeenCalledWith(30)
+    // Only the unseen token consumed holder/activity budget.
+    expect(mockListGmgnTokenHolders).toHaveBeenCalledTimes(1)
+    expect(result.tokensScanned).toBe(1)
+    expect(result.aggregated[0].contract).toBe(TOKEN2)
+  })
+
+  it('falls back to top candidates when every token is seen (never an empty pass)', async () => {
+    mockDiscoverEstablishedGmgnTokens.mockResolvedValue([
+      { contract: TOKEN, chain: 'solana', symbol: 'SEEN' },
+    ])
+    mockListGmgnTokenHolders.mockResolvedValue([holderRow(WALLET_A)])
+    mockFetchWalletActivity.mockResolvedValue({
+      source: 'gmgn',
+      swaps: [nswap({ inputUsd: 50_000 })],
+      coverage: { sigsSeen: 1, validEvents: 1, complete: true, gaps: [] },
+      note: 'gmgn',
+    })
+
+    const result = await scanWhaleBuys({
+      tokenLimit: 5,
+      config: { minUsd: 10_000 },
+      filterSeen: async () => true,
+    })
+
+    expect(result.tokensScanned).toBe(1)
+    expect(result.aggregated[0].contract).toBe(TOKEN)
+  })
 })

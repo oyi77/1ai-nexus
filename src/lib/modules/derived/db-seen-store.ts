@@ -11,6 +11,7 @@
 //   confluence:<contract>                confluence alert seen     (6h)
 //   accumulation:<contract>              accumulation alert seen   (6h)
 //   kolscan:<signature>                  KOLScan tx seen           (6h)
+//   smartmoney:<chain>:<token>:<wallet>:<action>:<hour>  alert sent  (6h)
 //
 // CRITICAL INVARIANT — dedup state must never crash a scan pass, an alert
 // cron or a review digest. Every DB operation is wrapped; on failure we
@@ -30,6 +31,8 @@ export const ACCUMULATION_SEEN_TTL_MS = 6 * 60 * 60_000
 export const KOLSCAN_SEEN_TTL_MS = 6 * 60 * 60_000
 /** Whale-buy scanner: one token = one emission per cooldown window. */
 export const WHALE_BUY_SEEN_TTL_MS = 6 * 60 * 60_000
+/** Smart-money Telegram alert: one alert per transaction (5-min cron, 1h query window). */
+export const SMART_MONEY_SEEN_TTL_MS = 6 * 60 * 60_000
 /**
  * Kill-switch: when `SNIPER_SEEN_DB` is 'off'/'false'/'0', ALL prisma calls
  * are skipped — reads go straight to the JSON namespace file, writes go only
@@ -48,6 +51,7 @@ const NAMESPACE_TTL_MS: Record<string, number> = {
   accumulation: ACCUMULATION_SEEN_TTL_MS,
   kolscan: KOLSCAN_SEEN_TTL_MS,
   whalebuy: WHALE_BUY_SEEN_TTL_MS,
+  smartmoney: SMART_MONEY_SEEN_TTL_MS,
 }
 
 function getJsonPath(namespace: string): string {
@@ -86,7 +90,8 @@ export function toJsonKey(key: string): { namespace: string; jsonKey: string } |
     namespace === 'review' ||
     namespace === 'confluence' ||
     namespace === 'accumulation' ||
-    namespace === 'kolscan'
+    namespace === 'kolscan' ||
+    namespace === 'smartmoney'
   ) {
     return { namespace, jsonKey: remainder }
   }
@@ -326,4 +331,21 @@ export function markWhaleBuySeen(
   ttlMs: number = WHALE_BUY_SEEN_TTL_MS,
 ): Promise<void> {
   return markKeySeen(`whalebuy:${chainContractKey(chain, contract)}`, ttlMs)
+}
+
+/**
+ * Composite dedup key for a smart-money Telegram alert. The 5-minute cron
+ * queries a 1-hour window, so the same transaction is re-selected up to 12
+ * times; keying on the trade's own hour bucket alerts each trade exactly once
+ * while still letting a genuinely new hour re-alert.
+ */
+export function smartMoneyAlertKey(
+  chain: string,
+  tokenAddress: string,
+  walletAddress: string,
+  action: string,
+  timestampMs: number,
+): string {
+  const hourBucket = Math.floor(timestampMs / 3_600_000)
+  return `smartmoney:${(chain || '').toLowerCase()}:${tokenAddress || 'unknown'}:${walletAddress || 'unknown'}:${action}:${hourBucket}`
 }

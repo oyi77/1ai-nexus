@@ -48,6 +48,7 @@ async function main(): Promise<void> {
     tokenLimit,
     holderLimit,
     config: { minUsd },
+    filterSeen: isWhaleBuySeen,
   })
 
   console.log(

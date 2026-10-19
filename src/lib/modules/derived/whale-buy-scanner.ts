@@ -69,6 +69,8 @@ export interface WhaleScanOpts {
   swapLimit?: number
   /** Detector config (min USD threshold). */
   config?: Partial<WhaleBuyDetectorConfig>
+  /** Optional predicate to skip already-seen tokens so the scan rotates through the candidate pool. */
+  filterSeen?: (chain: string, contract: string) => Promise<boolean>
 }
 
 function tokenLimitEnv(): number {
@@ -144,11 +146,25 @@ export async function scanWhaleBuys(
   //    Falls back to trending internally if the volume-sorted endpoint fails.
   let tokens: Array<{ contract: string; chain: string; symbol: string }> = []
   try {
-    const discovered = await discoverEstablishedGmgnTokens(Math.min(tokenLimit, 20))
-    tokens = discovered
+    // Request a deeper pool (up to 50 tokens) so rotation can bypass cooldown-suppressed tokens.
+    const poolSize = opts.filterSeen ? Math.max(tokenLimit * 3, 30) : Math.min(tokenLimit, 20)
+    const discovered = await discoverEstablishedGmgnTokens(poolSize)
+    const solanaCandidates = discovered
       .filter((t) => t.contract && t.chain === 'solana')
-      .slice(0, tokenLimit)
       .map((t) => ({ contract: t.contract, chain: t.chain, symbol: t.symbol }))
+
+    if (opts.filterSeen) {
+      const fresh: typeof solanaCandidates = []
+      for (const t of solanaCandidates) {
+        if (fresh.length >= tokenLimit) break
+        const seen = await opts.filterSeen(t.chain, t.contract)
+        if (!seen) fresh.push(t)
+      }
+      // Fall back to top tokens if the entire pool is seen, preventing an empty scan pass.
+      tokens = fresh.length > 0 ? fresh : solanaCandidates.slice(0, tokenLimit)
+    } else {
+      tokens = solanaCandidates.slice(0, tokenLimit)
+    }
   } catch (err) {
     return {
       detections: [],
