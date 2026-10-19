@@ -10,6 +10,6 @@
 # No network. Fixed seed (mulberry32/1337). Same workload every run.
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
-cd "$(dirname "$0")"
+export WORKING_DIR="/home/openclaw/projects/1ai-tracker"
 
-exec npx tsx scripts/autoresearch-bench.ts
+exec node "${WORKING_DIR}/scripts/autoresearch-bench.ts"

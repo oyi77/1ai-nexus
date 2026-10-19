@@ -622,8 +622,8 @@ background harvesters, scanners, and pipelines. Key entries:
 | `0 12 * * 1-5` | `npm run cron:alpha-track` | `/tmp/alpha-track-cron.log` | Alpha track (weekdays) |
 | `40 10 * * 1-5` | `npm run harvest:idx-saham` | `/tmp/idx-saham-harvest.log` | IDX saham harvest (weekdays) |
 | `5/15/19/30/45 19 * * 1-5` | `harvest:idx-ajaib/stockbit`, `track/alert:idx-signals` | various | IDX broker + signal pipeline (weekdays) |
-|| `20 18 * * 1-5` | `npm run harvest:idx-fundamentals` | `/tmp/idx-fundamentals.log` | IDX fundamentals (weekdays) |
-|| `17 3 * * *` | `bash scripts/autoresearch.sh` | `/tmp/autoresearch-bench.log` | Daily autoresearch benchmark (off-peak; avoids wallet-refresh and token-holdings slots) |
+| `20 18 * * 1-5` | `npm run harvest:idx-fundamentals` | `/tmp/idx-fundamentals.log` | IDX fundamentals (weekdays) |
+| `17 3 * * *` | `bash scripts/autoresearch.sh` | `logs/autoresearch-bench.log` | Daily autoresearch benchmark (off-peak; avoids wallet-refresh and token-holdings slots) |
 
 > **Conventions**: all cron lines `cd /home/openclaw/projects/1ai-tracker` first,
 > prefix `PATH=/home/openclaw/.nvm/versions/node/v22.22.3/bin:/usr/bin:/bin`

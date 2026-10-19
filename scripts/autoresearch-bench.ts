@@ -25,7 +25,7 @@
 
 import { existsSync, readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
-import { AnalyticsIndex } from '../src/lib/modules/market/analytics-index'
+import { AnalyticsIndex } from '../src/lib/modules/market/analytics-index.ts'
 
 const DATA = (...p: string[]) => join(process.cwd(), 'data', ...p)
 
