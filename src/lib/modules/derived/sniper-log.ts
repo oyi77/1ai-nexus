@@ -5,7 +5,7 @@
 // decisions themselves were only ever logged to stdout, so the web UI had
 // nothing to render. This module persists the last N decisions to
 // data/sniper-log.json (runtime state, gitignored — same class as
-// data/sniper-seen.json / data/sniper-circuit.json).
+// data/sniper-seen.json).
 //
 // Append-only ring buffer: newest first, capped at MAX_ENTRIES. A corrupt
 // or missing file reads as an empty log — an unreadable log must never
