@@ -163,7 +163,13 @@ class TokenBucket {
   private tokens: number = 60
   private lastRefill: number = Date.now()
   readonly capacity: number = 60
-  readonly refillRate: number = 1 / 60_000 // tokens per ms
+  // 60 requests per minute == 1 token per second. The previous value
+  // (1/60_000) was 1 token per MINUTE — a 60x error that made any pass with
+  // more than 60 calls effectively hang: a wallet-discovery run with 307
+  // survivors needed ~307 minutes and was killed at 200-300s with no output.
+  // Live measurement on 2026-10-20: 24 concurrent wallet-stats calls all
+  // succeeded in 11.9s, so 1/s is comfortably inside GMGN's tolerance.
+  readonly refillRate: number = 1_000 / 60_000 // tokens per ms
 
   async acquire(): Promise<void> {
     // Skip rate limiting in test environments
@@ -172,22 +178,28 @@ class TokenBucket {
       return
     }
 
-    const now = Date.now()
-    const elapsed = now - this.lastRefill
-    const toAdd = elapsed * this.refillRate
-    this.tokens = Math.min(this.capacity, this.tokens + toAdd)
-    this.lastRefill = now
+    // Bound the wait: 60s max. A pathological queue (many concurrent
+    // discovery callers) previously chained recursive acquire() calls and
+    // could hang a whole pass; a timed give-up degrades that call, and the
+    // retry/backoff wrapper above decides what to do with it.
+    const deadline = Date.now() + 60_000
+    for (;;) {
+      const now = Date.now()
+      if (now > deadline) throw new Error('gmgn rate limiter: 60s acquire timeout')
+      const elapsed = now - this.lastRefill
+      const toAdd = elapsed * this.refillRate
+      this.tokens = Math.min(this.capacity, this.tokens + toAdd)
+      this.lastRefill = now
 
-    if (this.tokens >= 1) {
-      this.tokens -= 1
-      return
+      if (this.tokens >= 1) {
+        this.tokens -= 1
+        return
+      }
+      const waitTime = Math.ceil((1 - this.tokens) / this.refillRate)
+      const { promise, resolve } = Promise.withResolvers<void>()
+      setTimeout(resolve, waitTime)
+      await promise
     }
-
-    const waitTime = Math.ceil((1 - this.tokens) / this.refillRate)
-    const { promise, resolve } = Promise.withResolvers<void>()
-    setTimeout(resolve, waitTime)
-    await promise
-    await this.acquire()
   }
 }
 

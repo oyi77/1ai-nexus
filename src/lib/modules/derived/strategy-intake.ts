@@ -65,7 +65,10 @@ export interface StrategyIntakeResult {
   guardSource: 'tracked' | 'onchain' | null
 }
 
-const CLASSIFIED = new Set(['WHALE', 'WHALE_AND_SMART_MONEY', 'QUALIFIED_SMART_MONEY'])
+// Statuses that count as a classified buyer. The discovery engine writes
+// 'WHALE' / 'QUALIFIED_SMART_MONEY'; the older sync paths wrote the mixed
+// variants, so all four are accepted rather than silently dropping whales.
+const CLASSIFIED = new Set(['WHALE', 'WHALE_AND_SMART_MONEY', 'QUALIFIED_SMART_MONEY', 'SMART_MONEY'])
 
 /**
  * Price-guard holders: wallets currently HOLDING the mint.
