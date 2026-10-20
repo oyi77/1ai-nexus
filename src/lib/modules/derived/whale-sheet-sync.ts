@@ -52,6 +52,7 @@ export const WHALE_WALLET_HEADER = [
   'First Caught (UTC)',
   'Last Caught (UTC)',
   'Tokens',
+  'Sources',
 ] as const
 
 function fmtUtc(ms: number | null): string {
@@ -113,6 +114,9 @@ export function whaleWalletsToSheetValues(wallets: WhaleWalletRecord[]): string[
       fmtUtc(w.firstCaughtAt),
       fmtUtc(w.lastCaughtAt),
       (w.tokens ?? []).join(', '),
+      Object.entries(w.sources ?? {})
+        .map(([k, v]) => `${k}:${v}`)
+        .join(' '),
     ]),
   ]
 }

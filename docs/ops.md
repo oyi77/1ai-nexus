@@ -635,7 +635,7 @@ Both tabs live on the operator spreadsheet (`SPREADSHEET_ID`, see `smart-money-s
 | Tab | Written by | Columns | Semantics |
 |---|---|---|---|
 | `WhaleScanner` | `whale-buy-scan` step 7 | Contract, Chain, Buyers, Volume USD, Buy Count, First/Last Buy (UTC) | Current candidates only — mirrors the 6h-pruned `WalletBuySignal` window. |
-| `WhaleWallets` | `whale-buy-scan` step 8 | Address, Alias, Status, Win Rate %, PnL 30d %, Labels, Times Caught, First/Last Caught (UTC), Tokens | Cumulative registry of every whale wallet the scanner ever caught; `Times Caught` / `Last Caught` show whether it is still active. |
+| `WhaleWallets` | `whale-buy-scan` step 8 **and** `kol-monitor` | Address, Alias, Status, Win Rate %, PnL 30d %, Labels, Times Caught, First/Last Caught (UTC), Tokens, Sources | Cumulative registry of every whale wallet **any** scanner caught; `Sources` (e.g. `whale-scan:3 axiom:1`) proves which feed found it, `Times Caught` / `Last Caught` show whether it is still active. Records written before provenance existed bucket their history as `legacy`. |
 
 Override names with `WHALE_SCAN_TAB` / `WHALE_WALLET_TAB`; override the registry path with `WHALE_REGISTRY_PATH`. A header-only `WhaleScanner` tab means the scanner ran and found nothing — distinct from a sync that never ran.
 

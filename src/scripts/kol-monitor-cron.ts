@@ -51,6 +51,14 @@ import {
 import { exportGatePassersToSheet } from '@/lib/modules/meme/sheet-export'
 import { foldWalletBuys } from '@/lib/modules/derived/wallet-discovery'
 import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
+import {
+  loadWhaleRegistry,
+  saveWhaleRegistry,
+  mergeWhaleRegistry,
+  loadWhaleIdentities,
+  type WalletCatch,
+} from '@/lib/modules/derived/whale-wallet-registry'
+import { syncWhaleWalletSheet } from '@/lib/modules/derived/whale-sheet-sync'
 import type { NormalizedSwap } from '@/lib/modules/derived/solana-harvest'
 
 async function buildWinRateMap(): Promise<Map<string, number | null>> {
@@ -100,6 +108,9 @@ async function main() {
   let kolscanPersisted = 0
   let kolscanPersistFailed = 0
   const unseenScreenedTxs: KolscanScreenedTx[] = []
+  const startsAtMs = Date.now()
+  const kolscanCatches: WalletCatch[] = []
+  const axiomCatches: WalletCatch[] = []
 
   if (kolscanEnabled) {
     try {
@@ -127,6 +138,17 @@ async function main() {
       kolscanUnseen = unseen.length
       console.log(`[kol-monitor] KOLScan unseen: ${unseen.length}/${screened.length} txs`)
       unseenScreenedTxs.push(...unseen)
+
+      // Registry catches: every wallet that passed the KOLScan gate, tagged
+      // with the token it bought so the sheet shows what it is buying.
+      for (const tx of unseen) {
+        kolscanCatches.push({
+          address: tx.walletAddress,
+          source: 'kolscan',
+          caughtAt: tx.timestamp ?? startsAtMs,
+          token: tx.outTokenAddress ?? undefined,
+        })
+      }
 
       // Persist screened wallets so wallet-refresh-cron can harvest them.
       const walletAddrs = [...new Set(screened.map((tx) => tx.walletAddress))]
@@ -226,6 +248,23 @@ async function main() {
     newAxiomWallets = axiomWallets.filter((w) => newAddrs.includes(w.address))
     console.log(`[kol-monitor] Axiom new wallets: ${newAxiomWallets.length}/${axiomWallets.length}`)
 
+    // Registry catches for every Axiom wallet that cleared the gate; the
+    // win-rate/PnL the leaderboard reported travels as its identity snapshot.
+    for (const w of axiomWallets) {
+      axiomCatches.push({
+        address: w.address,
+        source: 'axiom',
+        caughtAt: startsAtMs,
+        identity: {
+          alias: w.name,
+          status: null,
+          winRate: w.winRate30d ?? null,
+          pnl30d: w.pnl30d ?? null,
+          labels: ['axiom'],
+        },
+      })
+    }
+
     const persist = await persistMonitoredWallets(
       axiomWallets.map((w) => toMonitoredWallet(w.address, 'axiom')),
     )
@@ -239,6 +278,32 @@ async function main() {
     }
   } catch (err) {
     console.error(`[kol-monitor] Axiom failed: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  // ── Whale registry: fold every wallet we caught this pass ──
+  // Both sources feed the SAME cumulative ledger the token scanner writes,
+  // so WhaleWallets is the union of everything our scanners catch — not just
+  // token-scanner buyers. Identity comes from SmartMoneyWallet when present,
+  // falling back to the source-reported snapshot above.
+  try {
+    const allCatches: WalletCatch[] = [...kolscanCatches, ...axiomCatches]
+    if (allCatches.length > 0) {
+      const identities = await loadWhaleIdentities(allCatches.map((c) => c.address))
+      const merged = mergeWhaleRegistry(
+        loadWhaleRegistry(),
+        allCatches.map((c) => ({ ...c, identity: identities.get(c.address) ?? c.identity })),
+      )
+      saveWhaleRegistry(merged)
+      const sheet = await syncWhaleWalletSheet(merged)
+      console.log(
+        `[kol-monitor] whale registry: ${allCatches.length} catch(es) folded → ` +
+          `${merged.length} wallet(s); sheet ${sheet.skipped ? 'unchanged' : `rewritten(${sheet.written})`}`,
+      )
+    } else {
+      console.log('[kol-monitor] whale registry: no new catches this pass')
+    }
+  } catch (err) {
+    console.error(`[kol-monitor] whale registry failed: ${err instanceof Error ? err.message : String(err)}`)
   }
 
   // ── Telegram notification: only when the gate actually passed ──

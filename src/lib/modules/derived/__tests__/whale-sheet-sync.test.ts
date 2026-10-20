@@ -48,6 +48,7 @@ const WALLET: WhaleWalletRecord = {
   firstCaughtAt: Date.UTC(2026, 9, 18, 9, 0, 0),
   lastCaughtAt: Date.UTC(2026, 9, 19, 12, 0, 0),
   tokens: ['MintA', 'MintB'],
+  sources: { 'whale-scan': 5 },
 }
 
 function stubApi(overrides: Partial<SheetsApi> = {}): SheetsApi {
@@ -105,6 +106,15 @@ describe('whaleWalletsToSheetValues', () => {
       'axiom,kol-monitor',
     ])
     expect(values[1][8]).toBe('2026-10-19 12:00:00')
+    expect(values[1][9]).toBe('MintA, MintB')
+    expect(values[1][10]).toBe('whale-scan:5')
+  })
+
+  it('joins multiple sources so the operator sees who caught the whale', () => {
+    const values = whaleWalletsToSheetValues([
+      { ...WALLET, sources: { 'whale-scan': 3, kolscan: 2, axiom: 1 } },
+    ])
+    expect(values[1][10]).toBe('whale-scan:3 kolscan:2 axiom:1')
   })
 
   it('renders unknown identity as empty cells rather than "null"', () => {
@@ -200,7 +210,7 @@ describe('syncWhaleWalletSheet', () => {
     const res = await syncWhaleWalletSheet([WALLET, { ...WALLET, address: 'W2' }], api)
     expect(res).toEqual({ written: 2, skipped: false })
     const [ranges] = vi.mocked(api.batchUpdateValues).mock.calls[0]
-    expect(ranges[0].range).toBe(`${WHALE_WALLET_TAB}!A1:J3`)
+    expect(ranges[0].range).toBe(`${WHALE_WALLET_TAB}!A1:K3`)
   })
 
   it('skips an unchanged registry and rewrites when a whale is caught again', async () => {

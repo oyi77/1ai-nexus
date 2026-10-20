@@ -35,6 +35,7 @@ import {
   saveWhaleRegistry,
   mergeWhaleRegistry,
   loadWhaleIdentities,
+  catchesFromScanRows,
 } from '@/lib/modules/derived/whale-wallet-registry'
 
 function numEnv(name: string, fallback: number): number {
@@ -135,11 +136,11 @@ async function main(): Promise<void> {
   // 8. Fold this pass's buyers into the persistent whale registry, then
   //    rewrite the whale-wallet tab. The registry outlives the 6h prune, so
   //    the sheet stays cumulative while still reflecting current activity.
+  const scanCatches = catchesFromScanRows(result.aggregated, now)
+  const identities = await loadWhaleIdentities(scanCatches.map((c) => c.address))
   const registry = mergeWhaleRegistry(
     loadWhaleRegistry(),
-    result.aggregated,
-    await loadWhaleIdentities(result.aggregated.flatMap((r) => r.buyers ?? [])),
-    now,
+    scanCatches.map((c) => ({ ...c, identity: identities.get(c.address) })),
   )
   saveWhaleRegistry(registry)
   const walletSheet = await syncWhaleWalletSheet(registry)
