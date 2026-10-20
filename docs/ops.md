@@ -624,6 +624,21 @@ background harvesters, scanners, and pipelines. Key entries:
 | `5/15/19/30/45 19 * * 1-5` | `harvest:idx-ajaib/stockbit`, `track/alert:idx-signals` | various | IDX broker + signal pipeline (weekdays) |
 | `20 18 * * 1-5` | `npm run harvest:idx-fundamentals` | `/tmp/idx-fundamentals.log` | IDX fundamentals (weekdays) |
 | `17 3 * * *` | `bash scripts/autoresearch.sh` | `logs/autoresearch-bench.log` | Daily autoresearch benchmark (off-peak; avoids wallet-refresh and token-holdings slots) |
+| `*/10 * * * *` | `npm run cron:whale-buy-scan` | `/tmp/whale-buy-scan-cron.log` | Whale-buy scan over rotating GMGN candidates; upserts `WalletBuySignal` (source=`whale-buy-scanner`), prunes >6h, folds buyers into `data/whale-wallets-registry.json`, and rewrites both whale tabs on the operator sheet. |
+| `*/5 * * * *` | `npm run cron:kol-monitor` | `/tmp/kol-monitor.log` | KOLScan + Axiom smart-money monitor. OFF unless `KOL_MONITOR_ENABLED="true"`; the KOLScan source additionally needs `KOLSCAN_ENABLED="true"`. |
+| manual | `npm run cron:whale-sheet-sync` | — | Re-push both whale tabs from DB + registry without running a scan (repair / after a manual DB fix). |
+
+### Whale sheet tabs
+
+Both tabs live on the operator spreadsheet (`SPREADSHEET_ID`, see `smart-money-sync.ts`) and are **full rewrites**, never append logs:
+
+| Tab | Written by | Columns | Semantics |
+|---|---|---|---|
+| `WhaleScanner` | `whale-buy-scan` step 7 | Contract, Chain, Buyers, Volume USD, Buy Count, First/Last Buy (UTC) | Current candidates only — mirrors the 6h-pruned `WalletBuySignal` window. |
+| `WhaleWallets` | `whale-buy-scan` step 8 | Address, Alias, Status, Win Rate %, PnL 30d %, Labels, Times Caught, First/Last Caught (UTC), Tokens | Cumulative registry of every whale wallet the scanner ever caught; `Times Caught` / `Last Caught` show whether it is still active. |
+
+Override names with `WHALE_SCAN_TAB` / `WHALE_WALLET_TAB`; override the registry path with `WHALE_REGISTRY_PATH`. A header-only `WhaleScanner` tab means the scanner ran and found nothing — distinct from a sync that never ran.
+
 
 > **Conventions**: all cron lines `cd /home/openclaw/projects/1ai-tracker` first,
 > prefix `PATH=/home/openclaw/.nvm/versions/node/v22.22.3/bin:/usr/bin:/bin`

@@ -56,6 +56,7 @@
     "cron:caller-scores": "python3 scripts/fetch-caller-scores.py",
     "sync:call-feed": "tsx src/scripts/call-feed-sync-db.ts",
     "bot:sniper": "tsx src/scripts/sniper-bot-cron.ts",
+    "cron:whale-sheet-sync": "tsx src/scripts/whale-sheet-sync-cron.ts",
     "cron:whale-buy-scan": "tsx src/scripts/whale-buy-scan-cron.ts",
     "cron:token-holdings": "tsx src/scripts/token-holdings-cron.ts"
   },
