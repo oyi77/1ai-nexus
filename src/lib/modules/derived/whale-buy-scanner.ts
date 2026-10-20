@@ -71,6 +71,13 @@ export interface WhaleScanOpts {
   config?: Partial<WhaleBuyDetectorConfig>
   /** Optional predicate to skip already-seen tokens so the scan rotates through the candidate pool. */
   filterSeen?: (chain: string, contract: string) => Promise<boolean>
+  /**
+   * Ignore buy legs older than this epoch-ms floor. Without it a 28-day-old
+   * leg folds into the same "fresh accumulation" row as a buy from today,
+   * and the emitted window (673h) is presented as if it were fresh.
+   * A leg with an unknown timestamp is dropped — it cannot prove recency.
+   */
+  sinceMs?: number
 }
 
 function tokenLimitEnv(): number {
@@ -141,6 +148,8 @@ export async function scanWhaleBuys(
   const holderLimit = opts.holderLimit ?? holderLimitEnv()
   const swapLimit = opts.swapLimit ?? 25
   const config = opts.config
+  // null = no recency floor (callers that never pass one keep the old behaviour).
+  const sinceMs = opts.sinceMs ?? null
 
   // 1. Discover established candidate tokens (age > 24h, volume ≥ $100k).
   //    Falls back to trending internally if the volume-sorted endpoint fails.
@@ -217,9 +226,13 @@ export async function scanWhaleBuys(
       }
     }
 
-    // 4. Collect all swaps for this token and detect whale buys.
-    const allSwapsForToken = swapsByWallet.flatMap((w) => w.swaps)
-
+    // 4. Collect all swaps for this token and detect whale buys. Legs older
+    //    than `sinceMs` are dropped so the stored row's firstBuyAt is
+    //    truthful; an unknown timestamp cannot prove recency and is dropped
+    //    too (same rule foldWalletBuys applies).
+    const allSwapsForToken = swapsByWallet
+      .flatMap((w) => w.swaps)
+      .filter((s) => s.timestamp !== null && (sinceMs === null || s.timestamp >= sinceMs))
     // Gather all wallet addresses that have swaps for this token.
     const walletAddresses = [...new Set(allSwapsForToken.map((s) => s.walletAddress))]
 

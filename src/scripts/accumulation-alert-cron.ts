@@ -33,13 +33,10 @@ import {
   type BuyerFacts,
 } from '@/lib/modules/derived/accumulation-alert'
 import { isAccumulationSeen, markAccumulationSeen, markSent, pruneAccumulationState, readState, writeState } from '@/lib/modules/derived/accumulation-state'
+import { loadMarkets } from '@/lib/modules/derived/accumulation-markets'
+import { evaluateStrategiesFor } from '@/lib/modules/derived/strategy-intake'
+import { STRATEGY_DEFAULTS } from '@/lib/modules/derived/strategy-evaluator'
 import type { WalletBuyCandidate } from '@/lib/modules/derived/wallet-discovery'
-
-interface MarketRow {
-  marketCapUsd: number | null
-  liquidityUsd: number | null
-  symbol: string | null
-}
 
 function numEnv(name: string, fallback: number): number {
   const raw = process.env[name]
@@ -176,32 +173,6 @@ async function loadBuyerStatus(addresses: string[]): Promise<Map<string, BuyerFa
   return map
 }
 
-async function loadMarkets(candidates: WalletBuyCandidate[]): Promise<Map<string, MarketRow>> {
-  const map = new Map<string, MarketRow>()
-  try {
-    const contracts = [...new Set(candidates.map((c) => c.contract))]
-    const tokens = await prisma.token.findMany({
-      where: { address: { in: contracts }, chain: { in: ['solana'] } },
-      select: { address: true, chain: true, symbol: true, marketCap: true },
-    })
-    for (const t of tokens) {
-      map.set(t.address, { marketCapUsd: t.marketCap, liquidityUsd: null, symbol: t.symbol })
-    }
-    // LaunchToken is the only schema model with liquidityUsd; prefer it
-    // for the same mint when present (it also carries a fresher MC).
-    const launches = await prisma.launchToken.findMany({
-      where: { address: { in: contracts }, chain: { in: ['solana'] } },
-      select: { address: true, chain: true, symbol: true, marketCapUsd: true, liquidityUsd: true },
-    })
-    for (const l of launches) {
-      map.set(l.address, { marketCapUsd: l.marketCapUsd, liquidityUsd: l.liquidityUsd, symbol: l.symbol })
-    }
-  } catch (err) {
-    console.error(`[accumulation-alert] market query failed: ${err instanceof Error ? err.message : String(err)}`)
-  }
-  return map
-}
-
 async function main() {
   const now = Date.now()
   const opts: AccumulationOptions = {
@@ -242,12 +213,52 @@ async function main() {
   let deliveryFailures = 0
   let state = pruneAccumulationState(readState(), now)
 
+  // Strategy gate inputs (operator mandate: >= 10 price-guard holders,
+  // liquidity/volume floors, per-strategy MC bands). Sizing is optional —
+  // without it the alert still names the setup but shows no ladder.
+  const capitalUsd = numEnv('ACCUMULATION_CAPITAL_USD', 0)
+  const riskPct = numEnv('ACCUMULATION_RISK_PCT', 0.01)
+  const strategyConfig = {
+    minPriceGuardHolders: numEnv('ACCUMULATION_MIN_GUARD_HOLDERS', STRATEGY_DEFAULTS.minPriceGuardHolders),
+    minLiquidityUsd: numEnv('ACCUMULATION_MIN_LIQUIDITY_USD', STRATEGY_DEFAULTS.minLiquidityUsd),
+    minVolume24hUsd: numEnv('ACCUMULATION_MIN_VOLUME_24H_USD', STRATEGY_DEFAULTS.minVolume24hUsd),
+  }
+  let strategyRefused = 0
+
   for (const event of events) {
     const tagSummary = event.categories.join('+')
     console.log(
       `[accumulation-alert] event ${event.token.contract} tier=${event.tier} ` +
         `categories=${tagSummary} buyers=${event.buyers.length} $${event.totalBuyUsd.toFixed(2)}`,
     )
+
+    // Evaluate the operator's three strategies against real MC structure.
+    // A token with NO firing strategy is not a tradeable signal: it is
+    // logged and dropped rather than delivered with an entry claim.
+    const intake = await evaluateStrategiesFor({
+      contract: event.token.contract,
+      buyers: event.buyers.map((b) => b.address),
+      buyerStatus: new Map(event.buyers.map((b) => [b.address, { status: b.status ?? null }])),
+      market: markets.get(event.token.contract) ?? null,
+      config: strategyConfig,
+      sizing: capitalUsd > 0 ? { capitalUsd, riskPct } : undefined,
+    })
+    event.strategy = intake.fired
+    event.ladder = intake.ladder
+    event.structure = intake.structureLines
+
+    if (!intake.fired) {
+      strategyRefused += 1
+      console.log(
+        `[accumulation-alert] no strategy fired ${event.token.contract}: ${intake.refusals.join(' | ')}`,
+      )
+      continue
+    }
+    console.log(
+      `[accumulation-alert] strategy=${intake.fired.strategy} conf=${intake.fired.confidence} ` +
+        `entry=${intake.fired.entryUsd} sl=${intake.fired.stopUsd} contract=${event.token.contract}`,
+    )
+
     if (!shouldSend(event, state, now, opts.cooldownMs) || (await isAccumulationSeen(event.token.contract))) {
       suppressed += 1
       console.log(`[accumulation-alert] suppressed (cooldown) ${event.token.contract}`)
@@ -271,7 +282,7 @@ async function main() {
 
   console.log(
     `[accumulation-alert] done: events=${events.length} sent=${sent} ` +
-      `suppressed=${suppressed} delivery_failures=${deliveryFailures}`,
+      `suppressed=${suppressed} strategy_refused=${strategyRefused} delivery_failures=${deliveryFailures}`,
   )
   process.exit(0)
 }

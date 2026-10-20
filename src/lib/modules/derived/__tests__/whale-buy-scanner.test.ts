@@ -285,3 +285,77 @@ describe('scanWhaleBuys', () => {
     expect(result.aggregated[0].contract).toBe(TOKEN)
   })
 })
+
+
+describe('scanWhaleBuys — recency floor (sinceMs)', () => {
+  const DAY = 86_400_000
+
+  it('drops a stale leg so an old buy cannot masquerade as fresh accumulation', async () => {
+    mockDiscoverEstablishedGmgnTokens.mockResolvedValue([
+      { contract: TOKEN, chain: 'solana', symbol: 'TEST' },
+    ])
+    mockListGmgnTokenHolders.mockResolvedValue([holderRow(WALLET_A)])
+    mockFetchWalletActivity.mockResolvedValue({
+      source: 'gmgn',
+      swaps: [
+        // 28 days old — the exact failure that emitted "Window: 673.8h".
+        nswap({ transactionSignature: 'stale', timestamp: T0 - 28 * DAY, inputUsd: 8_000 }),
+        // inside the floor.
+        nswap({ transactionSignature: 'fresh', timestamp: T0, inputUsd: 50_000 }),
+      ],
+      coverage: { sigsSeen: 2, validEvents: 2, complete: true, gaps: [] },
+      note: 'gmgn',
+    })
+
+    const result = await scanWhaleBuys({
+      tokenLimit: 5,
+      holderLimit: 5,
+      config: { minUsd: 1_000 },
+      sinceMs: T0 - 12 * 60 * 60_000,
+    })
+
+    expect(result.detections).toHaveLength(1)
+    expect(result.detections[0].usdValue).toBe(50_000)
+    expect(result.aggregated[0].firstBuyAt).toBe(T0)
+    expect(result.aggregated[0].lastBuyAt).toBe(T0)
+  })
+
+  it('drops a leg with an unknown timestamp — it cannot prove recency', async () => {
+    mockDiscoverEstablishedGmgnTokens.mockResolvedValue([
+      { contract: TOKEN, chain: 'solana', symbol: 'TEST' },
+    ])
+    mockListGmgnTokenHolders.mockResolvedValue([holderRow(WALLET_A)])
+    mockFetchWalletActivity.mockResolvedValue({
+      source: 'gmgn',
+      swaps: [nswap({ timestamp: null, inputUsd: 50_000 })],
+      coverage: { sigsSeen: 1, validEvents: 1, complete: true, gaps: [] },
+      note: 'gmgn',
+    })
+
+    const result = await scanWhaleBuys({
+      tokenLimit: 5,
+      config: { minUsd: 1_000 },
+      sinceMs: T0 - 60_000,
+    })
+
+    expect(result.detections).toEqual([])
+    expect(result.aggregated).toEqual([])
+  })
+
+  it('keeps every leg when no floor is supplied (backward compatible)', async () => {
+    mockDiscoverEstablishedGmgnTokens.mockResolvedValue([
+      { contract: TOKEN, chain: 'solana', symbol: 'TEST' },
+    ])
+    mockListGmgnTokenHolders.mockResolvedValue([holderRow(WALLET_A)])
+    mockFetchWalletActivity.mockResolvedValue({
+      source: 'gmgn',
+      swaps: [nswap({ transactionSignature: 'old', timestamp: T0 - 28 * DAY, inputUsd: 5_000 })],
+      coverage: { sigsSeen: 1, validEvents: 1, complete: true, gaps: [] },
+      note: 'gmgn',
+    })
+
+    const result = await scanWhaleBuys({ tokenLimit: 5, config: { minUsd: 1_000 } })
+
+    expect(result.detections).toHaveLength(1)
+  })
+})

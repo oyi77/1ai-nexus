@@ -26,6 +26,8 @@
 // ─────────────────────────────────────────────────────────────
 
 import type { WalletBuyCandidate } from './wallet-discovery'
+import type { LadderPlan } from './ladder-planner'
+import type { StrategyVerdict } from './strategy-evaluator'
 
 /** Statuses that count as a whale/smart-money buyer (legacy gate, retained for callers). */
 export const ACCUMULATION_BUYER_STATUSES = [
@@ -105,8 +107,13 @@ export const FIRST_SEEN_LABEL = 'FIRST_SEEN'
 export const ACCUMULATION_DEFAULTS = {
   /** Minimum aggregate verified buy USD for a candidate to be an event. */
   minBuyUsd: 1000,
-  /** Tokens with verified market cap >= this are excluded (spec: < $1M). */
-  maxMarketCapUsd: 1_000_000,
+  /**
+   * LEGACY simple cap, kept for the renderer's still-unstructured path.
+   * The three strategy gates now own MC filtering (see strategy-evaluator
+   * baseBandByStrategy); this exists only so an event without a strategy
+   * read still cannot multi-million-cap through.
+   */
+  maxMarketCapUsd: 10_000_000,
   /** Per-contract alert cooldown. */
   cooldownMs: 6 * 60 * 60 * 1000,
   /** Fold window used by the caller — documented here, not re-applied. */
@@ -188,6 +195,16 @@ export interface AccumulationEvent {
   evidence: string[]
   risks: string[]
   missing: string[]
+  /**
+   * Which operator strategy fired for this token (null = none did).
+   * When null the event is suppressed by the strategy gate or rendered
+   * as a raw accumulation note with NO entry claim.
+   */
+  strategy?: StrategyVerdict | null
+  /** Ladder plan for the fired strategy, when sizing input exists. */
+  ladder?: LadderPlan | null
+  /** Structure evidence lines (base, higher low, breakout, retest). */
+  structure?: string[]
 }
 
 export interface AccumulationOptions {
@@ -599,6 +616,8 @@ function formatWindow(startIso: string, endIso: string): string {
  * truncated first, then the whole text is sliced for Telegram.
  */
 export function renderAccumulationAlert(event: AccumulationEvent): string {
+  /** MC formatter for strategy/structure lines (millions, 2dp). */
+  const mfmt = (v: number): string => (v / 1e6).toFixed(2) + 'M'
   const t = event.token
   const rawSymbol = t.symbol && t.symbol.trim() !== '' ? t.symbol.trim().toUpperCase() : '?'
   const symbol = rawSymbol.startsWith('$') ? rawSymbol : (rawSymbol === '?' ? '<i>Unknown</i>' : `$${escapeHtml(rawSymbol)}`)
@@ -696,6 +715,39 @@ export function renderAccumulationAlert(event: AccumulationEvent): string {
     for (const e of event.evidence.slice(0, 3)) {
       lines.push(`• <i>${escapeHtml(e)}</i>`)
     }
+  }
+
+  // Strategy verdict — the operator's playbook, evaluated by code.
+  if (event.strategy) {
+    const v = event.strategy
+    const label = { second_wave: 'Second Wave', level_flip: 'Level Flip', whale_comeback: 'Whale Comeback' }[v.strategy]
+    lines.push(``, `🎯 <b>Strategy: ${label}</b> — fires (confidence ${v.confidence}/100)`)
+    if (v.entryUsd !== null && v.stopUsd !== null) {
+      lines.push(
+        `• Entry: <b>$${mfmt(v.entryUsd)}</b> · SL: <b>$${mfmt(v.stopUsd)}</b>` +
+          (v.targetUsd !== null ? ` · TP: <b>$${mfmt(v.targetUsd)}</b>` : '') +
+          (v.rr !== null ? ` · RR <b>1:${v.rr.toFixed(2)}</b>` : ''),
+      )
+    }
+  }
+  if (event.structure && event.structure.length > 0) {
+    lines.push(``, `📐 <b>Structure (MC chart):</b>`)
+    for (const s of event.structure.slice(0, 6)) {
+      lines.push(`• <i>${escapeHtml(s)}</i>`)
+    }
+  }
+  if (event.ladder?.valid) {
+    const l = event.ladder
+    lines.push(
+      ``,
+      `🪜 <b>Ladder:</b> ${l.tranches.map((t) => `$${mfmt(t.atMcUsd)} (${t.reason} ${Math.round(t.weight * 100)}%)`).join('  →  ')}`,
+      `• One SL <b>$${mfmt(l.stopUsd)}</b> · risk $${l.riskUsd.toFixed(0)} · loss@SL $${l.lossAtStopUsd.toFixed(2)}`,
+    )
+  } else if (event.ladder && !event.ladder.valid && event.ladder.problem) {
+    lines.push(``, `🪜 <i>Ladder not buildable: ${escapeHtml(event.ladder.problem)}</i>`)
+  }
+  if (!event.strategy) {
+    lines.push(``, `🎯 <i>No strategy fired (structure/gates not met) — monitoring only.</i>`)
   }
 
   // Risks & Missing flags

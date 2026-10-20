@@ -105,10 +105,13 @@ describe('buildAccumulationEvents — verified-buy gating', () => {
   })
 
   it('excludes a candidate at/above maxMarketCapUsd', () => {
+    // The legacy cap moved from $1M to $10M when strategy-based gating took
+    // over MC filtering (per-strategy bands up to $45M). The gate itself is
+    // unchanged: the builder still drops anything >= the configured cap.
     const out = buildAccumulationEvents({
       candidates: [candidate()],
       buyerStatus: whaleStatus(),
-      market: market(1_000_000),
+      market: market(10_000_000),
     })
     expect(out).toEqual([])
   })
