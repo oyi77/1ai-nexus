@@ -205,6 +205,12 @@ export interface AccumulationEvent {
   ladder?: LadderPlan | null
   /** Structure evidence lines (base, higher low, breakout, retest). */
   structure?: string[]
+  /**
+   * Telegram call-group confluence line ("call groups (3): A, B, C · score 8.1").
+   * Absent/empty means the feed had nothing — the renderer then prints no
+   * confluence block rather than claiming "0 groups called it".
+   */
+  callGroups?: string | null
 }
 
 export interface AccumulationOptions {
@@ -735,6 +741,9 @@ export function renderAccumulationAlert(event: AccumulationEvent): string {
     for (const s of event.structure.slice(0, 6)) {
       lines.push(`• <i>${escapeHtml(s)}</i>`)
     }
+  }
+  if (event.callGroups) {
+    lines.push(``, `📣 <b>Call groups:</b> <i>${escapeHtml(event.callGroups)}</i>`)
   }
   if (event.ladder?.valid) {
     const l = event.ladder

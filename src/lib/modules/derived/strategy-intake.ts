@@ -31,7 +31,9 @@ import {
 } from './strategy-evaluator'
 import { planLadder, DEFAULT_WEIGHTS_3, type LadderPlan } from './ladder-planner'
 import { areWalletsConnected } from './whale-clustering'
+import { loadCallConfluence, describeConfluence, type CallConfluence } from './call-confluence'
 import type { MarketRow } from './dex-token-meta'
+import type { CallFeedRow } from './call-confluence'
 
 export interface StrategyIntakeInput {
   contract: string
@@ -48,6 +50,10 @@ export interface StrategyIntakeInput {
   sizing?: { capitalUsd: number; riskPct: number }
   /** Inject a fetch for tests. */
   fetchFn?: typeof fetch
+  /** Call groups that may vouch for a contract (confluence evidence). */
+  trustedCallGroups?: readonly string[]
+  /** Inject the call-feed loader (tests / batched reads). */
+  callFeedSeam?: (nowMs: number, maxAgeMin?: number) => Promise<CallFeedRow[]>
 }
 
 export interface StrategyIntakeResult {
@@ -63,6 +69,14 @@ export interface StrategyIntakeResult {
   refusals: string[]
   /** Where the price-guard holder count came from (null = unknown). */
   guardSource: 'tracked' | 'onchain' | null
+  /**
+   * Telegram call-group confluence for this contract. Reported on the alert
+   * and available to the gate; `available: false` means the feed was not
+   * readable, never "no group called it".
+   */
+  confluence: CallConfluence
+  /** One readable line for the alert body. */
+  confluenceLine: string
 }
 
 // Statuses that count as a classified buyer. The discovery engine writes
@@ -215,6 +229,22 @@ export async function evaluateStrategiesFor(
     classifiedBuyerCount,
   }
   const independence = await independenceOf(input.buyers)
+  // One feed read per contract; the loader is injected in tests and by the
+  // cron when it batches (see evaluateStrategiesFor's callFeedSeam).
+  const confluence =
+    (await loadCallConfluence([input.contract], {
+      trustedGroups: input.trustedCallGroups,
+      loadFeed: input.callFeedSeam,
+    })).get(input.contract) ?? {
+      contract: input.contract,
+      groups: [],
+      groupCount: 0,
+      mentions: 0,
+      weightedScore: null,
+      kinds: [],
+      trustedGroups: [],
+      available: false,
+    }
 
   const verdicts: StrategyVerdict[] = [
     evaluateSecondWave(sctx, market, holders, input.config),
@@ -261,6 +291,8 @@ export async function evaluateStrategiesFor(
     structureLines: structureLinesOf(structure),
     refusals,
     guardSource: guard?.source ?? null,
+    confluence,
+    confluenceLine: describeConfluence(confluence),
   }
 }
 

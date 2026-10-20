@@ -71,6 +71,19 @@ interface CallFeedArtifact {
   candidates: Array<Record<string, unknown>>
 }
 
+/**
+ * Read the Python-owned JSON artifact directly (no DB) — the sync step's
+ * source of truth. Needed because the DB-first `loadCallFeed` would hand back
+ * the DB's own rows (which lack provenance on old records), making the sync
+ * write empty `sources` back over good data.
+ */
+export function readCallFeedArtifact(
+  nowMs = Date.now(),
+  maxAgeMin = Number(process.env.CALL_FEED_MAX_AGE_MIN) || 180,
+): CallFeedRow[] {
+  return readJsonArtifact(nowMs, maxAgeMin)
+}
+
 function readJsonArtifact(nowMs: number, maxAgeMin: number): CallFeedRow[] {
   try {
     const p = callFeedJsonPath()
@@ -125,11 +138,20 @@ export async function saveCallFeedRows(rows: CallFeedRow[]): Promise<void> {
           ticker: '',
           marketCapUsd: null,
           mentionCount: row.mentions,
+          sources: row.sources,
+          kinds: row.kinds,
+          weightedScore: row.weightedScore ?? null,
           lastSeenAt,
         },
         update: {
           chain: row.chain || 'solana',
           mentionCount: row.mentions,
+          // Provenance is the whole point of the call-feed: "which group
+          // called this CA". Dropping it here made the DB-first read return
+          // sources:[] and sourceCount=mentionCount.
+          sources: row.sources,
+          kinds: row.kinds,
+          weightedScore: row.weightedScore ?? null,
           lastSeenAt,
         },
       })
@@ -144,11 +166,9 @@ export async function saveCallFeedRows(rows: CallFeedRow[]): Promise<void> {
  * has no rows while JSON has data. Applies the same staleness gate as the
  * legacy JSON reader (>maxAgeMin → empty). Never throws.
  *
- * NOTE: the DB row carries only the core fields (contract, chain,
- * mentionCount, lastSeenAt). The weighted_score / caller_weights / sources
- * / kinds live only in the JSON artifact — when the DB is primary, those
- * enrichment fields are absent and the caller treats them as optional
- * (they already are: sniper-scan discoverCallFeed reads them with `?.`).
+ * NOTE: sources / kinds / weightedScore are persisted (added 2026-10-20).
+ * callerWeights still lives only in the JSON artifact — the DB path returns
+ * it as absent, which callers already treat as optional.
  */
 export async function loadCallFeed(
   nowMs = Date.now(),
@@ -165,12 +185,16 @@ export async function loadCallFeed(
       return dbRows.map((r) => ({
         contract: r.contract,
         chain: r.chain,
-        sources: [],
-        sourceCount: r.mentionCount,
+        sources: r.sources,
+        // sourceCount is GROUPS, not mentions: the rows where an old record
+        // stored no provenance fall back to 1 (the row exists, so at least
+        // one group saw it) rather than inflating to the mention count.
+        sourceCount: r.sources.length > 0 ? r.sources.length : 1,
         mentions: r.mentionCount,
-        kinds: [],
+        kinds: r.kinds,
         firstSeen: r.lastSeenAt.toISOString(),
         lastSeen: r.lastSeenAt.toISOString(),
+        ...(r.weightedScore !== null && { weightedScore: r.weightedScore }),
       }))
     }
     return readJsonArtifact(nowMs, maxAgeMin)

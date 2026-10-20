@@ -1495,6 +1495,13 @@ model CallFeed {
   ticker        String   @default("")
   marketCapUsd  Float?
   mentionCount  Int      @default(0)
+  // Which call GROUPS saw this CA and under what kind ("score"/"whale"/
+  // "shill"), plus the weighted caller score. The DB-first read path was
+  // returning sources:[] and sourceCount=mentionCount, so "tag which group
+  // called a CA" was lost the moment the DB filled up.
+  sources       String[]
+  kinds         String[]
+  weightedScore Float?
   lastSeenAt    DateTime @default(now())
   updatedAt     DateTime @updatedAt
   @@index([lastSeenAt(sort: Desc)])

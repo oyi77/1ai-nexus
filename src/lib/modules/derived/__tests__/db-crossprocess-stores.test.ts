@@ -300,7 +300,7 @@ describe('db-call-feed', () => {
     expect(arg.where.contract).toBe(callRow.contract)
   })
 
-  it('loadCallFeed returns DB rows when present', async () => {
+  it('loadCallFeed returns DB rows with their group provenance', async () => {
     findMany.mockResolvedValue([
       {
         contract: callRow.contract,
@@ -308,6 +308,12 @@ describe('db-call-feed', () => {
         ticker: '',
         marketCapUsd: null,
         mentionCount: 6,
+        // [REGRESSION] The reader used to return sources:[] and
+        // sourceCount = mentionCount, which made "which group called this CA"
+        // unanswerable and inflated 6 mentions into 6 groups.
+        sources: ['CallAnalyser', 'ClubWhaleHunters'],
+        kinds: ['score', 'whale'],
+        weightedScore: 6.5,
         lastSeenAt: new Date('2026-10-15T19:47:20+00:00'),
       },
     ])
@@ -315,6 +321,30 @@ describe('db-call-feed', () => {
     expect(result).toHaveLength(1)
     expect(result[0].contract).toBe(callRow.contract)
     expect(result[0].mentions).toBe(6)
+    expect(result[0].sources).toEqual(['CallAnalyser', 'ClubWhaleHunters'])
+    expect(result[0].sourceCount).toBe(2) // groups, not mentions
+    expect(result[0].kinds).toEqual(['score', 'whale'])
+    expect(result[0].weightedScore).toBe(6.5)
+  })
+
+  it('loadCallFeed falls back to one source for rows without provenance', async () => {
+    findMany.mockResolvedValue([
+      {
+        contract: callRow.contract,
+        chain: 'solana',
+        ticker: '',
+        marketCapUsd: null,
+        mentionCount: 9,
+        sources: [],
+        kinds: [],
+        weightedScore: null,
+        lastSeenAt: new Date('2026-10-15T19:47:20+00:00'),
+      },
+    ])
+    const [row] = await loadCallFeed()
+    expect(row.sources).toEqual([])
+    expect(row.sourceCount).toBe(1) // row exists ⇒ at least one group saw it
+    expect(row.weightedScore).toBeUndefined()
   })
 
   it('loadCallFeed falls back to JSON without throwing', async () => {

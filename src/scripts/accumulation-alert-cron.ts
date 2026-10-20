@@ -16,6 +16,7 @@
 //   ACCUMULATION_COOLDOWN_MS               (default 6h)
 //   ACCUMULATION_AGGREGATION_WINDOW_MS     (default 1h, metadata)
 //   ACCUMULATION_STATE_PATH                (default data/accumulation-alert-state.json)
+//   ACCUMULATION_TRUSTED_CALL_GROUPS       comma-separated vetted call groups
 // -------------------------------------------------------------
 
 import 'dotenv/config'
@@ -223,6 +224,12 @@ async function main() {
     minLiquidityUsd: numEnv('ACCUMULATION_MIN_LIQUIDITY_USD', STRATEGY_DEFAULTS.minLiquidityUsd),
     minVolume24hUsd: numEnv('ACCUMULATION_MIN_VOLUME_24H_USD', STRATEGY_DEFAULTS.minVolume24hUsd),
   }
+  // Vetted call groups (comma-separated). Reported as trusted confluence;
+  // an empty list means no group is vetted yet — honest, not a blanket pass.
+  const trustedCallGroups = (process.env.ACCUMULATION_TRUSTED_CALL_GROUPS ?? '')
+    .split(',')
+    .map((g) => g.trim())
+    .filter((g) => g.length > 0)
   let strategyRefused = 0
 
   for (const event of events) {
@@ -242,10 +249,12 @@ async function main() {
       market: markets.get(event.token.contract) ?? null,
       config: strategyConfig,
       sizing: capitalUsd > 0 ? { capitalUsd, riskPct } : undefined,
+      trustedCallGroups,
     })
     event.strategy = intake.fired
     event.ladder = intake.ladder
     event.structure = intake.structureLines
+    event.callGroups = intake.confluence.available ? intake.confluenceLine : null
 
     if (!intake.fired) {
       strategyRefused += 1
@@ -256,7 +265,9 @@ async function main() {
     }
     console.log(
       `[accumulation-alert] strategy=${intake.fired.strategy} conf=${intake.fired.confidence} ` +
-        `entry=${intake.fired.entryUsd} sl=${intake.fired.stopUsd} contract=${event.token.contract}`,
+        `entry=${intake.fired.entryUsd} sl=${intake.fired.stopUsd} contract=${event.token.contract} ` +
+        `guards=${intake.guardSource ?? 'unknown'} ` +
+        `callGroups=${intake.confluence.available ? intake.confluence.groupCount : 'n/a'}`,
     )
 
     if (!shouldSend(event, state, now, opts.cooldownMs) || (await isAccumulationSeen(event.token.contract))) {

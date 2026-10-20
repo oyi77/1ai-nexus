@@ -17,7 +17,7 @@
 //      CALL_FEED_DB   (kill-switch: off/false/0 skips all DB writes)
 // ─────────────────────────────────────────────────────────────
 import 'dotenv/config'
-import { saveCallFeedRows, loadCallFeed, type CallFeedRow } from '@/lib/modules/derived/db-call-feed'
+import { saveCallFeedRows, readCallFeedArtifact, loadCallFeed, type CallFeedRow } from '@/lib/modules/derived/db-call-feed'
 
 async function main(): Promise<void> {
   if (process.env.CALL_FEED_DB === 'off' || process.env.CALL_FEED_DB === 'false' || process.env.CALL_FEED_DB === '0') {
@@ -28,10 +28,10 @@ async function main(): Promise<void> {
   const nowMs = Date.now()
   const maxAgeMin = Number(process.env.CALL_FEED_MAX_AGE_MIN) || 180
 
-  // loadCallFeed reads the JSON artifact (DB-first, but the DB is empty on
-  // first run; the JSON fallback is the source of truth here). We pass a
-  // fresh nowMs and the configured maxAge so stale artifacts return [].
-  const rows: CallFeedRow[] = await loadCallFeed(nowMs, maxAgeMin)
+  // Read the ARTIFACT, not loadCallFeed: the latter is DB-first and would
+  // return the DB's own (possibly provenance-less) rows, writing empty
+  // sources back over good data. Python owns the artifact; this is its reader.
+  const rows: CallFeedRow[] = readCallFeedArtifact(nowMs, maxAgeMin)
   if (rows.length === 0) {
     console.log('[call-feed-sync] no candidates in artifact (stale or empty) — nothing to sync')
     return
