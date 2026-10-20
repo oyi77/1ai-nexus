@@ -141,7 +141,13 @@ function fromDbRow(row: {
  * Never throws.
  */
 export async function saveWhaleBuys(rows: WhaleBuyRow[]): Promise<void> {
-  writeJsonArtifact(rows)
+  // Merge into the artifact instead of overwriting it: callers pass only the
+  // rows that are NEW this pass, so a plain overwrite would drop every
+  // candidate found earlier and leave the JSON a partial view of the DB.
+  const byContract = new Map<string, WhaleBuyRow>()
+  for (const existing of readJsonArtifact()) byContract.set(existing.contract, existing)
+  for (const row of rows) byContract.set(row.contract, row)
+  writeJsonArtifact([...byContract.values()])
   if (isWhaleBuysDbDisabled() || rows.length === 0) return
   try {
     for (const input of rows) {

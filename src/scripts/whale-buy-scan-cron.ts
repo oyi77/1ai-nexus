@@ -15,7 +15,8 @@
 //
 // Run: npm run cron:whale-buy-scan
 // Env:
-//   WHALE_SCAN_LIMIT       — tokens per pass (default 6; pass must finish inside the 10-min schedule)
+//   WHALE_SCAN_LIMIT       — tokens per pass (default 10; a measured pass takes
+//                            ~550s, so the cron runs every 15 min — see crontab)
 //   WHALE_HOLDER_LIMIT     — holders per token to scan (default 6)
 //   WHALE_MIN_USD          — min USD for whale buy threshold (default 10000)
 //   WHALE_BUYS_DB          — 'off' skips DB writes (tests)
@@ -56,7 +57,7 @@ async function main(): Promise<void> {
   }
 
   const now = Date.now()
-  const tokenLimit = numEnv('WHALE_SCAN_LIMIT', 6)
+  const tokenLimit = numEnv('WHALE_SCAN_LIMIT', 10)
   const holderLimit = numEnv('WHALE_HOLDER_LIMIT', 6)
   const minUsd = numEnv('WHALE_MIN_USD', 10_000)
   // Recency floor for buy legs (minutes). Without it a leg from weeks ago

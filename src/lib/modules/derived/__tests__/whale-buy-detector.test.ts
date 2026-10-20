@@ -11,6 +11,7 @@ import {
   detectWhaleBuys,
   aggregateWhaleBuyDetections,
   WHALE_BUY_DEFAULTS,
+  USDC_MINT,
   type WhaleBuyDetection,
 } from '../whale-buy-detector'
 import { SOL_MINT, type NormalizedSwap } from '../solana-harvest'
@@ -260,5 +261,32 @@ describe('aggregateWhaleBuyDetections', () => {
 
   it('returns [] for no detections', () => {
     expect(aggregateWhaleBuyDetections([])).toEqual([])
+  })
+
+  it('detects a USDC-quoted buy (stablecoin leg is a real buy, not a skip)', () => {
+    // Live evidence: 12 of 18 large buys on a scanned token were paid in USDC,
+    // including a $41.6k one. Gating on SOL-only silently dropped them all.
+    const dets = detectWhaleBuys({
+      contract: TOKEN,
+      chain: CHAIN,
+      swaps: [nswap({ inputMint: USDC_MINT, inputUsd: 41_657 })],
+      holders: [],
+      classifiedWallets: new Map(),
+      config: { minUsd: 1_000 },
+    })
+    expect(dets).toHaveLength(1)
+    expect(dets[0].usdValue).toBe(41_657)
+  })
+
+  it('still rejects an illiquid token-for-token quote leg', () => {
+    const dets = detectWhaleBuys({
+      contract: TOKEN,
+      chain: CHAIN,
+      swaps: [nswap({ inputMint: OTHER_TOKEN, inputUsd: 50_000 })],
+      holders: [],
+      classifiedWallets: new Map(),
+      config: { minUsd: 1_000 },
+    })
+    expect(dets).toHaveLength(0)
   })
 })

@@ -86,6 +86,26 @@ describe('whale-buy-store save + load (JSON with kill-switch)', () => {
     expect(loaded[0].buyVolumeUsd).toBe(50_000)
   })
 
+  it('merges successive saves instead of clobbering earlier candidates', async () => {
+    // The cron calls saveWhaleBuys with only the NEW rows of each pass. A
+    // plain overwrite would shrink the artifact to the latest pass and make
+    // the JSON a partial view of the DB (observed: 5 DB rows, 1 artifact row).
+    await saveWhaleBuys([row({ contract: 'FirstToken' })])
+    await saveWhaleBuys([row({ contract: 'SecondToken' })])
+
+    const loaded = await loadWhaleBuys()
+    expect(loaded.map((r) => r.contract).sort()).toEqual(['FirstToken', 'SecondToken'])
+  })
+
+  it('replaces the row for a re-saved contract rather than duplicating it', async () => {
+    await saveWhaleBuys([row({ contract: 'SameToken', buyVolumeUsd: 1_000 })])
+    await saveWhaleBuys([row({ contract: 'SameToken', buyVolumeUsd: 9_000 })])
+
+    const loaded = await loadWhaleBuys()
+    expect(loaded).toHaveLength(1)
+    expect(loaded[0].buyVolumeUsd).toBe(9_000)
+  })
+
   it('writes the JSON artifact to the configured path', async () => {
     await saveWhaleBuys([row()])
     expect(existsSync(whaleBuysJsonPath())).toBe(true)

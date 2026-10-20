@@ -3,8 +3,10 @@
 //
 // Token-first detection: given a token's recent wallet-activity swaps
 // (BUY legs with real USD) and its current holder set, identify
-// whale-sized buys. A whale buy is a BUY leg (SOL → token) whose
-// inputUsd >= minUsd — never a static holding, never an invented USD.
+// whale-sized buys. A whale buy is a BUY leg paid in a stable quote asset
+// (SOL or USDC) whose inputUsd >= minUsd — never a static holding, never an
+// invented USD. Restricting to SOL silently dropped every USDC-quoted buy:
+// on live data 12 of 18 large buys were paid in USDC, including a $41.6k one.
 //
 // Scoring:
 //   · walletClass = the wallet's SmartMoneyWallet status when known
@@ -50,6 +52,20 @@ export interface WhaleBuyDetectorConfig {
 
 export const WHALE_BUY_DEFAULTS: WhaleBuyDetectorConfig = {
   minUsd: 10_000,
+};
+
+/** USDC mint — the other quote asset Solana traders pay with. */
+export const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
+
+/**
+ * Quote assets we accept as the paying leg of a whale buy. Both are real,
+ * liquid assets with a known USD mark, so `cost_usd` is meaningful for both.
+ * Any other quote mint (illiquid token-for-token swap) stays rejected —
+ * its USD value would be an assumption, not a measurement.
+ */
+export const ACCEPTED_QUOTE_MINTS: Record<string, true> = {
+  [SOL_MINT]: true,
+  [USDC_MINT]: true,
 };
 
 /** Every status that means "this wallet has been classified" (any label). */
@@ -102,10 +118,10 @@ export function detectWhaleBuys(input: {
   const byWallet = new Map<string, WhaleBuyDetection>();
 
   for (const s of input.swaps) {
-    // Must be a BUY leg: SOL → the token we are scanning.
+    // Must be a BUY leg: accepted quote asset → the token we are scanning.
     if (s.completeness !== 'complete') continue;
     if (s.outputMint !== contract) continue;
-    if (s.inputMint !== SOL_MINT) continue;
+    if (ACCEPTED_QUOTE_MINTS[s.inputMint] !== true) continue;
     if (s.inputUsd === null) continue; // never invent USD
     if (!Number.isFinite(s.inputUsd) || s.inputUsd <= 0) continue;
     if (s.inputUsd < cfg.minUsd) continue; // below whale threshold
