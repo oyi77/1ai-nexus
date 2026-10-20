@@ -139,7 +139,8 @@ function sharedRefs(
     passed: market.liquidityUsd !== null && market.liquidityUsd >= cfg.minLiquidityUsd,
     detail: market.liquidityUsd === null
       ? 'liquidity unverified'
-      : `$${Math.round(market.liquidityUsd).toLocaleString()} >= $${(cfg.minLiquidityUsd / 1000).toFixed(0)}k`,
+      : `$${Math.round(market.liquidityUsd).toLocaleString()} vs $${(cfg.minLiquidityUsd / 1000).toFixed(0)}k floor ` +
+        (market.liquidityUsd >= cfg.minLiquidityUsd ? '(meets floor)' : '(BELOW floor)'),
   })
 
   refs.push({
@@ -147,7 +148,8 @@ function sharedRefs(
     passed: market.volume24hUsd !== null && market.volume24hUsd >= cfg.minVolume24hUsd,
     detail: market.volume24hUsd === null
       ? '24h volume unverified'
-      : `$${Math.round(market.volume24hUsd).toLocaleString()} >= $${(cfg.minVolume24hUsd / 1000).toFixed(0)}k`,
+      : `$${Math.round(market.volume24hUsd).toLocaleString()} vs $${(cfg.minVolume24hUsd / 1000).toFixed(0)}k floor ` +
+        (market.volume24hUsd >= cfg.minVolume24hUsd ? '(meets floor)' : '(BELOW floor)'),
   })
 
   refs.push({
@@ -155,7 +157,8 @@ function sharedRefs(
     passed: currentMcUsd !== null && currentMcUsd >= band.min && currentMcUsd <= band.max,
     detail: currentMcUsd === null
       ? 'current MC unavailable'
-      : `MC $${(currentMcUsd / 1e6).toFixed(2)}M within $${(band.min / 1e6).toFixed(1)}M–$${(band.max / 1e6).toFixed(1)}M band`,
+      : `MC $${(currentMcUsd / 1e6).toFixed(2)}M vs $${(band.min / 1e6).toFixed(1)}M–$${(band.max / 1e6).toFixed(1)}M band ` +
+        (currentMcUsd >= band.min && currentMcUsd <= band.max ? '(inside band)' : `(${currentMcUsd < band.min ? 'BELOW' : 'ABOVE'} band)`),
   })
 
   return refs
