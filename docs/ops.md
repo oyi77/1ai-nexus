@@ -630,7 +630,7 @@ background harvesters, scanners, and pipelines. Key entries:
 
 ### Whale sheet tabs
 
-Both tabs live on the operator spreadsheet (`SPREADSHEET_ID`, see `smart-money-sync.ts`) and are **full rewrites**, never append logs:
+Both tabs live on the operator spreadsheet (`SPREADSHEET_ID`, see `smart-money-sync.ts`) and are **full rewrites**, never append logs. Each rewrite is ONE atomic `values:batchUpdate` (Sheets applies all ranges or none), so a killed process can never leave a tab half-empty; stale tail rows are blanked in the same call, and an unchanged payload is skipped entirely (hash in `StateMeta` scope `whale-sheet-sync`), costing zero write quota.
 
 | Tab | Written by | Columns | Semantics |
 |---|---|---|---|

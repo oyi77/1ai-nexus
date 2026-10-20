@@ -222,6 +222,12 @@ export interface SheetsApi {
   /** Clear values in `range` (POST values:clear). Empty string clears all. */
   clear(range: string): Promise<boolean>
   batchUpdate(requests: unknown[]): Promise<boolean>
+  /**
+   * Write several ranges in ONE atomic request (`values:batchUpdate`).
+   * Sheets applies all ranges or none, so a multi-range rewrite can never
+   * leave a tab half-empty. Counts as a single write against the quota.
+   */
+  batchUpdateValues(data: Array<{ range: string; values: unknown[][] }>): Promise<boolean>
 }
 
 let cachedSheetsApi: SheetsApi | null | undefined
@@ -269,6 +275,14 @@ export async function getSheetsApi(): Promise<SheetsApi | null> {
     async batchUpdate(requests: unknown[]): Promise<boolean> {
       const res = await fetch(`${baseUrl}:batchUpdate`, {
         method: 'POST', headers, body: JSON.stringify({ requests }),
+      })
+      return res.ok
+    },
+    async batchUpdateValues(data): Promise<boolean> {
+      const res = await fetch(`${baseUrl}/values:batchUpdate`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ valueInputOption: 'RAW', data }),
       })
       return res.ok
     },

@@ -111,6 +111,7 @@ data/caller-scores.json
 data/wallet-buys-latest.json
 data/whale-buys-latest.json
 data/whale-wallets-registry.json
+data/whale-sheet-sync.json
 data/sniper-outcomes.json
 data/accumulation-alert-state.json
 data/confluence-seen.json

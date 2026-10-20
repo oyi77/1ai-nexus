@@ -58,17 +58,20 @@ async function main(): Promise<void> {
   const tokenLimit = numEnv('WHALE_SCAN_LIMIT', 6)
   const holderLimit = numEnv('WHALE_HOLDER_LIMIT', 6)
   const minUsd = numEnv('WHALE_MIN_USD', 10_000)
+  // Recency floor for buy legs (minutes). Without it a leg from weeks ago
+  // folds into the same "fresh accumulation" row as a buy from today.
+  const maxAgeMin = numEnv('WHALE_BUY_MAX_AGE_MIN', 720)
 
   console.log(
     `[whale-buy-scan] ${new Date(now).toISOString()} — starting ` +
-      `(tokenLimit=${tokenLimit} holderLimit=${holderLimit} minUsd=${minUsd})`,
+      `(tokenLimit=${tokenLimit} holderLimit=${holderLimit} minUsd=${minUsd} maxAgeMin=${maxAgeMin})`,
   )
-
   const result = await scanWhaleBuys({
     tokenLimit,
     holderLimit,
     config: { minUsd },
     filterSeen: isWhaleBuySeen,
+    sinceMs: now - maxAgeMin * 60_000,
   })
 
   console.log(
@@ -123,8 +126,11 @@ async function main(): Promise<void> {
   //    Full rewrite from the DB (source of truth), so the tab always equals
   //    what the scanner holds — never an append log.
   const sheetRows = await loadWhaleBuys()
-  const sheetWritten = await syncWhaleScanSheet(sheetRows)
-  console.log(`[whale-buy-scan] sheet rows written: ${sheetWritten} (candidates=${sheetRows.length})`)
+  const scanSheet = await syncWhaleScanSheet(sheetRows)
+  console.log(
+    `[whale-buy-scan] ${scanSheet.skipped ? 'candidate tab unchanged' : 'candidate tab rewritten'}: ` +
+      `rows=${scanSheet.written} (candidates=${sheetRows.length})`,
+  )
 
   // 8. Fold this pass's buyers into the persistent whale registry, then
   //    rewrite the whale-wallet tab. The registry outlives the 6h prune, so
@@ -136,9 +142,10 @@ async function main(): Promise<void> {
     now,
   )
   saveWhaleRegistry(registry)
-  const walletWritten = await syncWhaleWalletSheet(registry)
+  const walletSheet = await syncWhaleWalletSheet(registry)
   console.log(
-    `[whale-buy-scan] whale-wallet tab rows: ${walletWritten} (registry=${registry.length})`,
+    `[whale-buy-scan] ${walletSheet.skipped ? 'wallet tab unchanged' : 'wallet tab rewritten'}: ` +
+      `rows=${walletSheet.written} (registry=${registry.length})`,
   )
 
   // Print detection summary for the receipt.

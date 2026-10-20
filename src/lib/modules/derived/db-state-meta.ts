@@ -3,7 +3,7 @@
 //
 // Migrated 2026-10-15 (operator directive: prefer DB over JSON).
 // One row per scope in `StateMeta` (`scope @unique`).
-// Known scopes: `feed-health-prev`, `zero-issue-state`.
+// Known scopes: `feed-health-prev`, `zero-issue-state`, `whale-sheet-sync`.
 //
 // Invariants (mirrors db-stores.ts):
 //   • NEVER-FAIL: every DB op is wrapped; nothing exported throws.
@@ -35,6 +35,7 @@ export function isStateDbDisabled(): boolean {
 const SCOPE_JSON_FILE: Record<string, string> = {
   'feed-health-prev': 'feed-health-prev.json',
   'zero-issue-state': 'zero-issue-state.json',
+  'whale-sheet-sync': 'whale-sheet-sync.json',
 }
 
 function jsonPathFor(scope: string): string | null {
