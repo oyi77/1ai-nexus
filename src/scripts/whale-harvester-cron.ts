@@ -27,6 +27,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import 'dotenv/config'
+import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { appendWalletsToSheet, type SheetWallet } from '@/lib/modules/derived/smart-money-sync'
@@ -165,6 +166,10 @@ async function main() {
       `classified=${classified} db-failures=${failures + bootstrapFailures}`,
   )
 
+  const ok = (failures + bootstrapFailures) === 0 && (gmgnWallets.length > 0 || kolscanResult.kolscanTotal > 0)
+  const detail = `gmgn=${gmgnWallets.length} kolscan=${kolscanResult.kolscanTotal} db-failures=${failures + bootstrapFailures}`
+  await recordPipelineRun('whale-harvester', ok, detail)
+
   // Keep the exit clean unless the DB itself broke.
   process.exit(0)
 }
@@ -240,6 +245,7 @@ async function bootstrapNewlyClassified(
 }
 
 main().catch((err) => {
+  void recordPipelineRun('whale-harvester', false, `FATAL: ${err instanceof Error ? err.message : String(err)}`)
   console.error('[whale-harvester] FATAL:', err)
   process.exit(1)
 })

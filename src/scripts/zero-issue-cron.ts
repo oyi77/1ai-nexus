@@ -21,6 +21,7 @@ import {
   readPipelineHeartbeats,
   evaluatePipelines,
 } from '@/lib/modules/derived/pipeline-heartbeat'
+import { buildAlertMessage } from '@/lib/modules/derived/zero-issue-decision'
 
 
 const BASE = process.env.ZERO_ISSUE_BASE || 'http://localhost:4400'
@@ -240,7 +241,6 @@ async function main() {
   }
 
   const ids = failures.map(f => f.name)
-  const newOnly = ids.filter(id => !prev.failures.includes(id))
 
   await writeState({
     failures: ids,
@@ -248,12 +248,8 @@ async function main() {
     lastFailures: failures.map(f => `${f.name}: ${f.detail}`),
   })
 
-  const lines = [
-    `🔴 [1ai-tracker] zero-issue audit: ${failures.length}/${checks.length} check(s) FAILED`,
-    ...failures.map(f => `  • ${f.name}: ${f.detail}`),
-    newOnly.length ? `new since last run: ${newOnly.join(', ')}` : '(same failures as previous run — no new regressions)',
-  ]
-  const sent = await sendTelegram(lines.join('\n'))
+  const lines = buildAlertMessage(checks, checks.length, prev.failures) ?? ''
+  const sent = await sendTelegram(lines)
   console.log(`[zero-issue] ${stamp} ${failures.length} FAILURES: ${ids.join(', ')} | alert ${sent ? 'sent' : 'NOT SENT'}`)
   process.exit(1)
 }

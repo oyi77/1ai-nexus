@@ -13,6 +13,7 @@ import { checkAllFeeds, checkFeedMarkup } from '@/lib/feed-health'
 import { prisma } from '@/lib/db'
 import { sendTelegramAlert } from '@/lib/telegram/bot'
 import { loadStateMeta, saveStateMeta } from '@/lib/modules/derived/db-state-meta'
+import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 
 const ADMIN_CHAT = process.env.FEED_ALERT_CHAT_ID || process.env.TELEGRAM_ADMIN_CHAT_ID || ''
 
@@ -81,10 +82,16 @@ async function main() {
   }
 
   // Exit non-zero if >25% of feeds are down (for cron monitoring)
+  const ok = report.dead <= report.total * 0.25
+  await recordPipelineRun('feed-health', ok, `${report.working}/${report.total} working, ${report.atomOnly} atom-only, ${report.dead} dead`)
   if (report.dead > report.total * 0.25) {
     console.error(`[feed-health] CRITICAL: ${report.dead}/${report.total} feeds down`)
     process.exit(1)
   }
 }
 
-main().catch((e) => { console.error('[feed-health] failed:', e); process.exit(1) })
+main().catch((e) => {
+  void recordPipelineRun('feed-health', false, `FATAL: ${e instanceof Error ? e.message : String(e)}`)
+  console.error('[feed-health] failed:', e)
+  process.exit(1)
+})

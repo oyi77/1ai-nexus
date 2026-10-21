@@ -44,6 +44,7 @@ import {
   markConfluenceSeen,
 } from '@/lib/modules/derived/db-seen-store';
 import { prisma } from '@/lib/db';
+import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat';
 
 /** Operator DM chain — same fallback ladder as the other crons; deliberately
  * does NOT fall back to the sale channel. */
@@ -177,6 +178,10 @@ async function main(): Promise<void> {
 
   if (sent > 0) writeConfluenceSeenState(state);
 
+  const ok = result.signals.length > 0 || errors.length === 0;
+  const detail = `signals=${result.signals.length} sent=${sent} suppressed=${suppressed} failures=${errors.length}`;
+  await recordPipelineRun('confluence', ok, detail);
+
   console.log(
     `[confluence] wallets=${qualified.size} swaps=${swaps.length} signals=${result.signals.length} sent=${sent} suppressed=${suppressed} failures=${errors.length}`,
   );
@@ -185,6 +190,7 @@ async function main(): Promise<void> {
 main()
   .catch((err) => {
     console.error('[confluence] FATAL:', err);
+    void recordPipelineRun('confluence', false, `FATAL: ${err instanceof Error ? err.message : String(err)}`);
   })
   .finally(() => {
     process.exit(0);

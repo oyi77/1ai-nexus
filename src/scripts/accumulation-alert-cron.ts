@@ -38,6 +38,7 @@ import { loadMarkets } from '@/lib/modules/derived/accumulation-markets'
 import { evaluateStrategiesFor } from '@/lib/modules/derived/strategy-intake'
 import { STRATEGY_DEFAULTS } from '@/lib/modules/derived/strategy-evaluator'
 import type { WalletBuyCandidate } from '@/lib/modules/derived/wallet-discovery'
+import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 
 function numEnv(name: string, fallback: number): number {
   const raw = process.env[name]
@@ -295,10 +296,14 @@ async function main() {
     `[accumulation-alert] done: events=${events.length} sent=${sent} ` +
       `suppressed=${suppressed} strategy_refused=${strategyRefused} delivery_failures=${deliveryFailures}`,
   )
+
+  const ok = deliveryFailures === 0 // ok only if all deliveries succeeded
+  void recordPipelineRun('accumulation-alert', ok, `sent=${sent} suppressed=${suppressed} failures=${deliveryFailures}`)
   process.exit(0)
 }
 
 main().catch((err) => {
   console.error('[accumulation-alert] FATAL:', err)
+  void recordPipelineRun('accumulation-alert', false, `FATAL: ${err instanceof Error ? err.message : String(err)}`)
   process.exit(1)
 })
