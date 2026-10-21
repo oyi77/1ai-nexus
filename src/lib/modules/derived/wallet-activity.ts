@@ -347,10 +347,23 @@ async function fetchHeliusActivity(
  * Try sources in order, return the FIRST one with usable swaps.
  * If nothing works, return `{source:'none', swaps:[], ...}` with an honest
  * gaps note — never throw, never fabricate.
+ *
+ * `opts.fallback` bounds the public-RPC fallback. The default harvest pages
+ * 30 days of signatures and fetches every transaction at 650ms each, so a
+ * single fallback can take ~35s — measured: 69s for 2 wallets, 98% of a
+ * scanner pass. Callers that only need RECENT activity (the whale scanner
+ * filters by recency anyway) can pass a smaller window; callers that need
+ * history (wallet-refresh) keep the default.
  */
 export async function fetchWalletActivity(
   address: string,
-  opts: { limit?: number; minBlockTime?: number; cursor?: string | null } = {},
+  opts: {
+    limit?: number
+    minBlockTime?: number
+    cursor?: string | null
+    /** Bounds the public-RPC fallback. Omit for the 30-day default. */
+    fallback?: { days?: number; limit?: number; disabled?: boolean }
+  } = {},
 ): Promise<WalletActivityResult> {
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 100)
   const minBlockTime = opts.minBlockTime
@@ -381,8 +394,28 @@ export async function fetchWalletActivity(
   }
 
   // 3) Public Solana RPC fallback (no historical USD; real block timestamps).
+  //    `fallback: { disabled: true }` skips it: the RPC path always writes
+  //    inputUsd=null (historical USD is never invented), so a USD-gated
+  //    detector rejects every leg it produces. The whale scanner measured
+  //    69s of a 111s pass spent here for zero possible detections.
+  if (opts.fallback?.disabled) {
+    return {
+      source: 'none',
+      swaps: [],
+      coverage: {
+        sigsSeen: 0,
+        validEvents: 0,
+        complete: false,
+        gaps: [...gmgn.coverage.gaps, 'rpc-fallback-disabled'],
+      },
+      note: 'Public Solana RPC fallback disabled by caller',
+    }
+  }
   try {
-    const harvested = await harvestWallet(address, { limit, days: 30 })
+    const harvested = await harvestWallet(address, {
+      limit: opts.fallback?.limit ?? limit,
+      days: opts.fallback?.days ?? 30,
+    })
     const ok = harvested.swaps.filter((s) => s.completeness !== 'rejected')
     const gaps = [...harvested.coverage.gaps, ...gmgn.coverage.gaps]
     if (ok.length === 0) {

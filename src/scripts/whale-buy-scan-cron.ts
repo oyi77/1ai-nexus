@@ -92,7 +92,13 @@ async function main(): Promise<void> {
       `holders=${result.holdersFetched} ` +
       `detections=${result.detections.length} ` +
       `aggregated=${result.aggregated.length} ` +
-      `errors=${result.errors.length}`,
+      `errors=${result.errors.length} ` +
+      // Per-source breakdown: the RPC fallback pages 30 days of signatures at
+      // 650ms per transaction, so a few fallbacks can dominate a pass. Without
+      // this the cost was invisible — the only symptom was a slow pass.
+      `sources=${Object.entries(result.sourceCounts)
+        .map(([src, n]) => `${src}=${n}(${Math.round((result.sourceMs[src] ?? 0) / 1000)}s)`)
+        .join(',') || 'sources=none'}`,
   )
 
   if (result.errors.length > 0) {

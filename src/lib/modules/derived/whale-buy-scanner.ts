@@ -39,6 +39,16 @@ import type { WalletStatus } from '@/lib/modules/derived/wallet-intel'
 /** Politeness gap between wallet-activity fetches (ms). */
 const WALLET_FETCH_GAP_MS = 200
 
+/**
+ * Politeness gap between token-holder fetches (ms).
+ *
+ * Holder requests are the ones GMGN rate-limits (HTTP 429), and a 429 that
+ * exhausts the retry budget yields an EMPTY holder list — the token is then
+ * dropped from the scan without any visible error. Measured 2026-10-21: a
+ * 1.5s gap gave 10/10 successes at ~380ms each.
+ */
+const TOKEN_FETCH_GAP_MS = 1_200
+
 export interface WhaleScanResult {
   /** All detections across all tokens in this scan pass. */
   detections: WhaleBuyDetection[]
@@ -58,6 +68,16 @@ export interface WhaleScanResult {
   tokensScanned: number
   /** Number of holders fetched across all tokens. */
   holdersFetched: number
+  /**
+   * Which activity source answered each holder query, and how long it took.
+   *
+   * The RPC fallback (`solana-rpc`) pages 30 days of signatures and fetches
+   * every transaction at 650ms each, so a handful of fallbacks can dominate a
+   * pass. Without these counters that cost is invisible — the only symptom
+   * was a pass taking ten minutes.
+   */
+  sourceCounts: Record<string, number>
+  sourceMs: Record<string, number>
 }
 
 export interface WhaleScanOpts {
@@ -181,12 +201,16 @@ export async function scanWhaleBuys(
       errors: [`token-discovery: ${err instanceof Error ? err.message : String(err)}`],
       tokensScanned: 0,
       holdersFetched: 0,
+      sourceCounts: {},
+      sourceMs: {},
     }
   }
 
   const errors: string[] = []
   const allDetections: WhaleBuyDetection[] = []
   let holdersFetched = 0
+  const sourceCounts: Record<string, number> = {}
+  const sourceMs: Record<string, number> = {}
 
   for (let ti = 0; ti < tokens.length; ti++) {
     const token = tokens[ti]
@@ -194,6 +218,14 @@ export async function scanWhaleBuys(
     // 2. Fetch token holders.
     let holders: GmgnHolderRow[] = []
     try {
+      // Pace the token requests. A burst of holder requests trips GMGN's
+      // rate limiter (HTTP 429), and an exhausted retry budget returns an
+      // EMPTY holder list — the token is then silently dropped from the scan.
+      // Measured: 10 back-to-back requests succeed, but a burst combined with
+      // the wallet-activity calls behind it reliably trips the 429.
+      if (ti > 0) {
+        await new Promise<void>((r) => setTimeout(r, TOKEN_FETCH_GAP_MS))
+      }
       holders = await listGmgnTokenHolders(token.chain, token.contract)
       holdersFetched += holders.length
     } catch (err) {
@@ -217,9 +249,20 @@ export async function scanWhaleBuys(
         await new Promise<void>((r) => setTimeout(r, WALLET_FETCH_GAP_MS))
       }
       try {
+        const startedAt = Date.now()
         const activity = await fetchWalletActivity(holder.address, {
           limit: swapLimit,
+          // The scanner's detector requires a REAL trade-time USD value and
+          // rejects any leg with inputUsd=null. The public-RPC fallback always
+          // writes inputUsd=null (historical USD is never invented), so it
+          // can only ever produce rejected legs — while costing ~35s per
+          // wallet (measured: 69s of a 111s pass, 98% of the total).
+          // The scanner therefore runs GMGN-only.
+          fallback: { disabled: true },
         })
+        const source = activity.source
+        sourceCounts[source] = (sourceCounts[source] ?? 0) + 1
+        sourceMs[source] = (sourceMs[source] ?? 0) + (Date.now() - startedAt)
         swapsByWallet.push({ wallet: holder.address, swaps: activity.swaps })
       } catch (err) {
         errors.push(`activity:${holder.address}: ${err instanceof Error ? err.message.slice(0, 48) : 'err'}`)
@@ -259,5 +302,7 @@ export async function scanWhaleBuys(
     errors,
     tokensScanned: tokens.length,
     holdersFetched,
+    sourceCounts,
+    sourceMs,
   }
 }

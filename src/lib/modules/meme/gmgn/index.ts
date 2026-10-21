@@ -220,13 +220,22 @@ async function retryWithBackoff<T>(
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
       const isCloudflare = lastError.message.includes('403') || lastError.message.includes('Cloudflare')
-      if (isCloudflare && attempt < maxAttempts) {
-        logger.warn(`GMGN Cloudflare challenge detected (attempt ${attempt}/${maxAttempts})`, 'gmgn', {
-          error: lastError.message,
-        })
+      // A 429 is rate limiting, not a challenge: the request was understood
+      // and refused. It needs a LONGER wait than the generic ladder, and the
+      // failure must be visible — a 429 that exhausts its retries returns an
+      // empty holder list, which silently drops the token from the scan.
+      const isRateLimited = lastError.message.includes('429')
+      if ((isCloudflare || isRateLimited) && attempt < maxAttempts) {
+        logger.warn(
+          `GMGN ${isRateLimited ? 'rate limited (429)' : 'Cloudflare challenge'} (attempt ${attempt}/${maxAttempts})`,
+          'gmgn',
+          { error: lastError.message },
+        )
       }
       if (attempt < maxAttempts) {
-        const wait = Math.min(baseDelay * 2 ** (attempt - 1), 2_000)
+        const wait = isRateLimited
+          ? Math.min(baseDelay * 4 ** (attempt - 1), 8_000)
+          : Math.min(baseDelay * 2 ** (attempt - 1), 2_000)
         await new Promise((resolve) => setTimeout(resolve, wait))
       }
     }
