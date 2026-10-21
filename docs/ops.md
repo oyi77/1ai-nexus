@@ -269,6 +269,35 @@ curl -s http://localhost:4401/health
 
 ## Monitoring
 
+### Pipeline heartbeats (scheduled jobs)
+
+The app can be perfectly healthy while a scheduled job has been dead for days.
+Every pipeline records a heartbeat after each run, and the zero-issue audit
+(`npm run cron:zero-issue`, every 15 min) reports a job as FAILED when its
+heartbeat is stale (it stopped) or marked not-ok (it ran and failed).
+
+| State | Meaning | Alerts? |
+|---|---|---|
+| fresh + ok | ran recently and succeeded | no |
+| fresh + not ok | ran and failed (details carry the reason) | **yes** |
+| stale | last run is older than the job's max age → it stopped | **yes** |
+| no heartbeat | not instrumented yet (during rollout) | no |
+
+Heartbeats live in `StateMeta` under scope `pipeline-heartbeat`
+(DB-primary, JSON backup at `data/pipeline-heartbeat.json`).
+
+To instrument a new cron, call `recordPipelineRun(name, ok, detail)` at the
+end of the run — on success AND on failure. Add the job to
+`EXPECTED_PIPELINES` in `src/lib/modules/derived/pipeline-heartbeat.ts` with a
+`maxAgeMs` larger than its schedule (roughly 2–3 intervals).
+
+A job that reports success while its underlying write failed is the defect
+class this guards against: a rate-limited GMGN holder request returned an
+empty list and the scanner silently dropped 8 of 10 tokens per pass, and a
+missing Google credential made a sheet sync print "rewritten" while nothing
+was written. The receipt must distinguish `unchanged (skipped)` from
+`WRITE FAILED`.
+
 ### Data Sources Status
 
 The `/api/v1/data-sources` endpoint provides real-time health of all 17 integrations:

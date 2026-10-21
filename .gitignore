@@ -112,6 +112,7 @@ data/wallet-buys-latest.json
 data/whale-buys-latest.json
 data/whale-wallets-registry.json
 data/whale-sheet-sync.json
+data/pipeline-heartbeat.json
 # cron single-instance run locks (directories, created/removed per pass)
 data/.whale-buy-scan.lock/
 data/sniper-outcomes.json

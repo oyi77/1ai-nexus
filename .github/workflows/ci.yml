@@ -54,6 +54,14 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nexus
 
+      # Typecheck BEFORE build: a type error should fail fast with a clear
+      # message instead of surfacing as an opaque bundler error.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         run: npm run build
         env:

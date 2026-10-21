@@ -38,6 +38,7 @@ import {
   loadWhaleIdentities,
   catchesFromScanRows,
 } from '@/lib/modules/derived/whale-wallet-registry'
+import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 
 function numEnv(name: string, fallback: number): number {
   const parsed = Number.parseInt(process.env[name] ?? '', 10)
@@ -64,6 +65,9 @@ async function main(): Promise<void> {
   const lock = acquireRunLock(LOCK_PATH, LOCK_STALE_MS)
   if (!lock.acquired) {
     console.log('[whale-buy-scan] another pass is running — skipping this cycle')
+    // A skipped cycle still proves the job is alive; recording it keeps the
+    // heartbeat fresh without pretending a scan happened.
+    await recordPipelineRun('whale-buy-scan', true, 'skipped: previous pass still running')
     return
   }
 
@@ -186,12 +190,25 @@ async function main(): Promise<void> {
       `duration=${Math.round((Date.now() - now) / 1000)}s`,
   )
 
+  // Heartbeat: the audit needs to distinguish "this job ran and is healthy"
+  // from "this job stopped". A pass with token errors is NOT healthy — the
+  // scanner silently drops the tokens it could not read.
+  const failures = result.errors.length
+  await recordPipelineRun(
+    'whale-buy-scan',
+    failures === 0,
+    failures === 0
+      ? `tokens=${result.tokensScanned} holders=${result.holdersFetched} detections=${result.detections.length} saved=${newRows.length}`
+      : `${failures} token error(s): ${result.errors.slice(0, 2).join('; ')}`,
+  )
+
   lock.release()
 }
 
 main()
   .catch((err) => {
     console.error('[whale-buy-scan] FATAL:', err)
+    void recordPipelineRun('whale-buy-scan', false, `FATAL: ${err instanceof Error ? err.message : String(err)}`)
   })
   .finally(() => {
     process.exit(0)

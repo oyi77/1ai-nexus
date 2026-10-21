@@ -17,6 +17,10 @@ import 'dotenv/config'
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { loadStateMeta, saveStateMeta } from '@/lib/modules/derived/db-state-meta'
+import {
+  readPipelineHeartbeats,
+  evaluatePipelines,
+} from '@/lib/modules/derived/pipeline-heartbeat'
 
 
 const BASE = process.env.ZERO_ISSUE_BASE || 'http://localhost:4400'
@@ -149,6 +153,25 @@ async function runChecks() {
     const res = await fetch('http://localhost:4401/socket.io/?EIO=4&transport=polling', { signal: AbortSignal.timeout(5000) })
     if (res.status !== 200) throw new Error(`HTTP ${res.status}`)
     return 'handshake ok'
+  }))
+
+  // 6. Scheduled pipeline liveness.
+  //    The app can be perfectly healthy while a cron has been dead for days.
+  //    Each pipeline records a heartbeat after every run; a stale heartbeat
+  //    means the job stopped, a not-ok heartbeat means it ran and failed.
+  checks.push(await check('pipelines', async () => {
+    const heartbeats = await readPipelineHeartbeats()
+    const { failures, healthy, uninstrumented } = evaluatePipelines(heartbeats)
+    if (failures.length > 0) {
+      throw new Error(
+        `${failures.length} pipeline problem(s): ` +
+          failures.map((f) => `${f.name} — ${f.detail}`).join('; ').slice(0, 200),
+      )
+    }
+    // Pipelines with no heartbeat yet are reported but never alerted on —
+    // that state is "not instrumented", not "broken".
+    const pending = uninstrumented.length > 0 ? `, ${uninstrumented.length} not instrumented` : ''
+    return `all ${healthy.length} pipelines alive${pending}`
   }))
 }
 

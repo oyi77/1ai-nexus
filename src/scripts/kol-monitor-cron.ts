@@ -51,6 +51,7 @@ import {
 import { exportGatePassersToSheet } from '@/lib/modules/meme/sheet-export'
 import { foldWalletBuys } from '@/lib/modules/derived/wallet-discovery'
 import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
+import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 import {
   loadWhaleRegistry,
   saveWhaleRegistry,
@@ -348,13 +349,25 @@ async function main() {
 
   console.log(
     `[kol-monitor] done: kolscan_screened=${kolscanScreened} kolscan_unseen=${kolscanUnseen} ` +
-    `kolscan_persisted=${kolscanPersisted}/${kolscanPersistFailed} ` +
-    `axiom_persisted=${axiomPersisted}/${axiomPersistFailed}`,
+      `kolscan_persisted=${kolscanPersisted}/${kolscanPersistFailed} ` +
+      `axiom_persisted=${axiomPersisted}/${axiomPersistFailed}`,
+  )
+
+  // Heartbeat: a run that persisted nothing because a source failed must not
+  // look identical to a quiet run. Persist failures are the signal.
+  const persistFailed = kolscanPersistFailed + axiomPersistFailed
+  await recordPipelineRun(
+    'kol-monitor',
+    persistFailed === 0,
+    persistFailed === 0
+      ? `kolscan=${kolscanScreened} unseen=${kolscanUnseen} axiom=${axiomPersisted}`
+      : `${persistFailed} wallet persist failure(s)`,
   )
   process.exit(0)
 }
 
 main().catch((err) => {
   console.error('[kol-monitor] FATAL:', err)
+  void recordPipelineRun('kol-monitor', false, `FATAL: ${err instanceof Error ? err.message : String(err)}`)
   process.exit(1)
 })
