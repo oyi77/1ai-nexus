@@ -112,6 +112,8 @@ data/wallet-buys-latest.json
 data/whale-buys-latest.json
 data/whale-wallets-registry.json
 data/whale-sheet-sync.json
+# cron single-instance run locks (directories, created/removed per pass)
+data/.whale-buy-scan.lock/
 data/sniper-outcomes.json
 data/accumulation-alert-state.json
 data/confluence-seen.json
@@ -129,3 +131,5 @@ backups/
 
 # autoresearch / cron bench logs (regenerated on every run, never commit)
 /logs/
+/data/forward-test-state.json
+/data/forward-test-report.json
