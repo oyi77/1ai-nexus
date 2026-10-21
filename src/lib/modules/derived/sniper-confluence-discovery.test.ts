@@ -27,6 +27,10 @@ beforeEach(() => {
   process.env.CONFLUENCE_PREFETCH_DB = 'off'
   process.env.CALL_FEED_DB = 'off'
   process.env.WALLET_BUYS_DB = 'off'
+  // The call-feed / auto unions read the wallet-buys artifact. Without
+  // isolating its PATH the live data/wallet-buys-latest.json leaks real
+  // candidates into the union and the count assertions break.
+  process.env.WALLET_BUYS_PATH = join(dir, 'wallet-buys-latest.json')
   // whale-buy-scanner (whale-buy-store.ts) is a SECOND store with its own
   // env; without this the loader reads the live DB and injects rows into
   // auto/call-feed wallet unions, breaking candidate-count assertions.
@@ -43,11 +47,14 @@ afterEach(() => {
   delete process.env.CONFLUENCE_PREFETCH_DB
   delete process.env.CALL_FEED_DB
   delete process.env.WALLET_BUYS_DB
+  delete process.env.WALLET_BUYS_PATH
   delete process.env.WHALE_BUYS_PATH
   delete process.env.WHALE_BUYS_DB
   delete process.env.SNIPER_MIN_MARKET_CAP_USD
   delete process.env.SNIPER_MIN_LIQUIDITY_USD
   delete process.env.SNIPER_DISCOVER_MODE
+  vi.restoreAllMocks()
+  rmSync(dir, { recursive: true, force: true })
 })
 
 const NOW = Date.now()
@@ -71,6 +78,19 @@ function mockDexscreenerHydration(perContract: Record<string, { symbol?: string;
     const url = typeof input === 'string' ? input : String(input)
     if (url.includes('solpump') || url.includes('trenches')) {
       return new Response(JSON.stringify({ data: [], pairs: [] }), { status: 200 })
+    }
+    // GeckoTerminal serves the OHLCV/price legs of discovery. Left unmocked
+    // it reaches the live network, so real tokens enter the union and the
+    // "exactly one candidate" assertions fail on any machine with internet.
+    if (url.includes('geckoterminal')) {
+      return new Response(
+        JSON.stringify({ data: { attributes: { base_token_price_usd: '0.01' } } }),
+        { status: 200 },
+      )
+    }
+    if (url.includes('api.dexscreener.com') === false && url.includes('dexscreener') === false) {
+      // Any other outbound host (coin listings, solana RPC) must not be hit.
+      return new Response(JSON.stringify({ data: [], pairs: [], result: [] }), { status: 200 })
     }
     const contract = url.split('/latest/dex/tokens/')[1]
     if (!contract || !perContract[contract]) {
