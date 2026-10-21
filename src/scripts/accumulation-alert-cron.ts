@@ -17,6 +17,8 @@
 //   ACCUMULATION_AGGREGATION_WINDOW_MS     (default 1h, metadata)
 //   ACCUMULATION_STATE_PATH                (default data/accumulation-alert-state.json)
 //   ACCUMULATION_TRUSTED_CALL_GROUPS       comma-separated vetted call groups
+//   ACCUMULATION_REQUIRE_CALL_GROUPS       >0 turns confluence into a hard gate
+//   ACCUMULATION_CALL_GROUPS_TRUSTED_ONLY  true = only vetted groups count
 // -------------------------------------------------------------
 
 import 'dotenv/config'
@@ -231,6 +233,16 @@ async function main() {
     .split(',')
     .map((g) => g.trim())
     .filter((g) => g.length > 0)
+  // The bar is OFF unless configured: confluence is evidence by default, and
+  // turning it into a hard gate is an explicit operator decision.
+  const requireGroups = numEnv('ACCUMULATION_REQUIRE_CALL_GROUPS', 0)
+  const requireConfluence =
+    requireGroups > 0
+      ? {
+          minGroups: requireGroups,
+          trustedOnly: (process.env.ACCUMULATION_CALL_GROUPS_TRUSTED_ONLY ?? '') === 'true',
+        }
+      : undefined
   let strategyRefused = 0
 
   for (const event of events) {
@@ -251,6 +263,7 @@ async function main() {
       config: strategyConfig,
       sizing: capitalUsd > 0 ? { capitalUsd, riskPct } : undefined,
       trustedCallGroups,
+      requireConfluence,
     })
     event.strategy = intake.fired
     event.ladder = intake.ladder
@@ -268,7 +281,8 @@ async function main() {
       `[accumulation-alert] strategy=${intake.fired.strategy} conf=${intake.fired.confidence} ` +
         `entry=${intake.fired.entryUsd} sl=${intake.fired.stopUsd} contract=${event.token.contract} ` +
         `guards=${intake.guardSource ?? 'unknown'} ` +
-        `callGroups=${intake.confluence.available ? intake.confluence.groupCount : 'n/a'}`,
+        `callGroups=${intake.confluence.available ? intake.confluence.groupCount : 'n/a'} ` +
+        `bar=${intake.confluenceBar ? (intake.confluenceBar.pass ? 'pass' : 'fail') : 'off'}`,
     )
 
     if (!shouldSend(event, state, now, opts.cooldownMs) || (await isAccumulationSeen(event.token.contract))) {

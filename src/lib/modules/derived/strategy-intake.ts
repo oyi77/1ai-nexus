@@ -31,7 +31,13 @@ import {
 } from './strategy-evaluator'
 import { planLadder, DEFAULT_WEIGHTS_3, type LadderPlan } from './ladder-planner'
 import { areWalletsConnected } from './whale-clustering'
-import { loadCallConfluence, describeConfluence, type CallConfluence } from './call-confluence'
+import {
+  loadCallConfluence,
+  describeConfluence,
+  clearsConfluence,
+  EMPTY_CONFLUENCE,
+  type CallConfluence,
+} from './call-confluence'
 import type { MarketRow } from './dex-token-meta'
 import type { CallFeedRow } from './call-confluence'
 
@@ -54,8 +60,13 @@ export interface StrategyIntakeInput {
   trustedCallGroups?: readonly string[]
   /** Inject the call-feed loader (tests / batched reads). */
   callFeedSeam?: (nowMs: number, maxAgeMin?: number) => Promise<CallFeedRow[]>
+  /**
+   * Make call-group confluence a HARD gate: a contract that does not clear
+   * the bar fires no strategy, exactly as if the structure rules failed.
+   * Omit to keep confluence as reported evidence only.
+   */
+  requireConfluence?: { minGroups: number; trustedOnly?: boolean }
 }
-
 export interface StrategyIntakeResult {
   contract: string
   fired: StrategyVerdict | null
@@ -77,6 +88,11 @@ export interface StrategyIntakeResult {
   confluence: CallConfluence
   /** One readable line for the alert body. */
   confluenceLine: string
+  /**
+   * Result of the hard confluence gate when one was configured (null when
+   * confluence is evidence only). `pass: false` is why `fired` is null.
+   */
+  confluenceBar: { pass: boolean; detail: string } | null
 }
 
 // Statuses that count as a classified buyer. The discovery engine writes
@@ -231,20 +247,10 @@ export async function evaluateStrategiesFor(
   const independence = await independenceOf(input.buyers)
   // One feed read per contract; the loader is injected in tests and by the
   // cron when it batches (see evaluateStrategiesFor's callFeedSeam).
-  const confluence =
-    (await loadCallConfluence([input.contract], {
-      trustedGroups: input.trustedCallGroups,
-      loadFeed: input.callFeedSeam,
-    })).get(input.contract) ?? {
-      contract: input.contract,
-      groups: [],
-      groupCount: 0,
-      mentions: 0,
-      weightedScore: null,
-      kinds: [],
-      trustedGroups: [],
-      available: false,
-    }
+  const confluence = (await loadCallConfluence([input.contract], {
+    trustedGroups: input.trustedCallGroups,
+    loadFeed: input.callFeedSeam,
+  })).get(input.contract) ?? EMPTY_CONFLUENCE(input.contract)
 
   const verdicts: StrategyVerdict[] = [
     evaluateSecondWave(sctx, market, holders, input.config),
@@ -255,7 +261,8 @@ export async function evaluateStrategiesFor(
   const firedList = verdicts
     .filter((v) => v.fired)
     .sort((a, b) => b.confidence - a.confidence)
-  const fired = firedList[0] ?? null
+  const gated = applyConfluenceBar(firedList, confluence, input.requireConfluence)
+  const fired = gated.fired
 
   let ladder: LadderPlan | null = null
   if (fired && input.sizing && fired.entryUsd !== null && fired.stopUsd !== null) {
@@ -281,6 +288,9 @@ export async function evaluateStrategiesFor(
   const refusals = verdicts
     .filter((v) => !v.fired)
     .map((v) => `${STRATEGY_LABELS[v.strategy] ?? v.strategy} — ${firstFailure(v) ?? 'no rule failed?'}`)
+  // The bar refusal joins the structure refusals so the operator's log
+  // answers "why was this dropped" with one read.
+  refusals.push(...gated.refusals)
 
   return {
     contract: input.contract,
@@ -293,6 +303,28 @@ export async function evaluateStrategiesFor(
     guardSource: guard?.source ?? null,
     confluence,
     confluenceLine: describeConfluence(confluence),
+    confluenceBar: gated.bar,
+  }
+}
+
+/**
+ * Apply the optional hard confluence gate to the already-ranked firing list.
+ *
+ * Split out as a pure function so the wiring is testable without an HTTP
+ * fetch: the failure mode that matters is a bar that is computed but never
+ * applied, which leaves the alert claiming an entry the bar refused.
+ */
+export function applyConfluenceBar(
+  firedList: StrategyVerdict[],
+  confluence: CallConfluence,
+  bar: { minGroups: number; trustedOnly?: boolean } | undefined,
+): { fired: StrategyVerdict | null; bar: { pass: boolean; detail: string } | null; refusals: string[] } {
+  const cleared = bar ? clearsConfluence(confluence, bar.minGroups, bar.trustedOnly === true) : null
+  const suppressed = cleared !== null && !cleared.pass
+  return {
+    fired: suppressed ? null : (firedList[0] ?? null),
+    bar: cleared,
+    refusals: suppressed ? [`Call confluence — ${cleared.detail}`] : [],
   }
 }
 

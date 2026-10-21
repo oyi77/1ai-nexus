@@ -8,13 +8,28 @@ import {
   loadCallConfluence,
   clearsConfluence,
   describeConfluence,
+  EMPTY_CONFLUENCE,
   type CallConfluence,
   type CallFeedRow,
 } from '../call-confluence'
+import { applyConfluenceBar } from '../strategy-intake'
+import type { StrategyVerdict } from '../strategy-evaluator'
 
 let feedRows: CallFeedRow[] = []
 let feedBehavior: ((now: number, maxAge?: number) => Promise<CallFeedRow[]>) | null = null
 let feedCalls = 0
+
+const verdict = (over: Partial<StrategyVerdict> = {}): StrategyVerdict => ({
+  strategy: 'second_wave',
+  fired: true,
+  confidence: 80,
+  refs: [],
+  entryUsd: 4_600_000,
+  stopUsd: 3_600_000,
+  targetUsd: 9_000_000,
+  rr: 2.3,
+  ...over,
+})
 
 const feedLoader = (now: number, maxAge?: number): Promise<CallFeedRow[]> => {
   feedCalls++
@@ -167,5 +182,49 @@ describe('describeConfluence', () => {
         weightedScore: 8, kinds: [], trustedGroups: [], available: true,
       }),
     ).toBe('call groups (2): A, B · score 8.0 · 7 mention(s)')
+  })
+})
+
+describe('strategy-intake confluence gate', () => {
+  // The gate is a property of the intake, not of the confluence maths: these
+  // assert the WIRING (an explicit fire + an explicit bar), because a bar that
+  // is computed but never applied is the failure mode worth catching.
+  it('keeps confluence as evidence when no bar is configured', () => {
+    const r = applyConfluenceBar([verdict()], EMPTY_CONFLUENCE('x'), undefined)
+    expect(r.fired).not.toBeNull()
+    expect(r.bar).toBeNull()
+    expect(r.refusals).toEqual([])
+  })
+
+  it('drops the firing strategy when the bar is not cleared', () => {
+    const conf: CallConfluence = {
+      contract: 'x', groups: ['A'], groupCount: 1, mentions: 3,
+      weightedScore: 5, kinds: [], trustedGroups: [], available: true,
+    }
+    const r = applyConfluenceBar([verdict()], conf, { minGroups: 2 })
+    expect(r.fired).toBeNull()
+    expect(r.bar?.pass).toBe(false)
+    expect(r.refusals.some((l) => l.startsWith('Call confluence'))).toBe(true)
+  })
+
+  it('keeps the strategy when the bar is cleared, and trusted-only is stricter', () => {
+    const conf: CallConfluence = {
+      contract: 'x', groups: ['A', 'B'], groupCount: 2, mentions: 4,
+      weightedScore: 7, kinds: [], trustedGroups: ['A'], available: true,
+    }
+    expect(applyConfluenceBar([verdict()], conf, { minGroups: 2 }).fired).not.toBeNull()
+    const strict = applyConfluenceBar([verdict()], conf, { minGroups: 2, trustedOnly: true })
+    expect(strict.fired).toBeNull()
+  })
+
+  it('refuses when the feed is unreadable rather than passing it', () => {
+    const r = applyConfluenceBar([verdict()], EMPTY_CONFLUENCE('x'), { minGroups: 1 })
+    expect(r.fired).toBeNull()
+    expect(r.bar?.detail).toContain('unavailable')
+  })
+
+  it('returns null when nothing fired, with or without a bar', () => {
+    expect(applyConfluenceBar([], EMPTY_CONFLUENCE('x'), { minGroups: 1 }).fired).toBeNull()
+    expect(applyConfluenceBar([], EMPTY_CONFLUENCE('x'), undefined).fired).toBeNull()
   })
 })
