@@ -220,22 +220,26 @@ async function retryWithBackoff<T>(
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
       const isCloudflare = lastError.message.includes('403') || lastError.message.includes('Cloudflare')
-      // A 429 is rate limiting, not a challenge: the request was understood
-      // and refused. It needs a LONGER wait than the generic ladder, and the
-      // failure must be visible — a 429 that exhausts its retries returns an
-      // empty holder list, which silently drops the token from the scan.
+      // A 429 is rate limiting, not a challenge. Retrying it with a longer
+      // ladder does NOT work: measured 2026-10-21, four retries over 22s all
+      // came back 429, and the exhausted budget then returned an EMPTY
+      // holder list — the token was dropped from the scan with no signal.
+      // So a 429 fails fast (one retry) and the caller moves on; the token
+      // rotation picks that token up on a later pass.
       const isRateLimited = lastError.message.includes('429')
-      if ((isCloudflare || isRateLimited) && attempt < maxAttempts) {
-        logger.warn(
-          `GMGN ${isRateLimited ? 'rate limited (429)' : 'Cloudflare challenge'} (attempt ${attempt}/${maxAttempts})`,
-          'gmgn',
-          { error: lastError.message },
-        )
+      if (isRateLimited) {
+        logger.warn('GMGN rate limited (429) — skipping this call', 'gmgn', {
+          error: lastError.message,
+        })
+        throw new Error(`GMGN rate limited (429): ${lastError.message}`)
+      }
+      if (isCloudflare && attempt < maxAttempts) {
+        logger.warn(`GMGN Cloudflare challenge detected (attempt ${attempt}/${maxAttempts})`, 'gmgn', {
+          error: lastError.message,
+        })
       }
       if (attempt < maxAttempts) {
-        const wait = isRateLimited
-          ? Math.min(baseDelay * 4 ** (attempt - 1), 8_000)
-          : Math.min(baseDelay * 2 ** (attempt - 1), 2_000)
+        const wait = Math.min(baseDelay * 2 ** (attempt - 1), 2_000)
         await new Promise((resolve) => setTimeout(resolve, wait))
       }
     }
@@ -585,6 +589,12 @@ export async function listGmgnTokenHolders(chain: string, contract: string): Pro
       }))
   } catch (err) {
     logger.warn(`GMGN holder list failed for ${contract}: ${err}`, 'gmgn', { contract, error: String(err) })
+    // A rate-limited fetch must NOT look like "this token has no holders":
+    // an empty list is indistinguishable from a token nobody holds, and the
+    // caller would skip the token as if there were nothing to scan.
+    if (err instanceof Error && err.message.includes('429')) {
+      throw err
+    }
     return []
   }
 }
