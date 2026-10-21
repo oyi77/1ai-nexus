@@ -39,6 +39,7 @@
   ],
   "exclude": [
     "node_modules",
+    "backupcode_coding-high",
     "prisma/seed.ts",
     "indexer",
     "ws-server",

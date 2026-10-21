@@ -17,7 +17,13 @@
 //      CALL_FEED_DB   (kill-switch: off/false/0 skips all DB writes)
 // ─────────────────────────────────────────────────────────────
 import 'dotenv/config'
-import { saveCallFeedRows, readCallFeedArtifact, loadCallFeed, type CallFeedRow } from '@/lib/modules/derived/db-call-feed'
+import {
+  saveCallFeedRows,
+  readCallFeedArtifact,
+  loadCallFeed,
+  pruneStaleCallFeed,
+  type CallFeedRow,
+} from '@/lib/modules/derived/db-call-feed'
 
 async function main(): Promise<void> {
   if (process.env.CALL_FEED_DB === 'off' || process.env.CALL_FEED_DB === 'false' || process.env.CALL_FEED_DB === '0') {
@@ -34,11 +40,19 @@ async function main(): Promise<void> {
   const rows: CallFeedRow[] = readCallFeedArtifact(nowMs, maxAgeMin)
   if (rows.length === 0) {
     console.log('[call-feed-sync] no candidates in artifact (stale or empty) — nothing to sync')
-    return
+  } else {
+    console.log(`[call-feed-sync] syncing ${rows.length} candidate(s) from JSON → DB`)
+    await saveCallFeedRows(rows)
   }
 
-  console.log(`[call-feed-sync] syncing ${rows.length} candidate(s) from JSON → DB`)
-  await saveCallFeedRows(rows)
+  // Upsert-only left every row ever seen in the table (2,721 rows spanning a
+  // week, all past the read window). The delete runs even on an empty
+  // artifact — otherwise a stalled harvester freezes the stale set in place
+  // and DB-first reads keep serving week-old groups.
+  const pruned = await pruneStaleCallFeed(maxAgeMin)
+  if (pruned > 0) {
+    console.log(`[call-feed-sync] pruned ${pruned} stale row(s)`)
+  }
 
   // Verify: read back from DB to confirm the upserts landed.
   const dbRows = await loadCallFeed(nowMs, maxAgeMin)

@@ -30,12 +30,19 @@ import argparse
 import asyncio
 import json
 import os
-import re
 import sqlite3
 import sys
 from datetime import datetime, timedelta, timezone
 
 from telethon import TelegramClient
+
+from call_feed_contracts import (
+    chain_of,
+    extract_evm,
+    extract_sol,
+    is_plausible_sol,
+    pick_repair,
+)
 
 CHANS = [
     ('SeekrTrending', 'trend'),
@@ -58,15 +65,9 @@ CHANS = [
     ('KingdomOfDegenCalls', 'shill'),
 ]
 
-SOL = re.compile(r'[1-9A-HJ-NP-Za-km-z]{32,44}pump')
-EVM = re.compile(r'0x[0-9a-fA-F]{40}')
 
 STATE_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'call-feed-state.sqlite')
 
-def chain_of(contract: str) -> str:
-    if contract.startswith('0x'):
-        return 'bsc'  # evm-family; chain resolved downstream by audit fan-out
-    return 'solana'
 
 def load_scores(path: str) -> dict[str, float]:
     """Load caller name/id -> weight from caller-scores.json. Empty dict if absent."""
@@ -106,11 +107,73 @@ def upsert_state(cur: "sqlite3.Cursor", contract: str, source: str, msg_id: int,
         return False  # same (contract, source, msg_id) already seen
 
 
+async def repair_state(db: "sqlite3.Connection", client, limit: int) -> dict[str, str]:
+    """Re-derive poisoned contracts by re-reading their source messages.
+
+    A stored value cannot prove whether a leading `3A` is part of the mint or
+    the tail of an escaped ':' -- a genuine 45-character `3A` mint and a
+    46-character corrupted row are both valid base58. The only honest
+    recovery is the raw text, so every suspect is re-read once and accepted
+    only when its message yields exactly one mint.
+    """
+    suspects = [contract for contract in _SUSPECTS(db)]
+    if not suspects:
+        return {}
+    rows = db.execute(
+        'SELECT contract, source, msg_id FROM mentions WHERE contract IN (%s)'
+        % ','.join('?' * len(suspects)),
+        suspects,
+    ).fetchall()
+    entities: dict[str, object] = {}
+    repairs: dict[str, str] = {}
+    unresolved = 0
+    for contract, source, msg_id in rows[:limit]:
+        if contract in repairs:
+            continue
+        if source not in entities:
+            try:
+                entities[source] = await client.get_entity(source)
+            except Exception as exc:  # noqa: BLE001
+                print(f'REPAIR-ENTITY-FAIL {source}: {type(exc).__name__}', file=sys.stderr)
+                entities[source] = None
+        if entities[source] is None:
+            unresolved += 1
+            continue
+        try:
+            message = await client.get_messages(entities[source], ids=msg_id)
+        except Exception as exc:  # noqa: BLE001
+            print(f'REPAIR-FETCH-FAIL {source}/{msg_id}: {type(exc).__name__}', file=sys.stderr)
+            unresolved += 1
+            continue
+        fixed = pick_repair(contract, extract_sol((message.text if message else '') or ''))
+        if fixed and fixed != contract:
+            repairs[contract] = fixed
+        else:
+            unresolved += 1
+    for bad, fixed in repairs.items():
+        db.execute(
+            'INSERT OR IGNORE INTO mentions(contract, source, msg_id, seen_at) '
+            'SELECT ?, source, msg_id, seen_at FROM mentions WHERE contract = ?',
+            (fixed, bad),
+        )
+        db.execute('DELETE FROM mentions WHERE contract = ?', (bad,))
+    db.commit()
+    print(f'REPAIRED {len(repairs)} contracts, unresolved {unresolved}', file=sys.stderr)
+    return repairs
+
+
+def _SUSPECTS(db: "sqlite3.Connection") -> list[str]:
+    return [contract for (contract,) in db.execute('SELECT DISTINCT contract FROM mentions')
+            if not is_plausible_sol(contract) and contract.endswith('pump')]
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('--limit', type=int, default=25)
     ap.add_argument('--window-min', type=int, default=1440)
     ap.add_argument('--scores-file', default='data/caller-scores.json')
+    ap.add_argument('--repair-limit', type=int, default=400,
+                    help='max poisoned rows re-read per pass (0 disables repair)')
     args = ap.parse_args()
 
     scores = load_scores(args.scores_file)
@@ -134,6 +197,9 @@ async def main() -> int:
         print('NOT_AUTHORIZED', file=sys.stderr)
         return 2
 
+    if args.repair_limit > 0:
+        await repair_state(db, c, args.repair_limit)
+
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.window_min)
     mentions: dict[str, dict] = {}
     new_rows = 0
@@ -143,8 +209,7 @@ async def main() -> int:
                 if m.date.replace(tzinfo=timezone.utc) < cutoff:
                     break
                 text = m.text or ''
-                for ca in set(SOL.findall(text)) | set(EVM.findall(text)):
-                    key = (ca, handle)
+                for ca in set(extract_sol(text)) | set(extract_evm(text)):
                     ts = m.date.isoformat()
                     if upsert_state(cur, ca, handle, m.id, ts):
                         new_rows += 1
@@ -164,6 +229,8 @@ async def main() -> int:
             print(f'CHAN-FAIL {handle}: {type(e).__name__}', file=sys.stderr)
 
     db.commit()
+    for contract in _SUSPECTS(db):
+        mentions.pop(contract, None)
     rows = sorted(mentions.values(), key=lambda r: (-len(r['sources']), -r['weighted_score']))
     out = [{**r, 'sources': r['sources'], 'kinds': sorted(r['kinds']),
             'source_count': len(r['sources']), 'weighted_score': round(r['weighted_score'], 4)} for r in rows]

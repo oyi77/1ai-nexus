@@ -25,6 +25,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { prisma } from '@/lib/db'
+import { isPlausibleSolMint } from './solana-mint'
 
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
@@ -82,6 +83,10 @@ export function readCallFeedArtifact(
   maxAgeMin = Number(process.env.CALL_FEED_MAX_AGE_MIN) || 180,
 ): CallFeedRow[] {
   return readJsonArtifact(nowMs, maxAgeMin)
+}
+
+function isSolanaChain(chain: string | null | undefined): boolean {
+  return !chain || chain === 'solana'
 }
 
 function readJsonArtifact(nowMs: number, maxAgeMin: number): CallFeedRow[] {
@@ -182,7 +187,13 @@ export async function loadCallFeed(
       orderBy: { lastSeenAt: 'desc' },
     })
     if (dbRows.length > 0) {
-      return dbRows.map((r) => ({
+      // Rows written before the 2026-10-22 extractor fix can carry a contract
+      // that is not a mint at all (a `%3A` escape tail welded onto a real
+      // mint). A scanner handed one of those burns an audit on a token that
+      // does not exist, so they are dropped at the boundary rather than
+      // trusted because they happen to be fresh.
+      const usable = dbRows.filter((r) => !isSolanaChain(r.chain) || isPlausibleSolMint(r.contract))
+      return usable.map((r) => ({
         contract: r.contract,
         chain: r.chain,
         sources: r.sources,

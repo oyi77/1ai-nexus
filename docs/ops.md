@@ -637,6 +637,7 @@ background harvesters, scanners, and pipelines. Key entries:
 |----------|---------|-----|---------|
 | `*/5 * * * *` | `npm run cron:sniper` | `/tmp/sniper-cron.log` | Meme sniper scan (call-feed discovery, GMGN audit, signal delivery) |
 | `*/2 * * * *` | `python3 scripts/call-feed.py --limit 25 --window-min 60` | `/tmp/call-feed-cron.err` | Read operator call channels, score token confluence → `data/call-feed-latest.json` |
+| `*/2 * * * *` (offset 45s) | `npm run sync:call-feed` | `/tmp/call-feed-sync.log` | Mirror the call-feed artifact into the `CallFeed` table (DB-first reads) and prune rows older than `CALL_FEED_MAX_AGE_MIN` (180). |
 | `0 */6 * * *` | `npm run cron:caller-scores` | `/tmp/caller-scores-cron.log` | Refresh Telegram Alpha Caller weights from Solpump → `data/caller-scores.json` |
 | `*/15 * * * *` | `npm run cron:zero-issue` | `/tmp/nexus-zero-issue.log` | Zero-issue audit sweep + Telegram alerting |
 | `*/5 * * * *` | `npm run cron:smart-money-sync` | `/tmp/smart-money-sync.log` | Smart-money wallet sync |
@@ -788,6 +789,35 @@ to weight 1.0.
 > regenerated every 6 hours by cron and should not be committed. Add it to
 > `.gitignore` before staging (see `data/call-feed-latest.json` pattern at
 > line 111 of `.gitignore` for reference).
+
+### Contract extraction rules — `scripts/call_feed_contracts.py`
+
+Extraction lives in its own module so the rules are testable without a
+Telegram client (`scripts/tests/test_call_feed_contracts.py`, 22 tests), and
+so `call-feed.py` has no second copy to drift against.
+
+| Rule | Why |
+|---|---|
+| Percent-escapes are decoded **before** scanning (`%3A` → `:`) | Telegram text sometimes arrives URL-encoded; scanning first welds `3A` onto the following mint, producing a 46-char value that is not a mint. |
+| The base58 run must **start at a non-base58 boundary** | Measured: 0 of 12,870 live matches are preceded by a base58 character. Without the boundary rule, `sent<MINT>` yields a truncated mint. |
+| A Solana body must decode to **29–30 bytes** (`is_plausible_sol`) | Measured over 6,513 stored contracts: real bodies are 29/30/31 bytes; 31 is the ambiguous band shared by two genuine `3A…` mints and every welded row, so the write gate stops at 30 and refuses to guess. This also rejects word-shaped false positives such as `gptpump` (3 bytes) and `jonathanpump` (6 bytes). |
+| EVM matches require exactly `0x` + 40 hex chars | Base58 has no `0x`, so the two dialects never collide. |
+
+Stored rows are validated, never silently rewritten: `canonical_contract`
+only repairs when a proof exists (a `3A` prefix whose removal lands on 29–30
+bytes **and** a re-read source message confirming the mint). The same floor is
+enforced at the TypeScript boundary (`isPlausibleSolMint` in
+`solana-mint.ts`) so a row written before the fix cannot be handed to a
+scanner; both implementations are checked against each other on 6,513 live
+contracts plus 11 edge cases (0 mismatches).
+
+**DB mirror and retention.** `npm run sync:call-feed`
+(`src/scripts/call-feed-sync-db.ts`, cron `*/2`) upserts the JSON artifact into
+the `CallFeed` table so `sniper-scan` reads DB-first, then **prunes rows older
+than `CALL_FEED_MAX_AGE_MIN`** (default 180) in the same pass. The prune runs
+even when the artifact is empty — an upsert-only mirror grows without bound
+(measured: 2,721 rows spanning a week, every one past the read window) and a
+stalled harvester would otherwise freeze a week-old set in place.
 
 ## Sniper Environment Variables
 

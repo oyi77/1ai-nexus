@@ -347,15 +347,47 @@ describe('db-call-feed', () => {
     expect(row.weightedScore).toBeUndefined()
   })
 
+  it('loadCallFeed drops stored contracts that cannot be a mint at all', async () => {
+    // [REGRESSION 2026-10-22] The old extractor could weld the tail of an
+    // encoded escape onto a value; rows that survived as non-base58 or
+    // over-length text must not reach a scanner, because one of those audits a
+    // token that does not exist.
+    const real = 'CWHunzmc7p7HYpbRvauduXZ66mfBFwEybkQHwNZ5pump'
+    const garbage = '0OIl' + 'pump'
+    const tooLong = 'A'.repeat(45) + 'pump'
+    findMany.mockResolvedValue(
+      [garbage, tooLong, real].map((contract) => ({
+        contract,
+        chain: 'solana',
+        ticker: '',
+        marketCapUsd: null,
+        mentionCount: 2,
+        sources: ['ClubWhaleHunters'],
+        kinds: ['whale'],
+        weightedScore: null,
+        lastSeenAt: new Date('2026-10-15T19:47:20+00:00'),
+      })),
+    )
+    const result = await loadCallFeed()
+    expect(result.map((r) => r.contract)).toEqual([real])
+  })
+
   it('loadCallFeed falls back to JSON without throwing', async () => {
     findMany.mockRejectedValue(new Error('db down'))
     await expect(loadCallFeed()).resolves.toEqual([])
   })
 
-  it('pruneStaleCallFeed returns the deleted count', async () => {
+  it('pruneStaleCallFeed deletes by the same window the reader honours', async () => {
+    // The table was upsert-only for a week: 2,721 rows, every one past the
+    // read window, because nothing ever called this. The cutoff must match
+    // the read gate or rows linger invisible-but-present forever.
     deleteMany.mockResolvedValue({ count: 2 })
-    const result = await pruneStaleCallFeed()
+    const before = Date.now()
+    const result = await pruneStaleCallFeed(180)
     expect(result).toBe(2)
+    const cutoff = (deleteMany.mock.calls[0][0] as { where: { lastSeenAt: { lt: Date } } }).where.lastSeenAt.lt
+    const expected = before - 180 * 60_000
+    expect(Math.abs(cutoff.getTime() - expected)).toBeLessThan(5_000)
   })
 
   it('kill-switch CALL_FEED_DB=off skips prisma', async () => {

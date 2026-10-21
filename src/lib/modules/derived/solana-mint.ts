@@ -48,3 +48,69 @@ export function normalizeSolMint(mint: string): string {
   if (mint === MALFORMED_SOL_MINT) return SOL_MINT
   return mint
 }
+
+const B58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+const B58_INDEX: Record<string, number> = Object.fromEntries(
+  [...B58_ALPHABET].map((ch, i) => [ch, i]),
+)
+
+/**
+ * Decoded byte length of a base58 string, or null when it is not base58.
+ * Leading '1' characters are zero bytes, so they are counted separately from
+ * the big-integer part.
+ */
+export function b58DecodeLen(text: string): number | null {
+  if (!text) return null
+  let start = 0
+  while (start < text.length && text[start] === '1') start++
+  if (start === text.length) return start
+  const limbs = new Array<number>(12).fill(0)
+  for (let i = start; i < text.length; i++) {
+    const digit = B58_INDEX[text[i]]
+    if (digit === undefined) return null
+    let carry = digit
+    for (let j = 0; j < limbs.length; j++) {
+      const next = limbs[j] * 58 + carry
+      limbs[j] = next % 4294967296
+      carry = (next - limbs[j]) / 4294967296
+    }
+    if (carry !== 0) return null
+  }
+  let top = limbs.length - 1
+  while (top > 0 && limbs[top] === 0) top--
+  const high = limbs[top]
+  let bits = top * 32
+  let probe = high
+  while (probe > 0) {
+    bits++
+    probe = Math.floor(probe / 2)
+  }
+  return start + Math.ceil(bits / 8)
+}
+
+const SOL_MINT_MIN_BYTES = 29
+const SOL_MINT_MAX_BYTES = 31
+
+/**
+ * True when a stored Solana contract could be a real mint on its own.
+ *
+ * Measured 2026-10-22 over 6,518 stored pump contracts: bodies decode to 29,
+ * 30 or 31 bytes and nothing in between is empty. The 31-byte rows are two
+ * genuine mints (3AFVt63G..., 3AHLPuUk...), so the ceiling sits at 31 — cutting
+ * at 30 would drop real tokens. The floor of 29 refuses word-shaped rows that
+ * merely end in `pump` (observed: `jonathanpump`, 7 bytes, no trading pair),
+ * which the ceiling-only version let through.
+ *
+ * This mirrors `is_plausible_sol` in scripts/call_feed_contracts.py; the two
+ * are cross-checked contract by contract over the whole store, so keep the
+ * numbers identical.
+ *
+ * Byte length cannot prove a row is clean: a 31-byte body is also what the old
+ * extractor produced when it welded an escaped ':' onto a real mint. Keeping
+ * those honestly un-repaired is the extractor's job.
+ */
+export function isPlausibleSolMint(contract: string): boolean {
+  if (typeof contract !== 'string' || !contract.endsWith('pump')) return false
+  const bytes = b58DecodeLen(contract.slice(0, -4))
+  return bytes !== null && bytes >= SOL_MINT_MIN_BYTES && bytes <= SOL_MINT_MAX_BYTES
+}
