@@ -173,7 +173,11 @@ async function main(): Promise<void> {
   console.log(
     `[whale-buy-scan] done: tokens=${result.tokensScanned} ` +
       `detections=${result.detections.length} saved=${newRows.length} ` +
-      `suppressed=${suppressed} errors=${result.errors.length}`,
+      `suppressed=${suppressed} errors=${result.errors.length} ` +
+      // Duration in the receipt: the "done:" line carries no timestamp, so
+      // pass health was unmeasurable from the log alone. A pass that
+      // approaches the cron interval means the next one gets skipped.
+      `duration=${Math.round((Date.now() - now) / 1000)}s`,
   )
 
   lock.release()
