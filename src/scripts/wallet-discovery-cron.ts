@@ -1,3 +1,4 @@
+import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 // Wallet discovery cron — refreshes the tracked pool from measured data.
 //
 // Why this exists: `wallet-refresh` (03:00 daily) depends on KOLSCAN_SESSION,
@@ -94,5 +95,6 @@ main()
   .then(() => process.exit(0))
   .catch((err) => {
     console.error('[wallet-discovery] FATAL:', err instanceof Error ? err.message : String(err))
+    void recordPipelineRun('wallet-discovery', false, `FATAL: ${err instanceof Error ? err.message : String(err)}`)
     process.exit(1)
   })

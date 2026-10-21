@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 // -------------------------------------------------------------
 // Wallet refresh cron: batch classify → persist SmartMoneyWallet
 // Reads: Wallets whose last classification is stale (24h) or never classified.
@@ -174,10 +175,27 @@ async function main() {
       console.warn(`[wallet-refresh]   ↳ reason: ${r.error ?? 'unknown'}`)
     }
   }
-  if (res.failed > 0) process.exit(1)
+  if (res.failed > 0) {
+    await recordPipelineRun(
+      'wallet-refresh',
+      false,
+      `processed=${res.processed} succeeded=${res.succeeded} failed=${res.failed}`,
+    )
+    process.exit(1)
+  }
+  await recordPipelineRun(
+    'wallet-refresh',
+    true,
+    `processed=${res.processed} succeeded=${res.succeeded} failed=0`,
+  )
 }
 
 main().catch((e) => {
   console.error('[wallet-refresh] failed:', e)
+  void recordPipelineRun(
+    'wallet-refresh',
+    false,
+    `FATAL: ${e instanceof Error ? e.message : String(e)}`,
+  )
   process.exit(1)
 })

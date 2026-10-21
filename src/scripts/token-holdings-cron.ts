@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 // ─────────────────────────────────────────────────────────────
 // Token holdings cron — populate TokenHolding from GMGN holder data.
 //
@@ -74,6 +75,7 @@ async function main(): Promise<void> {
 main()
   .catch((err) => {
     console.error('[token-holdings] FATAL:', err)
+    void recordPipelineRun('token-holdings', false, `FATAL: ${err instanceof Error ? err.message : String(err)}`)
   })
   .finally(() => {
     process.exit(0)
