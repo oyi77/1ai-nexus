@@ -3,7 +3,13 @@
 // boundary behaviour (exact boundary, gaps, before-first, after-last,
 // empty, invalid input) is pinned here.
 import { describe, it, expect } from 'vitest'
-import { pickBarForTimestamp, type OhlcvBar } from '../historical-price'
+import {
+  pickBarForTimestamp,
+  fetchTokenBarSeries,
+  __setHistoricalPriceFetchForTests,
+  __resetHistoricalPriceCacheForTests,
+  type OhlcvBar,
+} from '../historical-price'
 
 // Bar times are epoch SECONDS, matching GeckoTerminal's ohlcv_list format.
 function bar(time: number, close: number): OhlcvBar {
@@ -80,5 +86,85 @@ describe('pickBarForTimestamp with real GeckoTerminal shape', () => {
   it('a trade seconds before the bar end still prices at that bar', () => {
     const bars = [{ time: 1791964800, open: 1, high: 2, low: 0.5, close: 1.5, volume: 10 }]
     expect(pickBarForTimestamp(bars, (1791964800 + 3_599) * 1000, 3_600)?.close).toBe(1.5)
+  })
+})
+
+describe('fetchTokenBarSeries (fetch-seam, no network)', () => {
+  const POOL = 'poolPDA111'
+  const MINT = 'MintSeriesAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+
+  function poolsBody(mint: string): string {
+    return JSON.stringify({
+      data: [
+        {
+          id: `solana_${POOL}`,
+          type: 'pool',
+          attributes: { address: POOL, reserve_in_usd: '1000000' },
+          relationships: {
+            base_token: { data: { id: `solana_${mint}`, type: 'token' } },
+            quote_token: {
+              data: { id: 'solana_So11111111111111111111111111111111111111112', type: 'token' },
+            },
+          },
+        },
+      ],
+    })
+  }
+
+  function barsBody(): string {
+    return JSON.stringify({
+      data: {
+        attributes: {
+          ohlcv_list: [
+            [1_700_000_000, 1, 1, 1, 1.5, 10],
+            [1_700_003_600, 1.5, 1.5, 1.5, 2, 20],
+          ],
+        },
+      },
+    })
+  }
+
+  it('returns the token OHLCV series from its best pool', async () => {
+    __resetHistoricalPriceCacheForTests()
+    __setHistoricalPriceFetchForTests(async (url) => {
+      if (url.includes('/ohlcv/')) return new Response(barsBody(), { status: 200 })
+      return new Response(poolsBody(MINT), { status: 200 })
+    })
+
+    const res = await fetchTokenBarSeries(MINT, { timeframe: 'hour' })
+    expect(res.source).toBe('geckoterminal:ohlcv')
+    expect(res.poolAddress).toBe(POOL)
+    expect(res.bars).toHaveLength(2)
+    expect(res.bars[1].close).toBe(2)
+    __setHistoricalPriceFetchForTests(null)
+  })
+
+  it('retries a 429 with a FRESH abort signal (a reused one is already aborted)', async () => {
+    __resetHistoricalPriceCacheForTests()
+    let poolCalls = 0
+    __setHistoricalPriceFetchForTests(async (url, init) => {
+      if (url.includes('/ohlcv/')) return new Response(barsBody(), { status: 200 })
+      {
+        poolCalls += 1
+        if (poolCalls === 1) return new Response('{"status":{"error_code":429}}', { status: 429 })
+        // The retry must arrive with a signal that is not already aborted.
+        expect(init?.signal?.aborted).toBe(false)
+        return new Response(poolsBody(MINT), { status: 200 })
+      }
+    })
+
+    const res = await fetchTokenBarSeries(MINT, { timeframe: 'hour' })
+    expect(poolCalls).toBe(2)
+    expect(res.bars).toHaveLength(2)
+    __setHistoricalPriceFetchForTests(null)
+  })
+
+  it('reports rate-limited distinctly from pool-not-found', async () => {
+    __resetHistoricalPriceCacheForTests()
+    __setHistoricalPriceFetchForTests(async () => new Response('{}', { status: 429 }))
+    const res = await fetchTokenBarSeries(MINT, { timeframe: 'hour' })
+    expect(res.source).toBe('geckoterminal:rate-limited')
+    expect(res.bars).toHaveLength(0)
+    __setHistoricalPriceFetchForTests(null)
   })
 })

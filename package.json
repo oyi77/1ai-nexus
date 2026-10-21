@@ -59,7 +59,9 @@
     "cron:wallet-refresh": "tsx src/scripts/wallet-refresh-cron.ts",
     "cron:whale-buy-scan": "tsx src/scripts/whale-buy-scan-cron.ts",
     "cron:whale-sheet-sync": "tsx src/scripts/whale-sheet-sync-cron.ts",
-    "cron:zero-issue": "tsx src/scripts/zero-issue-cron.ts"
+    "backtest:signals": "tsx src/scripts/backtest-signals.ts",
+    "cron:zero-issue": "tsx src/scripts/zero-issue-cron.ts",
+    "forward:test": "tsx src/scripts/forward-test.ts"
   },
   "dependencies": {
     "@1ai/payment": "file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",

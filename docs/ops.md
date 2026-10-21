@@ -640,6 +640,61 @@ Both tabs live on the operator spreadsheet (`SPREADSHEET_ID`, see `smart-money-s
 Override names with `WHALE_SCAN_TAB` / `WHALE_WALLET_TAB`; override the registry path with `WHALE_REGISTRY_PATH`. A header-only `WhaleScanner` tab means the scanner ran and found nothing — distinct from a sync that never ran.
 
 
+### Signal Backtest — `backtest:signals`
+
+**Script**: `src/scripts/backtest-signals.ts`
+**npm script**: `npm run backtest:signals` (manual; not a cron)
+
+Replays what the pipeline actually delivered (`data/sniper-delivery-log.json`)
+against **real historical prices** (GeckoTerminal OHLCV, `fetchTokenBarSeries`);
+four horizons (1h / 4h / 24h / 7d), target +50% / stop -35%, demo portfolio with
+a **virtual** balance (default 10 SOL ≈ $1500 @ $150/SOL, 10% max position,
+0.5% fee per side). NO orders are ever placed — demo money only.
+
+Env overrides: `BACKTEST_LIMIT` (signals, default 60), `BACKTEST_SOL`,
+`BACKTEST_SOL_PRICE`, `BACKTEST_MAX_POSITION_PCT`, `BACKTEST_FEE_PCT`,
+`BACKTEST_FETCH_DELAY_MS` (default 2200 — GeckoTerminal free tier is ~30
+req/min; below that you collect 429s and the report under-prices itself).
+
+Report: `data/signal-backtest-report.json`.
+
+**Why not `npm run cron:sniper-audit-backtest`?** That script prices a signal
+at its entry vs the price RIGHT NOW, so every memecoin that eventually dumped
+scores -99% regardless of the strategy. It answers "should I still be holding?",
+not "was the signal good when it fired?". The signal-backtest runner measures
+entry at the first bar after the signal and exits at the horizon bar from the
+same series.
+
+Known limits (stated, not hidden):
+- GeckoTerminal OHLCV starts at the pool's first trade, so a token delivered
+  before its pool existed is UNPRICEABLE, not a loss.
+- Delivery log entries are Telegram messages: one contract may have many
+  delivery rows; each (contract, timestamp) pair is one usable signal.
+- UNPRICEABLE trades are excluded from returns — never scored as zero.
+
+### Forward Test (Paper Trading) — `forward:test`
+
+**Script**: `src/scripts/forward-test.ts`
+**npm script**: `npm run forward:test` (manual paper trading, no orders ever placed)
+
+Simulates a **10 SOL demo balance** (\$1,500 @ \$150/SOL) over delivered signals:
+
+1. **Open** — stakes `FORWARD_MAX_POSITION_PCT` (default 10%) of current equity on untraded signals younger than 30 days, priced at the hourly bar covering delivery.
+2. **Close** — marks positions whose horizon has elapsed at the price on the horizon boundary (no hindsight stop/target).
+3. **Persist** — state in `data/forward-test-state.json` (gitignored), report in `data/forward-test-report.json`.
+
+**Env Overrides**:
+- `FORWARD_START_SOL=10` — demo balance in SOL
+- `FORWARD_SOL_PRICE=150` — SOL price used to convert to USD
+- `FORWARD_MAX_POSITION_PCT=0.1` — fraction of equity per trade
+- `FORWARD_FEE_PCT=0.005` — fee per leg
+- `FORWARD_LIMIT=5` — max new positions opened per run
+- `FORWARD_HORIZON=h4` — holding period (`h1`, `h4`, `h24`, `d7`)
+
+**Honesty bounds**: demo balance is virtual (no exchange order is ever placed); positions with no resolvable price stay open rather than being scored as losses; win rate is `n/a` when nothing has closed.
+
+---
+
 > **Conventions**: all cron lines `cd /home/openclaw/projects/1ai-tracker` first,
 > prefix `PATH=/home/openclaw/.nvm/versions/node/v22.22.3/bin:/usr/bin:/bin`
 > for npm/tsx, and append `>> /tmp/<name>.log 2>&1`. Python scripts use the

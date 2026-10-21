@@ -133,3 +133,4 @@ backups/
 /logs/
 /data/forward-test-state.json
 /data/forward-test-report.json
+/data/signal-backtest-report.json

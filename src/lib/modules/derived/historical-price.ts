@@ -122,31 +122,35 @@ async function gtGetJson(
   opts: { timeoutMs: number; fetchFn: FetchFn },
 ): Promise<unknown> {
   await rateLimit();
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs);
-  try {
-    const res = await opts.fetchFn(`${GECKO_API}${path}`, {
-      headers: { Accept: 'application/json', 'User-Agent': 'nexus/1.0' },
-      signal: ctrl.signal,
-    });
-    if (res.status === 429) {
-      // Public tier is ~30 calls/minute. Back off and retry once politely.
-      await sleep(1_500);
-      await rateLimit();
-      const retry = await opts.fetchFn(`${GECKO_API}${path}`, {
-        headers: { Accept: 'application/json', 'User-Agent': 'nexus/1.0' },
-        signal: ctrl.signal,
-      });
-      if (!retry.ok) return { __httpStatus: retry.status, __body: await retry.text().catch(() => '') };
-      return (await retry.json().catch(() => null)) as unknown;
+  const headers = { Accept: 'application/json', 'User-Agent': 'nexus/1.0' };
+
+  /** One request with its own controller: an aborted signal can never be
+   *  reused, so each attempt (including the 429 retry) needs a fresh one. */
+  const call = async (): Promise<Response> => {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), opts.timeoutMs);
+    try {
+      return await opts.fetchFn(`${GECKO_API}${path}`, { headers, signal: ctrl.signal });
+    } finally {
+      clearTimeout(timer);
     }
-    if (!res.ok) {
-      return { __httpStatus: res.status, __body: await res.text().catch(() => '') };
-    }
-    return (await res.json().catch(() => null)) as unknown;
-  } finally {
-    clearTimeout(timer);
+  };
+
+  const res = await call();
+  if (res.status === 429) {
+    // Public tier is ~30 calls/minute. Back off and retry once politely.
+    const body = await res.text().catch(() => '');
+    await sleep(1_500);
+    await rateLimit();
+    const retry = await call().catch(() => null);
+    if (!retry) return { __httpStatus: 429, __body: body };
+    if (!retry.ok) return { __httpStatus: retry.status, __body: await retry.text().catch(() => '') };
+    return (await retry.json().catch(() => null)) as unknown;
   }
+  if (!res.ok) {
+    return { __httpStatus: res.status, __body: await res.text().catch(() => '') };
+  }
+  return (await res.json().catch(() => null)) as unknown;
 }
 
 // ─── pure helpers ────────────────────────────────────────────
@@ -316,11 +320,71 @@ async function fetchPoolBars(
   return { bars, rawStatus: 200 };
 }
 
-// ─── public API ──────────────────────────────────────────────
+/** A token's OHLCV series plus the pool that produced it. */
+export interface TokenBarSeries {
+  bars: OhlcvBar[];
+  /** Pool address the bars came from, or null when no pool resolved. */
+  poolAddress: string | null;
+  /** Honest provenance, same vocabulary as fetchHistoricalTokenUsd. */
+  source: string;
+}
 
 /**
- * Historical USD price for a Solana token mint at `atMs` (epoch ms).
+ * Fetch a token's own OHLCV series (not a single price), newest bars last.
  *
+ * Needed by any caller that must measure a forward return — e.g. a backtest
+ * comparing an entry bar to the bar N hours later. Using one point-in-time
+ * price would answer a different question ("what is it worth now?"), which is
+ * exactly the mistake the old audit-backtest made.
+ *
+ * NEVER throws: failures return an empty series with an explanatory source.
+ */
+export async function fetchTokenBarSeries(
+  contract: string,
+  opts: { timeframe?: OhlcvTimeframe; atMs?: number; fetchFn?: FetchFn; timeoutMs?: number } = {},
+): Promise<TokenBarSeries> {
+  const f = opts.fetchFn ?? http()
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  const atMs = opts.atMs ?? Date.now()
+  const timeframe = opts.timeframe ?? 'hour'
+  if (!contract) return { bars: [], poolAddress: null, source: 'error' }
+
+  let pool: GtPoolRef | null = null
+  try {
+    pool = await resolvePool(contract, f, timeoutMs)
+  } catch (err) {
+    // A thrown resolvePool means the lookup FAILED (rate limit, HTTP error),
+    // which is not the same as "this token has no pool". Reporting pool-not-found
+    // here would hide a 429 and make a working token look unpriceable.
+    const message = err instanceof Error ? err.message : String(err)
+    const rateLimited = message.includes('429')
+    return {
+      bars: [],
+      poolAddress: null,
+      source: rateLimited ? 'geckoterminal:rate-limited' : 'error',
+    }
+  }
+  if (!pool) return { bars: [], poolAddress: null, source: 'geckoterminal:pool-not-found' }
+
+  const atSec = Number.isFinite(atMs) && atMs > 0 ? Math.floor(atMs / 1000) : Math.floor(Date.now() / 1000)
+  const res = await fetchPoolBars(pool, atSec, timeframe, f, timeoutMs).catch((err) => {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error(`[gt] ohlcv fetch threw for ${pool.address.slice(0, 10)}…: ${message}`)
+    return null
+  })
+  if (!res) return { bars: [], poolAddress: pool.address, source: 'error' }
+  if (res.rawStatus === 429) {
+    console.error(`[gt] ohlcv 429 for ${pool.address.slice(0, 10)}… — rate limit`)
+    return { bars: [], poolAddress: pool.address, source: 'geckoterminal:rate-limited' }
+  }
+  if (res.rawStatus !== 200) {
+    // Name the HTTP outcome - a 404 here is "pool too new for GT".
+    console.error(`[gt] ohlcv HTTP ${res.rawStatus} for ${pool.address.slice(0, 10)}…`)
+    return { bars: [], poolAddress: pool.address, source: 'error' }
+  }
+  return { bars: res.bars, poolAddress: pool.address, source: 'geckoterminal:ohlcv' }
+}
+/**
  * NEVER throws: every failure path returns `{usd:null, source:'error',
  * note}`. Source strings are the honest provenance the caller can audit:
  *   geckoterminal:sol-native      — SOL mint, close of the SOL/USDC bar
