@@ -44,6 +44,17 @@ function numEnv(name: string, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
+/**
+ * Describe a sheet sync outcome truthfully. `written: 0` with `skipped: false`
+ * means the write FAILED (no credentials, rejected) — reporting "rewritten"
+ * there hid a broken sheet for hours.
+ */
+function sheetState(result: { written: number; skipped: boolean }): string {
+  if (result.skipped) return 'tab unchanged (skipped)'
+  if (result.written === 0) return 'tab WRITE FAILED'
+  return 'tab rewritten'
+}
+
 /** Lock path for this cron — a pass may outlive the 10-minute schedule. */
 const LOCK_PATH = join(process.cwd(), 'data', '.whale-buy-scan.lock')
 /** Reclaim after this long so a crashed pass can never wedge the cron. */
@@ -130,7 +141,7 @@ async function main(): Promise<void> {
   const sheetRows = await loadWhaleBuys()
   const scanSheet = await syncWhaleScanSheet(sheetRows)
   console.log(
-    `[whale-buy-scan] ${scanSheet.skipped ? 'candidate tab unchanged' : 'candidate tab rewritten'}: ` +
+    `[whale-buy-scan] ${sheetState(scanSheet)}: ` +
       `rows=${scanSheet.written} (candidates=${sheetRows.length})`,
   )
 
@@ -146,7 +157,7 @@ async function main(): Promise<void> {
   saveWhaleRegistry(registry)
   const walletSheet = await syncWhaleWalletSheet(registry)
   console.log(
-    `[whale-buy-scan] ${walletSheet.skipped ? 'wallet tab unchanged' : 'wallet tab rewritten'}: ` +
+    `[whale-buy-scan] ${sheetState(walletSheet)}: ` +
       `rows=${walletSheet.written} (registry=${registry.length})`,
   )
 

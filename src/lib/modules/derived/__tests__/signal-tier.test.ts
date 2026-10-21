@@ -3,7 +3,7 @@
 // dev-history reputation, and trenches bonding curve formatting.
 // Pure; no I/O.
 // ─────────────────────────────────────────────────────────────
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import {
   classifySignalTier,
   shouldDeliver,
@@ -180,7 +180,15 @@ describe('classifySignalTier', () => {
 });
 
 describe('shouldDeliver', () => {
+  afterEach(() => {
+    delete process.env.SNIPER_DELIVER_WATCHLIST;
+  });
+
   it('delivers only HIGH_CONVICTION under the default policy', () => {
+    // The default policy reads SNIPER_DELIVER_WATCHLIST lazily, and the
+    // operator's .env sets it to "true". Unset it here so this case asserts
+    // the DEFAULT (watchlist off) instead of whatever the environment says.
+    delete process.env.SNIPER_DELIVER_WATCHLIST;
     expect(shouldDeliver('HIGH_CONVICTION')).toBe(true);
     expect(shouldDeliver('CANDIDATE')).toBe(false);
     expect(shouldDeliver('WATCHLIST')).toBe(false);

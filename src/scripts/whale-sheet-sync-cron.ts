@@ -29,14 +29,16 @@ async function main(): Promise<void> {
   const rows = await loadWhaleBuys()
   const candidates = await syncWhaleScanSheet(rows)
   console.log(
-    `[whale-sheet-sync] ${WHALE_SCAN_TAB}: ${candidates.skipped ? 'unchanged' : 'rewritten'} ` +
+    `[whale-sheet-sync] ${WHALE_SCAN_TAB}: ` +
+      `${candidates.skipped ? 'unchanged (skipped)' : candidates.written === 0 ? 'WRITE FAILED' : 'rewritten'} ` +
       `(${candidates.written} rows, candidates=${rows.length})`,
   )
 
   const registry = loadWhaleRegistry()
   const wallets = await syncWhaleWalletSheet(registry)
   console.log(
-    `[whale-sheet-sync] ${WHALE_WALLET_TAB}: ${wallets.skipped ? 'unchanged' : 'rewritten'} ` +
+    `[whale-sheet-sync] ${WHALE_WALLET_TAB}: ` +
+      `${wallets.skipped ? 'unchanged (skipped)' : wallets.written === 0 ? 'WRITE FAILED' : 'rewritten'} ` +
       `(${wallets.written} rows, registry=${registry.length})`,
   )
 }

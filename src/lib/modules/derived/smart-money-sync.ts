@@ -23,9 +23,9 @@
 // ─────────────────────────────────────────────────────────────
 
 import { execSync } from 'node:child_process'
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
+import fs, { existsSync } from 'node:fs'
+import os, { homedir } from 'node:os'
+import path, { join } from 'node:path'
 import { prisma } from '@/lib/db'
 import { contractButtons } from './signal-tier'
 import {
@@ -73,8 +73,35 @@ const GOG_ACCOUNT = process.env.GOG_ACCOUNT || 'moliangellina@gmail.com'
 /** gog binary path (checked once, cached). */
 let gogPath: string | null | undefined
 
+/**
+ * Absolute location of the `gog` binary.
+ *
+ * `which gog` alone is not enough: the cron PATH is pinned to
+ * nvm+/usr/bin:/bin, and gog lives in ~/.local/bin — so every scheduled
+ * pass resolved to "" and the sheet silently stopped being written. Check
+ * the well-known install locations explicitly before falling back to PATH.
+ */
 function getGogPath(): string | null {
   if (gogPath !== undefined) return gogPath
+  const candidates = [
+    process.env.GOG_BIN,
+    join(homedir(), '.local', 'bin', 'gog'),
+    join(homedir(), 'go', 'bin', 'gog'),
+    '/usr/local/bin/gog',
+    '/usr/bin/gog',
+  ].filter((p): p is string => Boolean(p))
+
+  for (const candidate of candidates) {
+    try {
+      if (existsSync(candidate)) {
+        gogPath = candidate
+        return gogPath
+      }
+    } catch {
+      // Unreadable path — try the next candidate.
+    }
+  }
+
   try {
     const result = execSync('which gog 2>/dev/null || echo ""', { encoding: 'utf8', timeout: 3000 }).trim()
     gogPath = result || null
