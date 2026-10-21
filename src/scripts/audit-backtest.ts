@@ -17,7 +17,7 @@
 //   SNIPER_LOG_PATH        — override scan-log path
 // ─────────────────────────────────────────────────────────────
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { setTimeout as sleep } from 'node:timers/promises'
 import type { AuditEntry } from '@/lib/modules/derived/sniper-audit'
@@ -39,11 +39,6 @@ const LOG_PATH = process.env.SNIPER_LOG_PATH ?? join(process.cwd(), 'data', 'sni
 const REPORT_PATH = join(process.cwd(), 'data', 'audit-backtest-report.json')
 const FETCH_DELAY_MS = 150
 const FETCH_TIMEOUT_MS = 8_000
-
-interface SniperLogEntry {
-  contract?: unknown
-  rejections?: unknown
-}
 
 function maxContracts(): number {
    const raw = process.env.BACKTEST_MAX_CONTRACTS

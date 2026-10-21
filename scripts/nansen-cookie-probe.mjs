@@ -81,7 +81,7 @@ function extractTokenFromCookieFile(path) {
 }
 
 // __dbg carries the token for truncated logging only; stripped before sending.
-function requestOnce(headers, dbg) {
+function requestOnce(headers, _dbg) {
   const send = { ...headers };
   delete send.__dbg;
   return new Promise((resolve, reject) => {

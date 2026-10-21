@@ -25,12 +25,14 @@
 //   * allowReturning: permit `return <value>` in a catch (default false)
 // ─────────────────────────────────────────────────────────────
 
-const EMPTY_RETURNS = new Set(['[]', 'null', 'undefined', '{}', '0', 'false', "''", '""'])
-
 /** Calls that make a swallowed error visible to a human or to the caller. */
 const EVIDENCE_CALLEES = new Set([
   'console.error',
   'console.warn',
+  // A plain log is still a record of the failure — the level is a routing
+  // choice, not a difference in whether the error was swallowed.
+  'console.log',
+  'console.info',
   'logger.error',
   'logger.warn',
   // debug-level still records the failure; the level is a routing choice,

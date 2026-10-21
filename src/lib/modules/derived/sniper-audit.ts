@@ -16,7 +16,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { SniperScanDecision } from './sniper-scan'
-import { classifyAccumulation, type AccumulationReading } from './sniper-accumulation'
+import type { AccumulationReading } from './sniper-accumulation'
 
 export interface AuditEntry {
 

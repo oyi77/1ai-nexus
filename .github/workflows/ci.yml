@@ -59,8 +59,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # --max-warnings 0 makes the warning budget explicit: a new warning
+      # fails the build instead of accumulating silently until nobody reads
+      # the log. The current tree is at zero warnings.
       - name: Lint
-        run: npm run lint
+        run: npm run lint -- --max-warnings 0
 
       - name: Build
         run: npm run build

@@ -14,7 +14,6 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runSniperScan, type SniperScanResult } from './sniper-scan'
-import type { MemeRiskAudit } from '@/lib/modules/meme/types'
 
 let dir = ''
 
@@ -131,34 +130,6 @@ function mockHydration(perContract: Record<string, { createdAt?: number; volume5
       { status: 200 },
     )
   })
-}
-
-const CLEAN: MemeRiskAudit = {
-  id: 'x',
-  platform: 'rugcheck',
-  chain: 'solana',
-  contract: '',
-  symbol: '',
-  name: '',
-  riskLevel: 0,
-  riskLabel: 'safe',
-  buyTax: 0,
-  sellTax: 0,
-  top10HolderPercent: 0.15,
-  lpLockedPercent: 1,
-  canFreeze: false,
-  canMint: false,
-  isHoneypot: false,
-  riskCounts: { high: 0, middle: 0, low: 0 },
-  distribution: {
-    devPercent: 0,
-    sniperPercent: 0,
-    bundlerPercent: 0,
-    insiderPercent: 0,
-  },
-  topWallets: [],
-  top5AvgPnlPercent: 20,
-  auditedAt: Date.now(),
 }
 
 function evidenceFor(res: SniperScanResult, contract: string) {

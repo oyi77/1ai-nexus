@@ -254,7 +254,7 @@ describe('fetchSolpumpTrenches', () => {
     __resetSolpumpTrenchesForTests()
 
     const fetchSpy = vi.fn(
-      async (_url: string, init: RequestInit) =>
+      async (_url: string, _init: RequestInit) =>
         new Response(JSON.stringify(PAGE_RESPONSE([SWEET_SPOT_TOKEN], null)), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },

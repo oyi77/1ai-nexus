@@ -8,9 +8,9 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 // The gmgn adapter is a separate module that would hit Cloudflare. Stub it
 // so these tests stay offline and deterministic; the helius leg is then
 // reached only via the mocked global fetch below.
-const gmgnHolders = vi.fn(async (...a: unknown[]): Promise<unknown[]> => []);
+const gmgnHolders = vi.fn(async (): Promise<unknown[]> => []);
 vi.mock('@/lib/modules/meme/gmgn', () => ({
-  listGmgnTokenHolders: (...a: unknown[]) => gmgnHolders(...a),
+  listGmgnTokenHolders: (...a: unknown[]) => gmgnHolders(),
 }));
 
 import { holderSource, fetchTopHolders } from './wallet-tracer';

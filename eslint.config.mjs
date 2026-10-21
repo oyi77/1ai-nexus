@@ -24,16 +24,24 @@ const eslintConfig = defineConfig([
     "scripts/tmp-*.ts",
   ]),
   {
-    plugins: {
-      // Local rules for failure shapes this repo has been bitten by.
-      integrity: { rules: { 'no-silent-empty-result': noSilentEmptyResult } },
-    },
     rules: {
       '@typescript-eslint/no-unused-vars': ['warn', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
         caughtErrorsIgnorePattern: '^_',
       }],
+    },
+  },
+  {
+    // The silent-failure rule guards the PRODUCTION pipeline: src/ (app +
+    // modules + crons). Browser bundles under public/ and one-off tooling
+    // under scripts/ are out of scope — a defensive `catch { return '' }` in
+    // a UI formatter is not a data-loss defect.
+    files: ['src/**/*.{ts,tsx}'],
+    plugins: {
+      integrity: { rules: { 'no-silent-empty-result': noSilentEmptyResult } },
+    },
+    rules: {
       // A catch that returns an empty result without logging, rethrowing, or
       // pushing to an errors array makes an upstream failure invisible to the
       // caller. This repo shipped a scanner that dropped 8 of 10 tokens per
