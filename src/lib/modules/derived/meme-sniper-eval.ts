@@ -206,25 +206,20 @@ function distributionBreaches(p: SniperPayload): string[] {
     out.push(`Snipers hold ${fmtPct(d.sniperPercent)}% (ceiling ${L.sniperPercent}%)`)
   }
 
+  // The launch cohort's own exit ratio judges it. Its supply share cannot:
+  // no audit source reports the share a cohort still holds (GMGN reports the
+  // exit ratio for launch buyers and no share; Birdeye's bundler field is a
+  // wallet count, not a percent of supply). Treating that missing share as a
+  // rejection rejected every candidate on facts no source can supply, and
+  // made the exit ratio — the one number that was measured — look unproven.
+  // UNKNOWN still never passes on its own; it becomes a capped warning.
   const sold = d.bundlerSoldPercent
-  if (d.bundlerPercent === null) {
+  if (sold === null) {
+    out.push('Launch cohort exit unproven — share and exit both unreported')
+  } else if (sold < L.bundlerExitRequiredPercent) {
     out.push(
-      sold === null
-        ? 'Bundler share unproven'
-        : `Bundler share unproven — launch cohort sold ${fmtPct(sold)}% of its position`,
+      `Launch cohort still holds ${fmtPct(100 - sold)}% (sold ${fmtPct(sold)}%, needs ${L.bundlerExitRequiredPercent}%)`,
     )
-  } else if (d.bundlerPercent >= L.bundlerToleratedPercent) {
-    out.push(`Bundlers hold ${fmtPct(d.bundlerPercent)}% — above tolerated max ${L.bundlerToleratedPercent}%`)
-  } else if (d.bundlerPercent >= L.bundlerPercent) {
-    if (sold === null) {
-      out.push(
-        `Bundlers hold ${fmtPct(d.bundlerPercent)}% and their exit is unproven — ceiling ${L.bundlerPercent}%`,
-      )
-    } else if (sold < 100) {
-      out.push(
-        `Bundlers hold ${fmtPct(d.bundlerPercent)}% and have not fully exited (sold ${fmtPct(sold)}%) — ceiling ${L.bundlerPercent}%`,
-      )
-    }
   }
 
   if (d.insiderPercent === null) out.push('Insider share unproven')
@@ -338,9 +333,21 @@ function buildAlert(
   // per metric; notes carry no emoji of their own).
   const passEmoji = (v: number | null | undefined, ceiling: number): string =>
     v === null || v === undefined ? '❓' : v < ceiling ? '✅' : '🔴'
-  // Bundlers: "(100% Sold)" only when the full exit is proven.
-  const soldPct = p.distribution.bundlerSoldPercent
-  const bundlerNote = soldPct === 100 ? ' (100% SOLD ✅)' : ''
+  // The cohort line speaks in the fact that is actually measured: its exit.
+  // No source reports the share a launch cohort still holds, so the alert
+  // must not print a Bundler percent that is structurally always unproven.
+  const soldPct = p.distribution.bundlerSoldPercent ?? null
+  const cohortPct =
+    soldPct === null
+      ? 'n/a'
+      : `${Math.round((100 - soldPct) * 10) / 10}%`
+  const cohortEmoji = soldPct === null ? '❓' : soldPct >= L.bundlerExitRequiredPercent ? '✅' : '🔴'
+  const cohortNote =
+    soldPct === null
+      ? ' (EXIT UNPROVEN ❓)'
+      : soldPct >= L.bundlerExitRequiredPercent
+        ? ' (100% SOLD ✅)'
+        : ` (SOLD ${Math.round(soldPct * 10) / 10}% 🔴)`
   // Cluster: "(Clean bubblemap)" below 1%.
   const clusterNote =
     m.clusterPercent != null && m.clusterPercent < 1 ? ' (Bersih ✅)' : ''
@@ -384,7 +391,7 @@ function buildAlert(
     '',
     '📊 <b>AUDIT &amp; INTEGRITAS ON-CHAIN</b>',
     `• <b>Dev Holding:</b> ${pct(m.devPercent)} ${passEmoji(m.devPercent, L.devHardCeilingPercent)}${devNote}`,
-    `• <b>Sniper:</b> ${pct(m.sniperPercent)} ${passEmoji(m.sniperPercent, L.sniperPercent)} | <b>Bundler:</b> ${pct(m.bundlerPercent)}${bundlerNote} ${passEmoji(m.bundlerPercent, L.bundlerPercent)}`,
+    `• <b>Sniper:</b> ${pct(m.sniperPercent)} ${passEmoji(m.sniperPercent, L.sniperPercent)} | <b>Launch Cohort Holds:</b> ${cohortPct}${cohortNote} ${cohortEmoji}`,
     `• <b>Insider:</b> ${pct(m.insiderPercent)} ${passEmoji(m.insiderPercent, L.insiderPercent)} | <b>Top 10 Supply:</b> ${pct(m.top10Percent)} ${passEmoji(m.top10Percent, L.top10Percent)}`,
     `• <b>Cluster:</b> ${pct(m.clusterPercent)}${clusterNote} ${passEmoji(m.clusterPercent, L.clusterPercent)}`,
     `• <b>LP &amp; Keamanan:</b> Mint ${mintStatus} | Freeze ${freezeStatus} | ${lpStatus}`,

@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   admissionStatus,
+  buildHolderReason,
   chainOfAddress,
   classifyHuman,
   DISCOVERY_DEFAULTS,
@@ -17,6 +18,7 @@ import {
   readGroups,
   type DiscoveredWallet,
   type DiscoveryFilters,
+  type HolderCandidate,
 } from '../wallet-discovery-engine'
 import { EMPTY_CONFLUENCE, type CallConfluence } from '../call-confluence'
 
@@ -100,6 +102,8 @@ describe('admissionStatus — WHALE requires the quality axis, not just volume',
     verdict: 'WHALE',
     admission: 'QUALIFIED',
     reason: 'test',
+    tokenContract: null,
+    callGroups: null,
     leg: 'leaderboard',
     human: { verdict: 'HUMAN', reason: 'test' },
     ...over,
@@ -132,6 +136,66 @@ describe('admissionStatus — WHALE requires the quality axis, not just volume',
 
   it('maps a QUALITY verdict to QUALIFIED_SMART_MONEY', () => {
     expect(admissionStatus(w({ verdict: 'QUALITY' }), F)).toBe('QUALIFIED_SMART_MONEY')
+  })
+})
+
+describe('buildHolderReason — every admission states its size and its caller', () => {
+  const holder = (over: Partial<HolderCandidate> = {}): HolderCandidate => ({
+    address: 'FVZRwUp6JbBm8uqWy1cHwEoPPjPzFjLuL7YQZ7qzXyZq',
+    source: 'call-feed:ABC123',
+    tokenContract: 'So11111111111111111111111111111111111111112',
+    valueUsd: 41_600,
+    pctOfSupply: 0.4,
+    flagged: false,
+    tags: ['whale'],
+    leg: 'called-contracts',
+    ...over,
+  })
+  const conf = (over: Partial<CallConfluence> = {}): CallConfluence => ({
+    ...EMPTY_CONFLUENCE('x'),
+    groups: ['A', 'B', 'C', 'D'],
+    groupCount: 4,
+    effectiveGroupCount: 2.15,
+    available: true,
+    present: true,
+    ...over,
+  })
+
+  it('names the groups that called the CA, capped at three, on the weighted basis', () => {
+    const r = buildHolderReason(holder(), conf())
+    expect(r).toContain('holds $41,600 of a group-called token')
+    expect(r).toContain('called by 4 group(s) / 2.15 effective: A, B, C')
+    expect(r).not.toContain('D')
+  })
+
+  it('separates "no longer in the feed" from "feed unreadable"', () => {
+    const gone = buildHolderReason(holder(), conf({ present: false, groups: [], groupCount: 0 }))
+    expect(gone).toContain('call feed readable but this contract is no longer in it')
+    const dead = buildHolderReason(
+      holder(),
+      conf({ available: false, present: false, groups: [], groupCount: 0 }),
+    )
+    expect(dead).toContain('call feed unreadable - group tag unknown')
+  })
+
+  it('refuses to invent a call tag when the contract has no confluence entry at all', () => {
+    expect(buildHolderReason(holder(), undefined)).toContain('call feed unreadable')
+  })
+
+  it('sizes a high-cap holder by its own mark and says so when unmeasured', () => {
+    const measured = holder({ leg: 'high-cap-holders', valueUsd: 250_000 })
+    expect(buildHolderReason(measured, undefined)).toBe(
+      'high-cap holder (whale): holds $250,000 of a $1M+ token',
+    )
+    const unmeasured = holder({ leg: 'high-cap-holders', valueUsd: null, tags: [] })
+    expect(buildHolderReason(unmeasured, undefined)).toBe(
+      'high-cap holder (untagged): holds size unmeasured',
+    )
+  })
+
+  it('never attaches a caller tag to a high-cap holder that has no call provenance', () => {
+    const r = buildHolderReason(holder({ leg: 'high-cap-holders' }), conf())
+    expect(r).not.toContain('called by')
   })
 })
 

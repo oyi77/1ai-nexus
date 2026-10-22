@@ -13,9 +13,14 @@ const REJECTIONS: Array<[string, string]> = [
   ['Dev holds 12.3% — beyond hard ceiling', 'Dev pegang 12.3% — beyond hard ceiling'],
   ['Snipers hold 31.2% (ceiling 20%)', 'Sniper pegang 31.2% (ceiling 20%)'],
   [
-    'Bundlers hold 25% and have not fully exited (sold 12.5%) — ceiling 20%',
-    'Bundler masih pegang 25% dan belum keluar penuh (terjual 12.5%) — batas 20%',
+    'Launch cohort still holds 25% (sold 75%, needs 100%)',
+    'Kohort peluncuran masih pegang 25% (terjual 75%, wajib 100%)',
   ],
+  [
+    'Launch cohort exit unproven — share and exit both unreported',
+    'Exit kohort peluncuran belum terbukti — porsi dan exit sama-sama tidak dilaporkan',
+  ],
+  ['Bundlers hold 25% and have not fully exited (sold 12.5%) — ceiling 20%', 'Bundler masih pegang 25% dan belum keluar penuh (terjual 12.5%) — batas 20%'],
   ['Bundlers hold 44.1% — above tolerated max 40%', 'Bundler pegang 44.1% — above tolerated max 40%'],
   ['Insiders hold 9.9% (ceiling 5%)', 'Insider pegang 9.9% (ceiling 5%)'],
   ['Mint authority unproven (must be disabled)', 'Mint authority belum terbukti mati'],
@@ -37,11 +42,6 @@ const REJECTIONS: Array<[string, string]> = [
   ['Top-10 concentration unproven', 'Konsentrasi top-10 belum terbukti'],
   ['Insider share unproven', 'Porsi insider belum terbukti'],
   ['Sniper share unproven', 'Porsi sniper belum terbukti'],
-  [
-    'Bundler share unproven — launch cohort sold 44.4% of its position',
-    'Porsi bundler belum terbukti — kohort peluncuran sudah keluar 44.4% dari posisinya',
-  ],
-  ['Bundler share unproven', 'Porsi bundler belum terbukti'],
   [
     'Top 1-3 holder identities unproven (2 of 3 known) — concentration unverifiable',
     'Identitas holder top 1-3 belum terbukti (2 dari 3 diketahui) — konsentrasi tidak bisa diverifikasi',

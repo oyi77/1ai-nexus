@@ -158,7 +158,7 @@ const CLEAN_AUDIT: MemeRiskAudit = {
   distribution: {
     devPercent: 0,
     sniperPercent: 0,
-    bundlerPercent: 0,
+    bundlerSoldPercent: 100,
     insiderPercent: 0,
   },
   topWallets: [],

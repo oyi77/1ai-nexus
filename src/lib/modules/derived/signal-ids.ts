@@ -86,6 +86,14 @@ export function rejectionId(s: string): string {
   out = out.replace(/^Dev holds ([\d.]+)%(.*)$/, 'Dev pegang $1%$2')
   out = out.replace(/^Snipers hold ([\d.]+)%(.*)$/, 'Sniper pegang $1%$2')
   out = out.replace(
+    /^Launch cohort still holds ([\d.]+)% \(sold ([\d.]+)%, needs ([\d.]+)%\)$/,
+    'Kohort peluncuran masih pegang $1% (terjual $2%, wajib $3%)',
+  )
+  out = out.replace(
+    /^Launch cohort exit unproven — share and exit both unreported$/,
+    'Exit kohort peluncuran belum terbukti — porsi dan exit sama-sama tidak dilaporkan',
+  )
+  out = out.replace(
     /^Bundlers hold ([\d.]+)% and have not fully exited \(sold ([\d.]+)%\) — ceiling ([\d.]+)%$/,
     'Bundler masih pegang $1% dan belum keluar penuh (terjual $2%) — batas $3%',
   )

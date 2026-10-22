@@ -76,7 +76,7 @@ const CLEAN: MemeRiskAudit = {
   distribution: {
     devPercent: 0,
     sniperPercent: 0.005,
-    bundlerPercent: 0.02,
+    bundlerSoldPercent: 100,
     insiderPercent: 0.01,
     clusterPercent: 0.01,
   },

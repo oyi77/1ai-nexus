@@ -15,7 +15,8 @@ function clean(over: Partial<SniperPayload> = {}): SniperPayload {
     distribution: {
       devPercent: 0,
       sniperPercent: 1,
-      bundlerPercent: 4,
+      bundlerPercent: null,
+      bundlerSoldPercent: 100,
       insiderPercent: 2,
       top10Percent: 18,
       clusterPercent: 2,
@@ -92,14 +93,22 @@ describe('meme-sniper hard filters', () => {
     expect(neither.alert).not.toContain('n/a%')
   })
 
-  it('renders an unmeasured distribution share without a percent sign', () => {
+  it('renders an unmeasured cohort exit without inventing a share', () => {
     const d = evaluateSniper(
       clean({
-        distribution: { ...clean().distribution, bundlerPercent: null, top10Percent: 67.7 },
+        distribution: { ...clean().distribution, bundlerPercent: null, bundlerSoldPercent: null, top10Percent: 67.7 },
       }),
     )
-    expect(d.alert).toContain('<b>Bundler:</b> n/a ❓')
+    expect(d.alert).toContain('<b>Launch Cohort Holds:</b> n/a (EXIT UNPROVEN ❓) ❓')
+    expect(d.alert).not.toContain('<b>Bundler:</b>')
     expect(d.alert).not.toContain('n/a%')
+  })
+
+  it('renders the measured exit as the share the cohort still holds', () => {
+    const d = evaluateSniper(
+      clean({ distribution: { ...clean().distribution, bundlerPercent: null, bundlerSoldPercent: 62.5 } }),
+    )
+    expect(d.alert).toContain('<b>Launch Cohort Holds:</b> 37.5% (SOLD 62.5% 🔴) 🔴')
   })
 
   it('accepts 100% locked with burn unproven; caps fully-unproven LP at WATCHLIST (UNKNOWN)', () => {
@@ -137,62 +146,59 @@ describe('meme-sniper hard filters', () => {
     expect(d.rejections.join(' ')).toContain('Snipers hold 6%')
   })
 
-  it('rejects bundlers above 10% when they have not fully exited', () => {
+  it('rejects a launch cohort that still holds supply it must have exited', () => {
     const d = evaluateSniper(clean({
       distribution: { ...clean().distribution, bundlerPercent: 20, bundlerSoldPercent: 40 },
     }))
     expect(d.status).toBe('REJECT')
-    expect(d.rejections.join(' ')).toContain('not fully exited')
+    expect(d.rejections.join(' ')).toContain('Launch cohort still holds 60% (sold 40%, needs 100%)')
   })
 
-  it('names an unmeasured bundler exit instead of printing it as sold 0%', () => {
+  it('names an unmeasured cohort exit instead of printing it as sold 0%', () => {
     const d = evaluateSniper(clean({
       distribution: { ...clean().distribution, bundlerPercent: 12, bundlerSoldPercent: null },
     }))
     expect(d.status).toBe('REJECT')
-    expect(d.rejections.join(' ')).toContain('exit is unproven')
+    expect(d.rejections.join(' ')).toContain('Launch cohort exit unproven')
     expect(d.rejections.join(' ')).not.toContain('sold 0%')
+    expect(d.rejections.join(' ')).not.toContain('holds 100%')
   })
 
-  it('keeps an unproven cohort share a rejection and reports the measured exit', () => {
-    const unknownExit = evaluateSniper(clean({
-      distribution: { ...clean().distribution, bundlerPercent: null, bundlerSoldPercent: null },
-    }))
-    expect(unknownExit.status).toBe('REJECT')
-    expect(unknownExit.rejections).toContain('Bundler share unproven')
+  it('judges the cohort on its measured exit, never on an unmeasured share', () => {
+    // No audit source reports the share of supply a cohort still holds, so a
+    // missing share must not reject a candidate whose exit was measured.
+    const measuredExit = evaluateSniper(clean({
+      distribution: { ...clean().distribution, bundlerPercent: null, bundlerSoldPercent: 100 },
+    }), { smartMoney: CONFIRMED })
+    expect(measuredExit.status).toBe('SIGNAL')
+    expect(measuredExit.rejections).toEqual([])
 
-    const knownExit = evaluateSniper(clean({
+    const partialExit = evaluateSniper(clean({
       distribution: { ...clean().distribution, bundlerPercent: null, bundlerSoldPercent: 75 },
     }))
-    expect(knownExit.status).toBe('REJECT')
-    expect(knownExit.rejections.join(' ')).toContain('launch cohort sold 75%')
-
-    // A proven full exit never erases the unproven share: 100% sold is the
-    // rug signature, not a safety proof.
-    const fullyDumped = evaluateSniper(clean({
-      distribution: { ...clean().distribution, bundlerPercent: null, bundlerSoldPercent: 100 },
-    }))
-    expect(fullyDumped.status).toBe('REJECT')
-    expect(fullyDumped.rejections.join(' ')).toContain('Bundler share unproven')
+    expect(partialExit.status).toBe('REJECT')
+    expect(partialExit.rejections.join(' ')).toContain('sold 75%, needs 100%')
   })
 
-  it('tolerates bundlers up to 30% only when 100% sold', () => {
-    const sold = evaluateSniper(clean({
-      distribution: { ...clean().distribution, bundlerPercent: 25, bundlerSoldPercent: 100 },
-    }), { smartMoney: CONFIRMED })
-    expect(sold.status).toBe('SIGNAL')
-    const unsold = evaluateSniper(clean({
-      distribution: { ...clean().distribution, bundlerPercent: 25, bundlerSoldPercent: 99 },
-    }))
-    expect(unsold.status).toBe('REJECT')
-  })
-
-  it('rejects bundlers above the 30% tolerated max even when fully sold', () => {
+  it('warns about an unmeasured cohort share instead of rejecting on it', () => {
+    // No audit source reports the share of supply a launch cohort holds, so
+    // a missing share is UNKNOWN: it must surface as a warning and leave the
+    // verdict to the facts that were actually measured (here: the exit).
     const d = evaluateSniper(clean({
-      distribution: { ...clean().distribution, bundlerPercent: 35, bundlerSoldPercent: 100 },
+      distribution: { ...clean().distribution, bundlerPercent: null, bundlerSoldPercent: 100 },
+    }), { smartMoney: CONFIRMED })
+    expect(d.status).toBe('SIGNAL')
+    expect(d.rejections).toEqual([])
+    expect(d.warnings.some((w) => w.includes('Bundlers') && w.endsWith('no data'))).toBe(true)
+  })
+
+  it('rejects a measured cohort share above the profile ceiling', () => {
+    const d = evaluateSniper(clean({
+      distribution: { ...clean().distribution, bundlerPercent: 45, bundlerSoldPercent: 100 },
     }))
     expect(d.status).toBe('REJECT')
-    expect(d.rejections.join(' ')).toContain('above tolerated max 30%')
+    expect(d.rejections.join(' ')).toContain('[golden-new-pairs]')
+    expect(d.rejections.join(' ')).toContain('Bundlers')
   })
 
   it('rejects insiders at the 5% ceiling', () => {
@@ -433,7 +439,10 @@ describe('ebook criteria cross-check (opts.criteriaProfiles)', () => {
   it('adds no rejections when the profile is not selected', () => {
     const d = evaluateSniper(clean(), { smartMoney: CONFIRMED })
     expect(d.rejections).toEqual([])
-    expect(d.warnings.some((w) => w.startsWith('[golden-new-pairs]'))).toBe(false)
+    // The stage profile still runs by design (a token can never escape the
+    // operator's documented criteria), but it only WARNS about facts no
+    // source measured — an unmeasured share is never a rejection.
+    expect(d.warnings.every((w) => !w.startsWith('[golden-new-pairs] ') || w.endsWith('no data'))).toBe(true)
   })
 
   it('golden-new-pairs rejects bundlers above its 40% ceiling', () => {

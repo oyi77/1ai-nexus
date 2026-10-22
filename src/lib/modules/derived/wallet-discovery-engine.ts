@@ -41,6 +41,8 @@ import { verifyWhaleForList } from '@/lib/modules/meme/whale-verifier'
 import { WHALE_HARVEST_TAGS, mergeRowGmgn, type HarvestedWallet } from '@/lib/modules/meme/whale-harvester'
 import { SMART_MONEY_DEFAULTS } from './wallet-intel'
 import { loadCallConfluence, type CallConfluence } from './call-confluence'
+import { loadCallFeed } from './db-call-feed'
+import { fetchDexTokenMeta } from './dex-token-meta'
 
 /**
  * Run `fn` over `items` with bounded concurrency. The discovery legs call a
@@ -133,6 +135,22 @@ export interface DiscoveryFilters {
    * measured count either way, so a below-bar token is never dressed as one.
    */
   minCallGroups: number
+  /**
+   * Max contracts pulled straight from the call feed per pass. The feed is
+   * an external write path: an unbounded list would let one busy window
+   * spend the whole holder budget on the loudest shill's mint.
+   */
+  maxCalledTokens: number
+  /**
+   * Max token contracts re-read from the persisted `TokenHolding` table per
+   * pass. GMGN's holders endpoint only serves pump.fun-origin mints, so an
+   * established token ($1M+) can never contribute holders through the live
+   * established-token leg — measured live, 35/35 tokens came back empty. The
+   * holdings table already carries GMGN holder rows for those contracts
+   * (written by token-holdings-persist, i.e. one measure per contract instead
+   * of one per pass), so this leg replays them.
+   */
+  maxPersistedTokens: number
 }
 
 export const DISCOVERY_DEFAULTS: DiscoveryFilters = {
@@ -151,9 +169,14 @@ export const DISCOVERY_DEFAULTS: DiscoveryFilters = {
   maxRateLimitedTokens: 3,
   trustedCallGroups: null,
   minCallGroups: 2,
+  maxCalledTokens: 8,
+  maxPersistedTokens: 10,
 }
-
-export type WalletLeg = 'leaderboard' | 'high-cap-holders'
+export type WalletLeg =
+  | 'leaderboard'
+  | 'high-cap-holders'
+  | 'called-contracts'
+  | 'persisted-holdings'
 export type HumanVerdict = 'HUMAN' | 'BOT_FAST_TX' | 'BOT_BUY_ONLY' | 'UNKNOWN'
 
 export interface HumanCheck {
@@ -227,6 +250,19 @@ export interface DiscoveredWallet {
   admission: 'QUALIFIED' | 'WATCHLIST'
   /** Why it was admitted, in the operator's words. Auditable, never blank. */
   reason: string
+  /**
+   * Mint the wallet was holding when the holder leg found it; null for a
+   * leaderboard wallet (the rank sweep proves nothing was held). This is the
+   * key that joins a wallet to the call groups that flagged its token.
+   */
+  tokenContract: string | null
+  /**
+   * Call groups that flagged `tokenContract`, strongest first, with the
+   * origin-weighted count the strategy gate reads. Null means the wallet is
+   * not tied to a called token — either the feed never mentioned it or the
+   * feed could not be read; `callGroupTag` says which.
+   */
+  callGroups: { groups: string[]; groupCount: number; effectiveGroupCount: number } | null
   leg: WalletLeg
   human: HumanCheck
 }
@@ -381,6 +417,8 @@ export async function measureLeaderboard(
         verdict: null,
         admission: 'WATCHLIST',
         reason: `whale-scale volume but below the quality bar (wr ${((w.winRate30d ?? 0) * 100).toFixed(0)}%, pnl ${((w.pnl30d ?? 0) * 100).toFixed(0)}%)`,
+        tokenContract: null,
+        callGroups: null,
         leg: 'leaderboard',
         human,
       })
@@ -414,6 +452,8 @@ export async function measureLeaderboard(
       verdict: verdict.label === 'WHALE' || verdict.label === 'QUALITY' ? verdict.label : null,
       admission: 'QUALIFIED',
       reason: verdict.reason,
+      tokenContract: null,
+      callGroups: null,
       leg: 'leaderboard',
       human,
     })
@@ -441,6 +481,92 @@ export interface HolderCandidate {
   flagged: boolean
   /** GMGN's tags on the holder row (`transfer_in`, `fomo`, `whale`, ...). */
   tags: string[]
+  /** Which discovery source produced this candidate. The admission evidence
+   * differs: a $1M+ established-token position is size on its own, while a
+   * called-mint position is size only when its USD mark clears the floor. */
+  leg: WalletLeg
+}
+
+/**
+ * The one-line provenance every holder admission carries.
+ *
+ * Sizing rules differ by leg and the difference is the point: a high-cap
+ * holder is sized by the position that put it in the list (and says so when
+ * the mark is unmeasured), while a called-mint holder has already cleared
+ * the USD floor before reaching here.
+ *
+ * The group tag is the operator's "tag which group called each CA". An
+ * unreadable feed is reported as unreadable, never as "nobody called it":
+ * the two facts need opposite fixes, so they never share a label.
+ */
+export function buildHolderReason(c: HolderCandidate, conf: CallConfluence | undefined): string {
+  const size =
+    c.leg === 'called-contracts'
+      ? `$${Math.round(c.valueUsd ?? 0).toLocaleString('en-US')} of a group-called token`
+      : c.valueUsd !== null
+        ? `$${Math.round(c.valueUsd).toLocaleString('en-US')} of a $1M+ token`
+        : 'size unmeasured'
+  const callerTag =
+    c.leg !== 'called-contracts'
+      ? null
+      : conf && conf.present
+        ? `called by ${conf.groupCount} group(s) / ${conf.effectiveGroupCount.toFixed(2)} effective: ` +
+          conf.groups.slice(0, 3).join(', ')
+        : conf && conf.available
+          ? 'call feed readable but this contract is no longer in it'
+          : 'call feed unreadable - group tag unknown'
+  const legLabel =
+    c.leg === 'called-contracts'
+      ? 'called-token holder'
+      : c.leg === 'persisted-holdings'
+        ? 'persisted-holding holder'
+        : 'high-cap holder'
+  return (
+    `${legLabel} ` +
+    `(${c.tags.length > 0 ? c.tags.join('/') : 'untagged'}): holds ${size}` +
+    (callerTag ? `; ${callerTag}` : '')
+  )
+}
+
+
+/**
+ * Counters for the holder leg. `missing`/`underFloor`/`bestUsd` describe why
+ * called-mint holders were refused: without them a leg whose every candidate
+ * was under the size floor reports as "0 admitted", which reads exactly like
+ * "the feed named nothing".
+ */
+interface HolderLegAudit {
+  refused: Array<{ address: string; reason: string }>
+  marksPicked: number
+  missing: number
+  underFloor: number
+  bestUsd: number
+  admitted: number
+  /** Called-mint holders whose stats call returned (measured past the floor). */
+  measured: number
+  /** Holders the called-mint sweep produced before any grading. */
+  candidates: number
+  /** Feed contracts the called-mint sweep was asked to read. */
+  contracts: number
+}
+
+/** Why the called-mint leg admitted what it did; reported with the sweep. */
+export interface HolderLegCounters {
+  /** Feed contracts the leg was asked to read. */
+  contracts: number
+  /** Holders swept before grading. */
+  candidates: number
+  /** Holders admitted (measured mark over the size floor, HUMAN). */
+  admitted: number
+  /** Of `admitted`, how many had a stats call return (so pnl/win-rate measured). */
+  measured: number
+  /** Holders refused for a measured mark below the floor. */
+  underFloor: number
+  /** Holders refused because their position value was unmeasured. */
+  missing: number
+  /** Largest measured position seen, USD (0 when none was measured). */
+  bestUsd: number
+  ms: number
 }
 
 /**
@@ -522,9 +648,14 @@ export function readGroups(
  */
 async function sweepHighCapHolders(
   f: DiscoveryFilters,
-  audit: { refused: Array<{ address: string; reason: string }>; marksPicked: number },
+  audit: HolderLegAudit,
   callGroups: CallGroupsReport,
-): Promise<DiscoveredWallet[]> {
+): Promise<{
+  wallets: DiscoveredWallet[]
+  called: HolderLegCounters
+  persisted: HolderLegCounters
+  highCapAdmitted: number
+}> {
   // maxTokens budgets SOLANA tokens (every leg below is Solana-scoped), so ask
   // for a multiple: the established feed interleaves every GMGN chain, and the
   // live pass took 12 tokens of which 8 were EVM and had to be discarded.
@@ -592,6 +723,7 @@ async function sweepHighCapHolders(
         flagged: h.suspicious === true,
         tags: h.tags,
         pctOfSupply: typeof h.amountPercentage === 'number' ? h.amountPercentage : null,
+        leg: 'high-cap-holders',
       })
     }
   }
@@ -627,20 +759,122 @@ async function sweepHighCapHolders(
   })
   // The operator's "tag which group called each CA" join, at its cheapest
   // point: ONE feed read for the whole leg, keyed by the contracts the
-  // surviving holders actually own, so a token some call group flagged is
-  // identified as such before any GMGN stats call is spent.
+  // surviving holders actually own.
   const heldContracts = [...new Set(holdersOfScale.map((c) => c.tokenContract))]
   const confluence = await loadCallConfluence(heldContracts, { trustedGroups: f.trustedCallGroups ?? [] })
-  readGroups(callGroups, heldContracts, confluence, f.minCallGroups)
+  // Queried-only above meant the join could never fire: measured live, the
+  // contracts 12 call groups shout about (pump.fun mints, ~$70k mc) and the
+  // contracts this leg inspects ($1M+ established tokens) were DISJOINT
+  // sets — queried=15 matched=0 on a healthy feed. Group-call propagation is
+  // what the operator asked to capture, so the called contracts are pulled by
+  // contract id (chain-scoped, no market-cap gate) and their holders swept
+  // too. The admission bar is unchanged: a called-token holder still needs a
+  // measured USD position over the floor, a 30d pnl/win-rate measurement, and
+  // a HUMAN verdict, so a thin-liquidity shill cannot enter the pool on the
+  // strength of the call alone.
+  const feedRead = await loadCallFeed().catch(() => null)
+  const feedMints = (feedRead?.readOk ? feedRead.rows : [])
+    .filter((r) => r.chain === 'solana' || r.chain === '')
+    .map((r) => r.contract)
+    .filter((c) => !heldContracts.includes(c))
+  // Rank BEFORE spending the holder budget. The feed is dominated by
+  // single-shill mints (live: 44 candidates, 12 carry two or more groups),
+  // so slicing the raw list spends the whole leg on whoever shilled loudest
+  // last. Confluence is the operator's own admission signal; contract id is
+  // only the tie-break so the order is stable between passes.
+  const feedConf = await loadCallConfluence(feedMints, { trustedGroups: f.trustedCallGroups ?? [] })
+  const rankOf = (contract: string): number => {
+    const c = feedConf.get(contract)
+    return c && c.available && c.present ? c.effectiveGroupCount : 0
+  }
+  const calledContracts = [...feedMints]
+    .sort((a, b) => rankOf(b) - rankOf(a) || a.localeCompare(b))
+    .slice(0, f.maxCalledTokens)
+  // The feed's LIVE contracts are all pump.fun-origin, and that is exactly the
+  // shape GMGN's holder endpoint serves — while the established-token leg just
+  // spent `maxEmptyHolderTokens` empty responses on mints it can never read.
+  // Passing that budget in as spent would skip every called mint unmeasured,
+  // so this leg starts from zero: its contracts are known-servable by
+  // construction, and the two legs must not share a stop condition that only
+  // one of them can hit.
+  const calledAudit: HolderLegAudit = {
+    refused: audit.refused,
+    marksPicked: 0,
+    missing: 0,
+    underFloor: 0,
+    bestUsd: 0,
+    admitted: 0,
+    measured: 0,
+    candidates: 0,
+    contracts: calledContracts.length,
+  }
+  const tC = Date.now()
+  const calledHolders = await collectCalledHolders(calledContracts, f, calledAudit, calledContracts.length)
+  const cMs = Date.now() - tC
+  calledAudit.candidates = calledHolders.length
+  if (calledContracts.length > 0) {
+    // `confluence` is the holder leg's lookup; the feed-wide map is already
+    // keyed by the same contracts, so it is reused rather than re-read.
+    for (const [contract, conf] of feedConf) {
+      if (calledContracts.includes(contract) && !confluence.has(contract)) confluence.set(contract, conf)
+    }
+    const calledConf = new Map<string, CallConfluence>()
+    for (const c of calledContracts) {
+      const conf = feedConf.get(c)
+      if (conf) calledConf.set(c, conf)
+    }
+    readGroups(callGroups, calledContracts, calledConf, f.minCallGroups)
+  }
+  // Leg B2 — persisted holdings of established tokens. The live established
+  // leg above cannot produce holders: GMGN serves the holders endpoint only
+  // for pump.fun-origin mints, so every $1M+ token came back empty (live:
+  // 35 tokens admitted from that leg were all leaderboard-sourced). The
+  // `TokenHolding` table already holds GMGN holder rows for established
+  // contracts, written once per contract by token-holdings-persist, so the
+  // evidence is replayed here instead of re-requested. Rows are upserted on
+  // every pass, so "persisted" means measured, never stale-by-construction —
+  // and the refused/floor rules below are the same ones the live leg uses.
+  const tP = Date.now()
+  const persisted = await sweepPersistedHoldings(f, audit)
+  const pMs = Date.now() - tP
+  const measured = [...holdersOfScale, ...calledHolders, ...persisted.holders]
   const statsList = await mapLimit(
-    holdersOfScale,
+    measured,
     f.concurrency,
     (c) => fetchGmgnWalletStats(c.address).catch(() => null),
     f.budgetMs,
   )
   const out: DiscoveredWallet[] = []
-  for (let i = 0; i < holdersOfScale.length; i++) {
-    const c = holdersOfScale[i]
+  let bestUsd = 0
+  for (let i = 0; i < measured.length; i++) {
+    const c = measured[i]
+    // Both holder legs admit on ownership alone, so the USD floor is applied
+    // here for both. Measured live for the called leg: the counters read
+    // 0/0/0 because nothing ever incremented them, which made "every called
+    // holder was dust" indistinguishable from "the leg was never asked".
+    const sized = c.leg === 'called-contracts' || c.leg === 'persisted-holdings'
+    if (sized) {
+      const counter = c.leg === 'called-contracts' ? calledAudit : persisted
+      if (c.valueUsd === null) {
+        counter.missing++
+        audit.refused.push({
+          address: c.address,
+          reason: `holder position unmeasured - cannot prove $${Math.round(f.minHolderValueUsd).toLocaleString('en-US')} scale`,
+        })
+        continue
+      }
+      bestUsd = Math.max(bestUsd, c.valueUsd)
+      if (c.valueUsd < f.minHolderValueUsd) {
+        counter.underFloor++
+        audit.refused.push({
+          address: c.address,
+          reason:
+            `holder position $${Math.round(c.valueUsd).toLocaleString('en-US')} ` +
+            `(BELOW $${Math.round(f.minHolderValueUsd).toLocaleString('en-US')} floor)`,
+        })
+        continue
+      }
+    }
     const stats = statsList[i]
     const human = classifyHuman(
       { fastTxRatio: stats?.fastTxRatio ?? null, buyCount30d: stats?.buyCount30d ?? null, sellCount30d: stats?.sellCount30d ?? null },
@@ -650,18 +884,10 @@ async function sweepHighCapHolders(
       audit.refused.push({ address: c.address, reason: `bot check refused: ${human.reason}` })
       continue
     }
-    const size = c.valueUsd !== null ? `$${Math.round(c.valueUsd).toLocaleString('en-US')} of a $1M+ token` : 'size unmeasured'
+    const counter = c.leg === 'called-contracts' ? calledAudit : c.leg === 'persisted-holdings' ? persisted : null
+    if (counter) counter.admitted++
+    if (counter && stats !== null) counter.measured++
     const conf = confluence.get(c.tokenContract)
-    // The operator's ask: tag WHICH group flagged the CA this wallet holds.
-    // An unreadable feed stays silent — "no group called it" and "we could
-    // not look" are different facts and never share a label. The count is the
-    // origin-weighted one the strategy gate uses, so this tag and a later
-    // "needs N groups" bar cannot contradict each other.
-    const callerTag =
-      conf && conf.available && conf.present
-        ? `called by ${conf.groupCount} group(s) / ${conf.effectiveGroupCount.toFixed(2)} effective: ` +
-          conf.groups.slice(0, 3).join(', ')
-        : null
     out.push({
       chain: chainOfAddress(c.address),
       address: c.address,
@@ -676,18 +902,268 @@ async function sweepHighCapHolders(
       tags: [...new Set([...(stats?.tags ?? []), ...c.tags])],
       verdict: null,
       admission: 'WATCHLIST',
-      reason:
-        `high-cap holder (${c.tags.length > 0 ? c.tags.join('/') : 'untagged'}): holds ${size}` +
-        (callerTag ? `; ${callerTag}` : ''),
-      leg: 'high-cap-holders',
+      reason: buildHolderReason(c, conf),
+      tokenContract: c.tokenContract,
+      callGroups:
+        conf && conf.available && conf.present
+          ? {
+              groups: conf.groups,
+              groupCount: conf.groupCount,
+              effectiveGroupCount: conf.effectiveGroupCount,
+            }
+          : null,
+      leg: c.leg,
       human,
     })
   }
+  calledAudit.bestUsd = bestUsd
+  return {
+    wallets: out,
+    called: {
+      contracts: calledAudit.contracts,
+      candidates: calledAudit.candidates,
+      admitted: calledAudit.admitted,
+      measured: calledAudit.measured,
+      underFloor: calledAudit.underFloor,
+      missing: calledAudit.missing,
+      bestUsd: calledAudit.bestUsd,
+      ms: cMs,
+    },
+    persisted: {
+      contracts: persisted.contracts,
+      candidates: persisted.candidates,
+      admitted: persisted.admitted,
+      measured: persisted.measured,
+      underFloor: persisted.underFloor,
+      missing: persisted.missing,
+      bestUsd: persisted.bestUsd,
+      ms: pMs,
+    },
+    // The high-cap holders are inside `out` too, so the caller splits them by
+    // tag rather than re-deriving them from a second list.
+    highCapAdmitted: out.filter((w) => w.leg === 'high-cap-holders').length,
+  }
+}
+
+/**
+ * Holders of contracts a call group flagged THIS feed window.
+ *
+ * Distinct from `sweepHighCapHolders` in every input that matters: the
+ * contracts come from the feed (by id, no market-cap gate), they are
+ * pump.fun mints on the whole, and there are few of them. Same ownership
+ * refusals apply — a flagged address or a `transfer_in` position is custody,
+ * not conviction. Size is NOT graded here: the caller grades it against
+ * `minHolderValueUsd` once, for both sources, so a called mint cannot slip
+ * past the floor through a second code path.
+ */
+async function collectCalledHolders(
+  contracts: string[],
+  f: DiscoveryFilters,
+  audit: HolderLegAudit,
+  feedSize: number,
+): Promise<HolderCandidate[]> {
+  // Proportional, not the established leg's absolute 2: `maxCalledTokens` is 8,
+  // so an absolute cap of 2 would abandon the sixth shilled mint even while
+  // every earlier one returned real holders. Half the window is the tolerance.
+  const emptyLimit = Math.max(2, Math.ceil(feedSize / 2))
+  const out: HolderCandidate[] = []
+  const seen = new Set<string>()
+  let empty = 0
+  let rateLimited = 0
+  const stopAt = Date.now() + f.budgetMs
+  for (const contract of contracts) {
+    if (Date.now() > stopAt) break
+    let holders: Awaited<ReturnType<typeof listGmgnTokenHolders>> = []
+    try {
+      holders = await listGmgnTokenHolders('solana', contract)
+    } catch (err) {
+      rateLimited++
+      audit.refused.push({
+        address: contract,
+        reason: `unreachable: called-token holder list rate limited (${String(err).slice(0, 80)})`,
+      })
+      if (rateLimited >= f.maxRateLimitedTokens) break
+      continue
+    }
+    if (holders.length === 0) {
+      empty++
+      if (empty >= emptyLimit) break
+      continue
+    }
+    const before = out.length
+    for (const h of holders.slice(0, f.maxHoldersPerToken)) {
+      const address = typeof h.address === 'string' && h.address.length > 20 ? h.address : null
+      if (!address || seen.has(address)) continue
+      if (h.suspicious === true) {
+        audit.refused.push({
+          address,
+          reason: 'GMGN flagged the address (bundler / sniper / fresh wallet) - not a tracked human whale',
+        })
+        continue
+      }
+      if (h.tags.includes('transfer_in')) {
+        audit.refused.push({
+          address,
+          reason: 'holder received the position by transfer (never bought) - custody, not conviction',
+        })
+        continue
+      }
+      seen.add(address)
+      out.push({
+        address,
+        source: `call-feed:${contract.slice(0, 6)}`,
+        tokenContract: contract,
+        valueUsd: typeof h.usdValue === 'number' && h.usdValue > 0 ? h.usdValue : null,
+        flagged: false,
+        tags: h.tags,
+        pctOfSupply: typeof h.amountPercentage === 'number' ? h.amountPercentage : null,
+        leg: 'called-contracts',
+      })
+      // Size and the bot check are graded once, by the caller, for both
+      // holder sources. Counting here would report a wallet as admitted
+      // before either rule ran.
+    }
+    logger.info(
+      `called-holders ${contract.slice(0, 8)}… rows=${holders.length} accepted=${out.length - before}`,
+      'wallet-discovery',
+    )
+  }
+  return out
+}
+interface PersistedHoldings {
+  holders: HolderCandidate[]
+  contracts: number
+  candidates: number
+  admitted: number
+  measured: number
+  underFloor: number
+  missing: number
+  bestUsd: number
+}
+
+/**
+ * Leg B2 — replay the holder rows already persisted for established tokens.
+ *
+ * The live established leg is structurally empty: GMGN's `/holders` endpoint
+ * serves pump.fun-origin mints only, so every $1M+ token it was given came
+ * back with zero rows (live: 35 established tokens, 0 holders, 0 admissions).
+ * `token-holdings-persist` writes those same rows for established contracts
+ * through the same endpoint, so the table holds the closest thing to a
+ * measured position list this repo has — and it is re-upserted, not frozen.
+ *
+ * Two rules keep the replay honest:
+ *   · a token whose metadata is a PLACEHOLDER row (symbol = address prefix,
+ *     marketCap 0) is not established evidence and is skipped, the same way
+ *     `loadMarkets` treats it as absent;
+ *   · a token is kept only when DexScreener confirms market cap >=
+ *     `minEstablishedMc` — the leg is defined by token scale, not by the
+ *     Token row's possibly-never-populated marketCap column.
+ *
+ * Positions reuse `minHolderValueUsd` only when the row carries a real USD
+ * mark; a zero mark stays zero and is refused downstream as unmeasured
+ * rather than being inflated from a guessed supply.
+ */
+async function sweepPersistedHoldings(
+  f: DiscoveryFilters,
+  audit: HolderLegAudit,
+): Promise<PersistedHoldings> {
+  const out: PersistedHoldings = {
+    holders: [],
+    contracts: 0,
+    candidates: 0,
+    admitted: 0,
+    measured: 0,
+    underFloor: 0,
+    missing: 0,
+    bestUsd: 0,
+  }
+  // Token selection happens BEFORE any slice. Ordering the groupBy so the
+  // real-cap contracts win is impossible: `Token.marketCap` defaults to 0 and
+  // the placeholder rows are all that table holds, while the seeding rows
+  // (ETH/BTC/SOL) carry a $2T fake cap on an EVM address. Taking the top N by
+  // summed holdings therefore picked ten contracts whose only persisted rows
+  // were the placeholders themselves — market cap unknown, leg empty (live:
+  // 0 of 0 established contracts). The honest order is: every contract that
+  // has holdings, resolve its REAL cap from DexScreener, keep the ones over
+  // `minEstablishedMc`, then take the top `maxPersistedTokens` of those.
+  const grouped = await prisma.tokenHolding
+    .groupBy({
+      by: ['tokenId'],
+      _sum: { usdValue: true },
+      orderBy: { _sum: { usdValue: 'desc' } },
+    })
+    .catch((err: unknown) => {
+      audit.refused.push({
+        address: 'token-holding',
+        reason: `unreachable: persisted holdings unreadable (${String(err).slice(0, 80)})`,
+      })
+      return []
+    })
+  if (grouped.length === 0) return out
+  const tokens = await prisma.token.findMany({
+    where: { id: { in: grouped.map((r) => r.tokenId) }, chain: 'solana' },
+    select: { id: true, address: true, chain: true },
+  })
+  const meta = await fetchDexTokenMeta(tokens.map((t) => t.address))
+  const capById = new Map<string, number>()
+  for (const t of tokens) {
+    const mc = meta.get(t.address)?.marketCapUsd
+    if (typeof mc === 'number' && mc >= f.minEstablishedMc) capById.set(t.id, mc)
+  }
+  if (capById.size === 0) return out
+  const established = new Map<string, string>()
+  for (const t of tokens) {
+    if (!capById.has(t.id)) continue
+    if (established.size >= f.maxPersistedTokens) break
+    established.set(t.id, t.address)
+  }
+  if (established.size === 0) return out
+  out.contracts = established.size
+  const holdings = await prisma.tokenHolding
+    .findMany({
+      where: { tokenId: { in: [...established.keys()] } },
+      orderBy: { usdValue: 'desc' },
+      take: established.size * f.maxHoldersPerToken,
+      select: {
+        usdValue: true,
+        tokenId: true,
+        wallet: {
+          select: { address: true, labels: true, smartMoneyWallet: { select: { status: true } } },
+        },
+      },
+    })
+    .catch((err: unknown) => {
+      audit.refused.push({
+        address: 'token-holding',
+        reason: `unreachable: persisted holder rows unreadable (${String(err).slice(0, 80)})`,
+      })
+      return []
+    })
+  const seen = new Set<string>()
+  for (const h of holdings) {
+    const address = h.wallet?.address
+    const contract = established.get(h.tokenId)
+    if (!contract || typeof address !== 'string' || address.length < 20) continue
+    if (seen.has(address)) continue
+    seen.add(address)
+    out.holders.push({
+      address,
+      source: `holding:${contract.slice(0, 6)}`,
+      tokenContract: contract,
+      valueUsd: typeof h.usdValue === 'number' && h.usdValue > 0 ? h.usdValue : null,
+      flagged: false,
+      tags: h.wallet.labels,
+      pctOfSupply: null,
+      leg: 'persisted-holdings',
+    })
+  }
+  out.candidates = out.holders.length
   return out
 }
 
 export interface DiscoveryResult {
   discovered: DiscoveredWallet[]
+
   /** Refusals that happened BEFORE any measurement (unreachable token, no
    * holder rows, dead rank call). Measured-and-refused passes are in
    * `refusals`, each with the address and the rule that failed. */
@@ -699,8 +1175,16 @@ export interface DiscoveryResult {
   filterReasons: Record<string, string>
   /** Every measured wallet that did not enter the pool, with its reason. */
   refusals: Array<{ address: string; reason: string }>
+  /** Wallets the leaderboard leg admitted (WHALE / QUALIFIED / WATCHLIST). */
   leaderboardLeg: number
+  /** Holders of $1M+ established tokens admitted by the holder sweep. */
   highCapLeg: number
+  /** Holders of call-feed contracts admitted (sized over the USD floor, HUMAN). */
+  calledContractLeg: number
+  /** Holders replayed from the persisted TokenHolding rows of $1M+ tokens
+   * (sized over the USD floor, HUMAN). Owned by its own leg because the live
+   * established leg cannot return holders at all. */
+  persistedHoldingLeg: number
   /** Call-group join outcome for the holder leg; see CallGroupsReport. */
   callGroups: CallGroupsReport
 }
@@ -724,7 +1208,17 @@ export async function runWalletDiscovery(
   const refused = { noMeasure: 0, bot: 0, filters: 0 }
   const refusals: Array<{ address: string; reason: string }> = []
   const leaderboardAudit = { refused: [] as Array<{ address: string; reason: string }>, marksPicked: 0 }
-  const holderAudit = { refused: [] as Array<{ address: string; reason: string }>, marksPicked: 0 }
+  const holderAudit: HolderLegAudit = {
+    refused: [],
+    marksPicked: 0,
+    missing: 0,
+    underFloor: 0,
+    bestUsd: 0,
+    admitted: 0,
+    measured: 0,
+    candidates: 0,
+    contracts: 0,
+  }
   const legAudit = { marksPicked: 0 }
   const callGroups = emptyCallGroups()
   const filterBuckets = new Map<string, { n: number; min: number; max: number }>()
@@ -754,7 +1248,8 @@ export async function runWalletDiscovery(
   const aMs = Date.now() - tA
   await new Promise((r) => setTimeout(r, paceMs))
   const tB = Date.now()
-  const highCap = await sweepHighCapHolders(f, holderAudit, callGroups)
+  const holderSweep = await sweepHighCapHolders(f, holderAudit, callGroups)
+  const highCap = holderSweep.wallets
   const bMs = Date.now() - tB
 
   for (const w of leaderboard) if (w.admission === 'WATCHLIST') noteFilter(w)
@@ -774,7 +1269,19 @@ export async function runWalletDiscovery(
   }
   logger.info(
     `wallet discovery legs: leaderboard=${leaderboard.length} in ${aMs}ms, ` +
-      `highCapHolders=${highCap.length} in ${bMs}ms, ` +
+      `highCapHolders=${holderSweep.highCapAdmitted} admitted of ${holderSweep.wallets.length - holderSweep.called.admitted - holderSweep.persisted.admitted} graded in ${bMs}ms, ` +
+      `calledHolders=${holderSweep.called.admitted} of ${holderSweep.called.candidates} swept ` +
+      `from ${holderSweep.called.contracts} feed contract(s) ` +
+      `(underFloor=${holderSweep.called.underFloor} noMark=${holderSweep.called.missing} ` +
+      `bestMark=$${Math.round(holderSweep.called.bestUsd).toLocaleString('en-US')} ` +
+      `statsMeasured=${holderSweep.called.measured}) ` +
+      `in ${holderSweep.called.ms}ms, ` +
+      `persistedHolders=${holderSweep.persisted.admitted} of ${holderSweep.persisted.candidates} ` +
+      `from ${holderSweep.persisted.contracts} established contract(s) ` +
+      `(underFloor=${holderSweep.persisted.underFloor} noMark=${holderSweep.persisted.missing} ` +
+      `bestMark=$${Math.round(holderSweep.persisted.bestUsd).toLocaleString('en-US')} ` +
+      `statsMeasured=${holderSweep.persisted.measured}) ` +
+      `in ${holderSweep.persisted.ms}ms, ` +
       `holdersSizedOnPctFallback=${legAudit.marksPicked}`,
     'wallet-discovery',
   )
@@ -822,7 +1329,12 @@ export async function runWalletDiscovery(
     ),
     refusals,
     leaderboardLeg: leaderboard.length,
-    highCapLeg: highCap.length,
+    // Each leg reports what IT admitted, not what the merged pool holds: the
+    // sweep returns both holder sources in one array, so counting the array
+    // made the high-cap leg claim the called holders' admissions as its own.
+    highCapLeg: holderSweep.highCapAdmitted,
+    calledContractLeg: holderSweep.called.admitted,
+    persistedHoldingLeg: holderSweep.persisted.admitted,
     callGroups,
   }
 }
@@ -899,7 +1411,15 @@ export async function persistWallets(
         })
       }
       const status = admissionStatus(w, f)
-      const reason = `discovered:${w.leg}:${w.source};${w.admission};${w.human.verdict};${w.reason}`
+      // Call-group provenance is appended to the reason so the operator can
+      // answer "which group flagged the CA this wallet bought" from the DB
+      // alone. Kept out of `labels` because labels are the wallet's own
+      // source identity, not a per-token observation.
+      const called =
+        w.callGroups && w.callGroups.groupCount > 0
+          ? `;called:${w.callGroups.effectiveGroupCount.toFixed(2)}/${w.callGroups.groups.slice(0, 3).join(',')}`
+          : ''
+      const reason = `discovered:${w.leg}:${w.source};${w.admission};${w.human.verdict};${w.reason}${called}`
       // 0..70: a 100% win rate and a 700% pnl both sit at the top of the band,
       // so no single wallet can pin the ranking with one extreme number. The
       // earlier `*100 + pnl*10` overflowed—two QUALIFIED wallets (wr 85%,

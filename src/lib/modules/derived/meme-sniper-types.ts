@@ -116,8 +116,8 @@ export const SNIPER_LIMITS = {
   devPercent: 0,
   devHardCeilingPercent: 2,
   sniperPercent: 6,
-  bundlerPercent: 10,
-  bundlerToleratedPercent: 30,
+  /** Launch-cohort exit ratio (0..100) the evaluator requires before entry. */
+  bundlerExitRequiredPercent: 100,
   insiderPercent: 5,
   top10Percent: 30,
   clusterPercent: 5,

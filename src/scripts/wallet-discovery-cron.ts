@@ -18,6 +18,9 @@ import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 //   WALLET_DISCOVERY_BUDGET_MS      wall-clock budget per pass (default 120000)
 //   WALLET_DISCOVERY_MAX_STAT       stat re-measurements per pass (default 150)
 //   WALLET_DISCOVERY_MIN_HOLDER_USD  min high-cap holder position size (default 10_000)
+//   WALLET_DISCOVERY_MAX_CALLED     call-feed contracts swept (default 8)
+//   WALLET_DISCOVERY_MAX_PERSISTED  established contracts replayed from
+//                                   TokenHolding (default 10)
 //   WALLET_DISCOVERY_MIN_CALL_GROUPS origin-weighted call groups for a confluence tag (default 2)
 //   WALLET_DISCOVERY_TRUSTED_GROUPS  comma-separated groups that always count
 //   WALLET_DISCOVERY_DRY            "1" = report only, no DB writes
@@ -65,6 +68,8 @@ async function main(): Promise<void> {
     maxRateLimitedTokens: numEnv('WALLET_DISCOVERY_MAX_429', DISCOVERY_DEFAULTS.maxRateLimitedTokens),
     minCallGroups: numEnv('WALLET_DISCOVERY_MIN_CALL_GROUPS', DISCOVERY_DEFAULTS.minCallGroups),
     trustedCallGroups: listEnv('WALLET_DISCOVERY_TRUSTED_GROUPS', DISCOVERY_DEFAULTS.trustedCallGroups),
+    maxCalledTokens: numEnv('WALLET_DISCOVERY_MAX_CALLED', DISCOVERY_DEFAULTS.maxCalledTokens),
+    maxPersistedTokens: numEnv('WALLET_DISCOVERY_MAX_PERSISTED', DISCOVERY_DEFAULTS.maxPersistedTokens),
   }
 
   console.log(
@@ -78,6 +83,7 @@ async function main(): Promise<void> {
   const result = await runWalletDiscovery(filters)
   console.log(
     `[wallet-discovery] legs: leaderboard=${result.leaderboardLeg} highCapHolders=${result.highCapLeg} ` +
+      `calledContracts=${result.calledContractLeg} persistedHoldings=${result.persistedHoldingLeg} ` +
       `→ accepted=${result.discovered.length} ` +
       `refused(bot=${result.refused.bot} noMeasure=${result.refused.noMeasure} filters=${result.refused.filters})`,
   )
