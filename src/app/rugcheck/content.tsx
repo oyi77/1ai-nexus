@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from 'react'
+import { AlertTriangle, ShieldCheck, ShieldX } from 'lucide-react'
 import { Panel } from '@/components/shell/Panel'
 
 interface RugCheckResult {
@@ -15,8 +16,6 @@ interface RugCheckResult {
 export function RugcheckPageContent() {
   return <RugcheckPageInner />
 }
-
-
 
 function RugcheckPageInner() {
   const [address, setAddress] = useState('')
@@ -68,7 +67,6 @@ function RugcheckPageInner() {
           </div>
         </div>
 
-        {/* Search */}
         <Panel title="Token Safety Check" subtitle="Enter a token contract address">
           <div className="p-3 space-y-3">
             <div className="flex gap-2">
@@ -93,21 +91,24 @@ function RugcheckPageInner() {
           </div>
         </Panel>
 
-        {/* Educational content when no search */}
         {!result && !loading && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Panel title="How to Spot a Rug Pull" subtitle="Common red flags">
               <div className="p-3 space-y-2">
                 {[
-                  { icon: '🔴', title: 'Honeypot Contract', desc: 'Token can be bought but not sold. Check sell function before buying.' },
-                  { icon: '🔴', title: 'Mint Function', desc: 'Owner can create unlimited tokens, diluting your holdings.' },
-                  { icon: '🔴', title: 'Unlocked Liquidity', desc: 'Dev can pull liquidity at any time, crashing the price to zero.' },
-                  { icon: '🔴', title: 'High Owner Concentration', desc: 'Top 10 wallets hold >80% of supply — one sell = crash.' },
-                  { icon: '🟡', title: 'No Verified Contract', desc: 'Source code not verified on Etherscan — could hide malicious functions.' },
-                  { icon: '🟡', title: 'New Contract (< 24h)', desc: 'Very new tokens have no track record — higher risk.' },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-start gap-2 py-1">
-                    <span className="text-[14px]">{item.icon}</span>
+                  { risk: 'high', title: 'Honeypot Contract', desc: 'Token can be bought but not sold. Check the sell path before buying.' },
+                  { risk: 'high', title: 'Mint Function', desc: 'Owner can create unlimited tokens, diluting your holdings.' },
+                  { risk: 'high', title: 'Unlocked Liquidity', desc: 'Dev can pull liquidity at any time, crashing the price to zero.' },
+                  { risk: 'high', title: 'High Owner Concentration', desc: 'Top 10 wallets hold >80% of supply — one sell can crash it.' },
+                  { risk: 'medium', title: 'No Verified Contract', desc: 'Source code not verified on the explorer — could hide malicious functions.' },
+                  { risk: 'medium', title: 'New Contract', desc: 'Tokens under 24h old have no track record — higher risk.' },
+                ].map((item) => (
+                  <div key={item.title} className="flex items-start gap-2 py-1">
+                    {item.risk === 'high' ? (
+                      <ShieldX size={14} className="shrink-0 mt-0.5 text-data-bear" aria-hidden="true" />
+                    ) : (
+                      <AlertTriangle size={14} className="shrink-0 mt-0.5 text-data-warn" aria-hidden="true" />
+                    )}
                     <div>
                       <div className="text-xs font-mono font-bold text-text-primary">{item.title}</div>
                       <div className="text-xs font-mono text-text-muted">{item.desc}</div>
@@ -138,7 +139,6 @@ function RugcheckPageInner() {
           </div>
         )}
 
-        {/* Result */}
         {result && (
           <>
             <Panel title="Safety Score" subtitle={result.summary}>
@@ -149,27 +149,25 @@ function RugcheckPageInner() {
                 <div className={`text-[18px] font-head font-bold ${riskColor(result.riskLevel)}`}>
                   {result.riskLevel}
                 </div>
-                {/* Score bar */}
                 <div className="mt-3 h-3 bg-bg-border rounded-full overflow-hidden max-w-xs mx-auto">
                   <div className={`h-full rounded-full transition-all ${riskBg(result.riskLevel)}`} style={{ width: `${result.riskScore}%` }} />
                 </div>
               </div>
             </Panel>
-
             <Panel title="Risk Factors" subtitle={`${result.checks.length} checks performed`}>
               <div className="space-y-0">
-                {result.checks.map((check, i) => (
-                  <div key={i} className="flex items-center gap-3 px-3 py-2 border-b border-bg-border/50">
-                    <span className={`text-[14px] ${check.passed ? 'text-data-bull' : 'text-data-bear'}`}>
-                      {check.passed ? '✅' : '⚠️'}
-                    </span>
+                {result.checks.map((check) => (
+                  <div key={check.name} className="flex items-center gap-3 px-3 py-2 border-b border-bg-border/50">
+                    {check.passed ? (
+                      <ShieldCheck size={14} className="shrink-0 text-data-bull" aria-hidden="true" />
+                    ) : (
+                      <AlertTriangle size={14} className="shrink-0 text-data-bear" aria-hidden="true" />
+                    )}
                     <div className="flex-1">
                       <div className="text-[12px] font-medium text-text-primary">{check.name}</div>
                       <div className="text-xs text-text-muted">{check.detail}</div>
                     </div>
-                    {check.weight > 0 && (
-                      <span className="text-xs font-mono text-data-bear">+{check.weight} risk</span>
-                    )}
+                    <span className="text-xs font-mono tabular-nums text-text-muted">{check.weight > 0 ? `+${check.weight} risk` : 'no weight'}</span>
                   </div>
                 ))}
               </div>
