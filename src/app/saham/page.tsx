@@ -27,19 +27,18 @@ export default function SahamHubPage() {
   const query = useQueryParams()
   const router = useRouter()
   const shown = query.get("tab")
-  const [tab, setTab] = useState<Tab>(isTab(shown) ? shown : "ideas")
-  const [syncedTab, setSyncedTab] = useState<Tab>(tab)
+  const urlTab: Tab = isTab(shown) ? shown : "ideas"
+  const [tab, setTab] = useState<Tab>(urlTab)
+  const [urlTabSeen, setUrlTabSeen] = useState<Tab>(urlTab)
   const [filter, setFilter] = useState("")
 
-  if (shown !== syncedTab && query.get("tab") !== syncedTab) {
-    const next = isTab(shown) ? shown : "ideas"
-    setSyncedTab(next)
-    if (next !== tab) setTab(next)
+  if (urlTab !== urlTabSeen) {
+    setUrlTabSeen(urlTab)
+    if (urlTab !== tab) setTab(urlTab)
   }
 
   const selectTab = (next: Tab) => {
     setTab(next)
-    setSyncedTab(next)
     router.replace(`/saham?tab=${next}`, { scroll: false })
   }
 
