@@ -78,12 +78,20 @@ def measure(days: int) -> dict:
 
 
 def merge(existing: dict, measured: dict) -> dict:
-    """Keep foreign producers' records; replace telegram-origin ones."""
+    """Keep foreign producers' records; only the weight is Telegram's to set.
+
+    A group measured on both sides (Solpump win rate + Telegram origin rate)
+    must keep BOTH: recording `source=telegram-origin` deleted the Solpump
+    fields on the next run, so `fetch-caller-scores.py` rewrote the file and
+    dropped every measured weight back to its default 1.0.
+    """
     kept = {
         name: rec for name, rec in existing.items()
         if isinstance(rec, dict) and rec.get('source') != 'telegram-origin'
     }
-    kept.update(measured)
+    for name, rec in measured.items():
+        prior = kept.get(name)
+        kept[name] = {**(prior if isinstance(prior, dict) else {}), **rec}
     return kept
 
 

@@ -639,9 +639,11 @@ background harvesters, scanners, and pipelines. Key entries:
 | `*/2 * * * *` | `python3 scripts/call-feed.py --limit 25 --window-min 60` | `/tmp/call-feed-cron.err` | Read operator call channels, score token confluence → `data/call-feed-latest.json` |
 | `*/2 * * * *` (offset 45s) | `npm run sync:call-feed` | `/tmp/call-feed-sync.log` | Mirror the call-feed artifact into the `CallFeed` table (DB-first reads) and prune rows older than `CALL_FEED_MAX_AGE_MIN` (180). |
 | `0 */6 * * *` | `npm run cron:caller-scores` | `/tmp/caller-scores-cron.log` | Refresh Telegram Alpha Caller weights from Solpump → `data/caller-scores.json` |
+| `5 */6 * * *` | `npm run cron:call-group-weights` | `/tmp/call-group-weights-cron.log` | Measure each call group's origin rate from the call-feed store and rewrite its confluence weight in `data/caller-scores.json`. Runs after `cron:caller-scores` so it can merge onto the Solpump set. |
 | `*/15 * * * *` | `npm run cron:zero-issue` | `/tmp/nexus-zero-issue.log` | Zero-issue audit sweep + Telegram alerting |
 | `*/5 * * * *` | `npm run cron:smart-money-sync` | `/tmp/smart-money-sync.log` | Smart-money wallet sync |
 | `0 3 * * *` | `npm run cron:wallet-refresh` | `/tmp/wallet-refresh.log` | Wallet refresh |
+| `17 2 * * *` | `npm run cron:wallet-discovery` | `/tmp/wallet-discovery.log` | Rebuild the tracked pool from the GMGN leaderboard + holders of MC>$1M tokens. KOLSCAN-independent. Anti-bot gate applies; every refusal is logged by rule. |
 | `30 3 * * *` | `npm run harvest:whales` | `/tmp/whale-harvester.log` | Whale harvest |
 | `0 4 * * *` | `npm run bootstrap:gmgn` | `/tmp/gmgn-bootstrap.log` | GMGN session bootstrap |
 | `*/30 * * * *` | `npm run cron:token-holdings` | `/tmp/token-holdings.log` | Populate TokenHolding from GMGN holder data (cross-token whale context). OFF unless `TOKEN_HOLDINGS_ENABLED="true"`. |
