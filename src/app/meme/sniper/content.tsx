@@ -7,6 +7,7 @@ import { LiveDot } from "@/components/primitives/LiveDot";
 import { csrfFetch } from "@/lib/csrf";
 import type { MemeRiskAudit } from "@/lib/modules/meme/types";
 import type { DevHistoryVerdict } from "@/lib/modules/derived/dev-history";
+import type { SniperLogEntry } from "@/lib/modules/derived/sniper-log";
 import {
   RefreshCw,
   ExternalLink,
@@ -22,20 +23,9 @@ type Entry = {
   rationale: string;
   rejections: string[];
   warnings: string[];
-  metrics: {
-    stage: string;
-    stageLabel: string;
-    ageLabel: string;
-    volMcRatio: number;
-    requiredRatio: number;
-    devPercent: number | null;
-    sniperPercent: number | null;
-    bundlerPercent: number | null;
-    insiderPercent: number | null;
-    top10Percent: number | null;
-    clusterPercent: number | null;
-    avgPnlPercent: number | null;
-    pnlAssessment: string;
+  metrics: Omit<SniperLogEntry["metrics"], "volMcRatio"> & {
+    /** null when momentum was never measured — the server type owns this. */
+    volMcRatio: number | null;
   };
   contract: string;
   ticker: string;
@@ -99,7 +89,6 @@ function isTrenchCandidate(e: Entry): boolean {
   if (e.contract.toLowerCase().endsWith("pump")) return true;
   if (e.discoveryCategory === "BONDING") return true;
   if (e.discoveryEvidence?.some((ev) => ev.provider?.includes("trenches") || ev.provider?.includes("solpump") || ev.note?.includes("bonding"))) return true;
-  if (e.metrics.stage === "bonding" || e.metrics.stageLabel?.toLowerCase().includes("bonding")) return true;
   const full = (e.rationale + " " + e.rejections.join(" ") + " " + e.warnings.join(" ")).toLowerCase();
   return full.includes("trenches") || full.includes("bonding");
 }
@@ -205,7 +194,7 @@ const columns: Column<Entry>[] = [
     header: "Vol/MCap",
     width: 90,
     align: "right",
-    accessor: (r) => r.metrics.volMcRatio,
+    accessor: (r) => r.metrics.volMcRatio ?? -1,
     render: (r) => {
       const ratio = r.metrics.volMcRatio;
       if (ratio === null) return <span className="text-text-muted">n/a</span>;
