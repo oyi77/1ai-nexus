@@ -91,6 +91,18 @@ interface CallFeedArtifact {
 }
 
 /**
+ * Outcome of one feed read. `readOk:false` means the source could not be
+ * read (artifact missing/invalid/stale AND no DB rows to fall back on, or the
+ * DB threw with no readable artifact). An empty-but-readable feed is
+ * `readOk:true, rows:[]` — "nobody called it" and "we could not look" have
+ * opposite fixes, so the caller must be able to tell them apart.
+ */
+export interface CallFeedRead {
+  rows: CallFeedRow[]
+  readOk: boolean
+}
+
+/**
  * Read the Python-owned JSON artifact directly (no DB) — the sync step's
  * source of truth. Needed because the DB-first `loadCallFeed` would hand back
  * the DB's own rows (which lack provenance on old records), making the sync
@@ -100,24 +112,24 @@ export function readCallFeedArtifact(
   nowMs = Date.now(),
   maxAgeMin = Number(process.env.CALL_FEED_MAX_AGE_MIN) || 180,
 ): CallFeedRow[] {
-  return readJsonArtifact(nowMs, maxAgeMin)
+  return readJsonArtifact(nowMs, maxAgeMin).rows
 }
 
 function isSolanaChain(chain: string | null | undefined): boolean {
   return !chain || chain === 'solana'
 }
 
-function readJsonArtifact(nowMs: number, maxAgeMin: number): CallFeedRow[] {
+function readJsonArtifact(nowMs: number, maxAgeMin: number): CallFeedRead {
   try {
     const p = callFeedJsonPath()
-    if (!existsSync(p)) return []
+    if (!existsSync(p)) return { rows: [], readOk: false }
     const raw = JSON.parse(readFileSync(p, 'utf8')) as CallFeedArtifact
-    if (!raw || !Array.isArray(raw.candidates)) return []
+    if (!raw || !Array.isArray(raw.candidates)) return { rows: [], readOk: false }
     const generatedAt = Date.parse(raw.generated_at)
-    if (!Number.isFinite(generatedAt)) return []
+    if (!Number.isFinite(generatedAt)) return { rows: [], readOk: false }
     const fresh = (ageMin: number) => ageMin <= maxAgeMin && ageMin >= -5
-    if (!fresh((nowMs - generatedAt) / 60_000)) return []
-    return raw.candidates
+    if (!fresh((nowMs - generatedAt) / 60_000)) return { rows: [], readOk: false }
+    const rows = raw.candidates
       .filter((c) => typeof c?.contract === 'string' && typeof c.source_count === 'number')
       .map((c) => ({
         contract: c.contract as string,
@@ -136,8 +148,9 @@ function readJsonArtifact(nowMs: number, maxAgeMin: number): CallFeedRow[] {
       }))
       .filter((c) => c.sourceCount >= 1)
       .filter((c) => fresh((nowMs - Date.parse(c.lastSeen)) / 60_000))
+    return { rows, readOk: true }
   } catch {
-    return []
+    return { rows: [], readOk: false }
   }
 }
 /**
@@ -219,6 +232,11 @@ export async function saveCallFeedRows(rows: CallFeedRow[]): Promise<void> {
  * still enforced: DB rows older than `maxAgeMin` are never queried, and the
  * artifact reader drops its own stale rows. Never throws.
  *
+ * `readOk` is a separate verdict from `rows`: a DB read that succeeded over
+ * an age-window with no calls is a legitimate "nobody called anything", not
+ * an unreadable feed. Only a failed read (and a dead/expired artifact) is
+ * readOk:false.
+ *
  * NOTE: sources / kinds / weightedScore / callerWeights are all persisted
  * (callerWeights added 2026-10-22 so the DB path can weight groups by origin
  * rate exactly as the JSON artifact does).
@@ -226,7 +244,7 @@ export async function saveCallFeedRows(rows: CallFeedRow[]): Promise<void> {
 export async function loadCallFeed(
   nowMs = Date.now(),
   maxAgeMin = Number(process.env.CALL_FEED_MAX_AGE_MIN) || 180,
-): Promise<CallFeedRow[]> {
+): Promise<CallFeedRead> {
   if (isCallFeedDbDisabled()) return readJsonArtifact(nowMs, maxAgeMin)
   try {
     const cutoff = new Date(nowMs - maxAgeMin * 60_000)
@@ -256,7 +274,12 @@ export async function loadCallFeed(
         ...(r.weightedScore !== null && { weightedScore: r.weightedScore }),
         ...(isWeightMap(r.callerWeights) && { callerWeights: r.callerWeights }),
       }))
-    return mergeCallFeedRows(usable, readJsonArtifact(nowMs, maxAgeMin))
+    // A resolved findMany() is itself proof the feed was readable: an empty
+    // window means "nobody called anything", which is a measurement, not an
+    // outage. Only a throw (or a dead artifact under a dead DB) is unreadable.
+    const artifact = readJsonArtifact(nowMs, maxAgeMin)
+    const rows = mergeCallFeedRows(usable, artifact.rows)
+    return { rows, readOk: true }
   } catch (err) {
     console.error(`[db-call-feed] DB read failed: ${errorMessage(err)}`)
     return readJsonArtifact(nowMs, maxAgeMin)

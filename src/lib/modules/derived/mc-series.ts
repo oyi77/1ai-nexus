@@ -15,8 +15,16 @@
 
 const GECKO = 'https://api.geckoterminal.com/api/v2'
 const TIMEOUT_MS = 10_000
-const MAX_PAGES = 3
+const MAX_PAGES = 1
 const PAGE_LIMIT = 1000
+// Measured live 2026-10-22: keyless GeckoTerminal returns 429 even at one
+// call every 30s (200/200/429/200), and the limit is shared with every other
+// process on the host. A single-shot read is therefore a coin flip, so each
+// request gets bounded retries and a full read costs ONE call (the pools
+// response already carries 1000 hourly bars).
+const RETRIES = 3
+const RETRY_BASE_MS = 2_000
+const MIN_GAP_MS = 2_500
 
 export type McTimeframe = 'minute' | 'hour' | 'day'
 
@@ -41,12 +49,25 @@ export interface McSeries {
   source: string
 }
 
+/**
+ * Why a series is missing, for the operator log: "no pool" is a real
+ * verdict about the token, "throttled" is a verdict about the host. They
+ * must never be reported as the same thing.
+ */
+export type McSeriesFailure = 'throttled' | 'no-pool' | 'no-bars'
+
 export interface McSeriesOptions {
   timeframe?: McTimeframe
   /** Bars to request in total (default 300, capped at 3000). */
   barLimit?: number
   fetchFn?: typeof fetch
   nowMs?: number
+  /** Injected in tests; defaults to a real timer. */
+  sleepFn?: (ms: number) => Promise<void>
+  /** Retries per request on 429/5xx (default RETRIES). */
+  retries?: number
+  /** Retry/backoff base in ms (default RETRY_BASE_MS). */
+  retryBaseMs?: number
 }
 
 interface GtPoolAttributes {
@@ -123,31 +144,98 @@ export function parseOhlcv(rows: number[][], supply: number): McBar[] {
   return out.sort((a, b) => a.timeMs - b.timeMs)
 }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+/** Host-wide spacing between GeckoTerminal calls, regardless of caller. */
+let nextCallAt = 0
+
+type GeckoResult<T> = { ok: true; json: T } | { ok: false; failure: McSeriesFailure }
+
+interface GeckoCtx {
+  fetchFn: typeof fetch
+  sleepFn: (ms: number) => Promise<void>
+  retries: number
+  retryBaseMs: number
+}
+
+/**
+ * One GeckoTerminal GET with the host-wide gap, bounded retries on 429/5xx,
+ * and a classified failure. Never throws: an unreachable host is reported as
+ * 'throttled' so the caller can say "the host was busy" instead of claiming
+ * the token has no market.
+ */
+async function geckoJson<T>(url: string, ctx: GeckoCtx): Promise<GeckoResult<T>> {
+  for (let attempt = 0; attempt <= ctx.retries; attempt++) {
+    const wait = nextCallAt - Date.now()
+    if (wait > 0) await ctx.sleepFn(wait)
+    nextCallAt = Date.now() + MIN_GAP_MS
+    let status = 0
+    try {
+      const res = await ctx.fetchFn(url, {
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        headers: { accept: 'application/json' },
+      })
+      status = res.status
+      if (res.ok) return { ok: true, json: (await res.json()) as T }
+    } catch {
+      status = 0
+    }
+    const retryable = status === 0 || status === 429 || status >= 500
+    if (!retryable) return { ok: false, failure: 'no-pool' }
+    if (attempt < ctx.retries) {
+      const backoff = ctx.retryBaseMs * 2 ** attempt
+      await ctx.sleepFn(backoff + Math.floor(Math.random() * 250))
+    }
+  }
+  return { ok: false, failure: 'throttled' }
+}
+
 /**
  * Fetch the MC series for one mint. Returns null when the token has no
  * usable base-token pool, no derivable supply, or no bars — the caller
  * must treat null as "no structure evidence", never as a flat curve.
+ *
+ * A throttled host is NOT a token without a market: `onFailure` reports
+ * which one happened. Both still yield null, because an unread series can
+ * never prove a strategy.
  */
 export async function fetchMcSeries(
   contract: string,
   opts: McSeriesOptions = {},
+  onFailure?: (reason: McSeriesFailure) => void,
 ): Promise<McSeries | null> {
-  const f = opts.fetchFn ?? fetch
+  const ctx: GeckoCtx = {
+    fetchFn: opts.fetchFn ?? fetch,
+    sleepFn: opts.sleepFn ?? sleep,
+    retries: opts.retries ?? RETRIES,
+    retryBaseMs: opts.retryBaseMs ?? RETRY_BASE_MS,
+  }
   const timeframe = opts.timeframe ?? 'hour'
   const barLimit = Math.max(20, Math.min(opts.barLimit ?? 300, PAGE_LIMIT * MAX_PAGES))
 
-  const poolsRes = await f(
+  const pools = await geckoJson<{ data?: GtPool[] }>(
     `${GECKO}/networks/solana/tokens/${encodeURIComponent(contract)}/pools?page=1`,
-    { signal: AbortSignal.timeout(TIMEOUT_MS) },
+    ctx,
   )
-  if (!poolsRes.ok) return null
-  const poolsJson = (await poolsRes.json()) as { data?: GtPool[] }
-  if (!Array.isArray(poolsJson?.data)) return null
+  if (!pools.ok) {
+    onFailure?.(pools.failure)
+    return null
+  }
+  if (!Array.isArray(pools.json?.data)) {
+    onFailure?.('no-pool')
+    return null
+  }
 
-  const picked = pickPool(poolsJson.data, contract)
-  if (!picked) return null
+  const picked = pickPool(pools.json.data, contract)
+  if (!picked) {
+    onFailure?.('no-pool')
+    return null
+  }
   const poolAddress = picked.pool.attributes?.address ?? picked.pool.id?.replace(/^solana_/, '')
-  if (!poolAddress) return null
+  if (!poolAddress) {
+    onFailure?.('no-pool')
+    return null
+  }
 
   const rows: number[][] = []
   let cursorSec: number | null = null
@@ -155,23 +243,34 @@ export async function fetchMcSeries(
   for (let i = 0; i < pages; i++) {
     const params = new URLSearchParams({ aggregate: '1', limit: String(PAGE_LIMIT) })
     if (cursorSec !== null) params.set('before_timestamp', String(cursorSec))
-    const res = await f(
+    const page = await geckoJson<{ data?: { attributes?: { ohlcv_list?: number[][] } } }>(
       `${GECKO}/networks/solana/pools/${encodeURIComponent(poolAddress)}/ohlcv/${timeframe}?${params}`,
-      { signal: AbortSignal.timeout(TIMEOUT_MS) },
+      ctx,
     )
-    if (!res.ok) break
-    const json = (await res.json()) as { data?: { attributes?: { ohlcv_list?: number[][] } } }
-    const list = json?.data?.attributes?.ohlcv_list
+    if (!page.ok) {
+      if (rows.length === 0) {
+        onFailure?.(page.failure)
+        return null
+      }
+      break
+    }
+    const list = page.json?.data?.attributes?.ohlcv_list
     if (!Array.isArray(list) || list.length === 0) break
     rows.push(...list)
     const oldest = list[list.length - 1]
     cursorSec = Array.isArray(oldest) && typeof oldest[0] === 'number' ? oldest[0] - 1 : null
     if (cursorSec === null || rows.length >= barLimit) break
   }
-  if (rows.length === 0) return null
+  if (rows.length === 0) {
+    onFailure?.('no-bars')
+    return null
+  }
 
   const bars = parseOhlcv(rows.slice(0, barLimit), picked.supply)
-  if (bars.length < 2) return null
+  if (bars.length < 2) {
+    onFailure?.('no-bars')
+    return null
+  }
 
   return {
     contract,

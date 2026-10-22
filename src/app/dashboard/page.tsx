@@ -79,10 +79,11 @@ const HUB_GROUPS: Array<{ title: string; links: Array<{ label: string; href: str
     links: [
       { label: 'Fundamentals', href: '/fundamentals' },
       { label: 'Financials', href: '/financials' },
-      { label: 'Prediction Markets', href: '/prediction-markets' },
-      { label: 'Paper Trading', href: '/predictions/paper' },
-      { label: 'Trade Tape', href: '/predictions/tape' },
-      { label: 'Forecast Board', href: '/predictions/leaderboard' },
+      { label: 'Forecast Hub', href: '/predictions' },
+      { label: 'Prediction Markets', href: '/predictions?tab=markets' },
+      { label: 'Paper Trading', href: '/predictions?tab=paper' },
+      { label: 'Trade Tape', href: '/predictions?tab=tape' },
+      { label: 'Forecast Board', href: '/predictions?tab=board' },
     ],
   },
 ]

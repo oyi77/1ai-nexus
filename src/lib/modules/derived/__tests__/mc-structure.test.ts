@@ -184,7 +184,44 @@ describe('analyzeStructure (end to end)', () => {
     expect(s?.seriesHighUsd).toBe(6_000_000)
     expect(s?.currentMcUsd).toBe(4_600_000)
   })
+  it('reads the base from BEFORE the breakout window, so a close above the old range is provable', () => {
+    const prior = baseBars(STRUCTURE_DEFAULTS.baseWindowBars, 3_600_000, 4_400_000)
+    const breakoutBar = series([[4_500_000, 5_200_000, 5_100_000, 50_000]])[0]
+    const after = baseBars(STRUCTURE_DEFAULTS.baseWindowBars - 1, 4_900_000, 5_400_000)
+    const bars = [...prior, breakoutBar, ...after]
+    const breakoutFrom = bars.length - STRUCTURE_DEFAULTS.baseWindowBars
+    const s = analyzeStructure(bars)
+    expect(s).not.toBeNull()
+    // The trailing post-breakout bars alone read as a 4.8M–5.4M range. The
+    // resistance must come from the PRIOR segment; taking it from the window
+    // the breakout is measured in makes the level a price just created.
+    expect(s?.base?.lowUsd).toBe(3_600_000)
+    expect(s?.base?.highUsd).toBe(4_400_000)
+    expect(s?.minorResistanceUsd).toBe(4_400_000)
+    expect(s?.breakout?.index).toBe(STRUCTURE_DEFAULTS.baseWindowBars)
+    expect(s?.breakout?.index ?? -1).toBeGreaterThanOrEqual(breakoutFrom)
+  })
 
+  it('does not lift resistance from a pivot inside the breakout window', () => {
+    const prior = baseBars(8, 3_600_000, 4_400_000)
+    // A spike whose HIGH (5.5M) sits inside the trailing window and never
+    // closes above it. Under a shared window that high becomes resistance,
+    // so the only path to a breakout would be a close over 5.61M.
+    const spike = series([[4_200_000, 5_500_000, 4_300_000, 9_000]])[0]
+    const after = baseBars(3, 4_100_000, 4_350_000)
+    const bars = [...prior, spike, ...after].map((b, i) => ({ ...b, timeMs: T0 + i * HOUR }))
+    const s = analyzeStructure(bars, { pivotWidth: 1, baseWindowBars: 4, minBaseBars: 4 })
+    expect(s?.minorResistanceUsd).toBe(4_400_000)
+    expect(s?.breakout).toBeNull()
+  })
+
+  it('reports NO breakout when every close stays inside the prior range', () => {
+    const prior = baseBars(STRUCTURE_DEFAULTS.baseWindowBars, 3_600_000, 4_400_000)
+    const inside = baseBars(STRUCTURE_DEFAULTS.baseWindowBars, 3_700_000, 4_300_000)
+    const s = analyzeStructure([...prior, ...inside])
+    expect(s?.base?.highUsd).toBe(4_400_000)
+    expect(s?.breakout).toBeNull()
+  })
   it('returns null for a series too short to read', () => {
     expect(analyzeStructure(series([[1, 2, 1.5, 1]]))).toBeNull()
   })

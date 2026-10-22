@@ -375,7 +375,7 @@ async function hydrateFromDexscreener(chain: string, contract: string): Promise<
 }
 
 async function readCallFeedArtifact(): Promise<CallFeedCandidate[]> {
-  const rows = await loadCallFeed()
+  const { rows } = await loadCallFeed()
   return rows.map((r) => ({
     contract: r.contract,
     chain: r.chain,

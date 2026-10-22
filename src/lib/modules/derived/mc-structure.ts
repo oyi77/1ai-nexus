@@ -174,13 +174,24 @@ export function printsNewLows(bars: StructureBar[], window: number): boolean {
   return recentLow <= priorLow
 }
 
-/** The consolidation range over the last `window` bars, or null if too wide. */
+/**
+ * The consolidation range, or null if too wide to be a base.
+ *
+ * The base is searched BACK from `atIndex` (default: the series end). The
+ * breakout window slices that end, so passing `bars.length -
+ * breakoutWindowBars` reads the base off bars the breakout cannot be
+ * inside. Reading both off the same trailing window made the two rules one
+ * statement: a base that still contains the breakout bar caps its own
+ * resistance, so "close above the range" could not be proven.
+ */
 export function findBase(
   bars: StructureBar[],
   cfg: StructureConfig,
+  atIndex: number = bars.length,
 ): ConsolidationBase | null {
-  if (bars.length < cfg.minBaseBars) return null
-  const window = bars.slice(-cfg.baseWindowBars)
+  const end = Math.max(0, Math.min(atIndex, bars.length))
+  if (end < cfg.minBaseBars) return null
+  const window = bars.slice(Math.max(0, end - cfg.baseWindowBars), end)
   const lowUsd = Math.min(...window.map((b) => b.lowUsd))
   const highUsd = Math.max(...window.map((b) => b.highUsd))
   if (!(lowUsd > 0) || !(highUsd > lowUsd)) return null
@@ -198,38 +209,43 @@ export function findBase(
 }
 
 /**
- * Minor resistance: the highest swing high of the base window that sits
- * above the base mid. Without a base, fall back to the highest pivot high
- * in the base window. Null when the series has no usable swing high.
+ * Minor resistance: the highest swing high BELOW `atIndex` (the base
+ * segment), falling back to the base's own high, then to the highest high
+ * of that segment. A swing high inside the breakout window is not
+ * resistance — the price already traded above it, so treating it as a
+ * ceiling would let a bar "break out" above a level it just created.
  */
 export function minorResistance(
   bars: StructureBar[],
   base: ConsolidationBase | null,
   pivots: Pivot[],
   cfg: StructureConfig,
+  atIndex: number = bars.length,
 ): number | null {
-  const fromIndex = Math.max(0, bars.length - cfg.baseWindowBars)
-  const highs = pivots.filter((p) => p.kind === 'high' && p.index >= fromIndex)
+  const end = Math.max(0, Math.min(atIndex, bars.length))
+  const fromIndex = Math.max(0, end - cfg.baseWindowBars)
+  const highs = pivots.filter((p) => p.kind === 'high' && p.index >= fromIndex && p.index < end)
   if (highs.length > 0) return Math.max(...highs.map((p) => p.priceUsd))
   if (base) return base.highUsd
-  const window = bars.slice(-cfg.baseWindowBars)
+  const window = bars.slice(fromIndex, end)
   return window.length > 0 ? Math.max(...window.map((b) => b.highUsd)) : null
 }
 
 /**
- * Breakout: the first bar whose CLOSE exceeds `level × (1 + margin)`.
- * A wick above the level is not a breakout — the operator's rule is
- * "break & CLOSE above resistance".
+ * Breakout: the first bar AT OR AFTER `fromIndex` whose CLOSE exceeds
+ * `level × (1 + margin)`. A wick above the level is not a breakout — the
+ * operator's rule is "break & CLOSE above resistance".
  */
 export function findBreakout(
   bars: StructureBar[],
   levelUsd: number | null,
   cfg: StructureConfig,
+  fromIndex: number = Math.max(0, bars.length - cfg.baseWindowBars),
 ): Breakout | null {
   if (levelUsd === null || !(levelUsd > 0)) return null
   const threshold = levelUsd * (1 + cfg.breakoutMarginPct)
-  const fromIndex = Math.max(0, bars.length - cfg.baseWindowBars)
-  for (let i = fromIndex; i < bars.length; i++) {
+  const start = Math.max(0, Math.min(fromIndex, bars.length))
+  for (let i = start; i < bars.length; i++) {
     const b = bars[i]
     if (b.closeUsd > threshold) {
       return {
@@ -335,9 +351,18 @@ export function analyzeStructure(
         return Math.min(...recent.map((b) => b.lowUsd)) > Math.min(...prior.map((b) => b.lowUsd))
       })()
 
-  const base = findBase(bars, cfg)
-  const resistance = minorResistance(bars, base, pivots, cfg)
-  const breakout = findBreakout(bars, resistance, cfg)
+  // Two segments when the series has history BEFORE the breakout window:
+  // the base (and its resistance) is read from bars that precede the
+  // window, the breakout from inside it. Sharing one trailing window made
+  // "range" and "left the range" the same statement, which no series can
+  // satisfy. A series no longer than one window has no prior segment, so it
+  // falls back to the single-window read (and the breakout stays unfound
+  // unless price clears the top of everything visible).
+  const breakoutFrom =
+    bars.length <= cfg.baseWindowBars ? bars.length : bars.length - cfg.baseWindowBars
+  const base = findBase(bars, cfg, breakoutFrom)
+  const resistance = minorResistance(bars, base, pivots, cfg, breakoutFrom)
+  const breakout = findBreakout(bars, resistance, cfg, breakoutFrom)
   const retest = findRetest(bars, breakout, cfg)
   const last = bars[bars.length - 1]
 

@@ -55,8 +55,11 @@ async function main(): Promise<void> {
   }
 
   // Verify: read back from DB to confirm the upserts landed.
-  const dbRows = await loadCallFeed(nowMs, maxAgeMin)
-  console.log(`[call-feed-sync] done: DB now has ${dbRows.length} call-feed row(s)`)
+  const back = await loadCallFeed(nowMs, maxAgeMin)
+  console.log(
+    `[call-feed-sync] done: DB now has ${back.rows.length} call-feed row(s)` +
+      (back.readOk ? '' : ' (feed NOT readable after sync)'),
+  )
 }
 
 main()

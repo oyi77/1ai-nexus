@@ -28,7 +28,7 @@ export interface MarketContext {
   volume24hUsd: number | null
 }
 
-import type { McStructure } from './mc-structure'
+import type { ConsolidationBase, McStructure } from './mc-structure'
 
 /** Holder-guard context: how many tracked wallets currently hold the token. */
 export interface HolderContext {
@@ -36,14 +36,16 @@ export interface HolderContext {
   trackedHolders: number | null
 }
 
-/** Wallet-independence context for Whale Comeback's funding-source rule. */
+/**
+ * Wallet-independence context for Whale Comeback's funding-source rule.
+ *
+ * The operator's mandate is explicit: "cek funding source ya, jangan sampe
+ * satu orang nyebar ke banyak wallet". So an UNCHECKED or UNKNOWN pair is
+ * not evidence of independence — it is absence of evidence, and the gate
+ * refuses until the cluster check actually answers. Only `false` (checked,
+ * not connected) passes; `true` and `null` both refuse.
+ */
 export interface IndependenceContext {
-  /**
-   * For each pair of buyers, true when the analyzer says they are NOT
-   * linked (cluster analysis / funding-trace evidence). A null entry
-   * means unknown — Whale Comeback treats unknown as INDEPENDENT with a
-   * confidence penalty, matching the operator's "check funding source".
-   */
   checked: Array<{ a: string; b: string; connected: boolean | null; confidence: number | null }>
 }
 
@@ -75,14 +77,58 @@ export interface StrategyVerdict {
   rr: number | null
 }
 
+/** Rules in the "setup readable" group: they describe the SHAPE, not the market. */
+export const STRUCTURE_RULES: ReadonlySet<string> = new Set([
+  'no-new-lows',
+  'higher-low',
+  'consolidation-base',
+  'selling-pressure-fading',
+  'buy-volume-returning',
+  'break-and-close-above-resistance',
+  'breakout-with-volume',
+  'retest-occurred-and-held',
+  'retest-volume-shrinking',
+  'prior-history',
+  'corrected-from-high',
+  'classified-whale-buys',
+])
+
+/**
+ * Rules that refuse on MISSING PROOF rather than on a market reading.
+ *
+ * A failed market rule is a near-miss (the setup existed, the market said no)
+ * and still scores. A failed evidence gate is not a near-miss: the setup may
+ * be flawless and still uninvestable. Scoring it would rank a clustered pair
+ * of whales — one funder, one decision — next to genuinely weaker tokens.
+ */
+export const EVIDENCE_BLOCKED: ReadonlySet<string> = new Set(['wallet-independence'])
+
+/**
+ * Rules whose FAILURE is only readable when they had a reference point to be
+ * judged against. `no-reentry-into-range` without a base is not "price went
+ * back into the range" — there is no range, so nothing was measured. That is
+ * the same unproven verdict as an unanswered cluster check and scores 0.
+ * With a base resolved, a failed re-entry IS a market reading (price really
+ * did fall back inside the old range) and scores like any other near-miss.
+ */
+export const UNJUDGEABLE_RULE = 'no-reentry-into-range'
+
 export interface StrategyConfig {
   minPriceGuardHolders: number
   minLiquidityUsd: number
   minVolume24hUsd: number
   /** Base-window volume/shares: recent buy volume must be this fraction of prior. */
   minUpVolumeRatio: number
-  /** Base break invalidation ref for alerts. */
+  /**
+   * MC band per strategy, from the operator's worked examples. NOT a global cap.
+   */
   baseBandByStrategy: Record<StrategyId, { min: number; max: number }>
+  /**
+   * A stop must sit BELOW the whole old range, else touching the base counts
+   * as support holding and "no re-entry" is unenforceable: price never had to
+   * leave the range for the stop to survive.
+   */
+  stopBelowBaseRange: boolean
 }
 
 export const STRATEGY_DEFAULTS: StrategyConfig = {
@@ -99,6 +145,7 @@ export const STRATEGY_DEFAULTS: StrategyConfig = {
     level_flip: { min: 8_000_000, max: 15_000_000 },
     whale_comeback: { min: 10_000_000, max: 45_000_000 },
   },
+  stopBelowBaseRange: true,
 }
 
 const STRATEGY_NAMES: Record<StrategyId, string> = {
@@ -167,6 +214,13 @@ function sharedRefs(
 function allPassed(refs: StrategyRefs[]): boolean {
   return refs.every((r) => r.passed)
 }
+
+/**
+ * Stops derived from a range floor sit this far BELOW it. A stop resting on
+ * the floor is stopped by the first wick that validates the support, before
+ * the setup's claim (the reclaim held) is even tested.
+ */
+const FLOOR_STOP_MARGIN = 0.02
 
 /** SECOND WAVE — pumped, consolidating, HIGHER LOW, closing above minor resistance. */
 export function evaluateSecondWave(
@@ -241,7 +295,7 @@ export function evaluateSecondWave(
     rr = (targetUsd / entryUsd - 1) / (entryUsd / stopUsd - 1)
   }
 
-  return { strategy: 'second_wave', fired, confidence: fired ? confidenceOf(refs) : 0, refs, entryUsd, stopUsd, targetUsd, rr }
+  return { strategy: 'second_wave', fired, confidence: structure ? confidenceOf(refs, structure) : 0, refs, entryUsd, stopUsd, targetUsd, rr }
 }
 
 /** LEVEL FLIP — resist, breakout, retest that HOLDS, then continue. */
@@ -290,32 +344,55 @@ export function evaluateLevelFlip(
     })
     refs.push({
       rule: 'no-reentry-into-range',
-      passed: structure.currentMcUsd > (structure.base?.highUsd ?? structure.currentMcUsd),
+      passed: structure.base !== null && structure.currentMcUsd > structure.base.highUsd,
       detail: structure.base === null
-        ? 'no base range to fall back into (price is above it)'
+        ? 'no consolidation base resolvable — the old range this reclaim was supposed to leave is unmeasurable, so "did not re-enter" is unproven'
         : structure.currentMcUsd > structure.base.highUsd
           ? 'price holds above the old range'
           : 'price is back INSIDE the old range — failed reclaim',
     })
+    const stop = stopForFlip(structure)
+    const stopRef = stop === null ? null : baseRangeStopRef('stop-below-base-range', structure.base, stop, c.stopBelowBaseRange)
+    if (stopRef) refs.push(stopRef)
   } else {
     refs.push({ rule: 'structure-available', passed: false, detail: 'no MC series — cannot evaluate structure' })
   }
 
   const fired = allPassed(refs)
-  let entryUsd: number | null = null
-  let stopUsd: number | null = null
-  let targetUsd: number | null = null
-  let rr: number | null = null
-  if (fired && structure?.retest) {
-    entryUsd = structure.retest.atMs !== 0 ? structure.currentMcUsd : null
-    stopUsd = structure.base ? structure.base.lowUsd : entryUsd
-    targetUsd = entryUsd !== null && stopUsd !== null ? entryUsd * ((entryUsd - stopUsd) / entryUsd + 2.5) : null
-    rr = targetUsd !== null && entryUsd !== null && stopUsd !== null && entryUsd > stopUsd
-      ? (targetUsd / entryUsd - 1) / (entryUsd / stopUsd - 1)
-      : null
-  }
+  const entryUsd = structure ? structure.currentMcUsd : null
+  const stopUsd = structure ? stopForFlip(structure) : null
+  const plan = entryUsd !== null && stopUsd !== null && entryUsd > stopUsd
+    ? flipPlan(entryUsd, stopUsd)
+    : { targetUsd: null, rr: null }
 
-  return { strategy: 'level_flip', fired, confidence: fired ? confidenceOf(refs) : 0, refs, entryUsd, stopUsd, targetUsd, rr }
+  return { strategy: 'level_flip', fired, confidence: structure ? confidenceOf(refs, structure) : 0, refs, entryUsd, stopUsd, targetUsd: plan.targetUsd, rr: plan.rr }
+}
+
+/**
+ * The one range-floor rule for every strategy: once a base exists the stop
+ * sits strictly BELOW its floor (a stop resting on the floor is stopped by
+ * the first wick that validates that support), otherwise the fallback applies.
+ */
+function stopBelowBase(structure: McStructure, fallbackUsd: number): number {
+  return structure.base ? structure.base.lowUsd * (1 - FLOOR_STOP_MARGIN) : fallbackUsd
+}
+
+/** Level Flip stop: just under the base floor, else just under the broken level. */
+function stopForFlip(structure: McStructure): number | null {
+  if (structure.base) return stopBelowBase(structure, structure.base.lowUsd)
+  if (structure.retest) return structure.retest.levelUsd
+  return null
+}
+
+/**
+ * Level Flip plan: TP = the retest-held level plus a fixed 2.5R extension.
+ * Returned for refused verdicts too — the log must show the plan the setup
+ * WOULD have used, not blanks that hide which rule refused it.
+ */
+function flipPlan(entryUsd: number, stopUsd: number): { targetUsd: number | null; rr: number | null } {
+  const riskPct = (entryUsd - stopUsd) / entryUsd
+  const targetUsd = entryUsd * (1 + riskPct + 2.5)
+  return { targetUsd, rr: (targetUsd / entryUsd - 1) / riskPct }
 }
 
 /** WHALE COMEBACK — old runner, classified whales buy again after a correction. */
@@ -361,36 +438,45 @@ export function evaluateWhaleComeback(
       detail: `${s.classifiedBuyerCount} WHALE/SMART_MONEY buyer(s) in the window`,
     })
     refs.push(...independenceRefs(s, independence))
+    const stop = stopBelowBase(structure, structure.currentMcUsd * 0.8)
+    const stopRef = baseRangeStopRef('stop-below-base-range', structure.base, stop, c.stopBelowBaseRange)
+    if (stopRef) refs.push(stopRef)
   } else {
     refs.push({ rule: 'structure-available', passed: false, detail: 'no MC series — cannot evaluate structure' })
   }
 
-  const fired = allPassed(refs)
-  let entryUsd: number | null = null
-  let stopUsd: number | null = null
-  let targetUsd: number | null = null
-  let rr: number | null = null
-  if (fired && structure) {
-    entryUsd = structure.currentMcUsd
-    stopUsd = structure.base ? structure.base.lowUsd : entryUsd * 0.8
-    targetUsd = structure.seriesHighUsd * 0.8
-    rr = entryUsd > stopUsd ? (targetUsd / entryUsd - 1) / (entryUsd / stopUsd - 1) : null
+  if (structure) {
+    const targetUsd = structure.seriesHighUsd * 0.8
+    refs.push({
+      rule: 'target-above-entry',
+      passed: targetUsd > structure.currentMcUsd,
+      detail: targetUsd > structure.currentMcUsd
+        ? `target $${(targetUsd / 1e6).toFixed(1)}M is above entry $${(structure.currentMcUsd / 1e6).toFixed(1)}M`
+        : `target $${(targetUsd / 1e6).toFixed(1)}M is NOT above entry $${(structure.currentMcUsd / 1e6).toFixed(1)}M — the plan has no upside`,
+    })
   }
 
-  return { strategy: 'whale_comeback', fired, confidence: fired ? confidenceOf(refs) : 0, refs, entryUsd, stopUsd, targetUsd, rr }
+  const fired = allPassed(refs)
+  const entryUsd = structure ? structure.currentMcUsd : null
+  const stopUsd = structure ? stopBelowBase(structure, structure.currentMcUsd * 0.8) : null
+  const targetUsd = structure ? structure.seriesHighUsd * 0.8 : null
+  const rr = entryUsd !== null && stopUsd !== null && targetUsd !== null && targetUsd > entryUsd && entryUsd > stopUsd
+    ? (targetUsd / entryUsd - 1) / (entryUsd / stopUsd - 1)
+    : null
+
+  return { strategy: 'whale_comeback', fired, confidence: structure ? confidenceOf(refs, structure) : 0, refs, entryUsd, stopUsd, targetUsd, rr }
 }
 
 /**
  * Funding-source rule (operator mandate): "cek funding source ya, jangan
- * sampe 1 orang nyebar ke banyak wallet." A pair of checked-not-connected
- * buyers is evidence. Unknown pairs count as independent BUT each one
- * that had to be assumed caps the strategy's confidence.
+ * sampe 1 orang nyebar ke banyak wallet." Only a checked pair that came
+ * back NOT connected is evidence of independence. A clustered pair refuses;
+ * an unchecked or unknown pair also refuses, because "belum dicek" is not
+ * "aman" — the gate stays closed until the cluster check answers.
  */
 function independenceRefs(s: StructureContext, independence?: IndependenceContext): StrategyRefs[] {
   const refs: StrategyRefs[] = []
   const evidence = independence?.checked ?? []
-  // Every unordered buyer pair is checked; a pair with no evidence is
-  // ASSUMED independent and says so (operator: "cek funding source").
   for (let i = 0; i < s.buyers.length; i++) {
     for (let j = i + 1; j < s.buyers.length; j++) {
       const a = s.buyers[i]
@@ -399,23 +485,29 @@ function independenceRefs(s: StructureContext, independence?: IndependenceContex
         (e) => (e.a === a && e.b === b) || (e.a === b && e.b === a),
       )
       const label = `${a.slice(0, 6)}…/${b.slice(0, 6)}…`
-      if (hit?.connected === true) {
-        refs.push({
-          rule: 'wallet-independence',
-          passed: false,
-          detail: `${label} CLUSTERED (conf ${hit.confidence ?? 'n/a'}) — one funder across wallets, not independent whales`,
-        })
-      } else if (hit?.connected === false) {
+      if (hit?.connected === false) {
         refs.push({
           rule: 'wallet-independence',
           passed: true,
           detail: `${label} independent (verified, conf ${hit.confidence ?? 'n/a'})`,
         })
+      } else if (hit?.connected === true) {
+        refs.push({
+          rule: 'wallet-independence',
+          passed: false,
+          detail: `${label} CLUSTERED (conf ${hit.confidence ?? 'n/a'}) — one funder across wallets, not independent whales`,
+        })
+      } else if (hit) {
+        refs.push({
+          rule: 'wallet-independence',
+          passed: false,
+          detail: `${label} cluster check returned UNKNOWN (conf ${hit.confidence ?? 'n/a'}) — funding source unproven, not assumed safe`,
+        })
       } else {
         refs.push({
           rule: 'wallet-independence',
-          passed: true,
-          detail: `${label} independent (assumed — no cluster evidence)`,
+          passed: false,
+          detail: `${label} NOT CHECKED — funding source unproven, not assumed safe`,
         })
       }
     }
@@ -426,17 +518,51 @@ function independenceRefs(s: StructureContext, independence?: IndependenceContex
   return refs
 }
 
-function confidenceOf(refs: StrategyRefs[]): number {
-  const passed = refs.filter((r) => r.passed)
-  const assumed = passed.filter((r) => r.detail.includes('assumed')).length
-  const base = refs.length > 0 ? (passed.length / refs.length) * 60 : 0
+/**
+ * Confidence describes how much of the READABLE setup is proven. A refused
+ * verdict with zero READABLE evidence (series missing, market context
+ * missing, no buyer classification) is not "10% likely" — it is unproven,
+ * and unproven reports 0. A rule that FAILED while the setup was readable
+ * still scores: the shape existed and the market said no, which is a
+ * measurable near-miss, not an unknown.
+ *
+ * An EVIDENCE_BLOCKED failure is the exception: a proof gate that came back
+ * negative is not a weaker reading of the same setup, so it cannot be scored
+ * as one.
+ *
+ * `no-reentry-into-range` follows the same rule for the only case where it is
+ * unreadable: no base means no reference range, so its failure is a missing
+ * measurement rather than a market reading. Without a base the verdict is
+ * unscorable. With a base it is an ordinary failed rule and scores normally.
+ */
+function confidenceOf(refs: StrategyRefs[], structure: McStructure | null): number {
+  if (refs.length === 0) return 0
+  if (refs.some((r) => !r.passed && EVIDENCE_BLOCKED.has(r.rule))) return 0
+  const reentry = refs.find((r) => r.rule === UNJUDGEABLE_RULE && !r.passed)
+  if (reentry && !structure?.base) return 0
+  const passed = refs.filter((r) => r.passed).length
+  const readable = refs.filter((r) => STRUCTURE_RULES.has(r.rule)).length > 0
+  if (!readable) return 0
+  const base = (passed / refs.length) * 60
   const bonus = allPassed(refs) ? 30 : 0
-  return Math.max(0, Math.min(100, Math.round(base + bonus - assumed * 5)))
+  return Math.max(0, Math.min(100, Math.round(base + bonus)))
 }
 
-/** Minimum independent-buyer cap for Whale Comeback from IndependenceContext. */
-export function minHolders(t: HolderContext, cfg: Partial<StrategyConfig> = {}): number | null {
-  return t.trackedHolders !== null ? t.trackedHolders : clamp(cfg).minPriceGuardHolders
+/**
+ * "No re-entry into the range" only means something when the exit was real.
+ * With a stop INSIDE the old range, the first touch of the base is a
+ * validated support, so a reclaim never had to survive anything.
+ */
+function baseRangeStopRef(rule: string, base: ConsolidationBase | null, stopUsd: number, enabled: boolean): StrategyRefs | null {
+  if (!enabled || base === null) return null
+  const passed = stopUsd < base.lowUsd
+  return {
+    rule,
+    passed,
+    detail: passed
+      ? `stop $${(stopUsd / 1e6).toFixed(2)}M sits below the old range floor $${(base.lowUsd / 1e6).toFixed(2)}M`
+      : `stop $${(stopUsd / 1e6).toFixed(2)}M sits INSIDE the old range $${(base.lowUsd / 1e6).toFixed(2)}M–$${(base.highUsd / 1e6).toFixed(2)}M — a touch of the base would stop the re-entry before the reclaim is tested`,
+  }
 }
 
 export const STRATEGY_LABELS = STRATEGY_NAMES

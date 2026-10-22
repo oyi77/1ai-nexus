@@ -12,11 +12,12 @@ import {
   type CallConfluence,
   type CallFeedRow,
 } from '../call-confluence'
+import type { CallFeedRead } from '../db-call-feed'
 import { applyConfluenceBar } from '../strategy-intake'
 import type { StrategyVerdict } from '../strategy-evaluator'
 
 let feedRows: CallFeedRow[] = []
-let feedBehavior: ((now: number, maxAge?: number) => Promise<CallFeedRow[]>) | null = null
+let feedBehavior: ((now: number, maxAge?: number) => Promise<CallFeedRead>) | null = null
 let feedCalls = 0
 
 const verdict = (over: Partial<StrategyVerdict> = {}): StrategyVerdict => ({
@@ -31,9 +32,9 @@ const verdict = (over: Partial<StrategyVerdict> = {}): StrategyVerdict => ({
   ...over,
 })
 
-const feedLoader = (now: number, maxAge?: number): Promise<CallFeedRow[]> => {
+const feedLoader = (now: number, maxAge?: number): Promise<CallFeedRead> => {
   feedCalls++
-  return feedBehavior ? feedBehavior(now, maxAge) : Promise.resolve(feedRows)
+  return feedBehavior ? feedBehavior(now, maxAge) : Promise.resolve({ rows: feedRows, readOk: true })
 }
 
 afterEach(() => {
@@ -58,10 +59,11 @@ function feedRow(contract: string, extra: Partial<CallFeedRow> = {}): CallFeedRo
 }
 
 describe('loadCallConfluence', () => {
-  it('marks entries unavailable when the feed has no rows', async () => {
+  it('marks an empty feed readable: nothing was called, but the source answered', async () => {
     feedRows = []
     const m = await loadCallConfluence(['abc'], { loadFeed: feedLoader })
-    expect(m.get('abc')?.available).toBe(false)
+    expect(m.get('abc')?.available).toBe(true)
+    expect(m.get('abc')?.present).toBe(false)
     expect(m.get('abc')?.groupCount).toBe(0)
   })
 
@@ -72,6 +74,16 @@ describe('loadCallConfluence', () => {
     const m = await loadCallConfluence(['abc'], { loadFeed: feedLoader })
     expect(m.get('abc')?.available).toBe(false)
     expect(m.get('abc')?.groups).toEqual([])
+  })
+
+  it('marks entries unavailable when the source reports it could not be read', async () => {
+    // A dead or expired artifact yields no rows AND readOk:false. Flipping
+    // `available` on it would turn "we could not look" into "nobody called it".
+    feedRows = []
+    feedBehavior = async () => ({ rows: [], readOk: false })
+    const m = await loadCallConfluence(['abc'], { loadFeed: feedLoader })
+    expect(m.get('abc')?.available).toBe(false)
+    expect(clearsConfluence(m.get('abc'), 2).detail).toContain('unreadable')
   })
 
   it('counts GROUPS (deduped), not messages, and keeps kinds + score', async () => {
@@ -97,11 +109,13 @@ describe('loadCallConfluence', () => {
     expect(c?.groups).toContain('KingdomOfDegenCalls')
   })
 
-  it('leaves contracts absent from the feed untouched', async () => {
+  it('reports an unmentioned contract as absent, not as an unreadable feed', async () => {
     feedRows = [feedRow('known')]
     const m = await loadCallConfluence(['known', 'unknown'], { loadFeed: feedLoader })
     expect(m.get('known')?.available).toBe(true)
-    expect(m.get('unknown')?.available).toBe(false)
+    expect(m.get('known')?.present).toBe(true)
+    expect(m.get('unknown')?.available).toBe(true)
+    expect(m.get('unknown')?.present).toBe(false)
   })
 
   it('reads the feed once for the whole batch', async () => {
@@ -168,19 +182,22 @@ describe('loadCallConfluence', () => {
   })
 })
 
+const confOf = (over: Partial<CallConfluence> = {}): CallConfluence => ({
+  contract: 'x',
+  groups: ['A', 'B'],
+  groupCount: 2,
+  mentions: 3,
+  weightedScore: null,
+  kinds: [],
+  trustedGroups: [],
+  effectiveGroupCount: 2,
+  available: true,
+  present: true,
+  ...over,
+})
+
 describe('clearsConfluence', () => {
-  const conf = (over: Partial<CallConfluence>): CallConfluence => ({
-    contract: 'x',
-    groups: ['A', 'B'],
-    groupCount: 2,
-    mentions: 3,
-    weightedScore: null,
-    kinds: [],
-    trustedGroups: [],
-    effectiveGroupCount: 2,
-    available: true,
-    ...over,
-  })
+  const conf = confOf
 
   it('passes at the bar', () => {
     expect(clearsConfluence(conf({ groupCount: 2, effectiveGroupCount: 2 }), 2).pass).toBe(true)
@@ -205,10 +222,20 @@ describe('clearsConfluence', () => {
     expect(clearsConfluence(c, 2, true).pass).toBe(false)
   })
 
-  it('refuses an unavailable feed instead of fabricating a pass', () => {
-    const r = clearsConfluence(conf({ available: false, groupCount: 0 }), 2)
+  it('refuses an unreadable feed instead of fabricating a pass', () => {
+    const r = clearsConfluence(conf({ available: false, present: false, groupCount: 0 }), 2)
     expect(r.pass).toBe(false)
-    expect(r.detail).toContain('unavailable')
+    expect(r.detail).toContain('unreadable')
+  })
+
+  it('distinguishes "no group called it" from "the feed is dead"', () => {
+    // Both refuse, but the operator's next move is opposite: a fresh feed
+    // with no entry means the CA was never called; an unreadable feed means
+    // the harvester is broken. Same label would hide that.
+    const absent = clearsConfluence(conf({ present: false, groups: [], groupCount: 0, effectiveGroupCount: 0 }), 2)
+    expect(absent.pass).toBe(false)
+    expect(absent.detail).toContain('no call group flagged it')
+    expect(absent.detail).not.toContain('unreadable')
   })
 
   it('refuses an undefined entry', () => {
@@ -229,20 +256,19 @@ describe('describeConfluence', () => {
   it('names the unavailable and empty states honestly', () => {
     const base: CallConfluence = {
       contract: 'x', groups: [], groupCount: 0, mentions: 0,
-      weightedScore: null, kinds: [], trustedGroups: [], effectiveGroupCount: 0, available: false,
+      weightedScore: null, kinds: [], trustedGroups: [], effectiveGroupCount: 0,
+      available: false, present: false,
     }
-    expect(describeConfluence(base)).toBe('call groups: no call-feed entry')
-    expect(describeConfluence({ ...base, available: true })).toBe(
+    expect(describeConfluence(base)).toBe('call groups: feed unreadable')
+    expect(describeConfluence({ ...base, available: true })).toBe('call groups: none flagged it')
+    expect(describeConfluence({ ...base, available: true, present: true })).toBe(
       'call groups: entry present but no group named',
     )
   })
 
   it('renders groups, score and mentions', () => {
     expect(
-      describeConfluence({
-        contract: 'x', groups: ['A', 'B'], groupCount: 2, mentions: 7,
-        weightedScore: 8, kinds: [], trustedGroups: [], effectiveGroupCount: 2, available: true,
-      }),
+      describeConfluence(confOf({ contract: 'x', groups: ['A', 'B'], groupCount: 2, mentions: 7, weightedScore: 8 })),
     ).toBe('call groups (2): A, B · score 8.0 · 7 mention(s)')
   })
 })
@@ -259,10 +285,7 @@ describe('strategy-intake confluence gate', () => {
   })
 
   it('drops the firing strategy when the bar is not cleared', () => {
-    const conf: CallConfluence = {
-      contract: 'x', groups: ['A'], groupCount: 1, mentions: 3,
-      weightedScore: 5, kinds: [], trustedGroups: [], effectiveGroupCount: 1, available: true,
-    }
+    const conf = confOf({ effectiveGroupCount: 1, groups: ['A'], groupCount: 1 })
     const r = applyConfluenceBar([verdict()], conf, { minGroups: 2 })
     expect(r.fired).toBeNull()
     expect(r.bar?.pass).toBe(false)
@@ -270,10 +293,7 @@ describe('strategy-intake confluence gate', () => {
   })
 
   it('keeps the strategy when the bar is cleared, and trusted-only is stricter', () => {
-    const conf: CallConfluence = {
-      contract: 'x', groups: ['A', 'B'], groupCount: 2, mentions: 4,
-      weightedScore: 7, kinds: [], trustedGroups: ['A'], effectiveGroupCount: 2, available: true,
-    }
+    const conf = confOf({ trustedGroups: ['A'] })
     expect(applyConfluenceBar([verdict()], conf, { minGroups: 2 }).fired).not.toBeNull()
     const strict = applyConfluenceBar([verdict()], conf, { minGroups: 2, trustedOnly: true })
     expect(strict.fired).toBeNull()
@@ -282,7 +302,7 @@ describe('strategy-intake confluence gate', () => {
   it('refuses when the feed is unreadable rather than passing it', () => {
     const r = applyConfluenceBar([verdict()], EMPTY_CONFLUENCE('x'), { minGroups: 1 })
     expect(r.fired).toBeNull()
-    expect(r.bar?.detail).toContain('unavailable')
+    expect(r.bar?.detail).toContain('unreadable')
   })
 
   it('returns null when nothing fired, with or without a bar', () => {

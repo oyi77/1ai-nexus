@@ -160,13 +160,15 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Forecasts',
     icon: Target,
-    href: '/prediction-markets',
+    href: '/predictions',
     items: [
-      { label: 'Prediction Markets', href: '/prediction-markets', icon: Target, description: 'Polymarket and Kalshi odds side by side.' },
-      { label: 'Markets Hub', href: '/predictions', icon: Target, description: 'All prediction-market views in one place.' },
-      { label: 'Paper Trading', href: '/predictions/paper', icon: Activity, description: 'Paper-trade the forecast book.' },
-      { label: 'Trade Tape', href: '/predictions/tape', icon: Activity, description: 'Live execution tape for forecasts.' },
-      { label: 'Forecast Board', href: '/predictions/leaderboard', icon: TrendingUp, description: 'Ranked forecasters and their accuracy.' },
+      { label: 'Forecast Hub', href: '/predictions', icon: Target, description: 'Prediction-market, paper, tape and board lanes in one tabbed surface.' },
+      { label: 'Forecast Markets', href: '/predictions?tab=markets', icon: Target, description: 'Polymarket, Manifold, Metaculus and Alphio odds side by side.' },
+      { label: 'Paper Trading', href: '/predictions?tab=paper', icon: Activity, description: 'Paper-trade the forecast book.' },
+      { label: 'Trade Tape', href: '/predictions?tab=tape', icon: Activity, description: 'Live execution tape for forecasts.' },
+      { label: 'Forecast Board', href: '/predictions?tab=board', icon: TrendingUp, description: 'Ranked forecast markets by volume and traders.' },
+      { label: 'Backtest', href: '/backtest', icon: Activity, description: 'Test a strategy against recorded signal history.' },
+      { label: 'Alpha Engine', href: '/alpha-engine', icon: Zap, description: 'Engine-level alpha scoring and paper-trading outcomes.' },
     ],
   },
   {
@@ -175,13 +177,11 @@ export const NAV_SECTIONS: NavSection[] = [
     href: '/analytics',
     items: [
       { label: 'Analytics Hub', href: '/analytics', icon: Zap, description: 'All analytics tools.' },
-      { label: 'Backtest', href: '/backtest', icon: Activity, description: 'Test a strategy against history.' },
       { label: 'Basis Scanner', href: '/basis', icon: Activity, description: 'Spot vs futures basis spreads.' },
       { label: 'Liquidations', href: '/liquidations', icon: Activity, description: 'Forced liquidation events.' },
       { label: 'Arbitrage', href: '/arbitrage', icon: Activity, description: 'Cross-exchange price gaps.' },
       { label: 'Gap Board', href: '/gaps', icon: Activity, description: 'Cross-venue gaps and price dislocations.' },
       { label: 'Capital Flows', href: '/flows', icon: BarChart3, description: 'Cross-asset capital flow tracking.' },
-      { label: 'Alpha Engine', href: '/alpha-engine', icon: Zap, description: 'Engine-level alpha scoring and backtest output.' },
     ],
   },
 ]

@@ -17,7 +17,7 @@
 //     per-caller weighting); it is never recomputed or scaled here.
 // ─────────────────────────────────────────────────────────────
 
-import { loadCallFeed, type CallFeedRow } from './db-call-feed'
+import { loadCallFeed, type CallFeedRead, type CallFeedRow } from './db-call-feed'
 import { independentGroupCount } from './call-group-weight'
 
 export interface CallConfluence {
@@ -44,8 +44,12 @@ export interface CallConfluence {
    * contributes exactly one vote no matter how many messages it sends.
    */
   effectiveGroupCount: number
-  /** True when the feed itself was readable and fresh. */
+  /** False when the feed source could not be read. An empty-but-readable
+   * feed is `available: true` — "nobody called it" and "we could not look"
+   * have opposite fixes and must never share a label. */
   available: boolean
+  /** True when the feed carried an entry for THIS contract. */
+  present: boolean
 }
 
 export const EMPTY_CONFLUENCE = (contract: string): CallConfluence => ({
@@ -58,6 +62,7 @@ export const EMPTY_CONFLUENCE = (contract: string): CallConfluence => ({
   trustedGroups: [],
   effectiveGroupCount: 0,
   available: false,
+  present: false,
 })
 
 /**
@@ -76,7 +81,7 @@ export async function loadCallConfluence(
      * Loader seam. Defaults to the real DB/JSON feed; tests inject a stub so
      * the failure path is exercised without mocking module internals.
      */
-    loadFeed?: (nowMs: number, maxAgeMin?: number) => Promise<CallFeedRow[]>
+    loadFeed?: (nowMs: number, maxAgeMin?: number) => Promise<CallFeedRead>
   } = {},
 ): Promise<Map<string, CallConfluence>> {
   const out = new Map<string, CallConfluence>()
@@ -85,16 +90,18 @@ export async function loadCallConfluence(
 
   const trusted = new Set(opts.trustedGroups ?? [])
   const loadFeed = opts.loadFeed ?? loadCallFeed
-  let rows: CallFeedRow[] = []
+  let read: CallFeedRead = { rows: [], readOk: false }
   try {
-    rows = await loadFeed(opts.nowMs ?? Date.now(), opts.maxAgeMin)
+    read = await loadFeed(opts.nowMs ?? Date.now(), opts.maxAgeMin)
   } catch {
-    return out // feed unreadable → every entry stays available:false
+    return out
   }
-  if (rows.length === 0) return out
+
+  if (!read.readOk) return out
+  for (const [contract, entry] of out) out.set(contract, { ...entry, available: true })
 
   const wanted = new Set(contracts)
-  for (const row of rows) {
+  for (const row of read.rows) {
     if (!wanted.has(row.contract)) continue
     const groups = [...new Set(row.sources.filter((s) => typeof s === 'string' && s.length > 0))]
     const weights = row.callerWeights ?? {}
@@ -106,6 +113,7 @@ export async function loadCallConfluence(
       weightedScore: typeof row.weightedScore === 'number' ? row.weightedScore : null,
       kinds: [...new Set(row.kinds)],
       trustedGroups: groups.filter((g) => trusted.has(g)),
+      present: true,
       effectiveGroupCount: independentGroupCount(groups, weights),
       available: true,
     })
@@ -125,7 +133,8 @@ export function clearsConfluence(
   minGroups: number,
   trustedOnly = false,
 ): { pass: boolean; detail: string } {
-  if (!c || !c.available) return { pass: false, detail: 'call-feed unavailable for this contract' }
+  if (!c || !c.available) return { pass: false, detail: 'call-feed unreadable (the feed source threw or could not be read)' }
+  if (!c.present) return { pass: false, detail: 'no call group flagged it (feed fresh)' }
   const counted = trustedOnly
     ? c.trustedGroups.length
     : Math.floor(c.effectiveGroupCount + 1e-9)
@@ -139,7 +148,8 @@ export function clearsConfluence(
 
 /** One readable line for the alert body: who called it, how strongly. */
 export function describeConfluence(c: CallConfluence): string {
-  if (!c.available) return 'call groups: no call-feed entry'
+  if (!c.available) return 'call groups: feed unreadable'
+  if (!c.present) return 'call groups: none flagged it'
   if (c.groupCount === 0) return 'call groups: entry present but no group named'
   const score = c.weightedScore === null ? 'score n/a' : `score ${c.weightedScore.toFixed(1)}`
   return `call groups (${c.groupCount}): ${c.groups.slice(0, 4).join(', ')}${c.groups.length > 4 ? '…' : ''} · ${score} · ${c.mentions} mention(s)`

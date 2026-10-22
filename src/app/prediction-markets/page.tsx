@@ -1,11 +1,5 @@
-"use client";
-import { NexusLayout } from '@/components/layout/NexusLayout';
-import { PredictionMarketsPageContent } from "./content";
+import { redirect } from "next/navigation"
 
-export default function PredictionMarketsPage() {
-  return (
-    <NexusLayout>
-      <PredictionMarketsPageContent />
-    </NexusLayout>
-  );
+export default function PredictionMarketsRedirect() {
+  redirect("/predictions?tab=markets")
 }

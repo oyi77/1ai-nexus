@@ -318,13 +318,14 @@ describe('db-call-feed', () => {
       },
     ])
     const result = await loadCallFeed()
-    expect(result).toHaveLength(1)
-    expect(result[0].contract).toBe(callRow.contract)
-    expect(result[0].mentions).toBe(6)
-    expect(result[0].sources).toEqual(['CallAnalyser', 'ClubWhaleHunters'])
-    expect(result[0].sourceCount).toBe(2) // groups, not mentions
-    expect(result[0].kinds).toEqual(['score', 'whale'])
-    expect(result[0].weightedScore).toBe(6.5)
+    expect(result.readOk).toBe(true)
+    expect(result.rows).toHaveLength(1)
+    expect(result.rows[0].contract).toBe(callRow.contract)
+    expect(result.rows[0].mentions).toBe(6)
+    expect(result.rows[0].sources).toEqual(['CallAnalyser', 'ClubWhaleHunters'])
+    expect(result.rows[0].sourceCount).toBe(2) // groups, not mentions
+    expect(result.rows[0].kinds).toEqual(['score', 'whale'])
+    expect(result.rows[0].weightedScore).toBe(6.5)
   })
 
   it('loadCallFeed falls back to one source for rows without provenance', async () => {
@@ -341,7 +342,7 @@ describe('db-call-feed', () => {
         lastSeenAt: new Date('2026-10-15T19:47:20+00:00'),
       },
     ])
-    const [row] = await loadCallFeed()
+    const [row] = (await loadCallFeed()).rows
     expect(row.sources).toEqual([])
     expect(row.sourceCount).toBe(1) // row exists ⇒ at least one group saw it
     expect(row.weightedScore).toBeUndefined()
@@ -368,7 +369,7 @@ describe('db-call-feed', () => {
         lastSeenAt: new Date('2026-10-15T19:47:20+00:00'),
       })),
     )
-    const result = await loadCallFeed()
+    const result = (await loadCallFeed()).rows
     expect(result.map((r) => r.contract)).toEqual([real])
   })
 
@@ -399,8 +400,9 @@ describe('db-call-feed', () => {
       }),
     )
     const result = await loadCallFeed()
-    expect(result.map((r) => r.contract)).toEqual(['BaBDzVBE3pTxuCjU7gcqNENUCfJpo24hDxDEsufhpump'])
-    expect(result[0].sourceCount).toBe(3)
+    expect(result.readOk).toBe(true)
+    expect(result.rows.map((r) => r.contract)).toEqual(['BaBDzVBE3pTxuCjU7gcqNENUCfJpo24hDxDEsufhpump'])
+    expect(result.rows[0].sourceCount).toBe(3)
   })
 
   it('loadCallFeed prefers the fresher row per contract, not the store', async () => {
@@ -437,14 +439,24 @@ describe('db-call-feed', () => {
         ],
       }),
     )
-    const [row] = await loadCallFeed()
+    const [row] = (await loadCallFeed()).rows
     expect(row.mentions).toBe(9)
     expect(row.sources).toEqual(['CallAnalyser2', 'SeekrTrending'])
   })
 
-  it('loadCallFeed falls back to JSON without throwing', async () => {
+  it('reports readOk:false when the DB throws and the artifact is unusable', async () => {
     findMany.mockRejectedValue(new Error('db down'))
-    await expect(loadCallFeed()).resolves.toEqual([])
+    const result = await loadCallFeed()
+    expect(result.rows).toEqual([])
+    expect(result.readOk).toBe(false)
+  })
+
+  it('keeps readOk:true for a live DB read whose window held no calls', async () => {
+    // Empty is not broken: Postgres answered, nobody called anything. Claiming
+    // `readOk:false` here would tell the operator to fix a healthy feed.
+    findMany.mockResolvedValue([])
+    const result = await loadCallFeed()
+    expect(result).toEqual({ rows: [], readOk: true })
   })
 
   it('pruneStaleCallFeed deletes by the same window the reader honours', async () => {

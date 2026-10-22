@@ -12,6 +12,7 @@ vi.mock('@/lib/api/server-cache', () => ({
 }))
 
 vi.mock('@/lib/modules/derived/brief-calibration', () => ({
+  FALLBACK_AS_OF: '2026-09-21',
   getFundingCells: vi.fn(async () => ({
     asOf: '2026-09-21',
     cells: {

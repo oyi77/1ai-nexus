@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { prisma } from '@/lib/db'
-import { fetchMcSeries, type McSeries } from './mc-series'
+import { fetchMcSeries, type McSeries, type McSeriesFailure } from './mc-series'
 import { analyzeStructure, type McStructure, type StructureBar } from './mc-structure'
 import {
   evaluateLevelFlip,
@@ -39,7 +39,7 @@ import {
   type CallConfluence,
 } from './call-confluence'
 import type { MarketRow } from './dex-token-meta'
-import type { CallFeedRow } from './call-confluence'
+import type { CallFeedRead } from './db-call-feed'
 
 export interface StrategyIntakeInput {
   contract: string
@@ -56,10 +56,12 @@ export interface StrategyIntakeInput {
   sizing?: { capitalUsd: number; riskPct: number }
   /** Inject a fetch for tests. */
   fetchFn?: typeof fetch
+  /** Inject the retry/sleep seam for tests (never sleeps in production tests). */
+  sleepFn?: (ms: number) => Promise<void>
   /** Call groups that may vouch for a contract (confluence evidence). */
   trustedCallGroups?: readonly string[]
   /** Inject the call-feed loader (tests / batched reads). */
-  callFeedSeam?: (nowMs: number, maxAgeMin?: number) => Promise<CallFeedRow[]>
+  callFeedSeam?: (nowMs: number, maxAgeMin?: number) => Promise<CallFeedRead>
   /**
    * Make call-group confluence a HARD gate: a contract that does not clear
    * the bar fires no strategy, exactly as if the structure rules failed.
@@ -73,6 +75,12 @@ export interface StrategyIntakeResult {
   /** Every strategy that was evaluated (fired or not) — full audit trail. */
   verdicts: StrategyVerdict[]
   structure: McStructure | null
+  /**
+   * Why `structure` is null: 'throttled' means the host refused the read,
+   * 'no-pool'/'no-bars' mean the token has no usable market. A throttled
+   * read is not evidence about the token, so it must not be reported as one.
+   */
+  seriesFailure: McSeriesFailure | null
   ladder: LadderPlan | null
   /** Human-readable structure summary lines for the alert body. */
   structureLines: string[]
@@ -216,11 +224,25 @@ function firstFailure(v: StrategyVerdict): string | null {
 export async function evaluateStrategiesFor(
   input: StrategyIntakeInput,
 ): Promise<StrategyIntakeResult> {
-  const series: McSeries | null = await fetchMcSeries(input.contract, {
-    timeframe: 'hour',
-    barLimit: input.barLimit ?? 300,
-    fetchFn: input.fetchFn,
-  })
+  let series: McSeries | null = null
+  let seriesFailure: McSeriesFailure | null = null
+  try {
+    series = await fetchMcSeries(
+      input.contract,
+      {
+        timeframe: 'hour',
+        barLimit: input.barLimit ?? 300,
+        fetchFn: input.fetchFn,
+        sleepFn: input.sleepFn,
+      },
+      (reason) => {
+        seriesFailure = reason
+      },
+    )
+  } catch {
+    // An escaping transport error is a host failure, not a market verdict.
+    seriesFailure = 'throttled'
+  }
   const bars: StructureBar[] = series ? series.bars : []
   const structure = bars.length > 0 ? analyzeStructure(bars) : null
 
@@ -299,6 +321,7 @@ export async function evaluateStrategiesFor(
     fired,
     verdicts,
     structure,
+    seriesFailure: structure === null ? (seriesFailure ?? 'no-bars') : null,
     ladder,
     structureLines: structureLinesOf(structure),
     refusals,

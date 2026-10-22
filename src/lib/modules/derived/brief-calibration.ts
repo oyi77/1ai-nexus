@@ -198,12 +198,50 @@ async function recomputeForeign(): Promise<ForeignEdgeCells> {
   }
 }
 
-export async function getFundingCells(): Promise<FundingUnwindCells> {
+/**
+ * A live cell is significant once it clears the n>=20 floor that fundingUnwind
+ * already enforces. It does NOT have to out-sample the baked backtest: waiting
+ * for a fresh recompute to beat n=866 would pin every leg to the stale cells
+ * forever. Below the floor, live is noise and the baked cell is the fallback.
+ */
+const MIN_CELL_N = 20
+
+function pickCells(live: { n: number; hits: number }, fallback?: { n: number; hits: number }): { n: number; hits: number } {
+  if (live.n >= MIN_CELL_N) return live
+  return fallback ?? live
+}
+
+export const FALLBACK_AS_OF = FALLBACK_FUNDING.asOf
+
+function mergeFundingCells(live: FundingUnwindCells): FundingUnwindCells & { live: FundingUnwindCells['cells'] } {
+  const cells: FundingUnwindCells['cells'] = {}
+  const exchanges = new Set([...Object.keys(FALLBACK_FUNDING.cells), ...Object.keys(live.cells)])
+  for (const ex of exchanges) {
+    const sides = new Set([...Object.keys(FALLBACK_FUNDING.cells[ex] ?? {}), ...Object.keys(live.cells[ex] ?? {})])
+    for (const side of sides) {
+      const fb = FALLBACK_FUNDING.cells[ex]?.[side] ?? {}
+      const lv = live.cells[ex]?.[side] ?? {}
+      const tiers = new Set([...Object.keys(fb), ...Object.keys(lv)])
+      for (const tier of tiers) {
+        const picked = lv[tier] ? pickCells(lv[tier], fb[tier]) : fb[tier]
+        if (!picked) continue
+        cells[ex] ??= {}
+        cells[ex][side] ??= {}
+        cells[ex][side][tier] = picked
+      }
+    }
+  }
+  return { asOf: live.asOf, cells, live: live.cells }
+}
+
+export async function getFundingCells(): Promise<FundingUnwindCells & { live?: FundingUnwindCells['cells'] }> {
   try {
     const { data } = await getCached<FundingUnwindCells>('brief-calib:funding', DAY_MS, recomputeFunding)
-    return data.cells && Object.keys(data.cells).length > 0 ? data : FALLBACK_FUNDING
+    const hasLive = data.cells && Object.keys(data.cells).length > 0
+    if (!hasLive) return { ...FALLBACK_FUNDING, live: {} }
+    return mergeFundingCells(data)
   } catch {
-    return FALLBACK_FUNDING
+    return { ...FALLBACK_FUNDING, live: {} }
   }
 }
 

@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────────────────────
 import { prisma } from '@/lib/db'
 import { getCached } from '@/lib/api/server-cache'
-import { getFundingCells, getSectorCells, getForeignCells } from '@/lib/modules/derived/brief-calibration'
+import { getFundingCells, getSectorCells, getForeignCells, FALLBACK_AS_OF } from '@/lib/modules/derived/brief-calibration'
 import type { FundingUnwindCells, SectorPersistCells } from '@/lib/modules/derived/brief-calibration'
 
 const CACHE_TTL = 10 * 60_000
@@ -244,12 +244,22 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
     const tx: Transmission[] = []
     const moon = tails['moonshot']
 
+    // A leg can be proven by a live cell or by the baked backtest cell, so the
+    // sample date has to travel WITH the number: a stale-but-significant cell
+    // stamped with today's recompute date would claim freshness it never had.
+    const cellDate = (exchange: string, side: 'long' | 'short', z: number): { rate: number; n: number; asOf: string } | null => {
+      const uw = fundingUnwind(fCells.cells, exchange, side, z)
+      if (!uw) return null
+      const live = fundingUnwind(fCells.live ?? {}, exchange, side, z)
+      return { ...uw, asOf: live && live.n === uw.n ? fCells.asOf : FALLBACK_AS_OF }
+    }
+
     // 1) Perpetuals crowding → mean-reversion pressure on named symbols.
     for (const f of funding) {
       // Crowding side comes from the RATE SIGN (longs pay shorts when positive);
       // z only measures how unusual that sign is vs the pair's own 7d history.
       const crowdedLong = f.rate > 0
-      const uw = fundingUnwind(fCells.cells, f.exchange, crowdedLong ? 'long' : 'short', f.z)
+      const uw = cellDate(f.exchange, crowdedLong ? 'long' : 'short', f.z)
       tx.push({
         id: `funding:${f.exchange}:${f.symbol}`,
         from: `perps funding ${f.rate >= 0 ? '+' : ''}${(f.rate * 100).toFixed(4)}%/interval (${f.z >= 0 ? '+' : ''}${f.z}σ vs its own 7d)`,
@@ -261,7 +271,7 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
         evidence: [
           { metric: 'funding z-score (7d)', value: String(f.z), source: 'DerivativesSnapshot' },
           ...(uw
-            ? [{ metric: 'unwind hit rate (24h)', value: `${uw.rate}% (n=${uw.n}, as of ${fCells.asOf})`, source: 'DerivativesSnapshot backtest' }]
+            ? [{ metric: 'unwind hit rate (24h)', value: `${uw.rate}% (n=${uw.n}, as of ${uw.asOf})`, source: 'DerivativesSnapshot backtest' }]
             : []),
         ],
         confidence: uw ? Math.round(uw.rate) : 50,
@@ -329,11 +339,20 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
       })
     }
 
-    const bearish = tx.filter((t) => t.direction === 'bearish').length
-    const bullish = tx.filter((t) => t.direction === 'bullish').length
+    const bearish = tx.filter((t) => t.direction === 'bearish' && !t.unproven).length
+    const bullish = tx.filter((t) => t.direction === 'bullish' && !t.unproven).length
     const regime: InsightBrief['regime'] = bullish > bearish + 1 ? 'risk-on' : bearish > bullish + 1 ? 'risk-off' : 'mixed'
 
-    return { generatedAt: new Date().toISOString(), regime, transmissions: tx }
+    // Legs whose measurement cannot be read today are reported as unproven
+    // rather than dropped: hiding them turns "the feed could not be read" into
+    // "the market is calm", and the operator can no longer tell the two apart.
+    const signal = tx.filter((t) => !t.unproven)
+    const unproven = tx.filter((t) => t.unproven)
+    const ranked = [...signal, ...unproven].sort(
+      (a, b) => Math.abs(b.confidence - 50) - Math.abs(a.confidence - 50) || Number(a.unproven) - Number(b.unproven),
+    )
+
+    return { generatedAt: new Date().toISOString(), regime, transmissions: ranked }
   })
   return data
 }

@@ -278,9 +278,14 @@ async function main() {
       // not come from on-chain structure, so seeing `callGroups=n/a` next to
       // a structural refusal is how the operator tells "no group called it"
       // apart from "the feed could not be read".
+      // A throttled GeckoTerminal read is a fact about the HOST, not about
+      // the token: without this tag, "every strategy refused" reads as
+      // "this token has no setup" and the operator cannot tell them apart.
+      const seriesTag =
+        intake.seriesFailure === 'throttled' ? ' series=THROTTLED(no verdict)' : ''
       console.log(
         `[accumulation-alert] no strategy fired ${event.token.contract}: ${intake.refusals.join(' | ')} ` +
-          `callGroups=${intake.confluence.available ? intake.confluence.groupCount : 'n/a'}`,
+          `callGroups=${intake.confluence.available ? intake.confluence.groupCount : 'n/a'}${seriesTag}`,
       )
       continue
     }

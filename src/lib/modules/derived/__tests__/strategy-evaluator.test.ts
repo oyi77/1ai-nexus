@@ -15,7 +15,7 @@ import {
   type HolderContext,
   type StructureContext,
 } from '../strategy-evaluator'
-import { analyzeStructure, type StructureBar } from '../mc-structure'
+import { analyzeStructure, type McStructure, type StructureBar } from '../mc-structure'
 import { planLadder, reportFills } from '../ladder-planner'
 
 const HOUR = 3_600_000
@@ -138,6 +138,69 @@ describe('Level Flip', () => {
     const v = evaluateLevelFlip(ctx(bars), GOOD_MARKET, GOOD_HOLDERS)
     const range = v.refs.find((r) => r.rule === 'no-reentry-into-range')
     expect(range?.passed).toBe(false)
+    expect(v.confidence).toBeGreaterThan(0)
+  })
+
+  it('refuses when no base is resolvable — "did not re-enter" is unprovable, not true', () => {
+    const noBase: McStructure = {
+      bars: 24,
+      currentMcUsd: 12_000_000,
+      pivots: [],
+      lastLows: null,
+      higherLow: true,
+      newLowRecently: false,
+      base: null,
+      minorResistanceUsd: 10_000_000,
+      breakout: { levelUsd: 10_000_000, closeUsd: 11_600_000, marginPct: 0.16, atMs: T0 + 20 * HOUR, index: 20 },
+      retest: { levelUsd: 10_000_000, held: true, atMs: T0 + 21 * HOUR, dipPct: -0.012 },
+      volume: { downRecent: 10_000, downPrior: 30_000, downRatio: 0.33, upRecent: 60_000, upPrior: 100_000, upRatio: 0.6 },
+      seriesHighUsd: 12_000_000,
+      seriesLowUsd: 4_000_000,
+    }
+    const v = evaluateLevelFlip({ ...ctx([]), structure: noBase }, GOOD_MARKET, GOOD_HOLDERS)
+    const range = v.refs.find((r) => r.rule === 'no-reentry-into-range')
+    expect(range?.passed).toBe(false)
+    expect(range?.detail).toContain('unproven')
+    expect(v.fired).toBe(false)
+    expect(v.confidence).toBe(0)
+  })
+
+  it('fires on a held retest with the base resolved, and prices the plan from it', () => {
+    const withBase: McStructure = {
+      bars: 24,
+      currentMcUsd: 12_000_000,
+      pivots: [],
+      lastLows: null,
+      higherLow: true,
+      newLowRecently: false,
+      base: {
+        lowUsd: 10_000_000,
+        highUsd: 11_000_000,
+        midUsd: 10_500_000,
+        widthPct: 0.1,
+        bars: 6,
+        startMs: T0 + 10 * HOUR,
+        endMs: T0 + 16 * HOUR,
+      },
+      minorResistanceUsd: 10_000_000,
+      breakout: { levelUsd: 10_000_000, closeUsd: 11_600_000, marginPct: 0.16, atMs: T0 + 20 * HOUR, index: 20 },
+      retest: { levelUsd: 10_000_000, held: true, atMs: T0 + 21 * HOUR, dipPct: -0.012 },
+      volume: { downRecent: 10_000, downPrior: 30_000, downRatio: 0.33, upRecent: 60_000, upPrior: 100_000, upRatio: 0.6 },
+      seriesHighUsd: 12_000_000,
+      seriesLowUsd: 4_000_000,
+    }
+    const v = evaluateLevelFlip({ ...ctx([]), structure: withBase }, GOOD_MARKET, GOOD_HOLDERS)
+    const range = v.refs.find((r) => r.rule === 'no-reentry-into-range')
+    expect(range?.passed).toBe(true)
+    const stop = v.refs.find((r) => r.rule === 'stop-below-base-range')
+    expect(stop?.passed).toBe(true)
+    expect(v.fired).toBe(true)
+    expect(v.entryUsd).toBe(12_000_000)
+    // The stop is the base floor minus the 2% margin, NOT the retest level:
+    // a stop parked on the floor is taken out by the wick that validates it.
+    expect(v.stopUsd).toBe(9_800_000)
+    expect(v.stopUsd).toBeLessThan(withBase.base!.lowUsd)
+    expect(v.rr).toBeGreaterThan(2)
   })
 })
 
@@ -193,6 +256,54 @@ describe('Whale Comeback', () => {
     const v = evaluateWhaleComeback(ctx(shallow), GOOD_MARKET, GOOD_HOLDERS)
     const hist = v.refs.find((r) => r.rule === 'prior-history')
     expect(hist?.passed).toBe(false)
+  })
+  it('refuses an UNCHECKED pair — "belum dicek" is not "aman"', () => {
+    const v = evaluateWhaleComeback(ctx(comebackBars, ['AAA1111', 'BBBB2222'], 2), GOOD_MARKET, GOOD_HOLDERS)
+    const ind = v.refs.find((r) => r.rule === 'wallet-independence')
+    expect(ind?.passed).toBe(false)
+    expect(ind?.detail).toContain('NOT CHECKED')
+    expect(v.fired).toBe(false)
+  })
+
+  it('refuses an UNKNOWN cluster result — an answerless check is no evidence', () => {
+    const v = evaluateWhaleComeback(
+      ctx(comebackBars, ['AAA1111', 'BBBB2222'], 2),
+      GOOD_MARKET,
+      GOOD_HOLDERS,
+      {},
+      { checked: [{ a: 'AAA1111', b: 'BBBB2222', connected: null, confidence: null }] },
+    )
+    const ind = v.refs.find((r) => r.rule === 'wallet-independence')
+    expect(ind?.passed).toBe(false)
+    expect(ind?.detail).toContain('UNKNOWN')
+    expect(v.fired).toBe(false)
+  })
+
+  it('passes only a CHECKED-INDEPENDENT pair, and reports it as verified', () => {
+    const v = evaluateWhaleComeback(
+      ctx(comebackBars, ['AAA1111', 'BBBB2222'], 2),
+      GOOD_MARKET,
+      GOOD_HOLDERS,
+      {},
+      { checked: [{ a: 'AAA1111', b: 'BBBB2222', connected: false, confidence: 0.8 }] },
+    )
+    const ind = v.refs.find((r) => r.rule === 'wallet-independence')
+    expect(ind?.passed).toBe(true)
+    expect(ind?.detail).toContain('verified')
+  })
+
+  it('gives a clustered and an unchecked pair the same zero confidence, never a vibe score', () => {
+    const buyers = ['AAA1111', 'BBBB2222']
+    const clustered = evaluateWhaleComeback(
+      ctx(comebackBars, buyers, 2),
+      GOOD_MARKET,
+      GOOD_HOLDERS,
+      {},
+      { checked: [{ a: buyers[0], b: buyers[1], connected: true, confidence: 0.95 }] },
+    )
+    const unchecked = evaluateWhaleComeback(ctx(comebackBars, buyers, 2), GOOD_MARKET, GOOD_HOLDERS)
+    expect(clustered.confidence).toBe(0)
+    expect(unchecked.confidence).toBe(0)
   })
 })
 

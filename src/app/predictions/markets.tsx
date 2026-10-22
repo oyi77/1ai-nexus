@@ -41,13 +41,13 @@ const SORT_OPTIONS = [
   { value: "probability", label: "Probability" },
 ] as const
 
-export function PredictionsPageContent() {
-  return <PredictionsPageInner />
+export function PredictionsMarketsContent() {
+  return <PredictionsMarketsInner />
 }
 
 
 
-function PredictionsPageInner() {
+function PredictionsMarketsInner() {
   const [data, setData] = useState<AggregatedData | null>(null)
   const [loading, setLoading] = useState(true)
   const [source, setSource] = useState<string>("all")
@@ -85,7 +85,7 @@ fetchData()
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-sm font-bold text-accent-cyan flex items-center gap-2">
-            <Target size={14} /> PREDICTION MARKETS
+            <Target size={14} /> FORECAST MARKETS
           </h1>
           <span className="text-xs text-text-muted">
             {data?.totalMarkets ?? 0} markets · {data ? Object.keys(data.sources).length : 0} sources
