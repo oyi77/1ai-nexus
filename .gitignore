@@ -130,6 +130,9 @@ data/gmgn-tag-inventory.json
 # nightly DB dumps (large, regenerated — never commit)
 backups/
 
+# pre-edit file backups (agent scratch, never commit)
+backupcode_coding-high/
+
 # autoresearch / cron bench logs (regenerated on every run, never commit)
 /logs/
 /data/forward-test-state.json
