@@ -179,6 +179,14 @@ export type WalletLeg =
   | 'persisted-holdings'
 export type HumanVerdict = 'HUMAN' | 'BOT_FAST_TX' | 'BOT_BUY_ONLY' | 'UNKNOWN'
 
+/**
+ * Pool statuses that already carry a human proof from `classifyHuman`. A
+ * replayed persisted holder is graded on this when GMGN's 30d window is
+ * empty: `UNKNOWN`/`DISQUALIFIED`/`null` are NOT proofs and re-enter the
+ * live check instead.
+ */
+const PRIOR_HUMAN_STATUSES = new Set(['WHALE', 'QUALIFIED_SMART_MONEY', 'WATCHLIST', 'PROVISIONAL'])
+
 export interface HumanCheck {
   verdict: HumanVerdict
   reason: string
@@ -485,6 +493,10 @@ export interface HolderCandidate {
    * differs: a $1M+ established-token position is size on its own, while a
    * called-mint position is size only when its USD mark clears the floor. */
   leg: WalletLeg
+  /** Status this wallet already holds in `SmartMoneyWallet`. Discovery replays
+   * persisted rows, so the wallet may have been proved human on an earlier
+   * pass; re-asking GMGN for 30d activity cannot re-prove it. */
+  priorStatus?: string | null
 }
 
 /**
@@ -845,7 +857,7 @@ async function sweepHighCapHolders(
     f.budgetMs,
   )
   const out: DiscoveredWallet[] = []
-  let bestUsd = 0
+
   for (let i = 0; i < measured.length; i++) {
     const c = measured[i]
     // Both holder legs admit on ownership alone, so the USD floor is applied
@@ -853,6 +865,10 @@ async function sweepHighCapHolders(
     // 0/0/0 because nothing ever incremented them, which made "every called
     // holder was dust" indistinguishable from "the leg was never asked".
     const sized = c.leg === 'called-contracts' || c.leg === 'persisted-holdings'
+    // `bestUsd` is reported separately per leg below: one shared high-water
+    // mark let a called-contract dust row ($441k) mask the persisted leg's
+    // real scale, and only the called leg ever received the value.
+    const legBest = c.leg === 'persisted-holdings' ? persisted : calledAudit
     if (sized) {
       const counter = c.leg === 'called-contracts' ? calledAudit : persisted
       if (c.valueUsd === null) {
@@ -863,7 +879,7 @@ async function sweepHighCapHolders(
         })
         continue
       }
-      bestUsd = Math.max(bestUsd, c.valueUsd)
+      if (c.valueUsd !== null) legBest.bestUsd = Math.max(legBest.bestUsd, c.valueUsd)
       if (c.valueUsd < f.minHolderValueUsd) {
         counter.underFloor++
         audit.refused.push({
@@ -876,13 +892,48 @@ async function sweepHighCapHolders(
       }
     }
     const stats = statsList[i]
-    const human = classifyHuman(
-      { fastTxRatio: stats?.fastTxRatio ?? null, buyCount30d: stats?.buyCount30d ?? null, sellCount30d: stats?.sellCount30d ?? null },
-      f,
-    )
-    if (human.verdict !== 'HUMAN') {
-      audit.refused.push({ address: c.address, reason: `bot check refused: ${human.reason}` })
+    // A replayed row may belong to a wallet this pipeline already proved
+    // human on an earlier pass. GMGN's per-wallet stats only cover recent 30d
+    // activity, so a real whale that simply did not trade in that window
+    // returns 0/0 and would be refused forever — the leg then re-measures the
+    // same 103 wallets every pass and can never admit one (measured live:
+    // 0 admitted across three passes). Recorded evidence is the only evidence
+    // available for these wallets, and it is the same bar (status set by
+    // `classifyHuman`), so it is used — and labelled as such.
+    const prior = c.priorStatus ?? null
+    const proven = PRIOR_HUMAN_STATUSES.has(prior ?? '')
+    let human: HumanCheck
+    if (proven) {
+      human = {
+        verdict: 'HUMAN',
+        reason: `human verified on an earlier pass (${prior} in the tracked pool)`,
+      }
+    } else if (stats === null || (stats.buyCount30d === 0 && stats.sellCount30d === 0)) {
+      // Holder rows also exist for wallets whose GMGN activity is empty or
+      // unreportable. Those are not bots (measured live: $20M-scale holders
+      // with 0 buys / 0 sells), but they cannot be PROVEN human either — so
+      // they leave as an unreachable measurement, not as a bot refusal.
+      audit.refused.push({
+        address: c.address,
+        reason:
+          stats === null
+            ? 'no measurement: GMGN wallet stats unavailable'
+            : 'no measurement: GMGN reports zero 30d activity - cannot prove human',
+      })
       continue
+    } else {
+      human = classifyHuman(
+        {
+          fastTxRatio: stats.fastTxRatio ?? null,
+          buyCount30d: stats.buyCount30d ?? null,
+          sellCount30d: stats.sellCount30d ?? null,
+        },
+        f,
+      )
+      if (human.verdict !== 'HUMAN') {
+        audit.refused.push({ address: c.address, reason: `bot check refused: ${human.reason}` })
+        continue
+      }
     }
     const counter = c.leg === 'called-contracts' ? calledAudit : c.leg === 'persisted-holdings' ? persisted : null
     if (counter) counter.admitted++
@@ -916,7 +967,8 @@ async function sweepHighCapHolders(
       human,
     })
   }
-  calledAudit.bestUsd = bestUsd
+  // No shared high-water mark: each leg reports its own `bestUsd`, so a dust
+  // called-contract row can no longer stand in for the persisted leg's scale.
   return {
     wallets: out,
     called: {
@@ -1155,6 +1207,7 @@ async function sweepPersistedHoldings(
       tags: h.wallet.labels,
       pctOfSupply: null,
       leg: 'persisted-holdings',
+      priorStatus: h.wallet?.smartMoneyWallet?.status ?? null,
     })
   }
   out.candidates = out.holders.length
