@@ -215,10 +215,16 @@ function distributionBreaches(p: SniperPayload): string[] {
     )
   } else if (d.bundlerPercent >= L.bundlerToleratedPercent) {
     out.push(`Bundlers hold ${fmtPct(d.bundlerPercent)}% — above tolerated max ${L.bundlerToleratedPercent}%`)
-  } else if (d.bundlerPercent >= L.bundlerPercent && (sold ?? 0) < 100) {
-    out.push(
-      `Bundlers hold ${fmtPct(d.bundlerPercent)}% and have not fully exited (sold ${fmtPct(sold ?? 0)}%) — ceiling ${L.bundlerPercent}%`,
-    )
+  } else if (d.bundlerPercent >= L.bundlerPercent) {
+    if (sold === null) {
+      out.push(
+        `Bundlers hold ${fmtPct(d.bundlerPercent)}% and their exit is unproven — ceiling ${L.bundlerPercent}%`,
+      )
+    } else if (sold < 100) {
+      out.push(
+        `Bundlers hold ${fmtPct(d.bundlerPercent)}% and have not fully exited (sold ${fmtPct(sold)}%) — ceiling ${L.bundlerPercent}%`,
+      )
+    }
   }
 
   if (d.insiderPercent === null) out.push('Insider share unproven')
@@ -288,7 +294,7 @@ function momentumBreaches(p: SniperPayload, stage: SniperStage): { breaches: str
     return { breaches: ['Market cap is zero/unknown — ratio uncomputable'], ratio: null }
   }
   if (!isPct(vol) || vol < 0) {
-    return { breaches: ['Volume is unknown — momentum uncomputable'], ratio: null }
+    return { breaches: ['Volume unknown — momentum uncomputable'], ratio: null }
   }
   const ratio = vol / mc
   const breaches: string[] = []
@@ -309,21 +315,22 @@ function buildAlert(
   const s = p.security
   const mintStatus = s.mintable === false ? '🟢 MATI' : s.mintable === true ? '🔴 HIDUP' : '❓ UNPROVEN'
   const freezeStatus = s.freezeAuthority === false ? '🟢 MATI' : s.freezeAuthority === true ? '🔴 HIDUP' : '❓ UNPROVEN'
-  const lpTotal = (s.lpBurnedPercent ?? 0) + (s.lpLockedPercent ?? 0)
-  // LP 100% burnt (raydium-style burn) vs 100% locked (streamflow-style
-  // locker) — the suffix names which was proven so the operator can verify.
-  const burned = s.lpBurnedPercent ?? 0
-  const locked = s.lpLockedPercent ?? 0
-  const lpStatus =
-    burned >= 99.5
-      ? '100% BURNT ✅'
-      : locked >= 99.5
-        ? '100% LOCKED ✅'
-        : `${fmtPct(lpTotal)}% 🔴`
-
-  // 2-decimal percents like the reference template (0.00%, 1.8% → 1.80%).
+  // 2-decimal percents like the template (1.8 → 1.80), so a partially locked
+  // LP never renders with a stray trailing zero from fmtPct.
   const pct2 = (v: number | null | undefined): string =>
     v === null || v === undefined ? 'n/a' : v.toFixed(2)
+  const burned = s.lpBurnedPercent ?? 0
+  const locked = s.lpLockedPercent ?? 0
+  const lpLeg = (v: number | null | undefined): string =>
+    v === null || v === undefined ? 'n/a' : `${pct2(v)}%`
+  const lpStatus =
+    s.lpBurnedPercent != null && burned >= 99.5
+      ? 'LP 100% BURNT ✅'
+      : s.lpLockedPercent != null && locked >= 99.5
+        ? 'LP 100% LOCKED ✅'
+        : s.lpBurnedPercent == null || s.lpLockedPercent == null
+          ? `LP burn ${lpLeg(s.lpBurnedPercent)} + lock ${lpLeg(s.lpLockedPercent)} ❓`
+          : `LP ${pct2(burned + locked)}% 🔴`
 
   // Dev annotation: "(Dev Out)" when proven 0, "(Dev In)" when holding.
   const devNote = m.devPercent === 0 ? ' (Dev Keluar ✅)' : m.devPercent != null && m.devPercent > 0 ? ' (Dev PEGANG 🔴)' : ' (UNPROVEN ❓)'
@@ -380,7 +387,7 @@ function buildAlert(
     `• <b>Sniper:</b> ${pct2(m.sniperPercent)}% ${passEmoji(m.sniperPercent, L.sniperPercent)} | <b>Bundler:</b> ${pct2(m.bundlerPercent)}%${bundlerNote} ${passEmoji(m.bundlerPercent, L.bundlerPercent)}`,
     `• <b>Insider:</b> ${pct2(m.insiderPercent)}% ${passEmoji(m.insiderPercent, L.insiderPercent)} | <b>Top 10 Supply:</b> ${pct2(m.top10Percent)}% ${passEmoji(m.top10Percent, L.top10Percent)}`,
     `• <b>Cluster:</b> ${pct2(m.clusterPercent)}%${clusterNote} ${passEmoji(m.clusterPercent, L.clusterPercent)}`,
-    `• <b>LP &amp; Keamanan:</b> Mint ${mintStatus} | Freeze ${freezeStatus} | LP ${lpStatus}`,
+    `• <b>LP &amp; Keamanan:</b> Mint ${mintStatus} | Freeze ${freezeStatus} | ${lpStatus}`,
     '',
     '📈 <b>DINAMIKA MARKET</b>',
     `• <b>Market Cap:</b> ${fmtUsd(p.momentum.marketCap)}`,
@@ -600,7 +607,9 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
   if (rejections.length > 0) {
     status = 'REJECT'
     rationale =
-      rejections.length === 1 ? rejections[0] : `${rejections.length} hard-rule breaches — ${rejections[0]}`
+      rejections.length === 1
+        ? rejections[0]
+        : `${rejections.length} hard-rule ${rejections.length === 2 ? "breach" : "breaches"} — ${rejections[0]}`
   } else if (pnlAssessment === 'dump-risk') {
     status = 'WATCHLIST'
     rationale = `Setup is clean and volume is live (${volRatioText}), but top holders sit on +${fmtPct(payload.momentum.top5AvgPnlPercent)}% — wait for the flush before entry`

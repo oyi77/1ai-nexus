@@ -39,6 +39,34 @@ export function reasonId(s: string): string {
  */
 export function rejectionId(s: string): string {
   let out = s
+  out = out.replace(/^(\d+) hard-rule breaches — (.+)$/, (_m, n: string, first: string) => {
+    return `${n} pelanggaran hard-rule — ${rejectionId(first)}`
+  })
+  out = out.replace(
+    /^Screening passed but security evidence is incomplete — (.+) \(not a rejection, but never a top signal on missing data\)$/,
+    (_m, missing: string) =>
+      `Screening lolos tapi bukti keamanan belum lengkap — ${rejectionId(missing)} (bukan penolakan, tapi tidak pernah jadi sinyal utama saat data hilang)`,
+  )
+  out = out.replace(
+    /^Setup is clean and volume is live \(([^)]+)\), but top holders sit on \+([\d.]+)% — wait for the flush before entry$/,
+    "Setup bersih dan volume hidup ($1), tapi holder teratas masih duduk di +$2% — tunggu flush sebelum masuk",
+  )
+  out = out.replace(
+    /^Clean distribution with top holders still accumulating \(\+([\d.]+)% avg PnL\), ([\d.]+x) volume, plus confirmed smart money \((.*?)\) — candidate for the downstream executor$/,
+    "Distribusi bersih dengan holder teratas masih mengakumulasi (+$1% avg PnL), volume $2, plus smart money terkonfirmasi ($3) — kandidat untuk executor hilir",
+  )
+  out = out.replace(
+    /^All hard filters passed with live ([\d.]+x) volume, no concentrated exits, plus confirmed smart money \((.*?)\) — candidate for the downstream executor$/,
+    "Semua hard filter lolos dengan volume hidup $1, tidak ada exit terkonsentrasi, plus smart money terkonfirmasi ($2) — kandidat untuk executor hilir",
+  )
+  out = out.replace(
+    /^Screening passed but no verified smart-money buyer — hold for wallet confirmation before it becomes a signal \(volume ([\d.]+x), accumulating\)$/,
+    "Screening lolos tapi belum ada pembeli smart-money terverifikasi — tahan sampai wallet terkonfirmasi sebelum jadi sinyal (volume $1, akumulasi)",
+  )
+  out = out.replace(
+    /^Hard filters clean, volume ([\d.]+x), but no verified smart-money buyer — hold for wallet confirmation$/,
+    "Hard filter bersih, volume $1, tapi belum ada pembeli smart-money terverifikasi — tahan sampai wallet terkonfirmasi",
+  )
   out = out.replace(
     /^Dead momentum: 5m vol\/mcap ([\d.]+)x < required ([\d.]+)x$/,
     'Volume lemah — 5m vol/mcap $1x < syarat $2x',
@@ -57,6 +85,10 @@ export function rejectionId(s: string): string {
   out = out.replace(
     /^Bundlers hold ([\d.]+)% and have not fully exited \(sold ([\d.]+)%\) — ceiling ([\d.]+)%$/,
     'Bundler masih pegang $1% dan belum keluar penuh (terjual $2%) — batas $3%',
+  )
+  out = out.replace(
+    /^Bundlers hold ([\d.]+)% and their exit is unproven — ceiling ([\d.]+)%$/,
+    'Bundler pegang $1% dan exit-nya belum terbukti — batas $2%',
   )
   out = out.replace(/^Bundlers hold ([\d.]+)%(.*)$/, 'Bundler pegang $1%$2')
   out = out.replace(/^Insiders hold ([\d.]+)%(.*)$/, 'Insider pegang $1%$2')

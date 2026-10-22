@@ -64,6 +64,42 @@ const REJECTIONS: Array<[string, string]> = [
     'Market cap nol/tidak diketahui — ratio tidak bisa dihitung',
   ],
   ['Volume unknown — momentum uncomputable', 'Volume tidak diketahui — momentum tidak bisa dihitung'],
+  [
+    'Bundlers hold 25% and their exit is unproven — ceiling 20%',
+    'Bundler pegang 25% dan exit-nya belum terbukti — batas 20%',
+  ],
+  [
+    '3 hard-rule breaches — Top 10 hold 31.2% (ceiling 25%)',
+    '3 pelanggaran hard-rule — Top 10 pegang 31.2% (batas 25%)',
+  ],
+  [
+    '2 hard-rule breaches — Bundlers hold 25% and their exit is unproven — ceiling 20%',
+    '2 pelanggaran hard-rule — Bundler pegang 25% dan exit-nya belum terbukti — batas 20%',
+  ],
+  [
+    'Setup is clean and volume is live (3.20x), but top holders sit on +260.0% — wait for the flush before entry',
+    'Setup bersih dan volume hidup (3.20x), tapi holder teratas masih duduk di +260.0% — tunggu flush sebelum masuk',
+  ],
+  [
+    'Screening passed but security evidence is incomplete — LP burn/lock unproven — no source measured it (not a breach, but never a pass) (not a rejection, but never a top signal on missing data)',
+    'Screening lolos tapi bukti keamanan belum lengkap — LP burn/lock belum terbukti — tidak ada sumber yang mengukurnya (bukan pelanggaran, tapi tidak pernah lolos) (bukan penolakan, tapi tidak pernah jadi sinyal utama saat data hilang)',
+  ],
+  [
+    'Clean distribution with top holders still accumulating (+12.5% avg PnL), 3.20x volume, plus confirmed smart money (7xKq9d2) — candidate for the downstream executor',
+    'Distribusi bersih dengan holder teratas masih mengakumulasi (+12.5% avg PnL), volume 3.20x, plus smart money terkonfirmasi (7xKq9d2) — kandidat untuk executor hilir',
+  ],
+  [
+    'All hard filters passed with live 3.20x volume, no concentrated exits, plus confirmed smart money (7xKq9d2) — candidate for the downstream executor',
+    'Semua hard filter lolos dengan volume hidup 3.20x, tidak ada exit terkonsentrasi, plus smart money terkonfirmasi (7xKq9d2) — kandidat untuk executor hilir',
+  ],
+  [
+    'Screening passed but no verified smart-money buyer — hold for wallet confirmation before it becomes a signal (volume 3.20x, accumulating)',
+    'Screening lolos tapi belum ada pembeli smart-money terverifikasi — tahan sampai wallet terkonfirmasi sebelum jadi sinyal (volume 3.20x, akumulasi)',
+  ],
+  [
+    'Hard filters clean, volume 3.20x, but no verified smart-money buyer — hold for wallet confirmation',
+    'Hard filter bersih, volume 3.20x, tapi belum ada pembeli smart-money terverifikasi — tahan sampai wallet terkonfirmasi',
+  ],
 ]
 
 const REASONS: Array<[string, string]> = [

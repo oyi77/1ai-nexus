@@ -65,6 +65,32 @@ describe('meme-sniper hard filters', () => {
     const d = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: 70, lpLockedPercent: 30 } }), { smartMoney: CONFIRMED })
     expect(d.status).toBe('SIGNAL')
   })
+  it('names an unmeasured LP leg instead of printing it as a measured zero', () => {
+    const partial = evaluateSniper(
+      clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: 60 } }),
+      { smartMoney: CONFIRMED },
+    )
+    expect(partial.alert).toContain('LP burn n/a + lock 60.00% ❓')
+    expect(partial.alert).not.toContain('60.00% 🔴')
+    const locked = evaluateSniper(
+      clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: 100 } }),
+      { smartMoney: CONFIRMED },
+    )
+    expect(locked.alert).toContain('LP 100% LOCKED ✅')
+    expect(locked.alert).not.toContain('n/a')
+    const burnt = evaluateSniper(
+      clean({ security: { ...clean().security, lpBurnedPercent: 100, lpLockedPercent: null } }),
+      { smartMoney: CONFIRMED },
+    )
+    expect(burnt.alert).toContain('LP 100% BURNT ✅')
+    expect(burnt.alert).not.toContain('n/a')
+    const neither = evaluateSniper(
+      clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: null } }),
+      { smartMoney: CONFIRMED },
+    )
+    expect(neither.alert).toContain('LP burn n/a + lock n/a ❓')
+    expect(neither.alert).not.toContain('n/a%')
+  })
 
   it('accepts 100% locked with burn unproven; caps fully-unproven LP at WATCHLIST (UNKNOWN)', () => {
     const lockedOnly = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: 100 } }), { smartMoney: CONFIRMED })
@@ -107,6 +133,15 @@ describe('meme-sniper hard filters', () => {
     }))
     expect(d.status).toBe('REJECT')
     expect(d.rejections.join(' ')).toContain('not fully exited')
+  })
+
+  it('names an unmeasured bundler exit instead of printing it as sold 0%', () => {
+    const d = evaluateSniper(clean({
+      distribution: { ...clean().distribution, bundlerPercent: 12, bundlerSoldPercent: null },
+    }))
+    expect(d.status).toBe('REJECT')
+    expect(d.rejections.join(' ')).toContain('exit is unproven')
+    expect(d.rejections.join(' ')).not.toContain('sold 0%')
   })
 
   it('keeps an unproven cohort share a rejection and reports the measured exit', () => {
@@ -303,7 +338,7 @@ describe('meme-sniper momentum gates', () => {
     const d = evaluateSniper(clean({ momentum: { marketCap: 483_685, volume5m: null } }), { smartMoney: CONFIRMED })
     expect(d.status).toBe('REJECT')
     expect(d.metrics.volMcRatio).toBeNull()
-    expect(d.rejections.join(' ')).toContain('Volume is unknown')
+    expect(d.rejections.join(' ')).toContain('Volume unknown — momentum uncomputable')
     expect(d.rejections.join(' ')).not.toContain('0.00x')
     expect(d.alert).not.toContain('0.00x')
   })
