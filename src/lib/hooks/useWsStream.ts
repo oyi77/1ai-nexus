@@ -19,6 +19,29 @@ const WS_URL = typeof window !== 'undefined' && window.location.hostname === 'lo
   : 'https://tracker-ws.aitradepulse.com'
 
 // Crypto symbols that come from the WS server /prices namespace
+
+type PriceTicker = { symbol: string; price?: string; change?: string }
+
+const PRICES_TTL_MS = 5_000
+let pricesCache: { at: number; tickers: PriceTicker[] } | null = null
+let pricesInFlight: Promise<PriceTicker[]> | null = null
+
+function loadPrices(): Promise<PriceTicker[]> {
+  if (pricesCache && Date.now() - pricesCache.at < PRICES_TTL_MS) return Promise.resolve(pricesCache.tickers)
+  if (pricesInFlight) return pricesInFlight
+  pricesInFlight = fetch('/api/v1/market/prices')
+    .then((res) => (res.ok ? res.json() : null))
+    .then((d) => {
+      const tickers = d?.data?.tickers
+      if (!Array.isArray(tickers)) return pricesCache?.tickers ?? []
+      pricesCache = { at: Date.now(), tickers }
+      return tickers as PriceTicker[]
+    })
+    .catch(() => pricesCache?.tickers ?? [])
+    .finally(() => { pricesInFlight = null })
+  return pricesInFlight
+}
+
 const CRYPTO_SYMBOLS = new Set(['BTC', 'ETH', 'SOL', 'XRP', 'DOGE', 'AVAX', 'LINK', 'ARB', 'OP'])
 
 /**
@@ -88,25 +111,14 @@ export function useTicker(symbol: string) {
     let wsFailed = false
 
     const fetchFromRest = async () => {
-      try {
-        const res = await fetch('/api/v1/market/prices')
-        if (!res.ok) return
-        const d = await res.json()
-        const tickers = d.data?.tickers
-        if (!Array.isArray(tickers)) return
-        const ticker = tickers.find((t: { symbol: string }) => t.symbol === symbol)
-        if (ticker) {
-          // Parse price: could be "$108,123" or "108123" or "16,234.50"
-          const priceStr = String(ticker.price ?? '').replace(/[$,]/g, '')
-          const parsedPrice = parseFloat(priceStr)
-          if (!isNaN(parsedPrice)) setPrice(parsedPrice)
-          // Parse change: could be "+1.2%" or "1.2"
-          const changeStr = String(ticker.change ?? '').replace(/[+%]/g, '')
-          const parsedChange = parseFloat(changeStr)
-          if (!isNaN(parsedChange)) setChange(parsedChange)
-          setConnected(true)
-        }
-      } catch {}
+      const tickers = await loadPrices()
+      const ticker = tickers.find((t) => t.symbol === symbol)
+      if (!ticker) return
+      const parsedPrice = parseFloat(String(ticker.price ?? '').replace(/[$,]/g, ''))
+      if (!isNaN(parsedPrice)) setPrice(parsedPrice)
+      const parsedChange = parseFloat(String(ticker.change ?? '').replace(/[+%]/g, ''))
+      if (!isNaN(parsedChange)) setChange(parsedChange)
+      setConnected(true)
     }
 
     const isCrypto = CRYPTO_SYMBOLS.has(symbol)

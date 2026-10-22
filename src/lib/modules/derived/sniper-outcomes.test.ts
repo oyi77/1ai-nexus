@@ -96,10 +96,20 @@ describe('outcome scoring — the window is fixed at delivery', () => {
     expect(out.verdict).toBe('STOPPED')
   })
 
-  it('scores FLAT between the bars', () => {
-    const out = scoreSignal(pending(), { marketCapUsd: 1_200_000, observedAt: DUE })
-    expect(out.verdict).toBe('FLAT')
-    expect(out.returnPct).toBeCloseTo(0.2, 9)
+  it('scores a +20% move as WIN and a -20% move as LOSS, never as FLAT', () => {
+    const up = scoreSignal(pending(), { marketCapUsd: 1_200_000, observedAt: DUE })
+    expect(up.verdict).toBe('WIN')
+    expect(up.returnPct).toBeCloseTo(0.2, 9)
+    const down = scoreSignal(pending(), { marketCapUsd: 800_000, observedAt: DUE })
+    expect(down.verdict).toBe('LOSS')
+    expect(down.returnPct).toBeCloseTo(-0.2, 9)
+  })
+
+  it('treats the flat band edges as real moves: +10% WIN, -10% LOSS, ±9.9% FLAT', () => {
+    expect(scoreSignal(pending(), { marketCapUsd: 1_100_000, observedAt: DUE }).verdict).toBe('WIN')
+    expect(scoreSignal(pending(), { marketCapUsd: 1_099_000, observedAt: DUE }).verdict).toBe('FLAT')
+    expect(scoreSignal(pending(), { marketCapUsd: 901_000, observedAt: DUE }).verdict).toBe('FLAT')
+    expect(scoreSignal(pending(), { marketCapUsd: 900_000, observedAt: DUE }).verdict).toBe('LOSS')
   })
 
   it('refuses a null observation — no price, no verdict', () => {
@@ -122,17 +132,25 @@ describe('outcome summary — unmeasurable is not a miss', () => {
     expect(stats.pending).toBe(2)
   })
 
-  it('counts only TARGET/STOPPED/FLAT in the hit rate', () => {
+  it('counts every measured verdict in scored but keeps hit rate on targets only', () => {
     const stats = summariseOutcomes([
       pending({ contract: 'a', verdict: 'TARGET', returnPct: 1.5 }),
       pending({ contract: 'b', verdict: 'STOPPED', returnPct: -0.6 }),
-      pending({ contract: 'c', verdict: 'FLAT', returnPct: 0.1 }),
-      pending({ contract: 'd', verdict: 'PENDING' }),
-      pending({ contract: 'e', verdict: 'UNPRICEABLE' }),
+      pending({ contract: 'c', verdict: 'FLAT', returnPct: 0.05 }),
+      pending({ contract: 'd', verdict: 'WIN', returnPct: 0.2 }),
+      pending({ contract: 'e', verdict: 'LOSS', returnPct: -0.2 }),
+      pending({ contract: 'f', verdict: 'PENDING' }),
+      pending({ contract: 'g', verdict: 'UNPRICEABLE' }),
     ])
-    expect(stats.scored).toBe(3)
-    expect(stats.hitRatePct).toBeCloseTo(100 / 3, 9)
-    expect(stats.avgReturnPct).toBeCloseTo(((1.5 - 0.6 + 0.1) / 3) * 100, 9)
+    expect(stats.scored).toBe(5)
+    expect(stats.targets).toBe(1)
+    expect(stats.wins).toBe(1)
+    expect(stats.losses).toBe(1)
+    expect(stats.stopped).toBe(1)
+    expect(stats.flat).toBe(1)
+    expect(stats.winRatePct).toBeCloseTo(50, 9)
+    expect(stats.hitRatePct).toBeCloseTo(20, 9)
+    expect(stats.avgReturnPct).toBeCloseTo(((1.5 - 0.6 + 0.05 + 0.2 - 0.2) / 5) * 100, 9)
     expect(stats.pending).toBe(1)
     expect(stats.unpriceable).toBe(1)
   })

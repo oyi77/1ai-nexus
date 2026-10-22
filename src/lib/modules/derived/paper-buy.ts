@@ -23,20 +23,20 @@
 // ─────────────────────────────────────────────────────────────
 
 import {
-  OUTCOME_HORIZONS,
   HORIZON_KEYS,
+  OUTCOME_HORIZONS,
   scoreSignalAtHorizon,
   type HorizonKey,
 } from './outcome-horizons'
+import { isClosedVerdict, type OutcomeVerdict, type SignalOutcome } from './sniper-outcomes'
 import { escapeSignalHtml } from './signal-tier'
-import type { SignalOutcome } from './sniper-outcomes'
 
 /** Per-horizon paper result for one position. null = PENDING at that bar. */
 export interface PaperHorizon {
   exitMarketCapUsd: number | null
   returnPct: number | null
   pnlUsd: number | null
-  verdict: 'TARGET' | 'STOPPED' | 'FLAT' | 'PENDING' | null
+  verdict: OutcomeVerdict | null
 }
 
 /** One paper trade: fixed `notionalUsd` staked at delivery time. */
@@ -117,10 +117,10 @@ export function buildPaperPositions(signals: SignalOutcome[], notionalUsd: numbe
 
     const key = horizonKeyFor(signal.horizonHours)
     const observedAt = signal.scoredAt ?? signal.dueAt
-    // The verdict set the engine actually measured. UNPRICEABLE is terminal
-    // but unmeasurable — such a signal stays open, never counts as a loss.
-    const scored =
-      signal.verdict === 'TARGET' || signal.verdict === 'STOPPED' || signal.verdict === 'FLAT'
+    // A closed verdict is one the engine actually measured. PENDING is not
+    // due yet and UNPRICEABLE is terminal but unmeasurable — both stay open,
+    // neither ever counts as a loss.
+    const scored = isClosedVerdict(signal.verdict)
     if (key !== null && scored && signal.exitMarketCapUsd !== null && observedAt !== null) {
       // Re-project the logged exit observation at the signal's own horizon
       // through the shared scorer — the verdict bands are never re-derived.
@@ -130,14 +130,14 @@ export function buildPaperPositions(signals: SignalOutcome[], notionalUsd: numbe
         signal.horizonHours,
       )
       const ret = projected.returnPct
-      const verdict = projected.verdict
+      const verdict: OutcomeVerdict | null = isClosedVerdict(projected.verdict) ? projected.verdict : null
       horizons[key] = {
         exitMarketCapUsd: signal.exitMarketCapUsd,
         returnPct: ret,
         pnlUsd: ret === null ? null : notionalUsd * ret,
-        // An already-scored verdict can only re-project to TARGET/STOPPED/
-        // FLAT (UNPRICEABLE is returned untouched, and is filtered above).
-        verdict: verdict === 'TARGET' || verdict === 'STOPPED' || verdict === 'FLAT' ? verdict : null,
+        // Re-projection preserves the measured class; only the open states
+        // (PENDING / UNPRICEABLE / null) collapse to "no verdict yet".
+        verdict,
       }
     }
 
@@ -188,8 +188,8 @@ export function summarisePaperPositions(positions: PaperPosition[]): PaperSummar
     closed += 1
     totalPnlUsd += scored.horizon.pnlUsd ?? 0
     returnSum += scored.horizon.returnPct ?? 0
-    if (scored.horizon.verdict === 'TARGET') wins += 1
-    else if (scored.horizon.verdict === 'STOPPED') losses += 1
+    if (scored.horizon.verdict === 'TARGET' || scored.horizon.verdict === 'WIN') wins += 1
+    else if (scored.horizon.verdict === 'STOPPED' || scored.horizon.verdict === 'LOSS') losses += 1
     else flat += 1
 
     if (scored.horizon.returnPct !== null && scored.horizon.returnPct > bestReturn) {

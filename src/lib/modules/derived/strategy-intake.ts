@@ -224,6 +224,8 @@ export async function evaluateStrategiesFor(
   const bars: StructureBar[] = series ? series.bars : []
   const structure = bars.length > 0 ? analyzeStructure(bars) : null
 
+  // This is the ONE evaluation entry point, so the call-feed read below is the
+  // batch's single read per contract (the loader is injected in tests).
   const guard = await countPriceGuardHolders(input.contract, input.fetchFn)
   const holders: HolderContext = { trackedHolders: guard ? guard.count : null }
 

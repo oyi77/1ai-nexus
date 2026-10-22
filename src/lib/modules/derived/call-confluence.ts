@@ -18,6 +18,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { loadCallFeed, type CallFeedRow } from './db-call-feed'
+import { independentGroupCount } from './call-group-weight'
 
 export interface CallConfluence {
   contract: string
@@ -58,32 +59,6 @@ export const EMPTY_CONFLUENCE = (contract: string): CallConfluence => ({
   effectiveGroupCount: 0,
   available: false,
 })
-
-/**
- * Weight for one group. Names are matched case-insensitively and without
- * the leading `@` because the harvester keys the artifact by Telegram
- * handle while the stored sources keep the raw channel name.
- */
-function weightOf(weights: Record<string, number>, group: string): number | null {
-  const key = group.trim().replace(/^@/, '').toLowerCase()
-  for (const [name, w] of Object.entries(weights)) {
-    if (name.trim().replace(/^@/, '').toLowerCase() === key && Number.isFinite(w)) return w
-  }
-  return null
-}
-
-/**
- * Sum of per-group weights, each clamped to [0, 1].
- *
- * A weight above 1 marks an origin hub; letting it count as 1.6 groups
- * would make one prolific caller able to clear a 2-group bar alone, which
- * defeats the point of requiring independent confirmation. The weight is
- * therefore used to DISCOUNT mirrors, never to inflate an origin.
- */
-function effectiveGroupCountOf(groups: string[], weights: Record<string, number>): number {
-  return groups.reduce((sum, g) => sum + Math.max(0, Math.min(1, weightOf(weights, g) ?? 0)), 0)
-}
-
 
 /**
  * Build a lookup of contract → confluence for the given contracts.
@@ -131,7 +106,7 @@ export async function loadCallConfluence(
       weightedScore: typeof row.weightedScore === 'number' ? row.weightedScore : null,
       kinds: [...new Set(row.kinds)],
       trustedGroups: groups.filter((g) => trusted.has(g)),
-      effectiveGroupCount: effectiveGroupCountOf(groups, weights),
+      effectiveGroupCount: independentGroupCount(groups, weights),
       available: true,
     })
   }

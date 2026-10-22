@@ -18,6 +18,7 @@ import { loadConfluencePrefetch } from '@/lib/modules/derived/db-confluence-pref
 import { loadWalletBuys } from '@/lib/modules/derived/db-wallet-buys'
 import { loadWhaleBuys } from '@/lib/modules/derived/whale-buy-store'
 import { loadCallFeed } from '@/lib/modules/derived/db-call-feed'
+import { independentGroupCount } from '@/lib/modules/derived/call-group-weight'
 
 const DEXS = 'https://api.dexscreener.com'
 const GECKO = 'https://api.geckoterminal.com'
@@ -247,8 +248,26 @@ interface CallFeedCandidate {
    * artifacts predate the field — absent stays absent, never a default. */
   weighted_score?: number
   caller_weights?: Record<string, number>
+  /** Groups weighted by measured origin rate, each clamped to 1. Flat
+   * `source_count` treats a pure mirror as a full confirmation, so the
+   * human-readable line and the ranking use this instead. */
+  effective_group_count?: number
 }
 
+/**
+ * One line the operator can audit: how many groups called it, and how much
+ * independent confirmation that really is once re-broadcasters are
+ * discounted. `4 channels` can be `1.3 independent` when three of them only
+ * copied the first, and reporting the flat number hides exactly that.
+ */
+function independentLine(r: CallFeedCandidate): string {
+  const groups = r.sources.join(',') || 'unnamed'
+  if (typeof r.effective_group_count !== 'number') {
+    return `${r.source_count} channel(s) unweighted: ${groups}`
+  }
+  const shown = r.effective_group_count.toFixed(2).replace(/0$/, '')
+  return `${r.source_count} channel(s), ${shown} independent: ${groups}`
+}
 
 async function discoverCallFeed(limit: number): Promise<SniperEnrichedToken[]> {
   const rows = await readCallFeedArtifact()
@@ -273,16 +292,19 @@ async function discoverCallFeed(limit: number): Promise<SniperEnrichedToken[]> {
       provenance: {
         sourceType: 'operator-feed',
         provider: 'call-feed',
-        note: `call-feed confluence: ${r.source_count} channels (${r.sources.join(',')})`,
+        note: `call-feed: ${independentLine(r)}`,
       },
       discoveryEvidence: [
         {
           provider: 'call-feed',
           category: categoryFor('call-feed', { kinds: r.kinds }),
           discoveredAt: Date.parse(r.last_seen) || Date.now(),
-          note: `${r.source_count} channels: ${r.sources.join(',')}`,
+          note: independentLine(r),
           mentions: r.mentions,
           confluence: r.source_count,
+          ...(typeof r.effective_group_count === 'number' && {
+            independentGroups: r.effective_group_count,
+          }),
           ...(typeof r.weighted_score === 'number' && Number.isFinite(r.weighted_score) && {
             weightedScore: r.weighted_score,
           }),
@@ -302,8 +324,8 @@ async function discoverCallFeed(limit: number): Promise<SniperEnrichedToken[]> {
     (a, b) =>
       (b.createdAt ?? 0) - (a.createdAt ?? 0) ||
       (b.volume5m ?? 0) - (a.volume5m ?? 0) ||
-      (b.discoveryEvidence?.[0]?.weightedScore ?? 0) -
-        (a.discoveryEvidence?.[0]?.weightedScore ?? 0),
+      (b.discoveryEvidence?.[0]?.independentGroups ?? 0) -
+        (a.discoveryEvidence?.[0]?.independentGroups ?? 0),
   )
   const nowMs = Date.now()
   return out
@@ -366,7 +388,10 @@ async function readCallFeedArtifact(): Promise<CallFeedCandidate[]> {
     }),
     ...(r.callerWeights !== undefined &&
       typeof r.callerWeights === 'object' &&
-      r.callerWeights !== null && { caller_weights: r.callerWeights }),
+      r.callerWeights !== null && {
+        caller_weights: r.callerWeights,
+        effective_group_count: independentGroupCount(r.sources, r.callerWeights),
+      }),
   }))
 }
 

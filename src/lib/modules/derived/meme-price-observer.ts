@@ -24,7 +24,14 @@
 
 import { setTimeout as sleep } from 'node:timers/promises'
 import { escapeHtml } from './meme-sniper'
-import { sweepOutcomes, type OutcomeLog, type OutcomeVerdict, type PriceObservation, type SignalOutcome } from './sniper-outcomes'
+import {
+  isClosedVerdict,
+  sweepOutcomes,
+  type OutcomeLog,
+  type OutcomeVerdict,
+  type PriceObservation,
+  type SignalOutcome,
+} from './sniper-outcomes'
 import { loadOutcomeLog, saveOutcomes } from './db-stores'
 import { JUP_PRICE_URL } from './solana-harvest'
 
@@ -43,6 +50,7 @@ export interface ObserveResult {
   /** Per-contract failures (never thrown). */
   errors: string[]
 }
+
 
 function errorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e)
@@ -133,10 +141,7 @@ export async function observeSignalOutcomes(): Promise<ObserveResult> {
   if (observations.length > 0) {
     const updatedLog = sweepOutcomes(log, observations)
     closed = updatedLog.signals.filter((s) => {
-      return (
-        beforeVerdict.get(s.contract) === 'PENDING' &&
-        (s.verdict === 'TARGET' || s.verdict === 'STOPPED' || s.verdict === 'FLAT')
-      )
+      return beforeVerdict.get(s.contract) === 'PENDING' && isClosedVerdict(s.verdict)
     }).length
     const verdictChanged = updatedLog.signals.some((s) => beforeVerdict.get(s.contract) !== s.verdict)
     if (verdictChanged) {
@@ -157,6 +162,8 @@ export async function observeSignalOutcomes(): Promise<ObserveResult> {
 const VERDICT_LABEL: Record<OutcomeVerdict, string> = {
   PENDING: '⏳ PENDING',
   TARGET: '🎯 TARGET',
+  WIN: '🟢 WIN',
+  LOSS: '🔴 LOSS',
   STOPPED: '🛑 STOPPED',
   FLAT: '➖ FLAT',
   UNPRICEABLE: '⚠️ UNPRICEABLE',
@@ -187,19 +194,16 @@ function buildCloseNotification(s: SignalOutcome): string {
 
 /**
  * Pure: one HTML close notification per signal that just moved out of
- * PENDING in this observation run — i.e. PENDING in `before` and
- * TARGET/STOPPED/FLAT in `after`. Already-closed, still-PENDING and
- * UNPRICEABLE signals are ignored. Each message is far under Telegram's
+ * PENDING in this observation run — i.e. PENDING in `before` and any measured
+ * verdict in `after` (see `isClosedVerdict`). Already-closed, still-PENDING
+ * and UNPRICEABLE signals are ignored. Each message is far under Telegram's
  * 4096-char limit (a single signal is ~4 short lines).
  */
 export function buildCloseNotifications(before: OutcomeLog, after: OutcomeLog): string[] {
   const beforeVerdict = new Map(before.signals.map((s) => [s.contract, s.verdict]))
   return after.signals
     .filter((s) => {
-      return (
-        beforeVerdict.get(s.contract) === 'PENDING' &&
-        (s.verdict === 'TARGET' || s.verdict === 'STOPPED' || s.verdict === 'FLAT')
-      )
+      return beforeVerdict.get(s.contract) === 'PENDING' && isClosedVerdict(s.verdict)
     })
     .map((s) => buildCloseNotification(s))
     .filter((text) => text.length < 4096)

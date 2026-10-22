@@ -27,7 +27,7 @@ const MOBILE_NAV = [
 
 export function NexusLayout({ children }: NexusLayoutProps) {
   const [collapsed, setCollapsed] = useState(false)
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  const [openSection, setOpenSection] = useState<string | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [time, setTime] = useState('')
   
@@ -123,49 +123,72 @@ export function NexusLayout({ children }: NexusLayoutProps) {
           {/* Nav Sections */}
           <div className="flex-1 py-1">
             {NAV_SECTIONS.map(section => {
-              const sectionCollapsed = collapsedSections.has(section.title)
-              const toggleSection = () => {
-                setCollapsedSections(prev => {
-                  const next = new Set(prev)
-                  if (next.has(section.title)) next.delete(section.title)
-                  else next.add(section.title)
-                  return next
-                })
-              }
+              const activeInSection = section.items.some(
+                (item) => pathname === item.href || (item.href !== '/' && pathname.startsWith(`${item.href}/`)),
+              )
+              const isOpen = openSection === section.title || (openSection === null && activeInSection)
+              const SectionIcon = section.icon
               return (
-                <div key={section.title}>
-                  {!collapsed && (
-                    <button
-                      onClick={toggleSection}
-                      className="flex items-center justify-between w-full px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wider text-text-muted hover:text-text-secondary transition-colors"
+                <div key={section.title} className="border-b border-bg-border/60 last:border-b-0">
+                  {collapsed ? (
+                    <Link
+                      href={section.href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      title={section.title}
+                      className={`flex items-center justify-center h-9 mx-1 my-0.5 rounded-md transition-colors ${
+                        activeInSection ? 'bg-teal-dim/40 text-teal-vivid' : 'text-text-muted hover:bg-bg-raised hover:text-text-secondary'
+                      }`}
                     >
-                      <span>{section.title}</span>
-                      <ChevronDown
-                        size={12}
-                        className={`transition-transform ${sectionCollapsed ? '-rotate-90' : ''}`}
-                      />
-                    </button>
+                      <SectionIcon size={15} />
+                    </Link>
+                  ) : (
+                    <>
+                      <div className={`flex items-center gap-1 pl-3 pr-2 ${activeInSection ? 'text-text-primary' : 'text-text-muted'}`}>
+                        <Link
+                          href={section.href}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex flex-1 items-center gap-2 min-w-0 py-2 text-[12px] font-semibold uppercase tracking-wider hover:text-text-secondary transition-colors"
+                        >
+                          <SectionIcon size={13} className="shrink-0" />
+                          <span className="truncate">{section.title}</span>
+                          <span className="font-mono text-[10px] text-text-muted/70 normal-case tracking-normal">{section.items.length}</span>
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => setOpenSection(isOpen && openSection === section.title ? null : section.title)}
+                          aria-expanded={isOpen}
+                          aria-label={`${isOpen ? 'Collapse' : 'Expand'} ${section.title}`}
+                          className="flex h-11 w-8 items-center justify-center rounded text-text-muted hover:text-text-primary hover:bg-bg-raised transition-colors"
+                        >
+                          <ChevronDown size={12} className={`transition-transform ${isOpen ? '' : '-rotate-90'}`} />
+                        </button>
+                      </div>
+                      {isOpen && (
+                        <div className="pb-1.5">
+                          {section.items.map(item => {
+                            const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(`${item.href}/`))
+                            const Icon = item.icon
+                            return (
+                              <Link
+                                key={`${item.href}::${item.label}`}
+                                href={item.href}
+                                onClick={() => setMobileMenuOpen(false)}
+                                className={`flex items-center gap-2.5 mx-2 rounded-md pl-2.5 pr-2 py-1.5 text-[13px] transition-colors border-l-2
+                                  ${isActive
+                                    ? 'border-teal-vivid bg-teal-dim/30 text-teal-vivid font-semibold'
+                                    : 'border-transparent text-text-secondary hover:bg-bg-raised hover:text-text-primary'
+                                  }`}
+                                title={item.description ? item.description : item.label}
+                              >
+                                <Icon size={14} className="shrink-0" />
+                                <span className="truncate">{item.label}</span>
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </>
                   )}
-                  {(!sectionCollapsed || collapsed) && section.items.map(item => {
-                    const isActive = pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))
-                    const Icon = item.icon
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className={`flex items-center gap-2.5 mx-2 rounded-md px-2.5 py-1.5 text-[13px] transition-colors
-                          ${isActive
-                            ? 'bg-teal-dim/40 text-teal-vivid font-semibold'
-                            : 'text-text-secondary hover:bg-bg-raised hover:text-text-primary'
-                          }`}
-                        title={item.description ? item.description : item.label}
-                      >
-                        <Icon size={14} className="shrink-0" />
-                        {!collapsed && <span className="truncate">{item.label}</span>}
-                      </Link>
-                    )
-                  })}
                 </div>
               )
             })}

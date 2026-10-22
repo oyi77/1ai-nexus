@@ -49,7 +49,7 @@ export interface HorizonObservation {
 /** Per-horizon projection of one signal. PENDING means not yet due. */
 export interface HorizonResult {
   returnPct: number | null
-  verdict: 'TARGET' | 'STOPPED' | 'FLAT' | 'PENDING' | null
+  verdict: OutcomeVerdict | 'PENDING' | null
   dueAt: string | null
 }
 

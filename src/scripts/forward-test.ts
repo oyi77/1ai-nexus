@@ -263,6 +263,14 @@ async function main(): Promise<void> {
     `winRate=${pct(summary.winRatePct)} avg=${pct(summary.avgReturnPct)} ` +
       `median=${pct(summary.medianReturnPct)} best=${pct(summary.bestReturnPct)} worst=${pct(summary.worstReturnPct)}`,
   )
+  const verdicts = state.closed.reduce<Record<string, number>>((acc, c) => {
+    acc[c.verdict] = (acc[c.verdict] ?? 0) + 1
+    return acc
+  }, {})
+  const verdictLine = Object.entries(verdicts)
+    .map(([verdict, count]) => `${verdict}=${count}`)
+    .join(' ')
+  if (verdictLine) console.log(`verdicts ${verdictLine} (FLAT = |move| <= ${(cfg.verdicts.flatBandPct * 100).toFixed(0)}%)`)
   if (summary.closed === 0) {
     console.log('no position has reached its horizon yet — rates are n/a, not 0%')
   }

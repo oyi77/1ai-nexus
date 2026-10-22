@@ -132,13 +132,31 @@ describe('loadCallConfluence', () => {
     expect(c?.effectiveGroupCount).toBeCloseTo(1.55, 5)
   })
 
-  it('counts an unmeasured group as zero rather than assuming a vote', async () => {
+  it('prices an unmeasured group below a measured one, never as a full vote', async () => {
+    // Two states were wrong: a silent 1.0 let an unmeasured channel (possibly
+    // a pure mirror) tie with a verified origin, and a 0 made it invisible -
+    // the operator could not tell "nobody else called it" from "I have no
+    // measurement for the group that did". 0.25 keeps it strictly below any
+    // measured group while staying visible in the count.
     const row = feedRow('abc', { sources: ['NoScoreGroup'] })
     delete (row as { callerWeights?: Record<string, number> }).callerWeights
     feedRows = [row]
     const c = (await loadCallConfluence(['abc'], { loadFeed: feedLoader })).get('abc')
     expect(c?.groupCount).toBe(1)
-    expect(c?.effectiveGroupCount).toBe(0)
+    expect(c?.effectiveGroupCount).toBeCloseTo(0.25, 5)
+    expect(clearsConfluence(c, 1).pass).toBe(false)
+  })
+
+  it('does not reach a two-group bar with one measured and one unmeasured group', async () => {
+    feedRows = [
+      feedRow('abc', {
+        sources: ['CallAnalyser2', 'NoScoreGroup'],
+        callerWeights: { CallAnalyser2: 1.5 },
+      }),
+    ]
+    const c = (await loadCallConfluence(['abc'], { loadFeed: feedLoader })).get('abc')
+    expect(c?.effectiveGroupCount).toBeCloseTo(1.25, 5)
+    expect(clearsConfluence(c, 2).pass).toBe(false)
   })
 
   it('treats a missing weightedScore as null, not zero', async () => {

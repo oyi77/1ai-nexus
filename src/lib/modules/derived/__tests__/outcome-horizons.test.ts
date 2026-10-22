@@ -64,7 +64,7 @@ describe('scoreSignalAtHorizon — the window starts at delivery', () => {
     expect(scored.scoredAt).not.toBeNull()
   })
 
-  it('classifies a +100% by 4h as TARGET even when the 24h verdict later goes FLAT', () => {
+  it('classifies a +100% by 4h as TARGET even when the 24h verdict later falls back to WIN', () => {
     const h4 = scoreSignalAtHorizon(
       signal(),
       obs(2_000_000, '2026-10-12T04:00:00.000Z'),
@@ -76,7 +76,7 @@ describe('scoreSignalAtHorizon — the window starts at delivery', () => {
       OUTCOME_HORIZONS.h24,
     )
     expect(h4.verdict).toBe('TARGET')
-    expect(h24.verdict).toBe('FLAT')
+    expect(h24.verdict).toBe('WIN')
   })
 })
 
@@ -105,7 +105,7 @@ describe('horizonOutcomes — per-horizon projection of one signal', () => {
     expect(horizons.h1.returnPct).toBeCloseTo(1, 9)
     expect(horizons.h4.verdict).toBe('TARGET')
     expect(horizons.h4.returnPct).toBeCloseTo(2, 9)
-    expect(horizons.h24.verdict).toBe('FLAT')
+    expect(horizons.h24.verdict).toBe('WIN')
     expect(horizons.d7.verdict).toBe('STOPPED')
   })
 })
@@ -142,9 +142,9 @@ describe('projectHorizonSignals + summariseHorizons — aggregate shape', () => 
     )
 
     expect(projected.h1.map((s) => s.verdict)).toEqual(['TARGET', 'STOPPED'])
-    expect(projected.h4.map((s) => s.verdict)).toEqual(['TARGET', 'FLAT'])
-    expect(projected.h24.map((s) => s.verdict)).toEqual(['FLAT', 'FLAT'])
-    expect(projected.d7.map((s) => s.verdict)).toEqual(['FLAT', 'FLAT'])
+    expect(projected.h4.map((s) => s.verdict)).toEqual(['TARGET', 'LOSS'])
+    expect(projected.h24.map((s) => s.verdict)).toEqual(['WIN', 'LOSS'])
+    expect(projected.d7.map((s) => s.verdict)).toEqual(['WIN', 'LOSS'])
   })
 
   it('summariseHorizons aggregates hitRatePct and avgReturnPct correctly', () => {

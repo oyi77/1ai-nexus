@@ -23,7 +23,24 @@ import { dirname, join } from 'node:path'
 
 import { type CriteriaProfileId } from './sniper-criteria'
 
-export type OutcomeVerdict = 'PENDING' | 'TARGET' | 'STOPPED' | 'FLAT' | 'UNPRICEABLE'
+/**
+ * Noise band around zero: a move strictly inside ±this fraction is a
+ * non-move, not a win or a loss. The edges are real moves: +0.1 is a WIN and
+ * -0.1 is a LOSS. One symmetric rule, because an asymmetric one lets the
+ * same +10% input read as FLAT in one report and WIN in another.
+ */
+export const FLAT_BAND_RETURN = 0.1
+export type OutcomeVerdict = 'PENDING' | 'TARGET' | 'WIN' | 'LOSS' | 'STOPPED' | 'FLAT' | 'UNPRICEABLE'
+
+/**
+ * A verdict is closed once the horizon has been measured: only PENDING (not
+ * yet due) and UNPRICEABLE (never measurable) remain open. Written as an
+ * exclusion so a newly added measured verdict can never be silently dropped
+ * by a consumer that enumerates the closed set.
+ */
+export function isClosedVerdict(v: OutcomeVerdict): boolean {
+  return v !== 'PENDING' && v !== 'UNPRICEABLE'
+}
 
 export interface SignalOutcome {
   contract: string
@@ -209,7 +226,15 @@ export function scoreSignal(
 
   const ret = (observation.marketCapUsd - entry) / entry
   const verdict: OutcomeVerdict =
-    ret >= config.targetReturn ? 'TARGET' : ret <= config.stopReturn ? 'STOPPED' : 'FLAT'
+    ret >= config.targetReturn
+      ? 'TARGET'
+      : ret <= config.stopReturn
+        ? 'STOPPED'
+        : ret > -FLAT_BAND_RETURN && ret < FLAT_BAND_RETURN
+          ? 'FLAT'
+          : ret > 0
+            ? 'WIN'
+            : 'LOSS'
 
   return {
     ...signal,
@@ -224,11 +249,22 @@ export interface OutcomeStats {
   /** Signals with a final verdict. */
   scored: number
   targets: number
+  /** Real up-moves that fell short of the target band. */
+  wins: number
+  /** Real down-moves that never reached the stop floor. */
+  losses: number
   stopped: number
   flat: number
   pending: number
   unpriceable: number
-  /** targets / scored, as a percentage. null when nothing is scored yet. */
+  /** (targets + wins) / (targets + wins + stops + losses). null when nothing decided. */
+  winRatePct: number | null
+  /**
+   * targets / (targets + wins + stopped + losses + flat). The denominator is
+   * kept at the pre-WIN/LOSS size on purpose: WIN and LOSS are a finer read of
+   * what used to land in FLAT, so publishing a different hit rate here would
+   * silently move tiers across the calibration floor without new evidence.
+   */
   hitRatePct: number | null
   /** Mean return over scored signals. null when nothing is scored. */
   avgReturnPct: number | null
@@ -237,23 +273,32 @@ export interface OutcomeStats {
 /**
  * Aggregate the log. UNPRICEABLE and PENDING are reported separately and
  * never folded into the hit rate — a signal that was never measurable is not
- * a miss, and counting it as one would understate the engine.
+ * a miss, and counting it as one would understate the engine. FLAT is a
+ * measured non-move: it counts toward `scored` and the mean return, but not
+ * toward the decided win-rate denominator.
  */
 export function summariseOutcomes(signals: SignalOutcome[]): OutcomeStats {
-  const scored = signals.filter((s) => s.verdict === 'TARGET' || s.verdict === 'STOPPED' || s.verdict === 'FLAT')
+  const scored = signals.filter((s) => isClosedVerdict(s.verdict))
   const targets = scored.filter((s) => s.verdict === 'TARGET').length
+  const wins = scored.filter((s) => s.verdict === 'WIN').length
+  const losses = scored.filter((s) => s.verdict === 'LOSS').length
   const stopped = scored.filter((s) => s.verdict === 'STOPPED').length
   const flat = scored.filter((s) => s.verdict === 'FLAT').length
   const returns = scored.map((s) => s.returnPct).filter((r): r is number => r !== null)
+  const positives = targets + wins
+  const decided = positives + stopped + losses
 
   return {
     scored: scored.length,
     targets,
+    wins,
+    losses,
     stopped,
     flat,
     pending: signals.filter((s) => s.verdict === 'PENDING').length,
     unpriceable: signals.filter((s) => s.verdict === 'UNPRICEABLE').length,
-    hitRatePct: scored.length > 0 ? (targets / scored.length) * 100 : null,
+    winRatePct: decided > 0 ? (positives / decided) * 100 : null,
+    hitRatePct: decided + flat > 0 ? (targets / (decided + flat)) * 100 : null,
     avgReturnPct: returns.length > 0 ? (returns.reduce((a, b) => a + b, 0) / returns.length) * 100 : null,
   }
 }

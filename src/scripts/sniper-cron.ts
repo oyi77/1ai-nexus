@@ -36,6 +36,14 @@ import { escapeSignalHtml } from '@/lib/modules/derived/signal-tier'
 import { calibrateTiers, demotionSummary } from '@/lib/modules/derived/tier-calibration'
 import { resolveAdaptivePolicy } from '@/lib/modules/derived/adaptive-policy'
 
+/** A malformed env value falls back to the module default, never to 0. */
+function positiveEnv(name: string): number | null {
+  const raw = process.env[name]
+  if (raw === undefined || raw.trim() === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 /**
  * Policy D keeps WATCHLIST opt-in: it is a labelled, unconfirmed candidate,
  * never a top signal. The cron is the only production pusher, so the opt-in
@@ -56,8 +64,13 @@ function deliveryPolicy(byTier?: Record<string, { scored: number; hitRatePct: nu
         ? 'dry-run'
         : 'off'
   if (mode === 'off') return base
-
-  const resolved = resolveAdaptivePolicy(base, byTier, mode)
+  const floorPct = positiveEnv('SNIPER_CALIBRATION_FLOOR_PCT')
+  const minScored = positiveEnv('SNIPER_CALIBRATION_MIN_SCORED')
+  const opts = {
+    ...(floorPct === null ? {} : { floorPct }),
+    ...(minScored === null ? {} : { minScored }),
+  }
+  const resolved = resolveAdaptivePolicy(base, byTier, mode, opts)
   if (mode === 'dry-run') {
     console.log(`[sniper] adaptive policy (dry-run): ${resolved.reason ?? 'no change'}`)
   } else {
@@ -168,11 +181,14 @@ async function main() {
   outcomeLog = sweepOutcomes(outcomeLog, prices)
   await saveOutcomes(outcomeLog)
   const stats = summariseOutcomes(outcomeLog.signals)
-  if (stats.scored > 0 || stats.pending > 0) {
+  if (outcomeLog.signals.length === 0) {
+    console.log('[sniper] outcomes: empty — no signal has been delivered yet, nothing to score')
+  } else if (stats.scored > 0 || stats.pending > 0) {
     const hit = stats.hitRatePct === null ? 'n/a' : `${stats.hitRatePct.toFixed(0)}%`
     const avg = stats.avgReturnPct === null ? 'n/a' : `${stats.avgReturnPct.toFixed(1)}%`
+    const win = stats.winRatePct === null ? 'n/a' : `${stats.winRatePct.toFixed(0)}%`
     console.log(
-      `[sniper] outcomes: scored=${stats.scored} target=${stats.targets} stopped=${stats.stopped} flat=${stats.flat} pending=${stats.pending} unpriceable=${stats.unpriceable} hitRate=${hit} avgReturn=${avg}`,
+      `[sniper] outcomes: scored=${stats.scored} target=${stats.targets} win=${stats.wins} loss=${stats.losses} stopped=${stats.stopped} flat=${stats.flat} pending=${stats.pending} unpriceable=${stats.unpriceable} hitRate=${hit} winRate=${win} avgReturn=${avg}`,
     )
   }
 

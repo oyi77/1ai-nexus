@@ -31,7 +31,7 @@ export interface DeliveredSignal {
   at: string
 }
 
-export type TradeVerdict = 'TARGET' | 'STOPPED' | 'FLAT' | 'UNPRICEABLE' | 'PENDING'
+export type TradeVerdict = 'TARGET' | 'WIN' | 'LOSS' | 'STOPPED' | 'FLAT' | 'UNPRICEABLE' | 'PENDING'
 
 export interface DemoTrade {
   contract: string
@@ -135,16 +135,22 @@ export function priceTrade(
 }
 
 /**
- * Classify a priced trade against the target/stop bands. A trade that never
- * reaches either band is FLAT, which is a real outcome — not a loss.
+ * Classify a priced trade against the target/stop bands.
+ *
+ * Four real outcomes: TARGET (hit the +targetPct mark), WIN (moved up more
+ * than noise but under target), LOSS (moved down more than noise but above
+ * the stop floor), STOPPED (hit -stopPct), and FLAT for a move too small to
+ * read. Collapsing WIN into FLAT or LOSS into FLAT lets the same report claim
+ * a 100%-flat record and a 100%-loser record from identical data.
  */
 export function classifyTrade(trade: DemoTrade, config: DemoBacktestConfig): DemoTrade {
   if (trade.returnPct === null) return trade
   let verdict: TradeVerdict
   if (trade.returnPct >= config.targetPct) verdict = 'TARGET'
   else if (trade.returnPct <= -config.stopPct) verdict = 'STOPPED'
-  else if (Math.abs(trade.returnPct) <= config.flatBandPct) verdict = 'FLAT'
-  else verdict = 'FLAT'
+  else if (trade.returnPct < config.flatBandPct && trade.returnPct > -config.flatBandPct) verdict = 'FLAT'
+  else if (trade.returnPct > 0) verdict = 'WIN'
+  else verdict = 'LOSS'
   return { ...trade, verdict }
 }
 
@@ -157,6 +163,8 @@ export interface DemoBacktestSummary {
   pending: number
   targets: number
   stops: number
+  wins: number
+  losses: number
   flats: number
   /** null when nothing was priced — never a fabricated 0%. */
   winRatePct: number | null
@@ -179,8 +187,11 @@ export function summariseDemoBacktest(trades: DemoTrade[]): DemoBacktestSummary 
   const returns = priced.map((t) => t.returnPct as number)
   const targets = trades.filter((t) => t.verdict === 'TARGET').length
   const stops = trades.filter((t) => t.verdict === 'STOPPED').length
+  const wins = trades.filter((t) => t.verdict === 'WIN').length
+  const losses = trades.filter((t) => t.verdict === 'LOSS').length
   const flats = trades.filter((t) => t.verdict === 'FLAT').length
-  const decided = targets + stops
+  const positives = targets + wins
+  const decided = positives + stops + losses
 
   return {
     priced: priced.length,
@@ -188,8 +199,10 @@ export function summariseDemoBacktest(trades: DemoTrade[]): DemoBacktestSummary 
     pending: trades.filter((t) => t.verdict === 'PENDING').length,
     targets,
     stops,
+    wins,
+    losses,
     flats,
-    winRatePct: decided > 0 ? (targets / decided) * 100 : null,
+    winRatePct: decided > 0 ? (positives / decided) * 100 : null,
     avgReturnPct:
       returns.length > 0 ? (returns.reduce((a, b) => a + b, 0) / returns.length) * 100 : null,
     medianReturnPct: median(returns) === null ? null : (median(returns) as number) * 100,

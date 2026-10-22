@@ -41,6 +41,10 @@ export interface CandidateEvidence {
   weightedScore?: number
   /** Per-caller weights behind weightedScore (channel name → weight). */
   callerWeights?: Record<string, number>
+  /** Groups weighted by measured origin rate, each clamped to 1. `confluence`
+   * counts channels flat, which credits a pure re-broadcaster as a full
+   * independent confirmation; this is the honest count. */
+  independentGroups?: number
   kinds?: string[]
 }
 

@@ -146,11 +146,34 @@ describe('summariseForward', () => {
     expect(s.returnPct).toBeCloseTo(0.15, 6)
   })
 
-  it('classifyForwardExit respects the flat band', () => {
+  it('classifyForwardExit separates wins, real losses, and a flat non-move', () => {
     expect(classifyForwardExit(0.02)).toBe('FLAT')
     expect(classifyForwardExit(-0.02)).toBe('FLAT')
     expect(classifyForwardExit(0.5)).toBe('TARGET')
-    expect(classifyForwardExit(-0.34)).toBe('FLAT')
+    expect(classifyForwardExit(0.2)).toBe('WIN')
+    expect(classifyForwardExit(-0.34)).toBe('LOSS')
     expect(classifyForwardExit(-0.36)).toBe('STOPPED')
+  })
+
+  it('counts losses in the denominator instead of hiding them as flats', () => {
+    const state = emptyForwardState(10, 150)
+    const at = new Date(Date.now() - 8 * 3_600_000).toISOString()
+    const cfg = { ...CFG, ...FORWARD_DEFAULTS }
+    for (const [contract, entry, exit] of [
+      ['WIN', 1, 2],
+      ['LOSS', 1, 0.9],
+      ['STOP', 1, 0.5],
+      ['FLAT', 1, 1.01],
+    ] as const) {
+      const pos = openForwardPosition(state, sig(contract, at), entry, 'h4', cfg)!
+      state.open.push(pos)
+      state.closed.push(closeForwardPosition(pos, exit, cfg))
+      state.open = state.open.filter((p) => p.contract !== contract)
+    }
+    const s = summariseForward(state)
+    expect(s.wins).toBe(1)
+    expect(s.losses).toBe(2)
+    expect(s.flats).toBe(1)
+    expect(s.winRatePct).toBeCloseTo(100 / 3)
   })
 })

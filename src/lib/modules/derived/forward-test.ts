@@ -104,14 +104,22 @@ export function openForwardPosition(
   }
 }
 
-/** Classify a closed forward trade: target/stop on the realised move, else flat. */
+/**
+ * Classify a closed forward trade on the realised move.
+ *
+ * Same five real outcomes as the backtest: FLAT means the move was too small
+ * to read, not "not a win". A +20% holding is a WIN and a -20% holding is a
+ * LOSS even though neither touched its target or stop; calling both FLAT lets
+ * a losing strategy publish a 100%-flat record.
+ */
 export function classifyForwardExit(
   returnPct: number,
   cfg: DemoBacktestConfig = DEMO_BACKTEST_DEFAULTS,
 ): TradeVerdict {
   if (returnPct >= cfg.targetPct) return 'TARGET'
   if (returnPct <= -cfg.stopPct) return 'STOPPED'
-  return 'FLAT'
+  if (returnPct < cfg.flatBandPct && returnPct > -cfg.flatBandPct) return 'FLAT'
+  return returnPct > 0 ? 'WIN' : 'LOSS'
 }
 
 /** Close an open position at its horizon price, charging fees on both legs. */
@@ -170,8 +178,8 @@ export interface ForwardSummary {
 export function summariseForward(state: ForwardState): ForwardSummary {
   const closed = state.closed
   const returns = closed.map((c) => c.returnPct).sort((a, b) => a - b)
-  const wins = closed.filter((c) => c.verdict === 'TARGET').length
-  const losses = closed.filter((c) => c.verdict === 'STOPPED').length
+  const wins = closed.filter((c) => c.verdict === 'TARGET' || c.verdict === 'WIN').length
+  const losses = closed.filter((c) => c.verdict === 'LOSS' || c.verdict === 'STOPPED').length
   const flats = closed.filter((c) => c.verdict === 'FLAT').length
   const median = returns.length === 0 ? null : returns[Math.floor((returns.length - 1) / 2)]
   const equityUsd = forwardEquityUsd(state)
@@ -184,7 +192,7 @@ export function summariseForward(state: ForwardState): ForwardSummary {
     wins,
     losses,
     flats,
-    winRatePct: closed.length === 0 ? null : (wins / closed.length) * 100,
+    winRatePct: wins + losses === 0 ? null : (wins / (wins + losses)) * 100,
     avgReturnPct: returns.length === 0 ? null : (returns.reduce((a, b) => a + b, 0) / returns.length) * 100,
     medianReturnPct: median === null ? null : median * 100,
     bestReturnPct: returns.length === 0 ? null : returns[returns.length - 1] * 100,

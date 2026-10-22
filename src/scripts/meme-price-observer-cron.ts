@@ -34,6 +34,7 @@ import {
   walletQualityFromStrongest,
 } from '@/lib/modules/derived/outcome-horizons'
 import { loadOutcomeLog } from '@/lib/modules/derived/db-stores'
+import { isClosedVerdict } from '@/lib/modules/derived/sniper-outcomes'
 
 const LOG_PATH = process.env.SNIPER_LOG_PATH ?? join(process.cwd(), 'data', 'sniper-log.json')
 
@@ -100,7 +101,7 @@ async function main() {
   )
 
   const signals = (await loadOutcomeLog()).signals
-  const scored = signals.filter((s) => s.verdict === 'TARGET' || s.verdict === 'STOPPED' || s.verdict === 'FLAT')
+  const scored = signals.filter((s) => isClosedVerdict(s.verdict))
   if (scored.length > 0) {
     const observations = priceHistoryByContract()
     const byHorizon = summariseHorizons(projectHorizonSignals(signals, observations))

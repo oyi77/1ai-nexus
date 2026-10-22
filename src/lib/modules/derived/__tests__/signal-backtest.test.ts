@@ -97,9 +97,20 @@ describe('classifyTrade', () => {
     expect(classifyTrade({ ...tradeOf(-0.4), verdict: 'FLAT' }, cfg).verdict).toBe('STOPPED')
   })
 
-  it('calls a move inside both bands FLAT — not a win and not a loss', () => {
-    expect(classifyTrade({ ...tradeOf(0.2), verdict: 'FLAT' }, cfg).verdict).toBe('FLAT')
+  it('reserves FLAT for a move inside the flat band, WIN above it, LOSS below it', () => {
+    expect(classifyTrade({ ...tradeOf(0.02), verdict: 'FLAT' }, cfg).verdict).toBe('FLAT')
+    expect(classifyTrade({ ...tradeOf(-0.03), verdict: 'FLAT' }, cfg).verdict).toBe('FLAT')
     expect(classifyTrade({ ...tradeOf(0), verdict: 'FLAT' }, cfg).verdict).toBe('FLAT')
+    expect(classifyTrade({ ...tradeOf(0.2), verdict: 'FLAT' }, cfg).verdict).toBe('WIN')
+    expect(classifyTrade({ ...tradeOf(-0.2), verdict: 'FLAT' }, cfg).verdict).toBe('LOSS')
+  })
+
+  it('treats a move exactly at the flat band as real: +band is WIN, -band is LOSS', () => {
+    const cfg = { ...DEMO_BACKTEST_DEFAULTS, flatBandPct: 0.1, targetPct: 0.5, stopPct: 0.35 }
+    expect(classifyTrade({ ...tradeOf(0.1), verdict: 'FLAT' }, cfg).verdict).toBe('WIN')
+    expect(classifyTrade({ ...tradeOf(-0.1), verdict: 'FLAT' }, cfg).verdict).toBe('LOSS')
+    expect(classifyTrade({ ...tradeOf(0.0999), verdict: 'FLAT' }, cfg).verdict).toBe('FLAT')
+    expect(classifyTrade({ ...tradeOf(-0.0999), verdict: 'FLAT' }, cfg).verdict).toBe('FLAT')
   })
 
   it('leaves an unpriced trade untouched', () => {

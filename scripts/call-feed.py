@@ -66,6 +66,8 @@ CHANS = [
     ('KingdomOfDegenCalls', 'shill'),
 ]
 
+CHANS_KINDS = dict(CHANS)
+
 
 STATE_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'call-feed-state.sqlite')
 
@@ -108,13 +110,15 @@ def caller_weight(scores: dict[str, float], channel: str) -> float:
     return scores.get(channel.strip().lstrip('@').lower(), UNSCORED_WEIGHT)
 
 
-def upsert_state(cur: "sqlite3.Cursor", contract: str, source: str, msg_id: int, ts: str) -> bool:
+def upsert_state(
+    cur: "sqlite3.Cursor", contract: str, source: str, msg_id: int, ts: str, kind: str,
+) -> bool:
     if not is_usable_contract(contract):
         return False
     try:
         cur.execute(
-            'INSERT INTO mentions(contract, source, msg_id, seen_at) VALUES(?,?,?,?)',
-            (contract, source, msg_id, ts),
+            'INSERT INTO mentions(contract, source, msg_id, seen_at, kind) VALUES(?,?,?,?,?)',
+            (contract, source, msg_id, ts, kind),
         )
         return True
     except sqlite3.IntegrityError:
@@ -184,8 +188,13 @@ def load_window(db: "sqlite3.Connection", cutoff: str, scores: dict[str, float])
     and weights need the same caller_weight() the live path uses.
     """
     rows: dict[str, dict] = {}
-    for contract, source, ts in db.execute(
-            'SELECT contract, source, seen_at FROM mentions WHERE seen_at >= ?', (cutoff,)):
+    # `kind` is STORED, not inferred from the live fetch. The artifact is built
+    # from the store, so a token whose only calls predate this pass had an
+    # empty kinds list, and categoryFor() then classified whale/KOL/smart-money
+    # calls as plain MEME. Every candidate carried kinds:[] in production.
+    for contract, source, ts, kind in db.execute(
+            'SELECT contract, source, seen_at, kind FROM mentions WHERE seen_at >= ?',
+            (cutoff,)):
         if not is_usable_contract(contract):
             continue
         rec = rows.setdefault(contract, {'contract': contract, 'chain': chain_of(contract),
@@ -196,6 +205,8 @@ def load_window(db: "sqlite3.Connection", cutoff: str, scores: dict[str, float])
         rec['mentions'] += 1
         if source not in rec['sources']:
             rec['sources'].append(source)
+        if kind:
+            rec['kinds'].add(kind)
         rec['caller_weights'][source] = caller_weight(scores, source)
         rec['first_seen'] = min(rec['first_seen'], ts)
         rec['last_seen'] = max(rec['last_seen'], ts)
@@ -232,8 +243,14 @@ async def main() -> int:
     db = sqlite3.connect(STATE_DB)
     cur = db.cursor()
     cur.execute('''CREATE TABLE IF NOT EXISTS mentions(
-        contract TEXT, source TEXT, msg_id INTEGER, seen_at TEXT,
+        contract TEXT, source TEXT, msg_id INTEGER, seen_at TEXT, kind TEXT,
         PRIMARY KEY (contract, source, msg_id))''')
+    # Stores created before `kind` existed need the column plus a backfill from
+    # the channel table; a rebuild would discard the dedupe history.
+    if 'kind' not in {row[1] for row in cur.execute('PRAGMA table_info(mentions)')}:
+        cur.execute('ALTER TABLE mentions ADD COLUMN kind TEXT')
+        cur.executemany('UPDATE mentions SET kind = ? WHERE source = ?', list(CHANS_KINDS.items()))
+        db.commit()
 
     c = TelegramClient(os.path.expanduser('~/.openclaw/workspace/vilona_session'), api_id, api_hash)
     await c.connect()
@@ -260,7 +277,7 @@ async def main() -> int:
                     break
                 text = m.text or ''
                 for ca in set(extract_sol(text)) | set(extract_evm(text)):
-                    if upsert_state(cur, ca, handle, m.id, ts):
+                    if upsert_state(cur, ca, handle, m.id, ts, kind):
                         new_rows += 1
                     rec = mentions.setdefault(ca, {'contract': ca, 'chain': chain_of(ca),
                                                   'mentions': 0, 'sources': [], 'first_seen': ts,
