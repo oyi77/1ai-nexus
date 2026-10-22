@@ -25,7 +25,7 @@ import 'dotenv/config'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { observeSignalOutcomes, buildCloseNotifications } from '@/lib/modules/derived/meme-price-observer'
-import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
+import { deliverSniperAlert, resolveReviewChatId } from '@/lib/modules/derived/meme-sniper'
 import {
   HORIZON_KEYS,
   groupByWalletQuality,
@@ -120,9 +120,15 @@ async function main() {
 
   if (result.updated === 1) {
     const notifications = buildCloseNotifications(before, await loadOutcomeLog())
-    for (const text of notifications) {
-      const sent = await deliverSniperAlert(text)
-      if (!sent) console.error('[meme-price-observer] close notification not delivered (Telegram unconfigured or rejected)')
+    const reviewChat = resolveReviewChatId()
+    if (!reviewChat) {
+      console.error(
+        `[meme-price-observer] ${notifications.length} close notification(s) suppressed: no operator chat configured`,
+      )
+    }
+    for (const text of reviewChat ? notifications : []) {
+      const sent = await deliverSniperAlert(text, reviewChat)
+      if (!sent) console.error('[meme-price-observer] close notification not delivered (Telegram rejected)')
     }
   }
 

@@ -6,6 +6,8 @@
 // other_coin_whale / smart_money), and emits ONE telegram alert per token
 // per cooldown when at least one tagged buyer made a confirmed buy of
 // >= minBuyUsd on a token with verified market cap < maxMarketCapUsd.
+// Delivery goes to the OPERATOR chat (SNIPER_REVIEW_CHAT_ID), never the
+// public sale channel: this is research output, not a published signal.
 //
 // Safe: no data, no alert; delivery failure logs and exits 0.
 //
@@ -24,7 +26,7 @@
 import 'dotenv/config'
 import { prisma } from '@/lib/db'
 import { loadWalletBuys } from '@/lib/modules/derived/db-wallet-buys'
-import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
+import { deliverSniperAlert, resolveReviewChatId } from '@/lib/modules/derived/meme-sniper'
 import { contractButtons } from '@/lib/modules/derived/signal-tier'
 import {
   ACCUMULATION_DEFAULTS,
@@ -292,7 +294,17 @@ async function main() {
     }
     const text = renderAccumulationAlert(event)
     const replyMarkup = contractButtons(event.token.contract, event.token.chain)
-    const ok = await deliverSniperAlert(text, undefined, replyMarkup)
+    // Operator surface: these alerts carry entry/SL/TP ladders and mark a
+    // token as whale-accumulated on the strength of ONE classified wallet.
+    // That is research, not a published signal - the channel only receives
+    // top-tier sniper signals that passed the full audit gate.
+    //
+    // The guard is load-bearing: an EMPTY chatId makes deliverSniperAlert
+    // fall through to SNIPER_TELEGRAM_CHAT_ID, i.e. the public channel. An
+    // unconfigured operator chat must mean "do not send", never "send to
+    // buyers".
+    const reviewChat = resolveReviewChatId()
+    const ok = reviewChat ? await deliverSniperAlert(text, reviewChat, replyMarkup) : false
     if (ok) {
       sent += 1
       state = markSent(state, event.token.contract, now)
@@ -300,7 +312,11 @@ async function main() {
       console.log(`[accumulation-alert] sent ${event.token.contract} (${event.buyers.length} buyer(s), $${event.totalBuyUsd.toFixed(2)})`)
     } else {
       deliveryFailures += 1
-      console.error(`[accumulation-alert] delivery failed ${event.token.contract}`)
+      console.error(
+        `[accumulation-alert] delivery failed ${event.token.contract}` +
+          (reviewChat ? '' : ' (no operator chat configured - SNIPER_REVIEW_CHAT_ID/HUB_TELEGRAM_OWNER_CHAT_ID/TELEGRAM_ADMIN_CHAT_ID empty)'),
+      )
+
     }
   }
 

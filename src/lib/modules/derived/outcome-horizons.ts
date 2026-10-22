@@ -192,7 +192,12 @@ export type RiskBucket = 'HIGH' | 'MED' | 'LOW' | 'UNKNOWN'
 
 export const RISK_BUCKET_KEYS = ['HIGH', 'MED', 'LOW', 'UNKNOWN'] as const satisfies readonly RiskBucket[]
 
-/** Normalise a smart-money `strongest` label into the four-bucket wallet quality. */
+/**
+ * Normalise a smart-money `strongest` label into the four-bucket wallet
+ * quality. Only a genuinely classified track record produces WHALE/SMART;
+ * TRACER_PNL (single-token PnL, no win rate) and any unknown label fall to
+ * NONE so they can never be measured as if they were whale evidence.
+ */
 export function walletQualityFromStrongest(strongest: string | null | undefined): WalletQuality {
   if (strongest === 'WHALE_AND_SMART_MONEY') return 'MIXED'
   if (strongest === 'WHALE') return 'WHALE'

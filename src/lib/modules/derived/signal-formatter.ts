@@ -13,7 +13,12 @@
 
 import type { SniperPayload } from './meme-sniper'
 import type { DevHistoryVerdict } from '@/lib/modules/derived/dev-history'
-import type { SmartMoneyEvidence } from './smart-money-provider'
+import {
+  BULLISH_STATUSES,
+  TRACER_PNL_STATUS,
+  type SmartMoneyEvidence,
+  type WalletBuyer,
+} from './smart-money-provider'
 import type { SignalTier } from './signal-tier-classify'
 import type { ContractButtons } from './signal-buttons'
 import { contractButtons } from './signal-buttons'
@@ -279,17 +284,31 @@ function renderDistributionSection(dst: SniperPayload['distribution']): string[]
   return L
 }
 
-/** Smart Money Inflow block. */
+/**
+ * Render the smart-money block.
+ *
+ * Two populations arrive in `buyers` and they are NOT interchangeable:
+ *   · BULLISH_STATUSES - a classified track record (whale / qualified smart
+ *     money). Only these may be called a classified whale.
+ *   · TRACER_PNL - a holder with positive realized PnL on THIS token only
+ *     (single sample, no win rate). Calling that a classified whale is the
+ *     exact confusion the classifier hardening exists to prevent, so it is
+ *     rendered as an unqualified line and can never become "Top Whale".
+ */
 function renderSmartMoneySection(smartMoney: SmartMoneyEvidence | null): string[] {
   const L: string[] = []
   L.push('🧠 <b>Smart Money:</b>')
 
   const buyers = smartMoney?.buyers ?? []
-  if (buyers.length > 0) {
-    const count = buyers.length
-    const first = buyers[0]
-    const firstAlias = escapeSignalHtml(first.alias ?? `${first.address.slice(0, 4)}…${first.address.slice(-4)}`)
+  const classified = buyers.filter((b) =>
+    (BULLISH_STATUSES as readonly string[]).includes(b.status ?? ''),
+  )
+  const unqualified = buyers.filter((b) => !(BULLISH_STATUSES as readonly string[]).includes(b.status ?? ''))
 
+  if (classified.length > 0) {
+    const first = classified[0]
+    const firstAlias = buyerAlias(first)
+    const count = classified.length
     if (count === 1) {
       L.push(`• 1 Classified Whale entered (${firstAlias})`)
     } else {
@@ -301,11 +320,36 @@ function renderSmartMoneySection(smartMoney: SmartMoneyEvidence | null): string[
     const wrStr = first.winRate != null ? `${Math.round(first.winRate * 100)}%` : 'n/a'
     const pnlStr = first.pnl30d != null ? `${first.pnl30d > 0 ? '+' : ''}${Math.round(first.pnl30d * 100)}%` : 'n/a'
     L.push(`   · Top Whale: ${firstAlias} (Win Rate: ${wrStr} | PnL: ${pnlStr})`)
-  } else {
+  }
+
+  if (unqualified.length > 0) {
+    const first = unqualified[0]
+    const firstAlias = buyerAlias(first)
+    const count = unqualified.length
+    const noun = count === 1 ? 'holder' : 'holders'
+    const pnlStr = first.pnl30d != null ? `${first.pnl30d > 0 ? '+' : ''}${Math.round(first.pnl30d * 100)}%` : 'n/a'
+    const tracerOnly = unqualified.every((b) => b.status === TRACER_PNL_STATUS)
+    if (tracerOnly) {
+      L.push(
+        `• ${count} profitable ${noun} on this token (${firstAlias}) — <i>no wallet track record: single-token PnL ${pnlStr}, sample ${first.sampleCount}, win rate n/a</i>`,
+      )
+    } else {
+      L.push(
+        `• ${count} unclassified ${noun} holding (${firstAlias}) — <i>status not qualified, not counted as smart money</i>`,
+      )
+    }
+  }
+
+  if (classified.length === 0 && unqualified.length === 0) {
     L.push('• No classified whales detected yet (Early stage)')
   }
 
   return L
+}
+
+/** Short, escaped display name for a buyer row. */
+function buyerAlias(b: WalletBuyer): string {
+  return escapeSignalHtml(b.alias ?? `${b.address.slice(0, 4)}…${b.address.slice(-4)}`)
 }
 
 /** Scenario Targets block. */

@@ -11,10 +11,14 @@
 // Body (POST):
 //   { payload: SniperPayload, deliver?: boolean }
 // The evaluator never trusts the caller's stage/status — it re-derives both.
+// A push is gated on the same quality tier as the cron: an approved
+// evaluator verdict is necessary but not sufficient, and no wallet evidence
+// means no evidence (never a pass by omission).
 // ─────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server'
-import { evaluateSniper, deliverSniperAlert, type SniperPayload } from '@/lib/modules/derived/meme-sniper'
+import { evaluateSniper, deliverSniperAlert, resolveReviewChatId, type SniperPayload } from '@/lib/modules/derived/meme-sniper'
+import { classifySignalTier, DEFAULT_DELIVERY_POLICY, shouldDeliver, tierLabel } from '@/lib/modules/derived/signal-tier-classify'
 
 function parseServiceKeys(): Set<string> {
   const keys = new Set<string>()
@@ -85,12 +89,41 @@ export async function POST(request: Request) {
 
   const decision = evaluateSniper(body.payload)
 
-  // Only actionable verdicts are worth a push; REJECT noise trains the operator
-  // to ignore the channel. WATCHLIST still notifies (it is actionable).
+  const tier = classifySignalTier({
+    decision,
+    smartMoney: null,
+    ageMinutes: body.payload.ageMinutes,
+    staleAfterMinutes: 60 * 12,
+    dataComplete: true,
+  })
+
+  // Only tiers the delivery policy allows are pushed. A REJECT, an expired
+  // payload, or a signal without wallet evidence stays API-only. The push
+  // is operator-facing (the caller is an internal service, not the audit
+  // pipeline), so it goes to the review chat - the public channel receives
+  // only cron signals that survived the full audit + wallet gate.
+  //
+  // An EMPTY review chat means "do not send": passing '' would make
+  // deliverSniperAlert fall through to SNIPER_TELEGRAM_CHAT_ID (the sale
+  // channel).
+  const reviewChat = resolveReviewChatId()
   let delivered = false
-  if (body.deliver === true && decision.status !== 'REJECT') {
-    delivered = await deliverSniperAlert(decision.alert)
+  if (body.deliver === true && reviewChat !== '' && shouldDeliver(tier.tier, DEFAULT_DELIVERY_POLICY)) {
+    delivered = await deliverSniperAlert(`${tierLabel(tier.tier)}\n${decision.alert}`, reviewChat)
   }
 
-  return NextResponse.json({ data: { ...decision, delivered }, error: null })
+  return NextResponse.json({
+    data: {
+      ...decision,
+      tier: tier.tier,
+      delivered,
+      deliverySkipped:
+        delivered || body.deliver !== true
+          ? null
+          : reviewChat === ''
+            ? 'no operator chat configured'
+            : 'tier not deliverable under policy',
+    },
+    error: null,
+  })
 }

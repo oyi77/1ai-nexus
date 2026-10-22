@@ -10,8 +10,12 @@
 //      results sheet (screening output: wallet, token, action, amount,
 //      token age, MC, timestamp).
 //   3. If any transaction matches the alert criteria (token age < 24h,
-//      amount > $1000, MC < $1M), a Telegram notification is sent to
-//      the sniper bot.
+//      amount > $1000, MC < $1M) AND the wallet carries a bullish
+//      classification (WHALE / QUALIFIED_SMART_MONEY /
+//      WHALE_AND_SMART_MONEY), a Telegram notification is sent to the
+//      OPERATOR chat. WATCHLIST/PROVISIONAL/DISQUALIFIED/TRACER_PNL rows are
+//      recorded in the sheet as observations only - an unqualified wallet
+//      must never be published as "SMART MONEY".
 //
 // Auth: uses a Google service account JSON (GOOGLE_APPLICATION_CREDENTIALS
 // env var pointing to a JSON key file). If no creds are set, the module
@@ -34,6 +38,9 @@ import {
   smartMoneyAlertKey,
   SMART_MONEY_SEEN_TTL_MS,
 } from './db-seen-store'
+
+import { BULLISH_STATUSES } from './smart-money-provider'
+import { resolveReviewChatId } from './meme-sniper-delivery'
 
 /** The operator's spreadsheet ID (from the shared link). */
 export const SPREADSHEET_ID = '14Kr-P8-DByM-jAw4ydo2x29YAp_LPc9uivHMidP6-78'
@@ -566,8 +573,19 @@ export async function querySmartMoneyActivity(hours = 1): Promise<SmartMoneyTrad
 
 // ── 3. Filter trades matching alert criteria ──────────────────
 
+/**
+ * Alert only on verified buyer quality. The DB is full of wallets that were
+ * classified and did NOT qualify (WATCHLIST, PROVISIONAL, DISQUALIFIED,
+ * TRACER_PNL, UNKNOWN); publishing their buys as smart money is the exact
+ * false-signal this gate exists to stop.
+ */
+export function isBullishWalletStatus(status: string | null | undefined): boolean {
+  return typeof status === 'string' && (BULLISH_STATUSES as readonly string[]).includes(status)
+}
+
 export function filterAlertableTrades(trades: SmartMoneyTrade[]): SmartMoneyTrade[] {
   return trades.filter((t) => {
+    if (!isBullishWalletStatus(t.walletStatus)) return false
     // Token age < 24h (null = unknown → include conservatively)
     if (t.tokenAgeHours !== null && t.tokenAgeHours > ALERT_THRESHOLDS.maxTokenAgeHours) return false
     // Amount > $1000
@@ -666,7 +684,7 @@ export function renderSmartMoneyAlert(t: SmartMoneyTrade): string {
     ? (t.marketCapUsd >= 1_000_000 ? `$${(t.marketCapUsd / 1_000_000).toFixed(1)}M` : `$${(t.marketCapUsd / 1000).toFixed(0)}K`)
     : 'unknown'
   const alias = t.walletAlias ? escapeHtml(t.walletAlias) : `${t.walletAddress.slice(0, 8)}…`
-  const status = escapeHtml(t.walletStatus ?? 'CLASSIFIED')
+  const status = typeof t.walletStatus === 'string' && t.walletStatus ? escapeHtml(t.walletStatus) : 'UNCLASSIFIED'
   const rawSym = t.tokenSymbol ? t.tokenSymbol.trim().toUpperCase() : t.tokenAddress.slice(0, 8)
   const symDisplay = rawSym.startsWith('$') ? rawSym : `$${rawSym}`
   const actionEmoji = t.action === 'BUY' ? '🟢' : '🔴'
@@ -691,14 +709,33 @@ export function renderSmartMoneyAlert(t: SmartMoneyTrade): string {
 
 /**
  * Send a Telegram alert for alertable smart money trades.
- * Uses the sniper bot token + chat ID.
+ *
+ * Operator surface, not the sale channel: these rows name individual
+ * wallets and their positions, so the destination is the review chat. An
+ * unconfigured review chat sends nothing (never the public channel).
+ * Uses the sniper bot token.
  */
 export async function sendSmartMoneyAlerts(trades: SmartMoneyTrade[]): Promise<number> {
   if (trades.length === 0) return 0
 
   const token = process.env.SNIPER_TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || ''
-  const chatId = process.env.SNIPER_TELEGRAM_CHAT_ID || process.env.TELEGRAM_ADMIN_CHAT_ID || ''
-  if (!token || !chatId) return 0
+  const chatId = resolveReviewChatId()
+  if (!token || !chatId) {
+    console.log('[smart-money-sync] alert skipped: operator chat or bot token unconfigured')
+    return 0
+  }
+
+  // Operator dry-run: exercise the real formatter + gate with zero sends.
+  if (process.env.SMART_MONEY_ALERTS_DRY_RUN === '1') {
+    console.log(
+      `[smart-money-sync] dry-run: would send ${trades.length} alert(s) to operator chat ` +
+        `(${trades.filter((t) => !isBullishWalletStatus(t.walletStatus)).length} unqualified filtered before)`,
+    )
+    for (const t of trades) {
+      console.log(`---\n${renderSmartMoneyAlert(t)}`)
+    }
+    return 0
+  }
 
   let sent = 0
   for (const t of trades) {

@@ -118,6 +118,23 @@ function deliveryCooldownMs(): number {
 }
 
 /**
+ * Operator-only chat (review digests, audits, position outcomes).
+ *
+ * NEVER falls back to SNIPER_TELEGRAM_CHAT_ID: that variable is the public
+ * sale channel. Operator material (near-miss reviews, backtest digests,
+ * close notices that name our own positions) must not reach buyers, so an
+ * unconfigured operator chat means "do not send", not "send to channel".
+ */
+export function resolveReviewChatId(): string {
+  return (
+    process.env.SNIPER_REVIEW_CHAT_ID ||
+    process.env.HUB_TELEGRAM_OWNER_CHAT_ID ||
+    process.env.TELEGRAM_ADMIN_CHAT_ID ||
+    ''
+  )
+}
+
+/**
  * Send an alert through the ecosystem's proven channel chain:
  * SCREENING ONLY: this repo never executes. Execution belongs to
  * 1ai-trade-dex; SNIPER_EXECUTE_ENABLED stays unset here, so the
@@ -135,6 +152,9 @@ function deliveryCooldownMs(): number {
  * rejected"). HTML only needs `&`, `<`, `>` escaped, so dynamic token data
  * (which never contains those) cannot break the message. See `escapeSignalHtml`.
  * Returns false (never throws) when unconfigured or the API rejects.
+ *
+ * Operator-only material MUST pass `resolveReviewChatId()` as `chatId`;
+ * omitting it routes to the public channel by design.
  */
 export async function deliverSniperAlert(
   text: string,

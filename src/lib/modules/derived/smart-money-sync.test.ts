@@ -85,6 +85,19 @@ describe('filterAlertableTrades', () => {
     expect(filterAlertableTrades([trade({ marketCapUsd: 1_000_000 })])).toHaveLength(1)
     expect(filterAlertableTrades([trade({ marketCapUsd: 1_000_001 })])).toHaveLength(0)
   })
+
+  it('rejects every non-bullish wallet status even when every numeric gate passes', () => {
+    for (const status of ['WATCHLIST', 'PROVISIONAL', 'DISQUALIFIED', 'TRACER_PNL', 'UNKNOWN', 'FIRST_SEEN', null]) {
+      const t = trade({ walletStatus: status })
+      expect(filterAlertableTrades([t]), `status ${String(status)} must not alert`).toHaveLength(0)
+    }
+  })
+
+  it('accepts each bullish status: WHALE, QUALIFIED_SMART_MONEY, WHALE_AND_SMART_MONEY', () => {
+    for (const status of ['WHALE', 'QUALIFIED_SMART_MONEY', 'WHALE_AND_SMART_MONEY']) {
+      expect(filterAlertableTrades([trade({ walletStatus: status })])).toHaveLength(1)
+    }
+  })
 })
 
 describe('ALERT_THRESHOLDS', () => {

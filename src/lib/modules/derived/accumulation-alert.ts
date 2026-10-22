@@ -276,6 +276,7 @@ const BUYER_CLASSIFICATION: Record<string, string> = {
   WHALE_AND_SMART_MONEY: 'Whale + Smart Money',
   QUALIFIED_SMART_MONEY: 'Qualified Smart Money',
   WHALE: 'Whale',
+  TRACER_PNL: 'Profitable holder on this token (no track record)',
 }
 
 /**

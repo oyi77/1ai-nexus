@@ -182,4 +182,72 @@ describe('formatPotentialCoinSignal', () => {
     })
     expect(out.replyMarkup).toBeUndefined()
   })
+
+  it('never calls a single-token PnL holder a classified whale', () => {
+    const tracer = evidence({
+      buyers: [
+        {
+          walletId: 't1',
+          address: 'Trace1Addr',
+          alias: 'TracedHolder',
+          status: 'TRACER_PNL',
+          pnl30d: 0.34,
+          winRate: null,
+          sampleCount: 1,
+          classifiedAt: null,
+          holdingUsd: 900,
+          stale: false,
+        },
+      ],
+      byStatus: { TRACER_PNL: 1 },
+      strongest: null,
+      bullishHoldingUsd: null,
+      source: 'wallet-tracer:gmgn-holders',
+    })
+    const out = formatPotentialCoinSignal({
+      payload: payload(),
+      tier: 'CANDIDATE',
+      tierReasons: [],
+      tierMissing: [],
+      smartMoney: tracer,
+      marketCapUsd: 250_000,
+      liquidityUsd: 50_000,
+    })
+    expect(out.text).not.toContain('Classified Whale')
+    expect(out.text).not.toContain('Top Whale')
+    expect(out.text).toContain('no wallet track record')
+    expect(out.text).toContain('+34%')
+  })
+
+  it('keeps classified whales separate from unqualified holders in one message', () => {
+    const mixed = evidence({
+      buyers: [
+        ...evidence().buyers,
+        {
+          walletId: 't1',
+          address: 'Trace1Addr',
+          alias: 'TracedHolder',
+          status: 'TRACER_PNL',
+          pnl30d: 0.2,
+          winRate: null,
+          sampleCount: 1,
+          classifiedAt: null,
+          holdingUsd: 900,
+          stale: false,
+        },
+      ],
+      byStatus: { QUALIFIED_SMART_MONEY: 1, TRACER_PNL: 1 },
+    })
+    const out = formatPotentialCoinSignal({
+      payload: payload(),
+      tier: 'CANDIDATE',
+      tierReasons: [],
+      tierMissing: [],
+      smartMoney: mixed,
+      marketCapUsd: 250_000,
+      liquidityUsd: 50_000,
+    })
+    expect(out.text).toContain('1 Classified Whale entered')
+    expect(out.text).toContain('no wallet track record')
+  })
 })
