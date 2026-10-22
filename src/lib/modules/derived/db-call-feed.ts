@@ -56,6 +56,18 @@ export interface CallFeedRow {
   callerWeights?: Record<string, number>
 }
 
+/**
+ * True for a JSON column holding group → weight. Postgres `Json?` has no
+ * shape guarantee: a migrated row can hold a string, an array, or null,
+ * so the map is validated before it reaches arithmetic.
+ */
+function isWeightMap(v: unknown): v is Record<string, number> {
+  if (v === null || typeof v !== 'object' || Array.isArray(v)) return false
+  return Object.values(v as Record<string, unknown>).every(
+    (w) => typeof w === 'number' && Number.isFinite(w),
+  )
+}
+
 // ── JSON artifact path (Python-owned, read-only here) ────────
 
 export function callFeedJsonPath(): string {
@@ -111,9 +123,7 @@ function readJsonArtifact(nowMs: number, maxAgeMin: number): CallFeedRow[] {
         ...(typeof c.weighted_score === 'number' && Number.isFinite(c.weighted_score) && {
           weightedScore: c.weighted_score as number,
         }),
-        ...(c.caller_weights !== undefined &&
-          typeof c.caller_weights === 'object' &&
-          c.caller_weights !== null && { callerWeights: c.caller_weights as Record<string, number> }),
+        ...(isWeightMap(c.caller_weights) && { callerWeights: c.caller_weights }),
       }))
       .filter((c) => c.sourceCount >= 1)
   } catch {
@@ -146,6 +156,7 @@ export async function saveCallFeedRows(rows: CallFeedRow[]): Promise<void> {
           sources: row.sources,
           kinds: row.kinds,
           weightedScore: row.weightedScore ?? null,
+          callerWeights: row.callerWeights ?? undefined,
           lastSeenAt,
         },
         update: {
@@ -157,6 +168,7 @@ export async function saveCallFeedRows(rows: CallFeedRow[]): Promise<void> {
           sources: row.sources,
           kinds: row.kinds,
           weightedScore: row.weightedScore ?? null,
+          callerWeights: row.callerWeights ?? undefined,
           lastSeenAt,
         },
       })
@@ -171,9 +183,9 @@ export async function saveCallFeedRows(rows: CallFeedRow[]): Promise<void> {
  * has no rows while JSON has data. Applies the same staleness gate as the
  * legacy JSON reader (>maxAgeMin → empty). Never throws.
  *
- * NOTE: sources / kinds / weightedScore are persisted (added 2026-10-20).
- * callerWeights still lives only in the JSON artifact — the DB path returns
- * it as absent, which callers already treat as optional.
+ * NOTE: sources / kinds / weightedScore / callerWeights are all persisted
+ * (callerWeights added 2026-10-22 so the DB path can weight groups by origin
+ * rate exactly as the JSON artifact does).
  */
 export async function loadCallFeed(
   nowMs = Date.now(),
@@ -206,6 +218,7 @@ export async function loadCallFeed(
         firstSeen: r.lastSeenAt.toISOString(),
         lastSeen: r.lastSeenAt.toISOString(),
         ...(r.weightedScore !== null && { weightedScore: r.weightedScore }),
+        ...(isWeightMap(r.callerWeights) && { callerWeights: r.callerWeights }),
       }))
     }
     return readJsonArtifact(nowMs, maxAgeMin)

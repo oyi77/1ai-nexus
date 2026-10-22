@@ -1502,6 +1502,11 @@ model CallFeed {
   sources       String[]
   kinds         String[]
   weightedScore Float?
+  // Per-group weights measured by the harvester (origin rate, 0.15-1.6).
+  // Without them the DB path cannot tell an origin hub from a pure mirror
+  // that re-broadcasts other groups' posts, so confluence counting would
+  // fall back to treating every group as an equal vote.
+  callerWeights Json?
   lastSeenAt    DateTime @default(now())
   updatedAt     DateTime @updatedAt
   @@index([lastSeenAt(sort: Desc)])

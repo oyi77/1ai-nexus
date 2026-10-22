@@ -33,6 +33,16 @@ export interface CallConfluence {
   kinds: string[]
   /** Which of the given trusted groups called it. */
   trustedGroups: string[]
+  /**
+   * Groups weighted by how often each one ORIGINATES a call rather than
+   * re-broadcasting another group's post (measured 2026-10-22: the
+   * origin hub `CallAnalyser2` originated 93.1% of its 5,341 contracts
+   * while `whaleBuyBotFree` originated 0 of 263 — it can never confirm
+   * anything). Counting both as one group lets a pure mirror satisfy a
+   * confluence bar on its own. Sum of per-group weights, because a group
+   * contributes exactly one vote no matter how many messages it sends.
+   */
+  effectiveGroupCount: number
   /** True when the feed itself was readable and fresh. */
   available: boolean
 }
@@ -45,8 +55,35 @@ export const EMPTY_CONFLUENCE = (contract: string): CallConfluence => ({
   weightedScore: null,
   kinds: [],
   trustedGroups: [],
+  effectiveGroupCount: 0,
   available: false,
 })
+
+/**
+ * Weight for one group. Names are matched case-insensitively and without
+ * the leading `@` because the harvester keys the artifact by Telegram
+ * handle while the stored sources keep the raw channel name.
+ */
+function weightOf(weights: Record<string, number>, group: string): number | null {
+  const key = group.trim().replace(/^@/, '').toLowerCase()
+  for (const [name, w] of Object.entries(weights)) {
+    if (name.trim().replace(/^@/, '').toLowerCase() === key && Number.isFinite(w)) return w
+  }
+  return null
+}
+
+/**
+ * Sum of per-group weights, each clamped to [0, 1].
+ *
+ * A weight above 1 marks an origin hub; letting it count as 1.6 groups
+ * would make one prolific caller able to clear a 2-group bar alone, which
+ * defeats the point of requiring independent confirmation. The weight is
+ * therefore used to DISCOUNT mirrors, never to inflate an origin.
+ */
+function effectiveGroupCountOf(groups: string[], weights: Record<string, number>): number {
+  return groups.reduce((sum, g) => sum + Math.max(0, Math.min(1, weightOf(weights, g) ?? 0)), 0)
+}
+
 
 /**
  * Build a lookup of contract → confluence for the given contracts.
@@ -85,6 +122,7 @@ export async function loadCallConfluence(
   for (const row of rows) {
     if (!wanted.has(row.contract)) continue
     const groups = [...new Set(row.sources.filter((s) => typeof s === 'string' && s.length > 0))]
+    const weights = row.callerWeights ?? {}
     out.set(row.contract, {
       contract: row.contract,
       groups,
@@ -93,6 +131,7 @@ export async function loadCallConfluence(
       weightedScore: typeof row.weightedScore === 'number' ? row.weightedScore : null,
       kinds: [...new Set(row.kinds)],
       trustedGroups: groups.filter((g) => trusted.has(g)),
+      effectiveGroupCount: effectiveGroupCountOf(groups, weights),
       available: true,
     })
   }
@@ -112,7 +151,9 @@ export function clearsConfluence(
   trustedOnly = false,
 ): { pass: boolean; detail: string } {
   if (!c || !c.available) return { pass: false, detail: 'call-feed unavailable for this contract' }
-  const counted = trustedOnly ? c.trustedGroups.length : c.groupCount
+  const counted = trustedOnly
+    ? c.trustedGroups.length
+    : Math.floor(c.effectiveGroupCount + 1e-9)
   const pass = counted >= minGroups
   const label = trustedOnly ? 'trusted group(s)' : 'group(s)'
   return {

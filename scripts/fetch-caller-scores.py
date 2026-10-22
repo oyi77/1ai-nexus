@@ -123,6 +123,32 @@ def build_output(items: list[dict], timeframe: str) -> dict:
     }
 
 
+def _preserve_measured(path: str, callers: dict) -> int:
+    """Re-insert measured-origin weights the Solpump universe does not cover.
+
+    Returns how many records were preserved. Records are matched by
+    lowercased name so `@Foo` and `foo` collapse to one entry; a Solpump
+    record wins only when it actually carries a weight.
+    """
+    try:
+        with open(path, encoding='utf-8') as f:
+            prior = (json.load(f).get('callers') or {})
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return 0
+    have = {name.strip().lstrip('@').lower() for name in callers}
+    preserved = 0
+    for name, rec in prior.items():
+        key = name.strip().lstrip('@').lower()
+        if not key or key in have or not isinstance(rec, dict):
+            continue
+        if not isinstance(rec.get('weight'), (int, float)):
+            continue
+        callers[name] = rec
+        have.add(key)
+        preserved += 1
+    return preserved
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument('--timeframe', default='30d', choices=['1d', '7d', '30d', '90d'])
@@ -137,11 +163,18 @@ def main() -> int:
         return 2
 
     out = build_output(items, args.timeframe)
+    # The same file also holds weights measured from our OWN harvested
+    # channels (scripts/call-feed.py measures each group's origin rate).
+    # Those groups are absent from the Solpump caller universe - measured
+    # 0 of 13 overlap - so a plain write would delete every measured
+    # weight and silently restore the flat fallback. Merge, keep ours.
+    preserved = _preserve_measured(args.output, out['callers'])
     out_dir = os.path.dirname(os.path.abspath(args.output))
     os.makedirs(out_dir, exist_ok=True)
     with open(args.output, 'w', encoding='utf-8') as f:
         json.dump(out, f, indent=1)
-    print(f'wrote {args.output}: {out["caller_count"]} callers, failed_pages={failed_pages}')
+    print(f'wrote {args.output}: {out["caller_count"]} callers, '
+          f'preserved_measured={preserved}, failed_pages={failed_pages}')
     return 1 if failed_pages else 0
 
 

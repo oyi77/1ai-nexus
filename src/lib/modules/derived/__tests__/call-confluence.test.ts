@@ -114,6 +114,33 @@ describe('loadCallConfluence', () => {
     expect(feedCalls).toBe(0)
   })
 
+  it('weights each group by origin rate and clamps hub weights to one vote', async () => {
+    feedRows = [
+      feedRow('abc', {
+        sources: ['CallAnalyser2', '@whaleBuyBotFree', 'Unmeasured'],
+        callerWeights: {
+          CallAnalyser2: 1.5,
+          whaleBuyBotFree: 0.15,
+          Unmeasured: 0.4,
+          'not-a-source': 1.2,
+        },
+      }),
+    ]
+    const c = (await loadCallConfluence(['abc'], { loadFeed: feedLoader })).get('abc')
+    // 1.0 (hub clamped) + 0.15 (mirror) + 0.4 (measured elsewhere) = 1.55
+    expect(c?.groupCount).toBe(3)
+    expect(c?.effectiveGroupCount).toBeCloseTo(1.55, 5)
+  })
+
+  it('counts an unmeasured group as zero rather than assuming a vote', async () => {
+    const row = feedRow('abc', { sources: ['NoScoreGroup'] })
+    delete (row as { callerWeights?: Record<string, number> }).callerWeights
+    feedRows = [row]
+    const c = (await loadCallConfluence(['abc'], { loadFeed: feedLoader })).get('abc')
+    expect(c?.groupCount).toBe(1)
+    expect(c?.effectiveGroupCount).toBe(0)
+  })
+
   it('treats a missing weightedScore as null, not zero', async () => {
     const row = feedRow('abc')
     delete (row as { weightedScore?: number }).weightedScore
@@ -132,13 +159,26 @@ describe('clearsConfluence', () => {
     weightedScore: null,
     kinds: [],
     trustedGroups: [],
+    effectiveGroupCount: 2,
     available: true,
     ...over,
   })
 
   it('passes at the bar', () => {
-    expect(clearsConfluence(conf({ groupCount: 2 }), 2).pass).toBe(true)
-    expect(clearsConfluence(conf({ groupCount: 1 }), 2).pass).toBe(false)
+    expect(clearsConfluence(conf({ groupCount: 2, effectiveGroupCount: 2 }), 2).pass).toBe(true)
+    expect(clearsConfluence(conf({ groupCount: 1, effectiveGroupCount: 1 }), 2).pass).toBe(false)
+  })
+
+  it('discounts a mirror group instead of counting it as a full vote', () => {
+    // Measured 2026-10-22: whaleBuyBotFree originated 0 of its 263 calls
+    // (weight 0.15) while CallAnalyser2 originated 93.1% of 5,341 (1.5).
+    // Both called the token, yet that is NOT two independent confirmations:
+    // the mirror merely re-broadcast the hub.
+    const mirrored = conf({ groupCount: 2, effectiveGroupCount: 1.15 })
+    expect(clearsConfluence(mirrored, 2).pass).toBe(false)
+    expect(clearsConfluence(mirrored, 1).pass).toBe(true)
+    const independent = conf({ groupCount: 2, effectiveGroupCount: 2 })
+    expect(clearsConfluence(independent, 2).pass).toBe(true)
   })
 
   it('trusted-only counting is stricter than raw group count', () => {
@@ -158,8 +198,12 @@ describe('clearsConfluence', () => {
   })
 
   it('reports the counted groups against the bar', () => {
-    expect(clearsConfluence(conf({ groupCount: 3 }), 2).detail).toContain('3 group(s)')
-    expect(clearsConfluence(conf({ groupCount: 1 }), 2).detail).toContain('below bar')
+    expect(clearsConfluence(conf({ groupCount: 3, effectiveGroupCount: 3 }), 2).detail).toContain(
+      '3 group(s)',
+    )
+    expect(clearsConfluence(conf({ groupCount: 1, effectiveGroupCount: 1 }), 2).detail).toContain(
+      'below bar',
+    )
   })
 })
 
@@ -167,7 +211,7 @@ describe('describeConfluence', () => {
   it('names the unavailable and empty states honestly', () => {
     const base: CallConfluence = {
       contract: 'x', groups: [], groupCount: 0, mentions: 0,
-      weightedScore: null, kinds: [], trustedGroups: [], available: false,
+      weightedScore: null, kinds: [], trustedGroups: [], effectiveGroupCount: 0, available: false,
     }
     expect(describeConfluence(base)).toBe('call groups: no call-feed entry')
     expect(describeConfluence({ ...base, available: true })).toBe(
@@ -179,7 +223,7 @@ describe('describeConfluence', () => {
     expect(
       describeConfluence({
         contract: 'x', groups: ['A', 'B'], groupCount: 2, mentions: 7,
-        weightedScore: 8, kinds: [], trustedGroups: [], available: true,
+        weightedScore: 8, kinds: [], trustedGroups: [], effectiveGroupCount: 2, available: true,
       }),
     ).toBe('call groups (2): A, B · score 8.0 · 7 mention(s)')
   })
@@ -199,7 +243,7 @@ describe('strategy-intake confluence gate', () => {
   it('drops the firing strategy when the bar is not cleared', () => {
     const conf: CallConfluence = {
       contract: 'x', groups: ['A'], groupCount: 1, mentions: 3,
-      weightedScore: 5, kinds: [], trustedGroups: [], available: true,
+      weightedScore: 5, kinds: [], trustedGroups: [], effectiveGroupCount: 1, available: true,
     }
     const r = applyConfluenceBar([verdict()], conf, { minGroups: 2 })
     expect(r.fired).toBeNull()
@@ -210,7 +254,7 @@ describe('strategy-intake confluence gate', () => {
   it('keeps the strategy when the bar is cleared, and trusted-only is stricter', () => {
     const conf: CallConfluence = {
       contract: 'x', groups: ['A', 'B'], groupCount: 2, mentions: 4,
-      weightedScore: 7, kinds: [], trustedGroups: ['A'], available: true,
+      weightedScore: 7, kinds: [], trustedGroups: ['A'], effectiveGroupCount: 2, available: true,
     }
     expect(applyConfluenceBar([verdict()], conf, { minGroups: 2 }).fired).not.toBeNull()
     const strict = applyConfluenceBar([verdict()], conf, { minGroups: 2, trustedOnly: true })

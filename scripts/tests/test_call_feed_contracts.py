@@ -24,6 +24,7 @@ from call_feed_contracts import (
     extract_evm,
     extract_sol,
     is_plausible_sol,
+    is_usable_contract,
     normalize_text,
     pick_repair,
     salvage_payload,
@@ -159,6 +160,19 @@ def test_short_word_shaped_values_are_not_contracts():
     assert is_plausible_sol(REAL) is True
 
 
+def test_evm_calls_survive_the_solana_byte_floor():
+    """Measured: 13 of 61 contracts in one 60-minute window were 0x... BSC
+    calls. A chain-blind guard deleted every one of them, so the artifact
+    under-reported the window while the store was correct."""
+    assert is_usable_contract(EVM) is True
+    assert is_usable_contract(EVM.upper().replace('0X', '0x')) is True
+    assert is_usable_contract('0x3b29cc') is False
+    assert is_usable_contract(REAL) is True
+    assert is_usable_contract('jonathanpump') is False
+    assert is_usable_contract(None) is False
+    assert is_usable_contract('') is False
+
+
 def test_canonical_contract_refuses_what_bytes_cannot_prove():
     """Byte structure alone cannot pick a side, so the string layer refuses.
 
@@ -258,3 +272,59 @@ def test_salvage_ranks_by_confluence_not_by_raw_mentions():
     rows = salvage_payload(payload, repairs={TRAPPED: REAL})['candidates']
     assert [r['source_count'] for r in rows] == [3, 1]
     assert rows[0]['contract'] == CLEAN_43
+
+
+def test_unscored_channel_keeps_only_a_reduced_vote():
+    """A channel with no measured origin rate must not get a full vote.
+
+    Measured 2026-10-22: 0 of 13 harvested groups appear in the Solpump
+    caller universe, so every weight fell back to 1.0 and a pure mirror
+    (whaleBuyBotFree originated 0 of its 263 calls) voted as loudly as the
+    origin hub CallAnalyser2 (93.1% of 5,341). Absence of evidence is not
+    equal evidence.
+    """
+    import importlib.util, pathlib as _p
+    spec = importlib.util.spec_from_file_location(
+        'call_feed_mod', _p.Path(__file__).resolve().parents[1] / 'call-feed.py')
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    scores = {'callanalyser2': 1.5}
+    assert mod.caller_weight(scores, 'CallAnalyser2') == 1.5
+    assert mod.caller_weight(scores, '@CallAnalyser2') == 1.5
+    assert mod.caller_weight(scores, 'whaleBuyBotFree') == mod.UNSCORED_WEIGHT
+    assert mod.UNSCORED_WEIGHT < 1.0
+
+
+def test_score_fetch_preserves_measured_weights_outside_its_universe():
+    """A Solpump refresh must not delete weights measured from our groups.
+
+    Verified 2026-10-22: the tuned fetcher rewrote 75 Solpump callers over a
+    file whose 13 measured groups had no Solpump counterpart, wiping every
+    weight and restoring the flat fallback. Measured records carry
+    source == 'telegram-origin' and must survive the merge.
+    """
+    import importlib.util, json, pathlib as _p, tempfile
+    spec = importlib.util.spec_from_file_location(
+        'fetch_scores_mod', _p.Path(__file__).resolve().parents[1] / 'fetch-caller-scores.py')
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    prior = {'callers': {
+        'CallAnalyser2': {'weight': 1.5, 'source': 'telegram-origin'},
+        'whaleBuyBotFree': {'weight': 0.15, 'source': 'telegram-origin'},
+        '@SolpumpKOL': {'weight': 0.9, 'source': 'solpump'},
+        'junk': {'weight': 'n/a'},
+    }}
+    with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False) as fh:
+        json.dump(prior, fh)
+        path = fh.name
+    fresh = {'@solpumpkol': {'weight': 1.2, 'source': 'solpump'},
+             'NewCaller': {'weight': 0.7, 'source': 'solpump'}}
+    preserved = mod._preserve_measured(path, fresh)
+    assert preserved == 2
+    assert 'CallAnalyser2' in fresh and fresh['CallAnalyser2']['weight'] == 1.5
+    assert 'whaleBuyBotFree' in fresh
+    assert fresh['@solpumpkol']['weight'] == 1.2
+    assert 'junk' not in fresh
+    _p.Path(path).unlink()

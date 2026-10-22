@@ -47,6 +47,7 @@
     "cron:accumulation-alert": "tsx src/scripts/accumulation-alert-cron.ts",
     "cron:alpha-track": "tsx src/scripts/alpha-track-record-cron.ts",
     "cron:caller-scores": "python3 scripts/fetch-caller-scores.py",
+    "cron:call-group-weights": "python3 scripts/refetch-call-group-weights.py",
     "cron:confluence": "tsx src/scripts/confluence-cron.ts",
     "cron:feed-health": "tsx src/scripts/feed-health-cron.ts",
     "cron:kol-monitor": "tsx src/scripts/kol-monitor-cron.ts",

@@ -234,6 +234,21 @@ def canonical_contract(raw) -> str:
     return ''
 
 
+def is_usable_contract(contract) -> bool:
+    """True when a stored value is a contract on whichever chain it belongs to.
+
+    The Solana byte floor must never be applied to an EVM address: a
+    42-character `0x…` value decodes to nothing under base58, so a chain-blind
+    guard silently deletes every BSC call in the window (measured: 13 of 61
+    contracts in one 60-minute window).
+    """
+    if not isinstance(contract, str) or not contract:
+        return False
+    if chain_of(contract) == 'bsc':
+        return bool(EVM_CA.fullmatch(contract))
+    return is_plausible_sol(contract)
+
+
 def salvage_payload(payload: dict, repairs=None) -> dict:
     """Canonicalise a feed artifact and re-merge rows the trap split apart.
 

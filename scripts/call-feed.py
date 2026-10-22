@@ -41,6 +41,7 @@ from call_feed_contracts import (
     extract_evm,
     extract_sol,
     is_plausible_sol,
+    is_usable_contract,
     pick_repair,
 )
 
@@ -92,11 +93,24 @@ def load_scores(path: str) -> dict[str, float]:
     return scores
 
 
+UNSCORED_WEIGHT = 0.25
+
+
 def caller_weight(scores: dict[str, float], channel: str) -> float:
-    """Weight for a Telegram channel name; 1.0 when no Solpump caller matches."""
-    return scores.get(channel.strip().lstrip('@').lower(), 1.0)
+    """Measured weight for a channel, or UNSCORED_WEIGHT when unmeasured.
+
+    A channel absent from the measurement has no evidence of originating
+    calls: it may be a mirror that only re-broadcasts another group's
+    post. Giving it a full 1.0 vote would let a pure reposter corroborate
+    itself, so unscored channels keep a reduced vote and are reported in
+    the artifact as `unscored_sources` for the operator to see.
+    """
+    return scores.get(channel.strip().lstrip('@').lower(), UNSCORED_WEIGHT)
+
 
 def upsert_state(cur: "sqlite3.Cursor", contract: str, source: str, msg_id: int, ts: str) -> bool:
+    if not is_usable_contract(contract):
+        return False
     try:
         cur.execute(
             'INSERT INTO mentions(contract, source, msg_id, seen_at) VALUES(?,?,?,?)',
@@ -162,6 +176,34 @@ async def repair_state(db: "sqlite3.Connection", client, limit: int) -> dict[str
     return repairs
 
 
+def load_window(db: "sqlite3.Connection", cutoff: str, scores: dict[str, float]) -> list[dict]:
+    """Candidates from the STORE, not from this pass's fetch.
+
+    Mentions are timestamped ISO-8601 UTC, so a lexical comparison is exact and
+    keeps sqlite from parsing dates. Grouped in Python because the source list
+    and weights need the same caller_weight() the live path uses.
+    """
+    rows: dict[str, dict] = {}
+    for contract, source, ts in db.execute(
+            'SELECT contract, source, seen_at FROM mentions WHERE seen_at >= ?', (cutoff,)):
+        if not is_usable_contract(contract):
+            continue
+        rec = rows.setdefault(contract, {'contract': contract, 'chain': chain_of(contract),
+                                         'mentions': 0, 'sources': [],
+                                         'first_seen': ts, 'last_seen': ts,
+                                         'kinds': set(), 'weighted_score': 0.0,
+                                         'caller_weights': {}})
+        rec['mentions'] += 1
+        if source not in rec['sources']:
+            rec['sources'].append(source)
+        rec['caller_weights'][source] = caller_weight(scores, source)
+        rec['first_seen'] = min(rec['first_seen'], ts)
+        rec['last_seen'] = max(rec['last_seen'], ts)
+    for rec in rows.values():
+        rec['weighted_score'] = sum(rec['caller_weights'].values())
+    return sorted(rows.values(), key=lambda r: (-len(r['sources']), -r['weighted_score']))
+
+
 def _SUSPECTS(db: "sqlite3.Connection") -> list[str]:
     return [contract for (contract,) in db.execute('SELECT DISTINCT contract FROM mentions')
             if not is_plausible_sol(contract) and contract.endswith('pump')]
@@ -174,6 +216,8 @@ async def main() -> int:
     ap.add_argument('--scores-file', default='data/caller-scores.json')
     ap.add_argument('--repair-limit', type=int, default=400,
                     help='max poisoned rows re-read per pass (0 disables repair)')
+    ap.add_argument('--emit', default='',
+                    help='write the artifact here instead of stdout (atomic rename)')
     args = ap.parse_args()
 
     scores = load_scores(args.scores_file)
@@ -200,17 +244,22 @@ async def main() -> int:
     if args.repair_limit > 0:
         await repair_state(db, c, args.repair_limit)
 
-    cutoff = datetime.now(timezone.utc) - timedelta(minutes=args.window_min)
+    # The window bounds the STORE and the OUTPUT, not just the fetch. Building
+    # candidates only from messages read in this pass dropped any token whose
+    # calls predate the per-channel limit: the Telegram fetch stops at
+    # `limit` messages, so a busy channel pushes an older call off the end and
+    # the token vanishes from the artifact while still sitting in the store.
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=args.window_min)).isoformat()
     mentions: dict[str, dict] = {}
     new_rows = 0
     for handle, kind in CHANS:
         try:
             async for m in c.iter_messages(handle, limit=args.limit):
-                if m.date.replace(tzinfo=timezone.utc) < cutoff:
+                ts = m.date.replace(tzinfo=timezone.utc).isoformat()
+                if ts < cutoff:
                     break
                 text = m.text or ''
                 for ca in set(extract_sol(text)) | set(extract_evm(text)):
-                    ts = m.date.isoformat()
                     if upsert_state(cur, ca, handle, m.id, ts):
                         new_rows += 1
                     rec = mentions.setdefault(ca, {'contract': ca, 'chain': chain_of(ca),
@@ -231,12 +280,26 @@ async def main() -> int:
     db.commit()
     for contract in _SUSPECTS(db):
         mentions.pop(contract, None)
-    rows = sorted(mentions.values(), key=lambda r: (-len(r['sources']), -r['weighted_score']))
-    out = [{**r, 'sources': r['sources'], 'kinds': sorted(r['kinds']),
-            'source_count': len(r['sources']), 'weighted_score': round(r['weighted_score'], 4)} for r in rows]
-    print(json.dumps({'generated_at': datetime.now(timezone.utc).isoformat(),
-                      'window_min': args.window_min, 'new_mentions': new_rows,
-                      'candidates': out}, indent=1))
+    rows = load_window(db, cutoff, scores)
+    out = [{**r, 'kinds': sorted(r['kinds']),
+            'source_count': len(r['sources']), 'weighted_score': round(r['weighted_score'], 4)}
+           for r in rows]
+    scored = set(scores)
+    unscored = sorted({s for r in rows for s in r['sources']
+                       if s.strip().lstrip('@').lower() not in scored})
+    payload = {'generated_at': datetime.now(timezone.utc).isoformat(),
+               'window_min': args.window_min, 'new_mentions': new_rows,
+               'unscored_sources': unscored, 'candidates': out}
+    if args.emit:
+        # Write-then-rename: a reader (sync:call-feed, every 2 min, offset 45s)
+        # must never see a half-written artifact, and a killed pass must never
+        # leave the previous good one truncated.
+        tmp = args.emit + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, indent=1)
+        os.replace(tmp, args.emit)
+    else:
+        print(json.dumps(payload, indent=1))
     await c.disconnect()
     db.close()
     return 0

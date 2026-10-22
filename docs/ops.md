@@ -773,22 +773,50 @@ called the same token.
   `caller_weights` map of `{channel_handle: weight}` for its contributors.
 - **Sort order**: `source_count` desc, then `weighted_score` desc (replaces
   raw mention count as the tiebreaker).
-- **Backward compatible**: if `data/caller-scores.json` is absent, all
-  weights default to 1.0 — the script degrades to the original unweighted
-  ranking with no behavior change.
+- **Unmeasured channels get `UNSCORED_WEIGHT = 0.25`, not 1.0.** A channel
+  with no measured weight has no evidence of originating calls — it may be a
+  mirror. The old silent 1.0 let a pure reposter cast a full vote. Every
+  unmeasured channel in the window is listed in the artifact's
+  `unscored_sources` array so the gap is visible instead of assumed.
 - **Fields in each candidate**: `contract`, `chain`, `sources`,
   `source_count`, `mentions`, `weighted_score`, `caller_weights`,
-  `first_seen`, `last_seen`, `kinds`
+  `first_seen`, `last_seen`, `kinds`. Top-level: `generated_at`,
+  `window_min`, `new_mentions`, `unscored_sources`, `candidates`.
 
 Channel handle normalization: leading `@` stripped + lowercased for lookup
-in `caller-scores.json`. Channels with no matching Solpump caller fall back
-to weight 1.0.
+in `caller-scores.json`.
 
-> ⚠️ **`data/caller-scores.json` is NOT in `.gitignore`** — it currently
-> shows as untracked (`??`) in `git status`. This is a runtime artifact
-> regenerated every 6 hours by cron and should not be committed. Add it to
-> `.gitignore` before staging (see `data/call-feed-latest.json` pattern at
-> line 111 of `.gitignore` for reference).
+> `data/caller-scores.json` is gitignored (runtime artifact).
+
+### Call-Group Origin Weights — `scripts/refetch-call-group-weights.py`
+
+**npm script**: `npm run cron:call-group-weights`
+
+Measures each harvested group's **origin rate** and rewrites its weight in
+`data/caller-scores.json`:
+
+    originRate = contracts this group saw FIRST / distinct contracts it saw
+    weight     = 0.15 + 1.45 * originRate, clamped to [0.15, 1.6]
+
+Origin rate is the only weight measurable without a price-history backtest.
+Measured 2026-10-22 over 7 days: `CallAnalyser2` originated 93.1% of 5,341
+contracts (weight 1.500) while `whaleBuyBotFree` originated **0 of 263**
+(weight 0.150) — it was being credited with 263 independent confirmations.
+
+**Why flat group counts lie:** the accumulation confluence bar counts groups.
+Under flat counting **22 of 22** multi-group CAs cleared a 2-group bar; with
+origin weighting only **1 of 22** does. A weight above 1 marks a hub but is
+clamped to 1 when summed (`effectiveGroupCount` in `call-confluence.ts`), so
+one prolific caller can never clear a multi-group bar alone — the weight
+discounts mirrors, it does not inflate hubs.
+
+**Merge contract:** the two producers share one file. `refetch-call-group-weights.py`
+replaces only records whose `source == 'telegram-origin'`;
+`fetch-caller-scores.py` re-inserts every measured record its Solpump universe
+does not cover (`_preserve_measured`, verified: 13 preserved, 0 of 13 overlap).
+Neither can wipe the other.
+
+**Cron:** `0 */6 * * *`, log `/tmp/call-group-weights-cron.log`.
 
 ### Contract extraction rules — `scripts/call_feed_contracts.py`
 
@@ -837,6 +865,18 @@ is staged) and defensive (unproven candidates are always REJECTED).
 | `SNIPER_TELEGRAM_BOT_TOKEN` | string | empty | Bot token used to push sniper alerts. Falls back to `HUB_TELEGRAM_BOT_TOKEN` then `TELEGRAM_BOT_TOKEN`. | **Secret.** Must never be committed. Without a token, `deliverSniperAlert` is a no-op (returns `false`, never throws). |
 | `SNIPER_DELIVER_CHAT_ID` | string | empty | Target chat for delivered signals. Falls back to `HUB_TELEGRAM_OWNER_CHAT_ID` → `TELEGRAM_ALERT_CHAT_ID` → `TELEGRAM_ADMIN_CHAT_ID`. | Points alerts at the sale/operator channel. A wrong ID leaks signals to the wrong audience. |
 | `SNIPER_REVIEW_CHAT_ID` | string | empty | Separate chat for the near-miss review digest. Falls back to `HUB_TELEGRAM_OWNER_CHAT_ID` / `TELEGRAM_ADMIN_CHAT_ID` — **never** to the sale channel. | A review digest is never a signal; this separation prevents it from leaking into the product surface. |
+
+### Evidence Provenance & Which Surface Sees What
+
+A buyer traced from `gmgn` holders with a positive PnL is **not** a classified whale. Its status is `TRACER_PNL`: profitable on *this* token, with no cross-token win rate, no sample size, and therefore no track record. Only `QUALIFIED_SMART_MONEY` / `WHALE_AND_SMART_MONEY` (a real classification pass) and `WHALE` (a large holder without a smart-money verdict) are classified. A `TRACER_PNL` holder is rendered as `Profitable holder · no wallet track record` and never counted as "Classified Whale"/"Top Whale" evidence. Treating absence of classification as a pass is the same defect class as a null market cap slipping through a `=` gate — missing evidence is not a passing gate.
+
+| Surface | Receives | Gate |
+|---|---|---|
+| Public channel (`SNIPER_DELIVER_CHAT_ID`) | HIGH_CONVICTION sniper signals only | full audit + evaluator + wallet-evidence gate; `SNIPER_DELIVER_WATCHLIST` off |
+| Operator DM (`SNIPER_REVIEW_CHAT_ID`) | accumulation alerts, position-close notifications, audit-backtest digests, near-miss review, and every API-triggered push (`POST /api/v1/meme/sniper`) | tier-classified, but never published |
+| Smart-money alerts (`smart-money-sync.ts`) | classified buyer activity on tokens <24h old, >$1000, MC <$1M | `isBullishWalletStatus()` — only `WHALE`, `QUALIFIED_SMART_MONEY`, `WHALE_AND_SMART_MONEY`; unqualified rows are still written to the results sheet as observations |
+
+Accumulation alerts, close notifications, and backtest digests are research output: they carry entry/SL/TP ladders and can mark a token accumulated on the strength of one classified wallet. `src/scripts/accumulation-alert-cron.ts`, `src/scripts/meme-price-observer-cron.ts`, `src/scripts/audit-backtest.ts`, and the sniper API route all deliver via `deliverSniperAlert(..., resolveReviewChatId())`. Only `src/scripts/sniper-cron.ts` and `src/lib/modules/derived/realtime-bridge.ts` push to the public channel, and only after `shouldDeliver(tier, DEFAULT_DELIVERY_POLICY)`.
 
 ### Discovery & Scan Cadence
 
