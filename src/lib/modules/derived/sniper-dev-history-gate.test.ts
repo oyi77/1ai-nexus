@@ -143,9 +143,11 @@ function devTokens(n: number, opts: Partial<DevHistoryToken> = {}): DevHistoryTo
   }))
 }
 
+// 209 judged deploys with zero migrations: (69/70)^209 ≈ 4.9%, the first
+// sample size that clears the default 5% binomial bar. Three zeros do not.
 const SERIAL_RUGGER: DevHistoryVerdict = assessDevHistory({
   devAddress: 'DEV',
-  tokens: devTokens(3),
+  tokens: devTokens(209),
 } satisfies DevHistoryInput)
 
 const CLEAN_DEV: DevHistoryVerdict = assessDevHistory({

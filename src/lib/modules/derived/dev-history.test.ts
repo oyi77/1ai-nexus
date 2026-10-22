@@ -51,29 +51,46 @@ describe('assessDevHistory', () => {
     })
   })
 
-  describe('tier: SERIAL_RUGGER (zero migrations)', () => {
-    it('exactly 3 tokens, 0 migrated → SERIAL_RUGGER (boundary)', () => {
+  describe('tier: zero migrations is a base rate, not a signal', () => {
+    it('exactly 3 tokens, 0 migrated → UNPROVEN (0/3 is the normal outcome)', () => {
+      // P(0 of 3 | honest dev, p=1/70) = 95.8% — a streak that ordinary.
       const v = assessDevHistory(input(tokens(3)))
 
-      expect(v.tier).toBe('SERIAL_RUGGER')
+      expect(v.tier).toBe('UNPROVEN')
       expect(v.previousTokens).toBe(3)
       expect(v.migrations).toBe(0)
       expect(v.migrationRate).toBe(0)
-      expect(v.reasons[0]).toContain('0 ever migrated')
+      expect(v.reasons[0]).toContain('not evidence of fraud')
     })
 
-    it('exactly 2 tokens, 0 migrated → NOT serial-rugger rule (falls through to SUSPECT)', () => {
+    it('20 tokens, 0 migrated → UNPROVEN (75% of honest devs do the same)', () => {
+      const v = assessDevHistory(input(tokens(20)))
+
+      expect(v.knownMigrations).toBe(20)
+      expect(v.tier).toBe('UNPROVEN')
+      expect(v.reasons[0]).toContain('75')
+    })
+
+    it('a zero streak well past the binomial bar → SERIAL_RUGGER', () => {
+      // P(0 of 400 | p=1/70) = (69/70)^400 ≈ 0.3% < the 5% limit.
+      const v = assessDevHistory(input(tokens(400)))
+
+      expect(v.tier).toBe('SERIAL_RUGGER')
+      expect(v.reasons[0]).toContain('0 of 400 judged tokens migrated')
+    })
+
+    it('2 tokens, 0 migrated → CLEAN (one deploy is not a sample)', () => {
       const v = assessDevHistory(input(tokens(2)))
 
-      expect(v.tier).toBe('SUSPECT') // rate 0 < 0.34 with 2 deploys
+      expect(v.tier).toBe('CLEAN')
     })
 
-    it('4 tokens, 1 migrated → not the zero-migration rule (rate 0.25 → SUSPECT)', () => {
+    it('3 prior tokens, 1 of the priors migrated → CLEAN, not a zero streak', () => {
       const v = assessDevHistory(
         input([{ tokenAddress: 'TOKN-1', migrated: true, migrationPct: 100 }, ...tokens(3)]),
       )
 
-      expect(v.tier).toBe('SUSPECT')
+      expect(v.tier).toBe('CLEAN')
       expect(v.migrations).toBe(1)
     })
   })
@@ -123,7 +140,8 @@ describe('assessDevHistory', () => {
       )
 
       expect(v.matureTokens).toBe(3)
-      expect(v.tier).toBe('SERIAL_RUGGER')
+      expect(v.knownMigrations).toBe(3)
+      expect(v.tier).toBe('UNPROVEN')
     })
   })
 
@@ -140,7 +158,7 @@ describe('assessDevHistory', () => {
       expect(v.tier).not.toBe('SERIAL_RUGGER')
     })
 
-    it('2 known outcomes plus 3 unreported → SERIAL_RUGGER needs 3 known, so not earned', () => {
+    it('2 known outcomes plus 3 unreported → the judged sample is 2, below the floor', () => {
       const v = assessDevHistory(
         input([
           ...tokens(2, { migrated: false, createdAtAgeSeconds: 86_400 }),
@@ -149,16 +167,17 @@ describe('assessDevHistory', () => {
       )
 
       expect(v.knownMigrations).toBe(2)
-      expect(v.tier).toBe('SUSPECT')
+      expect(v.tier).toBe('CLEAN')
     })
 
-    it('3 known zero-migration outcomes → SERIAL_RUGGER', () => {
+    it('3 known zero-migration outcomes → UNPROVEN, not a rugger verdict', () => {
       const v = assessDevHistory(
         input(tokens(3, { migrated: false, createdAtAgeSeconds: 86_400 })),
       )
 
       expect(v.knownMigrations).toBe(3)
-      expect(v.tier).toBe('SERIAL_RUGGER')
+      expect(v.tier).toBe('UNPROVEN')
+      expect(v.reasons[0]).toContain('UNPROVEN ≠ CLEAN')
     })
   })
 
@@ -173,8 +192,7 @@ describe('assessDevHistory', () => {
       expect(v.reasons[0]).toContain('rugged')
     })
 
-    it('ruggedCount = 1 → NOT SERIAL_RUGGER from ruggedness', () => {
-      // 2 deploys, 1 migrated, 1 rugged → rate 0.5 → CLEAN (1 rugged tolerated)
+    it('ruggedCount = 1 → SUSPECT (risk flag, not a conviction)', () => {
       const v = assessDevHistory(
         input([
           { tokenAddress: 'TOKN-1', migrated: true, migrationPct: 100 },
@@ -182,27 +200,22 @@ describe('assessDevHistory', () => {
         ]),
       )
 
-      expect(v.tier).toBe('CLEAN')
+      expect(v.tier).toBe('SUSPECT')
       expect(v.ruggedCount).toBe(1)
+      expect(v.reasons[0]).toContain('risk flag, not a conviction')
     })
   })
 
-  describe('tier: SUSPECT (migration rate)', () => {
-    it('rate exactly 0.34 → NOT suspect (strict <), 2+ deploys', () => {
-      // 34/100 = 0.34 exactly
-      const mixed = Array.from({ length: 100 }, (_, i) => ({
-        tokenAddress: `TOKN-${i + 1}`,
-        migrated: i < 34,
-        migrationPct: i < 34 ? 100 : 0,
-      }))
-      const v = assessDevHistory(input(mixed))
+  describe('tier: SUSPECT (thin migration record)', () => {
+    it('0 of 209 prior deploys migrated → SERIAL_RUGGER on the binomial bar', () => {
+      // (69/70)^209 ≈ 4.9% — the first sample size that clears the 5% limit.
+      const v = assessDevHistory(input(tokens(209)))
 
-      expect(v.migrationRate).toBe(0.34)
-      expect(v.tier).toBe('CLEAN')
+      expect(v.tier).toBe('SERIAL_RUGGER')
+      expect(v.reasons[0]).toContain('0 of 209 judged tokens migrated')
     })
 
-    it('rate just below 0.34 (0.33) with 3 deploys → SUSPECT', () => {
-      // 1/3 ≈ 0.3333 < 0.34
+    it('1 of 3 judged → CLEAN: a single migration already beats the baseline', () => {
       const v = assessDevHistory(
         input([
           { tokenAddress: 'TOKN-1', migrated: true, migrationPct: 100 },
@@ -211,11 +224,11 @@ describe('assessDevHistory', () => {
         ]),
       )
 
-      expect(v.tier).toBe('SUSPECT')
+      expect(v.tier).toBe('CLEAN')
       expect(v.migrationRate).toBeCloseTo(0.3333, 4)
     })
 
-    it('rate below threshold but only 1 deploy → NOT suspect (sample too small)', () => {
+    it('only 1 deploy → CLEAN (no sample to judge)', () => {
       const v = assessDevHistory(input(tokens(1)))
 
       expect(v.tier).toBe('CLEAN')
@@ -233,7 +246,7 @@ describe('assessDevHistory', () => {
       expect(v.migrationRate).toBe(1)
     })
 
-    it('2 deploys, 1 migrated, 0 rugged → CLEAN (rate 0.5 ≥ 0.34)', () => {
+    it('2 deploys, 1 migrated, 0 rugged → CLEAN (rate 0.5)', () => {
       const v = assessDevHistory(
         input([
           { tokenAddress: 'TOKN-1', migrated: true, migrationPct: 100 },
@@ -263,17 +276,18 @@ describe('assessDevHistory', () => {
     })
 
     it('thresholds are configurable overrides', () => {
-      // Default: 2 tokens 0 migrated → SUSPECT. Tighten serialMinTokens… no,
-      // loosen suspectRateMax to 0 → SUSPECT needs rate < 0, impossible.
-      const v = assessDevHistory(input(tokens(2)), { suspectRateMax: 0 })
+      const v = assessDevHistory(input(tokens(100)), { serialMaxBaselineP: 0.5 })
 
-      expect(v.tier).toBe('CLEAN')
+      expect(v.tier).toBe('SERIAL_RUGGER')
     })
 
     it('defaults match the documented rule set', () => {
       expect(DEV_HISTORY_DEFAULTS).toEqual({
         serialMinTokens: 3,
+        serialMaxBaselineP: 0.05,
+        baselineMigrationRate: 1 / 70,
         ruggedSerialMin: 2,
+        ruggedSuspectMin: 1,
         suspectRateMax: 0.34,
         suspectMinTokens: 2,
         matureMinAgeSeconds: 3_600,
@@ -289,8 +303,8 @@ describe('assessDevHistory', () => {
         ],
       })
 
-      // 2 mature entries, 0 migrations, rate 0 → SUSPECT per documented rules.
-      expect(v.tier).toBe('SUSPECT')
+      // 2 mature entries, 0 migrations, rate 0 → CLEAN: below the judged floor.
+      expect(v.tier).toBe('CLEAN')
     })
   })
 })
@@ -312,14 +326,22 @@ describe('toSniperGate', () => {
   })
 
   it('SUSPECT → rejected with dev_history_suspect', () => {
-    const gate = toSniperGate(assessDevHistory(input(tokens(2))))
+    const gate = toSniperGate(
+      assessDevHistory(input([...tokens(1, { migrated: true, migrationPct: 100 }), ...tokens(1, { rugged: true })])),
+    )
 
     expect(gate.ok).toBe(false)
     expect(gate.rejection).toBe('dev_history_suspect')
   })
 
-  it('SERIAL_RUGGER (zero migrations) → rejected with dev_serial_scammer', () => {
+  it('a normal zero-migration dev passes (0/3 is not evidence of fraud)', () => {
     const gate = toSniperGate(assessDevHistory(input(tokens(3))))
+
+    expect(gate).toEqual({ ok: true })
+  })
+
+  it('SERIAL_RUGGER (improbable zero streak) → rejected with dev_serial_scammer', () => {
+    const gate = toSniperGate(assessDevHistory(input(tokens(400))))
 
     expect(gate.ok).toBe(false)
     expect(gate.rejection).toBe('dev_serial_scammer')

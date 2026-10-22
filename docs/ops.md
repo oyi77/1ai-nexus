@@ -911,6 +911,17 @@ Accumulation alerts, close notifications, and backtest digests are research outp
 | `SNIPER_DEV_HISTORY_GATE` | boolean (`'true'` enables) | `false` (off) | Opt-in anti-rug gate. When ON, each candidate's deployer history is fetched (solpump dev-tokens endpoint) and a SERIAL_RUGGER verdict forces REJECT. | OFF keeps the pipeline byte-for-byte identical to pre-gate behavior. The lookup is memoized per-contract for 30 min (max 500 entries). |
 | `SNIPER_TRACE_WALLETS` | boolean (`'false'` disables) | `true` (on) | Whether on-chain buyer tracing runs when the DB has no smart-money evidence. Setting `'false'` restricts evidence to the DB only. | Disabling tracing reduces RPC cost but may leave a candidate unconfirmed (WATCHLIST) instead of SIGNAL — a conservative outcome, never a false positive. |
 
+How the classifier decides (`src/lib/modules/derived/dev-history.ts`):
+
+| Verdict | Rule |
+|---|---|
+| `UNPROVEN` (passes) | No deploy history, or nothing old enough / reported enough to judge, or a zero-migration record that is still normal for this launchpad. Not a clean bill of health — it means the record cannot speak. |
+| `SUSPECT` (rejects) | One rugged deploy among the history, or a migration record that is improbable under the honest baseline. |
+| `SERIAL_RUGGER` (rejects) | Two or more rugged deploys, or a zero-migration streak whose probability for an honest dev is below `serialMaxBaselineP`. |
+| `CLEAN` (passes) | Everything else — at least one migration already beats the baseline. |
+
+The zero-migration test is binomial, not a raw count: launches on this kind of launchpad migrate with probability ≈1/70, so "0 of N migrated" is the ordinary outcome (95.8% at N=3, 75% at N=20) and only becomes evidence near N≈209. A dev that deployed a handful of tokens that never graduated is not called a rugger for it. Rug behaviour is only ever asserted from an explicit rugged flag, which the dev-tokens endpoint does not currently report — so in practice the gate stays silent about fraud it cannot see rather than inferring it from silence.
+
 ### Realtime Bridge (opt-in firehose)
 
 | Variable | Type | Default | Purpose | Safety |

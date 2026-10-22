@@ -16,28 +16,48 @@
 //        prove nor disprove a migration)
 //   1. matureTokens === 0              → UNPROVEN
 //      (nothing has had time to mature — NOT safe by default)
-//   2. knownMigrations >= serialMinTokens && migrations === 0
+//   2. ruggedCount >= ruggedSerialMin  → SERIAL_RUGGER
+//   3. ruggedCount >= ruggedSuspectMin → SUSPECT
+//   4. migrations === 0 && knownMigrations >= serialMinTokens
+//      && P(0 migrations | honest dev) < serialMaxBaselineP
 //                                      → SERIAL_RUGGER
-//      (deployed 3+ judged tokens, none ever migrated = never serious)
-//   3. ruggedCount >= ruggedSerialMin  → SERIAL_RUGGER
-//   4. migrationRate < suspectRateMax && knownMigrations >= suspectMinTokens
-//                                      → SUSPECT
-//      (migrationRate = migrations / knownMigrations)
-//   5. otherwise                       → CLEAN
+//   5. migrationRate < suspectRateMax && knownMigrations >= suspectMinTokens
+//      → SUSPECT
+//   6. otherwise                       → CLEAN
+//
+// Rule 4 is a BINOMIAL TEST, not a raw count. Bonding-curve launches migrate
+// with probability ≈1/70 (baselineMigrationRate), so "0 of N migrated" is the
+// NORMAL outcome for an honest dev: P(0 of 3) = 95.8%, P(0 of 20) = 75%. Only
+// a sample whose zero-migration streak is improbable under that baseline
+// (n ≈ 209 at the default 0.05) is evidence of a rugger, and migration is
+// never mentioned again below that bar. `0/N` alone proves nothing.
+//
+// Migration failure is NOT the rug signal either: a launch that dies
+// silently is the ordinary life cycle of this market. Rug behaviour is
+// only ever asserted from an explicit rugged flag (rules 2/3), which this
+// endpoint currently never reports — so in practice the classifier judges
+// outcome coverage and stays silent about fraud it cannot see.
 //
 // The verdict reports previousTokens, matureTokens and knownMigrations, so a
 // rejection can say how many tokens were set aside and why instead of hiding
-// that evidence. Two unreported deployments therefore cannot earn
-// SERIAL_RUGGER: the verdict demands three tokens the record actually covers.
-// UNPROVEN ≠ CLEAN. SUSPECT ≠ banned. SERIAL_RUGGER = hard reject.
-// ─────────────────────────────────────────────────────────────
+// that evidence. UNPROVEN ≠ CLEAN. SUSPECT ≠ banned. SERIAL_RUGGER = hard reject.
 
 /** Every threshold, as a concrete contract (no literal-typed spread). */
 export interface ResolvedDevHistoryConfig {
-  /** Min deployed tokens before a 0-migration dev is called a rugger. */
+  /**
+   * Known-outcome sample at which a zero-migration streak is called a
+   * rugger pattern. Together with serialMaxBaselineP this is a binomial
+   * test on the population migration rate, not a raw token count.
+   */
   serialMinTokens: number
+  /** Probability of an all-zero streak, for an honest dev, that still counts as luck. */
+  serialMaxBaselineP: number
+  /** Population migration rate for launches on this launchpad. */
+  baselineMigrationRate: number
   /** Rugged tokens at which the dev is called a serial rugger. */
   ruggedSerialMin: number
+  /** Rugged tokens at which the dev is flagged SUSPECT (hard reject, not evidence). */
+  ruggedSuspectMin: number
   /** Migration rate below which a dev with >= suspectMinTokens is suspect. */
   suspectRateMax: number
   /** Min judged tokens for the suspect-rate rule to apply. */
@@ -51,10 +71,13 @@ export interface ResolvedDevHistoryConfig {
 
 export const DEV_HISTORY_DEFAULTS: ResolvedDevHistoryConfig = {
   serialMinTokens: 3,
+  serialMaxBaselineP: 0.05,
+  baselineMigrationRate: 1 / 70,
   ruggedSerialMin: 2,
+  ruggedSuspectMin: 1,
   suspectRateMax: 0.34,
   suspectMinTokens: 2,
-  matureMinAgeSeconds: 3_600, // 1 hour — younger tokens cannot be judged on migration failure
+  matureMinAgeSeconds: 3_600,
 };
 
 export type DevHistoryConfig = Partial<ResolvedDevHistoryConfig>;
@@ -101,6 +124,52 @@ export interface DevHistoryVerdict {
   ruggedCount: number
   /** Always non-empty — every tier carries explicit reasoning. */
   reasons: string[]
+}
+
+export interface ZeroStreakTest {
+  /** Deploys the streak is measured over. */
+  n: number
+  /** Zero-migration outcomes in that sample. */
+  k: number
+  /** P(X <= k) under the honest baseline — the one-sided p-value. */
+  p: number
+}
+
+export function binomCdf(n: number, k: number, p: number): number {
+  if (n <= 0) return 1
+  const q = 1 - p
+  let term = Math.pow(q, n)
+  let total = term
+  for (let i = 1; i <= k && i <= n; i++) {
+    term = (term * (n - i + 1) * p) / (i * q)
+    total += term
+  }
+  return Math.min(1, total)
+}
+
+/**
+ * One-sided probability of seeing `k` or fewer migrations in `n` judged
+ * deploys when the true rate is `baseline`. `priorOnly` restricts the sample
+ * to the previousTokens n-1 deploys (the token being judged never migrated
+ * yet by construction, so leaving it in biases the rate toward zero).
+ */
+export function zeroRun(
+  knownMigrations: number,
+  migrations: number,
+  baseline: number,
+  priorOnly?: number,
+): ZeroStreakTest {
+  const n = priorOnly ?? knownMigrations
+  const k = Math.max(0, migrations - (knownMigrations - n))
+  return { n, k, p: binomCdf(n, k, baseline) }
+}
+
+function fmtPct(x: number): string {
+  const pct = x * 100
+  if (pct === 0) return '0%'
+  if (pct < 0.01) return pct.toExponential(1) + '%'
+  if (pct < 1) return pct.toFixed(2) + '%'
+  return pct.toFixed(1) + '%'
 }
 
 /**
@@ -170,25 +239,9 @@ export function assessDevHistory(
     };
   }
 
-  // 2. 3+ mature deploys with a reported record, zero migrations — never
-  // finished anything seriously. Tokens with an unreported outcome cannot
-  // support this verdict, so two deployments are not enough to earn it.
-  if (knownMigrations >= C.serialMinTokens && migrations === 0) {
-    return {
-      tier: 'SERIAL_RUGGER',
-      previousTokens,
-      matureTokens: matureTokensCount,
-      knownMigrations,
-      migrations,
-      migrationRate,
-      ruggedCount,
-      reasons: [
-        `${knownMigrations} mature prior tokens with a reported outcome (out of ${previousTokens} total) and 0 ever migrated (threshold: >=${C.serialMinTokens} known outcomes, 0 migrations)`,
-      ],
-    };
-  }
-
-  // 3. Multiple rugged tokens — repeat offender.
+  // 2. Policy decision, not evidence: a dev with several rugged deploys is
+  // refused outright. The rugged flag is an explicit rug report, which is the
+  // only outcome that can witness rug behaviour; migration failure cannot.
   if (ruggedCount >= C.ruggedSerialMin) {
     return {
       tier: 'SERIAL_RUGGER',
@@ -204,12 +257,10 @@ export function assessDevHistory(
     };
   }
 
-  // 4. Low migration rate across a meaningful mature sample.
-  if (
-    migrationRate !== null &&
-    migrationRate < C.suspectRateMax &&
-    matureTokensCount >= C.suspectMinTokens
-  ) {
+  // 3. One rugged deploy is a risk flag, not a conviction: the dev is held on
+  // the watchlist instead of being refused. Same limit as a zero-migration
+  // streak that has not yet cleared the binomial bar (rule 4).
+  if (ruggedCount >= C.ruggedSuspectMin) {
     return {
       tier: 'SUSPECT',
       previousTokens,
@@ -219,12 +270,75 @@ export function assessDevHistory(
       migrationRate,
       ruggedCount,
       reasons: [
-        `migration rate ${migrationRate} < ${C.suspectRateMax} across ${knownMigrations} mature deploys with a reported outcome (out of ${previousTokens} total, threshold: >=${C.suspectMinTokens})`,
+        `${ruggedCount} of ${previousTokens} prior tokens rugged (watchlist threshold: >=${C.ruggedSuspectMin}, hard limit >=${C.ruggedSerialMin}) — risk flag, not a conviction`,
       ],
     };
   }
 
-  // 5. Everything else.
+  // 4. Binomial test on the population migration rate. A zero streak is only
+  // evidence once it is improbable for an honest dev, and the bar scales with
+  // the sample: 20 launches at a 1.4% base rate still leave an honest dev
+  // with a 75% chance of never migrating, so 0/20 says nothing.
+  const zeroStreak =
+    migrations === 0 && knownMigrations >= C.serialMinTokens
+      ? zeroRun(knownMigrations, migrations, C.baselineMigrationRate)
+      : null;
+  if (zeroStreak && zeroStreak.p < C.serialMaxBaselineP) {
+    return {
+      tier: 'SERIAL_RUGGER',
+      previousTokens,
+      matureTokens: matureTokensCount,
+      knownMigrations,
+      migrations,
+      migrationRate,
+      ruggedCount,
+      reasons: [
+        `0 of ${knownMigrations} judged tokens migrated (out of ${previousTokens} total); at the ${fmtPct(C.baselineMigrationRate)} baseline that streak happens in ${fmtPct(zeroStreak.p)} of honest devs (limit ${fmtPct(C.serialMaxBaselineP)})`,
+      ],
+    };
+  }
+
+  // 5. One-sided exact test on the migration RATE, with the honest baseline as
+  // the null hypothesis. Comparing the observed rate against a fixed fraction
+  // would flag every dev on a launchpad where migration is rare; excluding
+  // today's token keeps the sample limited to prior deploys.
+  if (knownMigrations >= C.suspectMinTokens) {
+    const priorStreak = zeroRun(
+      knownMigrations,
+      migrations,
+      C.baselineMigrationRate,
+      previousTokens,
+    );
+    if (priorStreak.p < C.serialMaxBaselineP) {
+      return {
+        tier: 'SUSPECT',
+        previousTokens,
+        matureTokens: matureTokensCount,
+        knownMigrations,
+        migrations,
+        migrationRate,
+        ruggedCount,
+        reasons: [
+          `${migrations} of ${knownMigrations} judged tokens migrated (${migrationRate ?? 'n/a'} rate, prior deploys only ${migrations}/${priorStreak.n}); at the ${fmtPct(C.baselineMigrationRate)} baseline that is a ${fmtPct(priorStreak.p)} outcome — thin record (UNPROVEN ≠ CLEAN)`,
+        ],
+      };
+    }
+  }
+
+  if (zeroStreak) {
+    return {
+      tier: 'UNPROVEN',
+      previousTokens,
+      matureTokens: matureTokensCount,
+      knownMigrations,
+      migrations,
+      migrationRate,
+      ruggedCount,
+      reasons: [
+        `0 of ${knownMigrations} judged tokens migrated: normal for this launchpad (${fmtPct(zeroStreak.p)} of honest devs do the same, limit ${fmtPct(C.serialMaxBaselineP)}) — not evidence of fraud, but nothing migrated either (UNPROVEN ≠ CLEAN)`,
+      ],
+    };
+  }
   return {
     tier: 'CLEAN',
     previousTokens,
