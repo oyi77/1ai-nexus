@@ -237,6 +237,8 @@ describe('formatTieredSignal — devHistory and bondingCurve', () => {
     const devClean: DevHistoryVerdict = {
       tier: 'CLEAN',
       previousTokens: 5,
+      matureTokens: 5,
+      knownMigrations: 5,
       migrations: 3,
       migrationRate: 0.6,
       ruggedCount: 0,
@@ -250,6 +252,8 @@ describe('formatTieredSignal — devHistory and bondingCurve', () => {
     const devRugger: DevHistoryVerdict = {
       tier: 'SERIAL_RUGGER',
       previousTokens: 8,
+      matureTokens: 8,
+      knownMigrations: 8,
       migrations: 0,
       migrationRate: 0,
       ruggedCount: 4,
@@ -263,6 +267,8 @@ describe('formatTieredSignal — devHistory and bondingCurve', () => {
     const devUnproven: DevHistoryVerdict = {
       tier: 'UNPROVEN',
       previousTokens: 0,
+      matureTokens: 0,
+      knownMigrations: 0,
       migrations: 0,
       migrationRate: null,
       ruggedCount: 0,
@@ -272,10 +278,30 @@ describe('formatTieredSignal — devHistory and bondingCurve', () => {
     expect(out.text).toContain('• Dev History: ℹ️ UNPROVEN (first deploy)');
   });
 
+  it('devHistory: UNPROVEN with deployments but no reported outcome says so', () => {
+    const devUnmeasured: DevHistoryVerdict = {
+      tier: 'UNPROVEN',
+      previousTokens: 3,
+      matureTokens: 3,
+      knownMigrations: 0,
+      migrations: 0,
+      migrationRate: null,
+      ruggedCount: 0,
+      reasons: ['no migration outcome reported'],
+    };
+    const out = formatTieredSignal(formatInput({ devHistory: devUnmeasured }));
+    expect(out.text).toContain(
+      '• Dev History: ℹ️ UNPROVEN (3 deployed, none had a reported migration outcome)',
+    );
+    expect(out.text).not.toContain('first deploy');
+  });
+
   it('devHistory: SUSPECT renders suspect warning with migration rate', () => {
     const devSuspect: DevHistoryVerdict = {
       tier: 'SUSPECT',
       previousTokens: 4,
+      matureTokens: 4,
+      knownMigrations: 4,
       migrations: 1,
       migrationRate: 0.25,
       ruggedCount: 0,
@@ -322,6 +348,8 @@ describe('formatTieredSignal — devHistory and bondingCurve', () => {
       devHistory: {
         tier: 'CLEAN',
         previousTokens: 3,
+        matureTokens: 3,
+        knownMigrations: 3,
         migrations: 2,
         migrationRate: 0.67,
         ruggedCount: 0,

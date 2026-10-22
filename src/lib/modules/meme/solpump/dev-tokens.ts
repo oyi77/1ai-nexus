@@ -35,6 +35,7 @@ import {
   type DevHistoryInput,
   type DevHistoryVerdict,
   type DevHistoryConfig,
+  type DevHistoryToken,
 } from '@/lib/modules/derived/dev-history'
 const SOLPUMP_BASE = 'https://trade.solpump.io/api/v2/token'
 const FETCH_TIMEOUT_MS = 8_000
@@ -60,6 +61,29 @@ export function __resetSolpumpDevTokensForTests(): void {
 }
 
 /**
+ * Normalize one upstream token entry into the classifier's token shape.
+ * Only fields upstream actually reported survive: a non-boolean `migrated`
+ * becomes null (no outcome), and `rugged` is omitted rather than defaulted to
+ * false, so an absent flag can never be read as proof of a clean deploy.
+ */
+function toDevHistoryToken(raw: unknown): DevHistoryToken {
+  const t = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>
+  const token: DevHistoryToken = {
+    tokenAddress: typeof t.tokenAddress === 'string' ? t.tokenAddress : '',
+    migrated: typeof t.migrated === 'boolean' ? t.migrated : null,
+    migrationPct: typeof t.migrationPct === 'number' && Number.isFinite(t.migrationPct)
+      ? t.migrationPct
+      : null,
+    createdAtAgeSeconds:
+      typeof t.createdAtAgeSeconds === 'number' && Number.isFinite(t.createdAtAgeSeconds)
+        ? t.createdAtAgeSeconds
+        : null,
+  }
+  if (typeof t.rugged === 'boolean') token.rugged = t.rugged
+  return token
+}
+
+/**
  * Parse the raw JSON body into a DevHistoryInput-compatible object.
  * Malformed → { devAddress: null, tokens: [] }.
  * Exported for unit testing with fixture strings.
@@ -72,7 +96,7 @@ export function parseDevTokensResponse(body: unknown): DevHistoryInput {
   return {
     devAddress: typeof obj.devAddress === 'string' ? obj.devAddress : null,
     tokens: Array.isArray(obj.tokens)
-      ? (obj.tokens as DevHistoryInput['tokens'])
+      ? obj.tokens.map(toDevHistoryToken)
       : [],
   }
 }

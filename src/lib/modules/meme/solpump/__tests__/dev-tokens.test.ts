@@ -101,6 +101,13 @@ describe('fetchDevTokenHistory', () => {
     expect(result.tokens).toHaveLength(2)
     expect(result.tokens[0].migrated).toBe(true)
     expect(result.tokens[0].migrationPct).toBe(100)
+    // Age must survive normalization — the classifier drops immature tokens
+    // from the migration math based on it, so a lost age silently restores
+    // the "counts as a failed migration" bug.
+    expect(result.tokens[0].createdAtAgeSeconds).toBe(86_400 * 30)
+    expect(result.tokens[1].createdAtAgeSeconds).toBe(86_400 * 10)
+    // An absent rugged flag must stay absent — defaulting it to false would
+    // present an unreported field as a clean deploy record.
     expect(result.tokens[1].rugged).toBeUndefined()
   })
 

@@ -78,6 +78,90 @@ describe('assessDevHistory', () => {
     })
   })
 
+  describe('tier: immature history (time is not evidence)', () => {
+    it('3 tokens all 24 minutes old → UNPROVEN, NOT SERIAL_RUGGER', () => {
+      // Live case 2026-10-22 (token EVOLVE): dev with 3 tokens, youngest 1448s
+      // old, none migrated. Aged history had zero chance to migrate, so the
+      // zero-migration rule cannot fire.
+      const v = assessDevHistory(input(tokens(3, { createdAtAgeSeconds: 1_448 })))
+
+      expect(v.tier).toBe('UNPROVEN')
+      expect(v.previousTokens).toBe(3)
+      expect(v.matureTokens).toBe(0)
+      expect(v.migrationRate).toBeNull()
+      expect(v.reasons[0]).toContain('not yet measurable')
+    })
+
+    it('one mature zero-migration token plus two young → still not SERIAL_RUGGER', () => {
+      const v = assessDevHistory(
+        input([
+          { tokenAddress: 'OLD', migrated: false, migrationPct: 0, createdAtAgeSeconds: 86_400 },
+          ...tokens(2, { createdAtAgeSeconds: 60 }),
+        ]),
+      )
+
+      expect(v.matureTokens).toBe(1)
+      expect(v.tier).not.toBe('SERIAL_RUGGER')
+    })
+
+    it('a migrated token counts regardless of age', () => {
+      const v = assessDevHistory(
+        input([
+          { tokenAddress: 'FRESH-MIGRATED', migrated: true, migrationPct: 100, createdAtAgeSeconds: 30 },
+          ...tokens(2, { createdAtAgeSeconds: 30 }),
+        ]),
+      )
+
+      expect(v.matureTokens).toBe(1)
+      expect(v.migrations).toBe(1)
+      expect(v.tier).not.toBe('SERIAL_RUGGER')
+    })
+
+    it('age equal to the maturity threshold counts as mature (boundary)', () => {
+      const v = assessDevHistory(
+        input(tokens(3, { createdAtAgeSeconds: DEV_HISTORY_DEFAULTS.matureMinAgeSeconds })),
+      )
+
+      expect(v.matureTokens).toBe(3)
+      expect(v.tier).toBe('SERIAL_RUGGER')
+    })
+  })
+
+  describe('unreported migration outcome', () => {
+    it('migrated: null is excluded from the judged sample, never read as a failure', () => {
+      const v = assessDevHistory(
+        input(tokens(3, { migrated: null, createdAtAgeSeconds: 86_400 })),
+      )
+
+      expect(v.previousTokens).toBe(3)
+      expect(v.knownMigrations).toBe(0)
+      expect(v.migrations).toBe(0)
+      expect(v.migrationRate).toBeNull()
+      expect(v.tier).not.toBe('SERIAL_RUGGER')
+    })
+
+    it('2 known outcomes plus 3 unreported → SERIAL_RUGGER needs 3 known, so not earned', () => {
+      const v = assessDevHistory(
+        input([
+          ...tokens(2, { migrated: false, createdAtAgeSeconds: 86_400 }),
+          ...tokens(3, { migrated: null, createdAtAgeSeconds: 86_400 }),
+        ]),
+      )
+
+      expect(v.knownMigrations).toBe(2)
+      expect(v.tier).toBe('SUSPECT')
+    })
+
+    it('3 known zero-migration outcomes → SERIAL_RUGGER', () => {
+      const v = assessDevHistory(
+        input(tokens(3, { migrated: false, createdAtAgeSeconds: 86_400 })),
+      )
+
+      expect(v.knownMigrations).toBe(3)
+      expect(v.tier).toBe('SERIAL_RUGGER')
+    })
+  })
+
   describe('tier: SERIAL_RUGGER (rugged count)', () => {
     it('ruggedCount = 2 → SERIAL_RUGGER (boundary)', () => {
       const v = assessDevHistory(

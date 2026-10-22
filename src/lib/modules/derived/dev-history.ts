@@ -9,22 +9,26 @@
 // (from GET /api/v2/token/{chain}/{address}/dev-tokens).
 //
 // Rules (evaluated in order, first match wins):
-//   0. drop tokens younger than matureMinAgeSeconds from the migration math
-//      (a token a few minutes old has not had the chance to migrate; counting
-//      it as "never migrated" invents a failure out of missing time)
+//   0. Exclude tokens the developer's record cannot speak to:
+//      - younger than matureMinAgeSeconds and not yet migrated (no time to
+//        migrate — counting them as failures invents guilt out of missing time)
+//      - `migrated` unreported (null: upstream never said, so it can neither
+//        prove nor disprove a migration)
 //   1. matureTokens === 0              → UNPROVEN
 //      (nothing has had time to mature — NOT safe by default)
-//   2. matureTokens >= serialMinTokens && migrations === 0
+//   2. knownMigrations >= serialMinTokens && migrations === 0
 //                                      → SERIAL_RUGGER
-//      (deployed 3+ mature tokens, none ever migrated = never serious)
+//      (deployed 3+ judged tokens, none ever migrated = never serious)
 //   3. ruggedCount >= ruggedSerialMin  → SERIAL_RUGGER
-//   4. migrationRate < suspectRateMax && matureTokens >= suspectMinTokens
+//   4. migrationRate < suspectRateMax && knownMigrations >= suspectMinTokens
 //                                      → SUSPECT
-//      (migrationRate = migrations / matureTokens; null when nothing matured)
+//      (migrationRate = migrations / knownMigrations)
 //   5. otherwise                       → CLEAN
 //
-// The verdict always reports both counts, so a rejection can say how many
-// tokens were set aside as too young instead of hiding that evidence.
+// The verdict reports previousTokens, matureTokens and knownMigrations, so a
+// rejection can say how many tokens were set aside and why instead of hiding
+// that evidence. Two unreported deployments therefore cannot earn
+// SERIAL_RUGGER: the verdict demands three tokens the record actually covers.
 // UNPROVEN ≠ CLEAN. SUSPECT ≠ banned. SERIAL_RUGGER = hard reject.
 // ─────────────────────────────────────────────────────────────
 
@@ -36,8 +40,7 @@ export interface ResolvedDevHistoryConfig {
   ruggedSerialMin: number
   /** Migration rate below which a dev with >= suspectMinTokens is suspect. */
   suspectRateMax: number
-  /** Min deployed tokens for the suspect-rate rule to apply. */
-  /** Min deployed tokens for the suspect-rate rule to apply. */
+  /** Min judged tokens for the suspect-rate rule to apply. */
   suspectMinTokens: number
   /**
    * Age at which a token is old enough to have migrated. Younger tokens are
@@ -62,10 +65,14 @@ export type DevHistoryTier =
   | 'SUSPECT'
   | 'SERIAL_RUGGER';
 
-/** One deployed token from the dev-tokens endpoint (subset we judge on). */
+/**
+ * One deployed token from the dev-tokens endpoint (subset we judge on).
+ * `migrated: null` means the upstream never reported the field — that token is
+ * excluded from the migration math instead of being read as "did not migrate".
+ */
 export interface DevHistoryToken {
   tokenAddress: string
-  migrated: boolean
+  migrated: boolean | null
   migrationPct: number | null
   rugged?: boolean
   createdAtAgeSeconds?: number | null
@@ -82,9 +89,13 @@ export interface DevHistoryVerdict {
   tier: DevHistoryTier
   /** All tokens the dev has ever deployed (input length). */
   previousTokens: number
+  /** Tokens old enough (or already migrated) to be judged on migration. */
+  matureTokens: number
+  /** Tokens whose migration outcome upstream actually reported. */
+  knownMigrations: number
   /** Tokens that completed the bonding-curve migration. */
   migrations: number
-  /** migrations / previousTokens; null when previousTokens === 0. */
+  /** migrations / knownMigrations; null when no outcome was reported. */
   migrationRate: number | null
   /** Tokens explicitly flagged rugged. */
   ruggedCount: number
@@ -116,11 +127,14 @@ export function assessDevHistory(
     return t.createdAtAgeSeconds >= C.matureMinAgeSeconds;
   });
   const matureTokensCount = matureTokensList.length;
+  // An unreported outcome is not a failed migration: only tokens whose
+  // `migrated` field upstream actually sent can prove or disprove a migration.
+  const knownMigrations = matureTokensList.filter((t) => t.migrated !== null).length;
   const migrations = tokens.filter((t) => t && t.migrated === true).length;
   const ruggedCount = tokens.filter((t) => t && t.rugged === true).length;
   const migrationRate =
-    matureTokensCount > 0
-      ? Math.round((migrations / matureTokensCount) * 10_000) / 10_000
+    knownMigrations > 0
+      ? Math.round((migrations / knownMigrations) * 10_000) / 10_000
       : null;
 
   // 1. Brand-new dev — nothing to judge.
@@ -128,6 +142,8 @@ export function assessDevHistory(
     return {
       tier: 'UNPROVEN',
       previousTokens,
+      matureTokens: matureTokensCount,
+      knownMigrations,
       migrations,
       migrationRate,
       ruggedCount,
@@ -136,17 +152,38 @@ export function assessDevHistory(
       ],
     };
   }
-
-  // 2. 3+ mature deploys, zero migrations — never finished anything seriously.
-  if (matureTokensCount >= C.serialMinTokens && migrations === 0) {
+  // 0b. History exists but none of it has had time to mature — nothing to judge.
+  // Falling through here would score "0 migrations out of 0 mature tokens" as
+  // CLEAN, which is the opposite error of the SERIAL_RUGGER false positive.
+  if (matureTokensCount === 0) {
     return {
-      tier: 'SERIAL_RUGGER',
+      tier: 'UNPROVEN',
       previousTokens,
+      matureTokens: matureTokensCount,
+      knownMigrations,
       migrations,
       migrationRate,
       ruggedCount,
       reasons: [
-        `${matureTokensCount} mature prior tokens deployed (out of ${previousTokens} total) and 0 ever migrated (threshold: >=${C.serialMinTokens} mature deploys, 0 migrations)`,
+        `${previousTokens} token(s) deployed but none older than ${C.matureMinAgeSeconds}s — migration record is not yet measurable (UNPROVEN ≠ CLEAN)`,
+      ],
+    };
+  }
+
+  // 2. 3+ mature deploys with a reported record, zero migrations — never
+  // finished anything seriously. Tokens with an unreported outcome cannot
+  // support this verdict, so two deployments are not enough to earn it.
+  if (knownMigrations >= C.serialMinTokens && migrations === 0) {
+    return {
+      tier: 'SERIAL_RUGGER',
+      previousTokens,
+      matureTokens: matureTokensCount,
+      knownMigrations,
+      migrations,
+      migrationRate,
+      ruggedCount,
+      reasons: [
+        `${knownMigrations} mature prior tokens with a reported outcome (out of ${previousTokens} total) and 0 ever migrated (threshold: >=${C.serialMinTokens} known outcomes, 0 migrations)`,
       ],
     };
   }
@@ -156,6 +193,8 @@ export function assessDevHistory(
     return {
       tier: 'SERIAL_RUGGER',
       previousTokens,
+      matureTokens: matureTokensCount,
+      knownMigrations,
       migrations,
       migrationRate,
       ruggedCount,
@@ -174,11 +213,13 @@ export function assessDevHistory(
     return {
       tier: 'SUSPECT',
       previousTokens,
+      matureTokens: matureTokensCount,
+      knownMigrations,
       migrations,
       migrationRate,
       ruggedCount,
       reasons: [
-        `migration rate ${migrationRate} < ${C.suspectRateMax} across ${matureTokensCount} mature deploys (out of ${previousTokens} total, threshold: >=${C.suspectMinTokens} mature deploys)`,
+        `migration rate ${migrationRate} < ${C.suspectRateMax} across ${knownMigrations} mature deploys with a reported outcome (out of ${previousTokens} total, threshold: >=${C.suspectMinTokens})`,
       ],
     };
   }
@@ -187,11 +228,13 @@ export function assessDevHistory(
   return {
     tier: 'CLEAN',
     previousTokens,
+    matureTokens: matureTokensCount,
+    knownMigrations,
     migrations,
     migrationRate,
     ruggedCount,
     reasons: [
-      `${previousTokens} prior token(s), ${migrations} migrated (${migrationRate ?? 'n/a'} rate), ${ruggedCount} rugged — no red flags`,
+      `${previousTokens} prior token(s), ${migrations} migrated of ${knownMigrations} with a reported outcome (${migrationRate ?? 'n/a'} rate), ${ruggedCount} rugged — no red flags`,
     ],
   };
 }

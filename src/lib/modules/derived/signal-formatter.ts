@@ -229,13 +229,18 @@ function renderSafetySection(
   }
 
   if (devHistory) {
+    const judged = devHistory.knownMigrations ?? devHistory.previousTokens
     if (devHistory.tier === 'CLEAN') {
-      L.push(`• Dev History: ✅ CLEAN (${devHistory.migrations}/${devHistory.previousTokens} migrated)`)
+      L.push(`• Dev History: ✅ CLEAN (${devHistory.migrations}/${judged} migrated)`)
     } else if (devHistory.tier === 'UNPROVEN') {
-      L.push('• Dev History: ℹ️ UNPROVEN (first deploy)')
+      L.push(
+        devHistory.previousTokens === 0
+          ? `• Dev History: ℹ️ UNPROVEN (first deploy)`
+          : `• Dev History: ℹ️ UNPROVEN (${devHistory.previousTokens} deployed, none had a reported migration outcome)`,
+      )
     } else if (devHistory.tier === 'SUSPECT') {
       const rate = Math.round((devHistory.migrationRate ?? 0) * 100)
-      L.push(`• Dev History: ⚠️ SUSPECT (${devHistory.migrations}/${devHistory.previousTokens} migrated, rate ${rate}%)`)
+      L.push(`• Dev History: ⚠️ SUSPECT (${devHistory.migrations}/${judged} migrated, rate ${rate}%)`)
     } else if (devHistory.tier === 'SERIAL_RUGGER') {
       L.push(`• Dev History: 🚨 SERIAL RUGGER (${devHistory.ruggedCount} rugged / ${devHistory.previousTokens} deployed)`)
     }

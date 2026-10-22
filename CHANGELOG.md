@@ -15,6 +15,7 @@ All notable changes to this project will be documented in this file.
   - Updated `src/lib/data-refresher.ts` to use logger
   - Updated `src/instrumentation.ts` to use logger
   - Updated `src/app/api/v1/webhooks/[gateway]/route.ts` to use logger
+- **Dev-history verdict fabricated migration failures**: `assessDevHistory` counted every deployed token as a failed migration, so a developer with three tokens younger than a day was rejected as `SERIAL_RUGGER` ("3 prior tokens deployed and 0 ever migrated") — token EVOLVE was 24 minutes old. Immature tokens (`createdAtAgeSeconds < matureMinAgeSeconds`, default 3600s) are now excluded from both the migration rate and the zero-migration rule; a migrated token still counts at any age. A token whose `migrated` field upstream never reported is now `null` (tri-state) and excluded from the judged sample (`knownMigrations`) instead of being read as "did not migrate", and `0` judged tokens returns UNPROVEN instead of falling through to CLEAN. The verdict exposes `matureTokens` and `knownMigrations` so every reason names the sample it was earned on. Verified live against `EdNSCBBx…pump`: previously SERIAL_RUGGER on 3 tokens, now `SUSPECT` on 2 mature known outcomes out of 3 total
 
 ### Added
 - **Tests**: Added comprehensive tests for `format.ts` utility (15 tests)
