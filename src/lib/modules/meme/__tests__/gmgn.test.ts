@@ -678,6 +678,25 @@ describe('auditGmgnToken (top_buyers contract)', () => {
     expect(audit!.distribution?.bundlerSoldPercent).toBe(0)
   })
 
+  it('leaves the exit ratio unproven when the endpoint omits holding_rate', async () => {
+    mockFetchSequence([{
+      status: 200,
+      body: {
+        code: 0, data: {
+          holders: {
+            holder_count: 12, top70_sniper_hold_rate: '0.02',
+            statusNow: { hold: 0, sold: 9, sold_part: 1, transfered: 0, top_10_holder_rate: 0.21 },
+            holderInfo: [],
+          },
+        },
+      },
+    }, { status: 200, body: HOLDERS_FIXTURE }])
+    const audit = await auditGmgnToken('solana', 'NoRate111111111111111111111111111111111111')
+    expect(audit).not.toBeNull()
+    expect(audit!.distribution?.bundlerSoldPercent).toBeNull()
+    expect(audit!.distribution?.bundlerPercent).toBeUndefined()
+  })
+
   it('never claims authority/honeypot data it does not report', async () => {
     mockFetchSequence([
       { status: 200, body: AUDIT_SUCCESS_FIXTURE },

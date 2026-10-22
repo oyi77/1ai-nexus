@@ -126,6 +126,10 @@ interface GmgnTopBuyersResponse {
         hold?: number; bought_more?: number; sold_part?: number; sold?: number
         transfered?: number; bought_rate?: string | number; holding_rate?: string | number
         top_10_holder_rate?: number
+        /** Raw token units still held by the cohort (live-proven 2026-10-22). */
+        hold_amount?: string | number
+        /** Raw token units the cohort bought at launch (live-proven 2026-10-22). */
+        bought_amount?: string | number
       }
       holderInfo?: GmgnHolderEntry[]
     }
@@ -800,9 +804,17 @@ export async function auditGmgnToken(
     // Real payload nests this under statusNow (proven live 2026-10-09).
     const top10HolderPercent = Math.min(1, Number(holders.statusNow?.top_10_holder_rate ?? 0))
     const sniperPercent = Math.min(1, Number(holders.top70_sniper_hold_rate ?? 0))
-    const holdingRate = Math.min(1, Math.max(0, Number(holders.statusNow?.holding_rate ?? 1)))
-    const bundlerSoldPercent = Math.round((1 - holdingRate) * 100 * 10) / 10
-
+    // A missing holding_rate is unproven, never a measured "sold 0%".
+    // The old `?? 1` default turned absence into a clean-exit claim — the
+    // same fabrication as a hardcoded zero, only optimistic.
+    const rawHoldingRate = Number(holders.statusNow?.holding_rate)
+    const holdingRate =
+      holders.statusNow?.holding_rate === undefined ||
+      holders.statusNow?.holding_rate === null ||
+      !Number.isFinite(rawHoldingRate)
+        ? null
+        : Math.min(1, Math.max(0, rawHoldingRate))
+    const bundlerSoldPercent = holdingRate === null ? null : Math.round((1 - holdingRate) * 100 * 10) / 10
     // Per-holder PnL + taint from the holders endpoint (richer than the
     // status list: real percents, avg cost, is_suspicious). Falls back to
     // the top_buyers status list when that endpoint refuses.
@@ -866,8 +878,10 @@ export async function auditGmgnToken(
       distribution: {
         sniperPercent,
         bundlerSoldPercent,
-        // insider share not reported by this endpoint — stays absent
-        // (unproven), never zero.
+        // Cohort supply share is not reported by top_buyers — sniper-side
+        // bundlerPercent stays null (unproven), which the evaluator flags
+        // instead of treating as a proven-safe zero.
+        // insider share is likewise absent, never zero.
       },
       /** Top-5 holder average unrealized PnL in percent (null = unproven). */
       top5AvgPnlPercent: pnl?.avgPnlPercent ?? null,

@@ -49,9 +49,14 @@ export interface SniperPayload {
     devPercent: number | null
     /** Percent bought in the launch block/seconds. */
     sniperPercent: number | null
-    /** Percent held by wallets that bought the same block as the deployer. */
+    /**
+     * Percent of supply still held by the launch-buyer cohort (same-block
+     * bundlers + launch snipers). Proven exit data lands in
+     * `bundlerSoldPercent`; this share is what makes that exit ratio
+     * meaningful. Null = unproven.
+     */
     bundlerPercent: number | null
-    /** Percent of the bundler position already exited (0..100). */
+    /** Percent of the launch-buyer cohort already exited (0..100). */
     bundlerSoldPercent?: number | null
     insiderPercent: number | null
     /** Combined top-10 holder share. */

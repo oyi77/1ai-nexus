@@ -109,6 +109,28 @@ describe('meme-sniper hard filters', () => {
     expect(d.rejections.join(' ')).toContain('not fully exited')
   })
 
+  it('keeps an unproven cohort share a rejection and reports the measured exit', () => {
+    const unknownExit = evaluateSniper(clean({
+      distribution: { ...clean().distribution, bundlerPercent: null, bundlerSoldPercent: null },
+    }))
+    expect(unknownExit.status).toBe('REJECT')
+    expect(unknownExit.rejections).toContain('Bundler share unproven')
+
+    const knownExit = evaluateSniper(clean({
+      distribution: { ...clean().distribution, bundlerPercent: null, bundlerSoldPercent: 75 },
+    }))
+    expect(knownExit.status).toBe('REJECT')
+    expect(knownExit.rejections.join(' ')).toContain('launch cohort sold 75%')
+
+    // A proven full exit never erases the unproven share: 100% sold is the
+    // rug signature, not a safety proof.
+    const fullyDumped = evaluateSniper(clean({
+      distribution: { ...clean().distribution, bundlerPercent: null, bundlerSoldPercent: 100 },
+    }))
+    expect(fullyDumped.status).toBe('REJECT')
+    expect(fullyDumped.rejections.join(' ')).toContain('Bundler share unproven')
+  })
+
   it('tolerates bundlers up to 30% only when 100% sold', () => {
     const sold = evaluateSniper(clean({
       distribution: { ...clean().distribution, bundlerPercent: 25, bundlerSoldPercent: 100 },

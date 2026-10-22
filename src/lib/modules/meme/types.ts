@@ -153,15 +153,23 @@ export interface MemeRiskAudit {
   riskCounts: { high: number; middle: number; low: number }
   /**
    * Optional holder-distribution breakdown (fraction 0..1), when the source
-   * exposes it — Birdeye audit groups (`dev`/`snipper`/`bundler`/`insider`)
-   * and RugCheck dev/insider legs. Absent means "not reported", which the
-   * sniper treats as unproven, never as safe.
+   * exposes it — Birdeye/GMGN audit groups (`dev`/`sniper`/`insider`) and
+   * RugCheck dev/insider legs. Absent means "not reported", which the sniper
+   * treats as unproven, never as safe.
+   *
+   * `bundlerPercent` is the share of supply the LAUNCH-BUYER COHORT still
+   * holds (same-block bundlers + launch snipers), which is the only quantity
+   * `bundlerSoldPercent` (their exit ratio) can be read against. A raw
+   * bundler WALLET COUNT is not this number and must never be mapped here:
+   * Birdeye's `bundler.percentage` is a count (74.67 = ~75 wallets) and was
+   * dropped for exactly that reason.
    */
   distribution?: {
     devPercent?: number
     sniperPercent?: number
     bundlerPercent?: number
-    bundlerSoldPercent?: number
+    /** Exit ratio of that cohort (0..100); null = its rate was not reported. */
+    bundlerSoldPercent?: number | null
     insiderPercent?: number
     clusterPercent?: number
   }

@@ -206,12 +206,18 @@ function distributionBreaches(p: SniperPayload): string[] {
     out.push(`Snipers hold ${fmtPct(d.sniperPercent)}% (ceiling ${L.sniperPercent}%)`)
   }
 
-  if (d.bundlerPercent === null) out.push('Bundler share unproven')
-  else if (d.bundlerPercent >= L.bundlerToleratedPercent) {
-    out.push(`Bundlers hold ${fmtPct(d.bundlerPercent)}% — above tolerated max ${L.bundlerToleratedPercent}%`)
-  } else if (d.bundlerPercent >= L.bundlerPercent && (d.bundlerSoldPercent ?? 0) < 100) {
+  const sold = d.bundlerSoldPercent
+  if (d.bundlerPercent === null) {
     out.push(
-      `Bundlers hold ${fmtPct(d.bundlerPercent)}% and have not fully exited (sold ${fmtPct(d.bundlerSoldPercent ?? 0)}%) — ceiling ${L.bundlerPercent}%`,
+      sold === null
+        ? 'Bundler share unproven'
+        : `Bundler share unproven — launch cohort sold ${fmtPct(sold)}% of its position`,
+    )
+  } else if (d.bundlerPercent >= L.bundlerToleratedPercent) {
+    out.push(`Bundlers hold ${fmtPct(d.bundlerPercent)}% — above tolerated max ${L.bundlerToleratedPercent}%`)
+  } else if (d.bundlerPercent >= L.bundlerPercent && (sold ?? 0) < 100) {
+    out.push(
+      `Bundlers hold ${fmtPct(d.bundlerPercent)}% and have not fully exited (sold ${fmtPct(sold ?? 0)}%) — ceiling ${L.bundlerPercent}%`,
     )
   }
 
