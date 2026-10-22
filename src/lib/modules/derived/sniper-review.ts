@@ -152,8 +152,8 @@ export function assessReview(d: SniperScanDecision): ReviewAssessment {
         ? 'RE-EVALUATE'
         : 'WATCHLIST'
   const reevaluateReasons: string[] = []
-  if (finalStatus === 'RE-EVALUATE') {
-    reevaluateReasons.push(`vol/mcap ${(m.volMcRatio ?? 0).toFixed(2)}x ≥ syarat 2x tetapi tidak ada breach kritis — layak dinilai ulang saat data segar`)
+  if (finalStatus === 'RE-EVALUATE' && m.volMcRatio !== null) {
+    reevaluateReasons.push(`vol/mcap ${m.volMcRatio.toFixed(2)}x ≥ syarat 2x tetapi tidak ada breach kritis — layak dinilai ulang saat data segar`)
   }
 
   return {

@@ -23,10 +23,7 @@ type Entry = {
   rationale: string;
   rejections: string[];
   warnings: string[];
-  metrics: Omit<SniperLogEntry["metrics"], "volMcRatio"> & {
-    /** null when momentum was never measured — the server type owns this. */
-    volMcRatio: number | null;
-  };
+  metrics: SniperLogEntry["metrics"];
   contract: string;
   ticker: string;
   deduped: boolean;

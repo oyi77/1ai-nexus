@@ -128,7 +128,7 @@ export function classifySignalTier(input: TierInput): TierResult {
   //    operator policy: UNKNOWN ≠ PASS, UNKNOWN ≠ BREACH.
   if (decision.status === 'SIGNAL' && confirmed && missing.length === 0) {
     reasons.push(
-      `clean screen at ${(decision.metrics.volMcRatio ?? 0).toFixed(2)}x volume`,
+      `clean screen at ${decision.metrics.volMcRatio === null ? 'n/a' : decision.metrics.volMcRatio.toFixed(2) + 'x'} volume`,
       `${confirmedBuyers} confirmed buyer(s), strongest=${smartMoney?.strongest}`,
     )
     return { tier: 'HIGH_CONVICTION', reasons, missing, deliverableAsTopSignal: true, deliverableAsWatchlist: true }

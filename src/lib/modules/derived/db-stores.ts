@@ -114,7 +114,7 @@ function fromScanDecisionRow(row: {
       ageMinutes: (metrics.ageMinutes as number) ?? 0,
       ageLabel: (metrics.ageLabel as string) ?? 'unknown',
       stageLabel: (metrics.stageLabel as string) ?? 'unknown',
-      volMcRatio: (metrics.volMcRatio as number) ?? 0,
+      volMcRatio: typeof metrics.volMcRatio === 'number' && Number.isFinite(metrics.volMcRatio) ? metrics.volMcRatio : null,
       requiredRatio: (metrics.requiredRatio as number) ?? 0,
       devPercent: (metrics.devPercent as number | null) ?? null,
       sniperPercent: (metrics.sniperPercent as number | null) ?? null,
