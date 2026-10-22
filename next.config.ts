@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
   // than ship silently.
   typescript: { ignoreBuildErrors: false },
   
+  turbopack: {},
+
   // Turbopack: treat native modules as external during build
   webpack: (config, { isServer }) => {
     if (isServer) {
