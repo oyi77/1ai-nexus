@@ -66,9 +66,7 @@ fetchData()
       <div className="p-4 space-y-4 max-w-7xl mx-auto">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-[24px] font-head font-bold text-text-primary flex items-center gap-2">
-              <span className="text-teal-vivid">🏛</span> Macro Command Center
-            </h1>
+            <h1 className="text-[24px] font-head font-bold text-text-primary">Macro Command Center</h1>
             <p className="text-[12px] text-text-muted mt-1">Global macro indicators, yield curves, and crypto sentiment</p>
           </div>
           <LiveDot status={status} label />

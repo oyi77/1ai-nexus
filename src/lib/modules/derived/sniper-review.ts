@@ -60,10 +60,10 @@ export function pickReviewCandidates(decisions: SniperScanDecision[]): SniperSca
       (d) =>
         d.status === 'REJECT' &&
         !d.deduped &&
-        Number.isFinite(d.metrics.volMcRatio) &&
+        d.metrics.volMcRatio !== null &&
         d.metrics.volMcRatio >= REVIEW_VOLMC_FLOOR,
     )
-    .sort((a, b) => b.metrics.volMcRatio - a.metrics.volMcRatio)
+    .sort((a, b) => (b.metrics.volMcRatio ?? 0) - (a.metrics.volMcRatio ?? 0))
 }
 
 // ─── Value-vs-threshold rows ─────────────────────────────────────
@@ -148,12 +148,12 @@ export function assessReview(d: SniperScanDecision): ReviewAssessment {
     ? 'REJECT'
     : securityUnproven
       ? 'UNKNOWN'
-      : m.volMcRatio >= 2
+      : m.volMcRatio !== null && m.volMcRatio >= 2
         ? 'RE-EVALUATE'
         : 'WATCHLIST'
   const reevaluateReasons: string[] = []
   if (finalStatus === 'RE-EVALUATE') {
-    reevaluateReasons.push(`vol/mcap ${m.volMcRatio.toFixed(2)}x ≥ syarat 2x tetapi tidak ada breach kritis — layak dinilai ulang saat data segar`)
+    reevaluateReasons.push(`vol/mcap ${(m.volMcRatio ?? 0).toFixed(2)}x ≥ syarat 2x tetapi tidak ada breach kritis — layak dinilai ulang saat data segar`)
   }
 
   return {
@@ -186,7 +186,7 @@ function tokenBlock(d: SniperScanDecision): string {
     L.push(`Catatan: label INFLUENCER = tag channel call-feed, bukan verifikasi jangkauan/pengikut KOL`)
   }
   L.push(`Usia: ${escapeSignalHtml(m.ageLabel)}`)
-  L.push(`Vol/MC: ${Number.isFinite(m.volMcRatio) ? m.volMcRatio.toFixed(2) + 'x' : 'UNKNOWN'}`)
+  L.push(`Vol/MC: ${m.volMcRatio === null ? 'UNKNOWN' : m.volMcRatio.toFixed(2) + 'x'}`)
   L.push(`Market cap: ${usdOrU(mk.marketCapUsd)} (${verified(mk.marketCapUsd as number | null)})`)
   L.push(`Liquidity: ${usdOrU(mk.liquidityUsd)} (${verified(mk.liquidityUsd as number | null)})`)
   L.push(`Top 10 holders: ${vOrU(m.top10Percent)} (${verified(m.top10Percent)})`)

@@ -108,7 +108,7 @@ export default function PnlPage() {
       <div className="h-full overflow-auto p-4 space-y-4 max-w-6xl mx-auto">
         <div className="flex items-end justify-between">
           <div>
-            <h1 className="text-[20px] font-head font-bold text-text-primary">💰 Smart Money Wallet Tracker</h1>
+            <h1 className="text-[20px] font-head font-bold text-text-primary">Smart Money Wallet Tracker</h1>
             <p className="text-xs text-text-muted mt-1">Top wallets ranked by Smart Money Score. Entity data from DeFiLlama.</p>
           </div>
           <div className="text-xs font-mono text-text-muted">{wallets.length} wallets tracked</div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Panel } from "@/components/shell/Panel";
 import { DataTable, type Column } from "@/components/shell/DataTable";
@@ -19,7 +19,7 @@ type Meta = {
   timestamp: string;
 };
 
-export function MemeRiskPageContent() {
+function MemeRiskPanel() {
   const router = useRouter();
   const params = useSearchParams();
   const chainParam = params.get("chain") ?? "";
@@ -144,5 +144,19 @@ export function MemeRiskPageContent() {
         </>
       )}
     </div>
+  );
+}
+
+export function MemeRiskPageContent() {
+  return (
+    <Suspense
+      fallback={
+        <div className="space-y-4" aria-busy="true">
+          <div className="text-xs font-mono text-text-muted">Loading risk audit…</div>
+        </div>
+      }
+    >
+      <MemeRiskPanel />
+    </Suspense>
   );
 }

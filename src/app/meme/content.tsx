@@ -10,6 +10,11 @@ type MemeCard = {
 
 const CARDS: MemeCard[] = [
   {
+    title: "Sniper",
+    href: "/meme/sniper",
+    desc: "The screening pipeline: hard-rule gates, tiered delivery and the decision log for every token the cron evaluated.",
+  },
+  {
     title: "Launch Alpha",
     href: "/meme/launch-alpha",
     desc: "Recently launched meme tokens across configured discovery platforms, sorted by listing time.",

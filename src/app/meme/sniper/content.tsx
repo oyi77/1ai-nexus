@@ -206,11 +206,15 @@ const columns: Column<Entry>[] = [
     width: 90,
     align: "right",
     accessor: (r) => r.metrics.volMcRatio,
-    render: (r) => (
-      <span className={r.metrics.volMcRatio >= r.metrics.requiredRatio ? "text-data-bull" : "text-text-secondary"}>
-        {r.metrics.volMcRatio.toFixed(2)}x
-      </span>
-    ),
+    render: (r) => {
+      const ratio = r.metrics.volMcRatio;
+      if (ratio === null) return <span className="text-text-muted">n/a</span>;
+      return (
+        <span className={ratio >= r.metrics.requiredRatio ? "text-data-bull" : "text-text-secondary"}>
+          {ratio.toFixed(2)}x
+        </span>
+      );
+    },
   },
   {
     key: "sniper",

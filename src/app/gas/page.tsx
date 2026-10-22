@@ -34,7 +34,7 @@ export default function GasPage() {
       <div className="p-3 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-[20px] font-head font-bold text-text-primary">⛽ Gas Tracker</h1>
+            <h1 className="text-[20px] font-head font-bold text-text-primary">Gas Tracker</h1>
             <p className="text-xs text-text-muted">Real-time gas prices across all chains</p>
           </div>
           <LiveDot status={status} label />

@@ -308,7 +308,7 @@ export async function runSniperScan(
           rationale: devHistoryRejection,
           rejections: [devHistoryRejection],
           warnings: [],
-          metrics: { volMcRatio: NaN, ageMinutes: 0, ageLabel: 'unknown', stage: 'new-pair', stageLabel: 'unknown', requiredRatio: 0, devPercent: null, sniperPercent: null, bundlerPercent: null, insiderPercent: null, top10Percent: null, clusterPercent: null, avgPnlPercent: null, pnlAssessment: 'neutral' },
+          metrics: { volMcRatio: null, ageMinutes: 0, ageLabel: 'unknown', stage: 'new-pair', stageLabel: 'unknown', requiredRatio: 0, devPercent: null, sniperPercent: null, bundlerPercent: null, insiderPercent: null, top10Percent: null, clusterPercent: null, avgPnlPercent: null, pnlAssessment: 'neutral' },
           alert: '',
           contract: token.contract,
           ticker: token.symbol,

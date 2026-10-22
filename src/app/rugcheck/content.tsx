@@ -63,7 +63,7 @@ function RugcheckPageInner() {
       <div className="p-3 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-[20px] font-head font-bold text-text-primary">🛡 RugCheck</h1>
+            <h1 className="text-[20px] font-head font-bold text-text-primary">RugCheck</h1>
             <p className="text-xs text-text-muted">Honeypot / rug pull detector — check any token before buying</p>
           </div>
         </div>

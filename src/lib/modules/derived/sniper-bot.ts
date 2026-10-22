@@ -82,9 +82,9 @@ export function formatLogEntry(entry: SniperLogEntry, index: number): string {
   const ticker = escapeSignalHtml(entry.ticker)
   const contract = escapeHtml(entry.contract)
   const status = escapeSignalHtml(entry.status)
-  const volMc = Number.isFinite(entry.metrics.volMcRatio)
-    ? entry.metrics.volMcRatio.toFixed(2) + 'x'
-    : 'n/a'
+  const volMc = entry.metrics.volMcRatio === null
+    ? 'n/a'
+    : entry.metrics.volMcRatio.toFixed(2) + 'x'
   const delivered = entry.delivered ? ' ✉' : ''
   return (
     `${index + 1}. <b>[${tier}]</b> ${ticker} — ${status}${delivered}\n` +
@@ -133,7 +133,7 @@ export function formatCheckVerdict(decision: SniperDecision, contract: string): 
     '',
     `<b>Metrics:</b>`,
     `Stage: ${escapeSignalHtml(m.stageLabel)} (${m.ageLabel})`,
-    `Vol/MC: ${Number.isFinite(m.volMcRatio) ? m.volMcRatio.toFixed(2) + 'x' : 'n/a'} (req ${m.requiredRatio}x)`,
+    `Vol/MC: ${m.volMcRatio === null ? 'n/a' : m.volMcRatio.toFixed(2) + 'x'} (req ${m.requiredRatio}x)`,
     `Dev: ${m.devPercent ?? 'n/a'}% | Sniper: ${m.sniperPercent ?? 'n/a'}% | Bundler: ${m.bundlerPercent ?? 'n/a'}%`,
   )
   return lines.join('\n')

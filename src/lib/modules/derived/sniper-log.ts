@@ -48,6 +48,34 @@ function emptyLog(): SniperLog {
   return { entries: [], updatedAt: null, lastScan: null }
 }
 
+/**
+ * A persisted entry can predate a field or be hand-edited, so the read path
+ * cannot trust the declared shape. Entries written by earlier versions carry
+ * `volMcRatio: null` (or `NaN`) for tokens whose momentum was never measured;
+ * the UI calls formatters on it, so an un-normalised row crashed the page.
+ * Unknown stays `null` — never coerced to 0, which would claim a measured
+ * ratio of zero.
+ */
+function normalizeEntry(raw: unknown): SniperLogEntry | null {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const e = raw as Partial<SniperLogEntry>
+  if (typeof e.contract !== 'string' || typeof e.status !== 'string') return null
+  const m = (e.metrics ?? {}) as Partial<SniperLogEntry['metrics']>
+  const ratio = typeof m.volMcRatio === 'number' && Number.isFinite(m.volMcRatio) ? m.volMcRatio : null
+  return {
+    ...(e as SniperLogEntry),
+    rejections: Array.isArray(e.rejections) ? e.rejections : [],
+    warnings: Array.isArray(e.warnings) ? e.warnings : [],
+    auditsUsed: Array.isArray(e.auditsUsed) ? e.auditsUsed : [],
+    tierMissing: Array.isArray(e.tierMissing) ? e.tierMissing : [],
+    metrics: {
+      ...(m as SniperLogEntry['metrics']),
+      volMcRatio: ratio,
+      requiredRatio: typeof m.requiredRatio === 'number' && Number.isFinite(m.requiredRatio) ? m.requiredRatio : 0,
+    },
+  }
+}
+
 /** Read the persisted log; a missing/corrupt file reads as empty. */
 export function readSniperLog(): SniperLog {
   const path = logPath()
@@ -55,8 +83,13 @@ export function readSniperLog(): SniperLog {
   try {
     const raw = JSON.parse(readFileSync(path, 'utf8')) as Partial<SniperLog>
     if (!Array.isArray(raw.entries)) return emptyLog()
+    const entries: SniperLogEntry[] = []
+    for (const row of raw.entries) {
+      const normalized = normalizeEntry(row)
+      if (normalized !== null) entries.push(normalized)
+    }
     return {
-      entries: raw.entries,
+      entries,
       updatedAt: typeof raw.updatedAt === 'string' ? raw.updatedAt : null,
       lastScan: raw.lastScan ?? null,
     }

@@ -112,7 +112,7 @@ function InsiderPageInner() {
       <div className="p-3 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-[20px] font-head font-bold text-text-primary">🔍 Insider Detector</h1>
+            <h1 className="text-[20px] font-head font-bold text-text-primary">Insider Detector</h1>
             <p className="text-xs text-text-muted">Fresh wallets with sudden large transactions — classic insider accumulation pattern</p>
           </div>
           <LiveDot status={status} label />

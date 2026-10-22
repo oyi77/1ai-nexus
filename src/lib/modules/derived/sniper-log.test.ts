@@ -110,4 +110,27 @@ describe('sniper-log', () => {
     expect(log.entries).toHaveLength(200)
     expect(log.entries[0].contract).toBe('tok209')
   })
+
+  it('normalises legacy rows whose ratio was never measured instead of crashing the reader', () => {
+    const bad = {
+      ...decision('legacy', 'REJECT'),
+      metrics: { ...decision('legacy', 'REJECT').metrics, volMcRatio: null },
+    } as unknown as SniperScanDecision
+    const nan = {
+      ...decision('nanrow', 'REJECT'),
+      metrics: { ...decision('nanrow', 'REJECT').metrics, volMcRatio: NaN },
+    } as unknown as SniperScanDecision
+    const junk = [null, 'string', 42, { noContract: true }]
+
+    writeFileSync(
+      process.env.SNIPER_LOG_PATH!,
+      JSON.stringify({ entries: [bad, nan, ...junk], updatedAt: null, lastScan: null }),
+    )
+    const log = readSniperLog()
+
+    // Rows without a contract are dropped; the rest survive with an unknown ratio.
+    expect(log.entries.map((e) => e.contract)).toEqual(['legacy', 'nanrow'])
+    expect(log.entries[0].metrics.volMcRatio).toBeNull()
+    expect(log.entries[1].metrics.volMcRatio).toBeNull()
+  })
 })

@@ -330,7 +330,8 @@ function buildAlert(
   const clusterNote =
     m.clusterPercent != null && m.clusterPercent < 1 ? ' (Bersih ✅)' : ''
   // Volume fire: ratio >= 5x.
-  const volFire = m.volMcRatio >= 5 ? ' 🔥' : ''
+  const volRatioText = m.volMcRatio === null ? 'n/a' : `${m.volMcRatio.toFixed(2)}x`
+  const volFire = m.volMcRatio !== null && m.volMcRatio >= 5 ? ' 🔥' : ''
 
   // Stage suffix: Pump.fun graduated pairs read "(Pump.fun)".
   const stageExtra =
@@ -375,7 +376,7 @@ function buildAlert(
     '',
     '📈 <b>DINAMIKA MARKET</b>',
     `• <b>Market Cap:</b> ${fmtUsd(p.momentum.marketCap)}`,
-    `• <b>Volume 5m:</b> ${fmtUsd(p.momentum.volume5m)} (<b>Ratio:</b> ${m.volMcRatio.toFixed(2)}x)${volFire}`,
+    `• <b>Volume 5m:</b> ${fmtUsd(p.momentum.volume5m)} (<b>Ratio:</b> ${volRatioText})${volFire}`,
     `• <b>Top Holder Avg PnL:</b> ${pnlText}% ${pnlPhase}`,
     `• <b>Narasi / Katalis:</b> ${escapeHtml(narrative)}`,
     '',
@@ -521,6 +522,8 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
     avgPnlPercent: payload.momentum.top5AvgPnlPercent ?? null,
     pnlAssessment,
   }
+  const volRatioText =
+    metrics.volMcRatio === null ? 'n/a' : `${metrics.volMcRatio.toFixed(2)}x`
 
   let status: SniperStatus
   let rationale: string
@@ -592,7 +595,7 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
       rejections.length === 1 ? rejections[0] : `${rejections.length} hard-rule breaches — ${rejections[0]}`
   } else if (pnlAssessment === 'dump-risk') {
     status = 'WATCHLIST'
-    rationale = `Setup is clean and volume is live (${metrics.volMcRatio.toFixed(2)}x), but top holders sit on +${fmtPct(payload.momentum.top5AvgPnlPercent)}% — wait for the flush before entry`
+    rationale = `Setup is clean and volume is live (${volRatioText}), but top holders sit on +${fmtPct(payload.momentum.top5AvgPnlPercent)}% — wait for the flush before entry`
   } else if (securityUnknowns.length > 0) {
     // UNKNOWN is a third state, not a pass: a token whose LP burn/lock was
     // never measured cannot become a SIGNAL (which the tier classifier would
@@ -604,14 +607,14 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
     status = 'SIGNAL'
     rationale =
       pnlAssessment === 'accumulation'
-        ? `Clean distribution with top holders still accumulating (+${fmtPct(payload.momentum.top5AvgPnlPercent)}% avg PnL), ${metrics.volMcRatio.toFixed(2)}x volume, plus confirmed smart money (${opts.smartMoney?.strongest}) — candidate for the downstream executor`
-        : `All hard filters passed with live ${metrics.volMcRatio.toFixed(2)}x volume, no concentrated exits, plus confirmed smart money (${opts.smartMoney?.strongest}) — candidate for the downstream executor`
+        ? `Clean distribution with top holders still accumulating (+${fmtPct(payload.momentum.top5AvgPnlPercent)}% avg PnL), ${volRatioText} volume, plus confirmed smart money (${opts.smartMoney?.strongest}) — candidate for the downstream executor`
+        : `All hard filters passed with live ${volRatioText} volume, no concentrated exits, plus confirmed smart money (${opts.smartMoney?.strongest}) — candidate for the downstream executor`
   } else {
     status = 'WATCHLIST'
     rationale =
       pnlAssessment === 'accumulation'
-        ? `Screening passed but no verified smart-money buyer — hold for wallet confirmation before it becomes a signal (volume ${metrics.volMcRatio.toFixed(2)}x, accumulating)`
-        : `Hard filters clean, volume ${metrics.volMcRatio.toFixed(2)}x, but no verified smart-money buyer — hold for wallet confirmation`
+        ? `Screening passed but no verified smart-money buyer — hold for wallet confirmation before it becomes a signal (volume ${volRatioText}, accumulating)`
+        : `Hard filters clean, volume ${volRatioText}, but no verified smart-money buyer — hold for wallet confirmation`
   }
 
   return {

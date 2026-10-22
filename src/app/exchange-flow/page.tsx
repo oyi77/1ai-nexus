@@ -199,7 +199,7 @@ export default function ExchangeFlowPage() {
       <div className="p-3 space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-[20px] font-head font-bold text-text-primary">💰 Exchange Flow</h1>
+            <h1 className="text-[20px] font-head font-bold text-text-primary">Exchange Flow</h1>
             <p className="text-xs text-text-muted">Whale deposits/withdrawals to CEX — leading indicator for selling pressure</p>
           </div>
           <LiveDot status={status} label />

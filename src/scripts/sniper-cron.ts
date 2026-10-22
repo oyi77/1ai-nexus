@@ -126,7 +126,7 @@ async function main() {
     const money = d.smartMoneyBuyers > 0 ? ` sm=${d.smartMoneyBuyers}(${d.smartMoneyStrongest})` : ' sm=none'
     const gap = d.tierMissing.length > 0 ? ` missing=[${d.tierMissing.join('; ')}]` : ''
     console.log(
-      `[sniper]   ${d.ticker} ${d.status} ${d.tier} (${why}) vol/mc=${d.metrics.volMcRatio.toFixed(2)} age=${d.metrics.ageLabel} audits=[${d.auditsUsed.join(',')}]${money}${gap}${d.delivered ? ' → PUSHED' : ''}${d.deduped ? ' (seen)' : ''}`,
+      `[sniper]   ${d.ticker} ${d.status} ${d.tier} (${why}) vol/mc=${d.metrics.volMcRatio === null ? 'n/a' : d.metrics.volMcRatio.toFixed(2)} age=${d.metrics.ageLabel} audits=[${d.auditsUsed.join(',')}]${money}${gap}${d.delivered ? ' → PUSHED' : ''}${d.deduped ? ' (seen)' : ''}`,
     )
     const phase = phaseByContract.get(d.contract)?.phase
     if (phase !== undefined && phase.verdict !== 'UNKNOWN') {

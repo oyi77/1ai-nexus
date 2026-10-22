@@ -335,7 +335,7 @@ function WhaleClusterPageInner() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-[20px] font-head font-bold text-text-primary">🐋 Whale Clusters</h1>
+            <h1 className="text-[20px] font-head font-bold text-text-primary">Whale Clusters</h1>
             <p className="text-xs text-text-muted">
               Identify connected wallets controlled by the same entity — cross-chain intelligence
             </p>

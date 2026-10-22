@@ -82,7 +82,8 @@ export interface SniperMetrics {
   ageMinutes: number
   ageLabel: string
   stageLabel: string
-  volMcRatio: number
+  /** null when the token has no measured momentum yet (metric unknown, not zero). */
+  volMcRatio: number | null
   requiredRatio: number
   devPercent: number | null
   sniperPercent: number | null
