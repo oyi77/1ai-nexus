@@ -706,6 +706,19 @@ export async function runWalletDiscovery(
   }
 }
 
+/**
+ * The stored reason for one admission, as a `String[]`. The column is JSON and
+ * Prisma returns an ARRAY as a JSON OBJECT (`{0: '...', push: fn()}`) — every
+ * field name is the array index, not a key. Merging that back in would nest a
+ * snapshot of the old list, so the reader normalises to a list first.
+ */
+function reasonList(raw: unknown, next: string): string[] {
+  const list = Array.isArray(raw)
+    ? raw.filter((r): r is string => typeof r === 'string')
+    : []
+  return list.includes(next) ? list : [...list, next]
+}
+
 /** Persist through the Wallet → SmartMoneyWallet one-to-one. Idempotent. */
 export async function persistWallets(discovered: DiscoveredWallet[]): Promise<number> {
   let written = 0
@@ -720,9 +733,18 @@ export async function persistWallets(discovered: DiscoveredWallet[]): Promise<nu
           lastSeen: new Date(),
         },
         update: {
-          labels: { push: w.source },
+          lastSeen: new Date(),
         },
       })
+      // `labels: { push }` appends unconditionally, so re-running a pass
+      // doubled the label on 254 wallets ("gmgn-holder:x" twice) and every
+      // later pass doubled it again. Read-then-write keeps the column a set.
+      if (!wallet.labels.includes(w.source)) {
+        await prisma.wallet.update({
+          where: { id: wallet.id },
+          data: { labels: { push: w.source } },
+        })
+      }
       // Status follows ADMISSION, never the nullable verdict label. A
       // WATCHLIST row (high-cap holder, or whale-volume with a weak win
       // rate) has verdict=null by construction, and mapping that to WHALE
@@ -734,7 +756,17 @@ export async function persistWallets(discovered: DiscoveredWallet[]): Promise<nu
             ? 'WHALE'
             : 'QUALIFIED_SMART_MONEY'
       const reason = `discovered:${w.leg}:${w.source};${w.admission};${w.human.verdict};${w.reason}`
-      const score = (w.winRate30d ?? 0) * 100 + (w.pnl30d ?? 0) * 10
+      // 0..70: a 100% win rate and a 700% pnl both sit at the top of the band,
+      // so no single wallet can pin the ranking with one extreme number. The
+      // earlier `*100 + pnl*10` overflowed—two QUALIFIED wallets (wr 85%,
+      // pnl 174%) were stored at score 0 while WATCHLIST rows scored 15..53.
+      const score = Math.round(
+        Math.max(0, Math.min(70, (w.winRate30d ?? 0) * 50 + (w.pnl30d ?? 0) * 20)),
+      )
+      const existing = await prisma.smartMoneyWallet.findUnique({
+        where: { walletId: wallet.id },
+        select: { reasons: true },
+      })
       await prisma.smartMoneyWallet.upsert({
         where: { walletId: wallet.id },
         create: {
@@ -744,14 +776,17 @@ export async function persistWallets(discovered: DiscoveredWallet[]): Promise<nu
           status,
           pnl30d: w.pnl30d,
           winRate: w.winRate30d,
+          sampleCount: w.buyCount30d ?? 0,
           reasons: [reason],
           classifiedAt: new Date(),
         },
         update: {
           status,
+          score,
           pnl30d: w.pnl30d,
           winRate: w.winRate30d,
-          reasons: { push: reason },
+          sampleCount: w.buyCount30d ?? 0,
+          reasons: reasonList(existing?.reasons, reason),
           // Without this, the operator's "how fresh is the pool" query
           // (max(classifiedAt)) never advanced for discovered wallets —
           // verified: 3 rows persisted with classifiedAt NULL.
