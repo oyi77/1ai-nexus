@@ -50,6 +50,10 @@ export function rejectionId(s: string): string {
   )
   out = out.replace(/^Dev holds ([\d.]+)%(.*)$/, 'Dev pegang $1%$2')
   out = out.replace(/^Snipers hold ([\d.]+)%(.*)$/, 'Sniper pegang $1%$2')
+  out = out.replace(
+    /^Bundlers hold ([\d.]+)% and have not fully exited \(sold ([\d.]+)%\) — ceiling ([\d.]+)%$/,
+    'Bundler masih pegang $1% dan belum keluar penuh (terjual $2%) — batas $3%',
+  )
   out = out.replace(/^Bundlers hold ([\d.]+)%(.*)$/, 'Bundler pegang $1%$2')
   out = out.replace(/^Insiders hold ([\d.]+)%(.*)$/, 'Insider pegang $1%$2')
   out = out.replace(/^Mint authority unproven \(must be disabled\)$/, 'Mint authority belum terbukti mati')
@@ -70,6 +74,10 @@ export function rejectionId(s: string): string {
     'Porsi bundler belum terbukti — kohort peluncuran sudah keluar $1% dari posisinya',
   )
   out = out.replace(/^Bundler share unproven$/, 'Porsi bundler belum terbukti')
+  out = out.replace(
+    /^Bundlers hold ([\d.]+)% and have not fully exited \(sold ([\d.]+)%\) — ceiling ([\d.]+)%$/,
+    'Bundler masih pegang $1% dan belum keluar penuh (terjual $2%) — batas $3%',
+  )
   out = out.replace(/^Dev holding unproven \(must be 0%\)$/, 'Porsi dev belum terbukti (harus 0%)')
   out = out.replace(/^Market cap is zero\/unknown — ratio uncomputable$/, 'Market cap nol/tidak diketahui — ratio tidak bisa dihitung')
   out = out.replace(/^Volume unknown — momentum uncomputable$/, 'Volume tidak diketahui — momentum tidak bisa dihitung')
