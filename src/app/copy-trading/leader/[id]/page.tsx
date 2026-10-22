@@ -1,7 +1,8 @@
 "use client"
 
-import { Suspense, useCallback, useEffect, useState } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
+import { useParams } from 'next/navigation'
+import { useQueryParams } from '@/components/primitives/useQueryParams'
 import { NexusLayout } from '@/components/layout/NexusLayout'
 import { Panel } from '@/components/shell/Panel'
 import { DataTable, type Column } from '@/components/shell/DataTable'
@@ -378,25 +379,12 @@ function adaptOkxPositions(positions: unknown[] | undefined): GateioMarketConcen
 }
 
 export default function LeaderPerformancePage() {
-  // `useSearchParams` must sit under a Suspense boundary for static prerendering.
-  return (
-    <Suspense
-      fallback={
-        <NexusLayout>
-          <Panel title="Leader" subtitle="Loading profile…" liveStatus="stale">
-            <div className="py-6 text-sm text-text-muted">Loading…</div>
-          </Panel>
-        </NexusLayout>
-      }
-    >
-      <LeaderPerformanceInner />
-    </Suspense>
-  )
+  return <LeaderPerformanceInner />
 }
 
 function LeaderPerformanceInner() {
   const params = useParams<{ id: string }>()
-  const searchParams = useSearchParams()
+  const searchParams = useQueryParams()
   const id = params?.id ?? ''
 
   const platform = parsePlatform(searchParams?.get('platform'))

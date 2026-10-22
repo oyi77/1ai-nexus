@@ -1,7 +1,8 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryParams } from "@/components/primitives/useQueryParams";
 import { Panel } from "@/components/shell/Panel";
 import { DataTable, type Column } from "@/components/shell/DataTable";
 import { LiveDot } from "@/components/primitives/LiveDot";
@@ -21,7 +22,7 @@ type Meta = {
 
 function MemeRiskPanel() {
   const router = useRouter();
-  const params = useSearchParams();
+  const params = useQueryParams();
   const chainParam = params.get("chain") ?? "";
   const contractParam = params.get("contract") ?? "";
   const platformParam = (params.get("platform") ?? "all").toLowerCase();
@@ -148,15 +149,5 @@ function MemeRiskPanel() {
 }
 
 export function MemeRiskPageContent() {
-  return (
-    <Suspense
-      fallback={
-        <div className="space-y-4" aria-busy="true">
-          <div className="text-xs font-mono text-text-muted">Loading risk audit…</div>
-        </div>
-      }
-    >
-      <MemeRiskPanel />
-    </Suspense>
-  );
+  return <MemeRiskPanel />;
 }
