@@ -48,6 +48,10 @@ export function rejectionId(s: string): string {
     /^Linked cluster unproven — cannot rule out coordinated wallets$/,
     'Cluster belum terbukti — wallet terkoordinasi belum bisa disingkirkan',
   )
+  out = out.replace(
+    /^Linked cluster holds ([\d.]+)% \(ceiling ([\d.]+)%\)$/,
+    'Cluster terhubung pegang $1% (batas $2%)',
+  )
   out = out.replace(/^Dev holds ([\d.]+)%(.*)$/, 'Dev pegang $1%$2')
   out = out.replace(/^Snipers hold ([\d.]+)%(.*)$/, 'Sniper pegang $1%$2')
   out = out.replace(
@@ -57,14 +61,35 @@ export function rejectionId(s: string): string {
   out = out.replace(/^Bundlers hold ([\d.]+)%(.*)$/, 'Bundler pegang $1%$2')
   out = out.replace(/^Insiders hold ([\d.]+)%(.*)$/, 'Insider pegang $1%$2')
   out = out.replace(/^Mint authority unproven \(must be disabled\)$/, 'Mint authority belum terbukti mati')
+  out = out.replace(
+    /^Mint authority ENABLED — dev can inflate$/,
+    'Mint authority AKTIF — dev bisa mencetak token baru',
+  )
   out = out.replace(/^Freeze authority unproven \(must be disabled\)$/, 'Freeze authority belum terbukti mati')
+  out = out.replace(
+    /^Freeze authority ENABLED — holders can be frozen$/,
+    'Freeze authority AKTIF — holder bisa dibekukan',
+  )
   out = out.replace(
     /^Honeypot status unproven \(sell-side safety unknown\)$/,
     'Status honeypot belum terbukti — keamanan sisi jual tidak diketahui',
   )
+  out = out.replace(/^Honeypot: sells are blocked$/, 'Honeypot — penjualan diblokir')
   out = out.replace(
     /^LP burn\/lock unproven — no source measured it \(not a breach, but never a pass\)$/,
     'LP burn/lock belum terbukti — tidak ada sumber yang mengukurnya (bukan pelanggaran, tapi tidak pernah lolos)',
+  )
+  out = out.replace(
+    /^LP only ([\d.]+)% burnt\+locked — exit liquidity exposed$/,
+    'LP baru $1% dibakar+dikunci — likuiditas keluar terbuka',
+  )
+  out = out.replace(
+    /^LP burn only ([\d.]+)% — exit liquidity exposed$/,
+    'LP baru dibakar $1% — likuiditas keluar terbuka',
+  )
+  out = out.replace(
+    /^LP lock only ([\d.]+)% — exit liquidity exposed$/,
+    'LP baru dikunci $1% — likuiditas keluar terbuka',
   )
   out = out.replace(/^Top-10 concentration unproven$/, 'Konsentrasi top-10 belum terbukti')
   out = out.replace(/^Insider share unproven$/, 'Porsi insider belum terbukti')
@@ -75,8 +100,16 @@ export function rejectionId(s: string): string {
   )
   out = out.replace(/^Bundler share unproven$/, 'Porsi bundler belum terbukti')
   out = out.replace(
-    /^Bundlers hold ([\d.]+)% and have not fully exited \(sold ([\d.]+)%\) — ceiling ([\d.]+)%$/,
-    'Bundler masih pegang $1% dan belum keluar penuh (terjual $2%) — batas $3%',
+    /^Top 1-3 holder identities unproven \((\d+) of (\d+) known\) — concentration unverifiable$/,
+    'Identitas holder top 1-3 belum terbukti ($1 dari $2 diketahui) — konsentrasi tidak bisa diverifikasi',
+  )
+  out = out.replace(
+    /^Top 1-3 holder classification unproven — cannot rule out taint$/,
+    'Klasifikasi holder top 1-3 belum terbukti — taint belum bisa disingkirkan',
+  )
+  out = out.replace(
+    /^Top wallet ([1-9A-HJ-NP-Za-km-z]{4,})… is a (sniper|dev|bundler|insider|fresh) wallet \(([\d.]+)%\) — not a clean holder$/,
+    'Wallet top $1… adalah wallet $2 ($3%) — bukan holder bersih',
   )
   out = out.replace(/^Dev holding unproven \(must be 0%\)$/, 'Porsi dev belum terbukti (harus 0%)')
   out = out.replace(/^Market cap is zero\/unknown — ratio uncomputable$/, 'Market cap nol/tidak diketahui — ratio tidak bisa dihitung')
