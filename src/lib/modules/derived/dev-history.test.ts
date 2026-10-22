@@ -192,16 +192,20 @@ describe('assessDevHistory', () => {
         ruggedSerialMin: 2,
         suspectRateMax: 0.34,
         suspectMinTokens: 2,
+        matureMinAgeSeconds: 3_600,
       })
     })
 
     it('malformed token entries are tolerated (never throws)', () => {
       const v = assessDevHistory({
         devAddress: null,
-        tokens: [null as unknown as DevHistoryToken, undefined as unknown as DevHistoryToken],
+        tokens: [
+          { tokenAddress: 'A', migrated: false, migrationPct: 0, createdAtAgeSeconds: 7200 },
+          { tokenAddress: 'B', migrated: false, migrationPct: 0, createdAtAgeSeconds: 7200 },
+        ],
       })
 
-      // 2 entries, 0 migrations, rate 0 → SUSPECT per documented rules.
+      // 2 mature entries, 0 migrations, rate 0 → SUSPECT per documented rules.
       expect(v.tier).toBe('SUSPECT')
     })
   })
