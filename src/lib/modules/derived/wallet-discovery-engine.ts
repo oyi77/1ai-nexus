@@ -40,6 +40,7 @@ import {
 import { verifyWhaleForList } from '@/lib/modules/meme/whale-verifier'
 import { WHALE_HARVEST_TAGS, mergeRowGmgn, type HarvestedWallet } from '@/lib/modules/meme/whale-harvester'
 import { SMART_MONEY_DEFAULTS } from './wallet-intel'
+import { loadCallConfluence, type CallConfluence } from './call-confluence'
 
 /**
  * Run `fn` over `items` with bounded concurrency. The discovery legs call a
@@ -119,6 +120,19 @@ export interface DiscoveryFilters {
    * reporting a healthy empty leg.
    */
   maxRateLimitedTokens: number
+  /**
+   * Explicit call groups whose mention counts as confluence. When set, the
+   * harvester's own per-group weight stops deciding: the operator named the
+   * groups by hand, so a weighted-out megaphone still counts. When unset the
+   * weight floor does the deciding (see call-confluence).
+   */
+  trustedCallGroups: string[] | null
+  /**
+   * Origin-weighted group count a contract must reach before its holders are
+   * labelled "confluence above bar". Reporting only — the tag states the
+   * measured count either way, so a below-bar token is never dressed as one.
+   */
+  minCallGroups: number
 }
 
 export const DISCOVERY_DEFAULTS: DiscoveryFilters = {
@@ -135,6 +149,8 @@ export const DISCOVERY_DEFAULTS: DiscoveryFilters = {
   maxStatMeasurements: 150,
   minHolderValueUsd: 10_000,
   maxRateLimitedTokens: 3,
+  trustedCallGroups: null,
+  minCallGroups: 2,
 }
 
 export type WalletLeg = 'leaderboard' | 'high-cap-holders'
@@ -165,22 +181,25 @@ export function classifyHuman(
   if (fastTx !== null && fastTx >= f.maxFastTxRatio) {
     return {
       verdict: 'BOT_FAST_TX',
-      reason: `fastTxRatio ${(fastTx * 100).toFixed(1)}% >= ${(f.maxFastTxRatio * 100).toFixed(0)}% — sniper automation, not human`,
+      reason: `fastTxRatio ${(fastTx * 100).toFixed(1)}% >= ${(f.maxFastTxRatio * 100).toFixed(0)}% (sniper automation, not human)`,
     }
   }
-  if (sells === null || sells === 0) {
+  if (sells === null) {
     // Unknown sell count is NOT a pass: the operator's mandate is to prove a
     // wallet is not a bot, and a wallet whose exits are unmeasured proves
-    // nothing. Zero sells is the dump-and-abandon pattern.
+    // nothing.
     return {
-      verdict: sells === 0 ? 'BOT_BUY_ONLY' : 'UNKNOWN',
-      reason:
-        sells === 0
-          ? `${buys} buys, 0 sells in 30d — dump-and-abandon bot pattern`
-          : 'sell count unreported — cannot prove the wallet exits positions',
+      verdict: 'UNKNOWN',
+      reason: 'sell count unreported (cannot prove the wallet exits positions)',
     }
   }
-  return { verdict: 'HUMAN', reason: `fastTx ${(fastTx ?? 0).toFixed(2)}, ${buys} buys / ${sells} sells — human trading cadence` }
+  if (sells === 0) {
+    return {
+      verdict: 'BOT_BUY_ONLY',
+      reason: `${buys} buys, 0 sells in 30d (dump-and-abandon bot pattern)`,
+    }
+  }
+  return { verdict: 'HUMAN', reason: `fastTx ${(fastTx ?? 0).toFixed(2)}, ${buys} buys / ${sells} sells (human trading cadence)` }
 }
 
 export interface DiscoveredWallet {
@@ -413,6 +432,8 @@ async function sweepLeaderboard(
 export interface HolderCandidate {
   address: string
   source: string
+  /** Contract of the high-cap token that put this wallet in the list. */
+  tokenContract: string
   /** USD mark-to-market of the position that put this wallet in the list. */
   valueUsd: number | null
   pctOfSupply: number | null
@@ -420,6 +441,69 @@ export interface HolderCandidate {
   flagged: boolean
   /** GMGN's tags on the holder row (`transfer_in`, `fomo`, `whale`, ...). */
   tags: string[]
+}
+
+/**
+ * Provenance for the call-group join, reported even when nothing matched:
+ * `feedAvailable:true` with `tokensMatched:0` says the groups we trust never
+ * called these tokens, while `feedAvailable:false` says the join never ran.
+ * The two need opposite fixes, so they never share a number.
+ *
+ * The group counts come from the SAME `CallConfluence` the strategy gate
+ * reads, so a wallet tagged "4 groups called it" cannot disagree with the
+ * alert that later requires 3.
+ */
+export interface CallGroupsReport {
+  feedAvailable: boolean
+  /** Contracts the holder leg asked the feed about. */
+  tokensQueried: number
+  /** Contracts at least one group called. */
+  tokensMatched: number
+  /** Contracts that cleared `minCallGroups` on the weighted basis. */
+  tokensAboveBar: number
+  /** Origin-weighted group count across matched contracts. */
+  effectiveGroups: number
+  /** Group names seen across matched contracts, strongest first. */
+  groupsSeen: string[]
+}
+
+export function emptyCallGroups(): CallGroupsReport {
+  return {
+    feedAvailable: false,
+    tokensQueried: 0,
+    tokensMatched: 0,
+    tokensAboveBar: 0,
+    effectiveGroups: 0,
+    groupsSeen: [],
+  }
+}
+
+/**
+ * Folds one feed read into the report. Runs inside the leg because the
+ * contracts are only known once holders survive the ownership filters —
+ * asking about tokens whose holders we then reject would report confluence
+ * nobody consumed.
+ */
+export function readGroups(
+  report: CallGroupsReport,
+  contracts: string[],
+  byContract: Map<string, CallConfluence>,
+  minCallGroups: number,
+): void {
+  report.tokensQueried = contracts.length
+  const groups = new Set<string>()
+  let effective = 0
+  for (const contract of contracts) {
+    const match = byContract.get(contract)
+    if (!match || !match.present) continue
+    report.tokensMatched++
+    effective += match.effectiveGroupCount
+    if (match.effectiveGroupCount >= minCallGroups) report.tokensAboveBar++
+    for (const g of match.groups) groups.add(g)
+  }
+  report.feedAvailable = contracts.length > 0 && byContract.get(contracts[0])?.available === true
+  report.effectiveGroups = Number(effective.toFixed(4))
+  report.groupsSeen = [...groups]
 }
 
 /**
@@ -439,6 +523,7 @@ export interface HolderCandidate {
 async function sweepHighCapHolders(
   f: DiscoveryFilters,
   audit: { refused: Array<{ address: string; reason: string }>; marksPicked: number },
+  callGroups: CallGroupsReport,
 ): Promise<DiscoveredWallet[]> {
   // maxTokens budgets SOLANA tokens (every leg below is Solana-scoped), so ask
   // for a multiple: the established feed interleaves every GMGN chain, and the
@@ -502,6 +587,7 @@ async function sweepHighCapHolders(
       candidates.push({
         address,
         source: `gmgn-holder:${tok.contract.slice(0, 6)}`,
+        tokenContract: tok.contract,
         valueUsd: usd,
         flagged: h.suspicious === true,
         tags: h.tags,
@@ -539,6 +625,13 @@ async function sweepHighCapHolders(
     audit.marksPicked++
     return true
   })
+  // The operator's "tag which group called each CA" join, at its cheapest
+  // point: ONE feed read for the whole leg, keyed by the contracts the
+  // surviving holders actually own, so a token some call group flagged is
+  // identified as such before any GMGN stats call is spent.
+  const heldContracts = [...new Set(holdersOfScale.map((c) => c.tokenContract))]
+  const confluence = await loadCallConfluence(heldContracts, { trustedGroups: f.trustedCallGroups ?? [] })
+  readGroups(callGroups, heldContracts, confluence, f.minCallGroups)
   const statsList = await mapLimit(
     holdersOfScale,
     f.concurrency,
@@ -558,6 +651,17 @@ async function sweepHighCapHolders(
       continue
     }
     const size = c.valueUsd !== null ? `$${Math.round(c.valueUsd).toLocaleString('en-US')} of a $1M+ token` : 'size unmeasured'
+    const conf = confluence.get(c.tokenContract)
+    // The operator's ask: tag WHICH group flagged the CA this wallet holds.
+    // An unreadable feed stays silent — "no group called it" and "we could
+    // not look" are different facts and never share a label. The count is the
+    // origin-weighted one the strategy gate uses, so this tag and a later
+    // "needs N groups" bar cannot contradict each other.
+    const callerTag =
+      conf && conf.available && conf.present
+        ? `called by ${conf.groupCount} group(s) / ${conf.effectiveGroupCount.toFixed(2)} effective: ` +
+          conf.groups.slice(0, 3).join(', ')
+        : null
     out.push({
       chain: chainOfAddress(c.address),
       address: c.address,
@@ -572,7 +676,9 @@ async function sweepHighCapHolders(
       tags: [...new Set([...(stats?.tags ?? []), ...c.tags])],
       verdict: null,
       admission: 'WATCHLIST',
-      reason: `high-cap holder (${c.tags.length > 0 ? c.tags.join('/') : 'untagged'}): holds ${size}`,
+      reason:
+        `high-cap holder (${c.tags.length > 0 ? c.tags.join('/') : 'untagged'}): holds ${size}` +
+        (callerTag ? `; ${callerTag}` : ''),
       leg: 'high-cap-holders',
       human,
     })
@@ -595,6 +701,8 @@ export interface DiscoveryResult {
   refusals: Array<{ address: string; reason: string }>
   leaderboardLeg: number
   highCapLeg: number
+  /** Call-group join outcome for the holder leg; see CallGroupsReport. */
+  callGroups: CallGroupsReport
 }
 
 /**
@@ -618,6 +726,7 @@ export async function runWalletDiscovery(
   const leaderboardAudit = { refused: [] as Array<{ address: string; reason: string }>, marksPicked: 0 }
   const holderAudit = { refused: [] as Array<{ address: string; reason: string }>, marksPicked: 0 }
   const legAudit = { marksPicked: 0 }
+  const callGroups = emptyCallGroups()
   const filterBuckets = new Map<string, { n: number; min: number; max: number }>()
   const noteFilter = (w: DiscoveredWallet): void => {
     const wr = w.winRate30d ?? 0
@@ -645,7 +754,7 @@ export async function runWalletDiscovery(
   const aMs = Date.now() - tA
   await new Promise((r) => setTimeout(r, paceMs))
   const tB = Date.now()
-  const highCap = await sweepHighCapHolders(f, holderAudit)
+  const highCap = await sweepHighCapHolders(f, holderAudit, callGroups)
   const bMs = Date.now() - tB
 
   for (const w of leaderboard) if (w.admission === 'WATCHLIST') noteFilter(w)
@@ -667,6 +776,17 @@ export async function runWalletDiscovery(
     `wallet discovery legs: leaderboard=${leaderboard.length} in ${aMs}ms, ` +
       `highCapHolders=${highCap.length} in ${bMs}ms, ` +
       `holdersSizedOnPctFallback=${legAudit.marksPicked}`,
+    'wallet-discovery',
+  )
+  // The join is logged on its own line because a leg that reports zero
+  // wallets must still say whether the call feed was READ: `feedAvailable`
+  // false means the tag is missing from every row for an infrastructure
+  // reason, not because no group called anything.
+  logger.info(
+    `wallet discovery call-groups: available=${callGroups.feedAvailable} ` +
+      `queried=${callGroups.tokensQueried} matched=${callGroups.tokensMatched} ` +
+      `aboveBar=${callGroups.tokensAboveBar} effective=${callGroups.effectiveGroups} ` +
+      `groups=${callGroups.groupsSeen.slice(0, 6).join('|') || 'none'}`,
     'wallet-discovery',
   )
 
@@ -703,20 +823,32 @@ export async function runWalletDiscovery(
     refusals,
     leaderboardLeg: leaderboard.length,
     highCapLeg: highCap.length,
+    callGroups,
   }
 }
 
 /**
- * The stored reason for one admission, as a `String[]`. The column is JSON and
- * Prisma returns an ARRAY as a JSON OBJECT (`{0: '...', push: fn()}`) — every
- * field name is the array index, not a key. Merging that back in would nest a
- * snapshot of the old list, so the reader normalises to a list first.
+ * Merge the stored reason for one admission into the column, capped so the
+ * column cannot grow without bound over months of passes.
+ *
+ * The column is JSON and Prisma returns an ARRAY as a JSON OBJECT
+ * (`{0: '...', push: fn()}`) — every field name is the array index, not a
+ * key — so the reader normalises to a list first.
+ *
+ * A discovery pass OVERWRITES winRate/pnl30d/status with its own GMGN
+ * measurement, so the classifier reasons that justified those fields
+ * (`'PnL 94.2% ≥ 70%, WR 73.9% ≥ 60%, n=23'`) would otherwise be the only
+ * surviving trace of a measurement the row no longer shows. They are kept,
+ * labelled `prior:`, until the cap evicts the oldest.
  */
+const MAX_REASONS = 8
+
 function reasonList(raw: unknown, next: string): string[] {
   const list = Array.isArray(raw)
     ? raw.filter((r): r is string => typeof r === 'string')
     : []
-  return list.includes(next) ? list : [...list, next]
+  const merged = list.map((r) => (r.startsWith('prior: ') ? r : `prior: ${r}`))
+  return [...merged, next].slice(-MAX_REASONS)
 }
 
 /** Persist through the Wallet → SmartMoneyWallet one-to-one. Idempotent. */

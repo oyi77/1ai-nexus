@@ -146,6 +146,28 @@ export function clearsConfluence(
   }
 }
 
+/**
+ * Same bar, counting DISTINCT GROUP NAMES instead of origin-weighted
+ * groups. Only for an explicit 'raw' basis: a pure mirror that re-broadcasts
+ * another group satisfies this bar on its own, which is exactly the
+ * inflation `effectiveGroupCount` exists to prevent.
+ */
+export function clearsRawGroups(
+  c: CallConfluence | undefined,
+  minGroups: number,
+  trustedOnly = false,
+): { pass: boolean; detail: string } {
+  if (!c || !c.available) return { pass: false, detail: 'call-feed unreadable (the feed source threw or could not be read)' }
+  if (!c.present) return { pass: false, detail: 'no call group flagged it (feed fresh)' }
+  const counted = trustedOnly ? c.trustedGroups.length : c.groupCount
+  const pass = counted >= minGroups
+  const label = trustedOnly ? 'trusted group(s)' : 'group name(s)'
+  return {
+    pass,
+    detail: `${counted} ${label} called it (bar ${minGroups}, raw count)` + (pass ? '' : ' — below bar'),
+  }
+}
+
 /** One readable line for the alert body: who called it, how strongly. */
 export function describeConfluence(c: CallConfluence): string {
   if (!c.available) return 'call groups: feed unreadable'

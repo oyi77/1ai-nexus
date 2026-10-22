@@ -7,13 +7,14 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   loadCallConfluence,
   clearsConfluence,
+  clearsRawGroups,
   describeConfluence,
   EMPTY_CONFLUENCE,
   type CallConfluence,
   type CallFeedRow,
 } from '../call-confluence'
 import type { CallFeedRead } from '../db-call-feed'
-import { applyConfluenceBar } from '../strategy-intake'
+import { applyConfluenceBar, evaluateStrategiesFor } from '../strategy-intake'
 import type { StrategyVerdict } from '../strategy-evaluator'
 
 let feedRows: CallFeedRow[] = []
@@ -308,5 +309,80 @@ describe('strategy-intake confluence gate', () => {
   it('returns null when nothing fired, with or without a bar', () => {
     expect(applyConfluenceBar([], EMPTY_CONFLUENCE('x'), { minGroups: 1 }).fired).toBeNull()
     expect(applyConfluenceBar([], EMPTY_CONFLUENCE('x'), undefined).fired).toBeNull()
+  })
+
+  it('raw basis counts a mirror group the effective basis discounts to zero', () => {
+    const mirror = confOf({ groups: ['whaleBuyBotFree'], groupCount: 1, effectiveGroupCount: 0 })
+    expect(applyConfluenceBar([verdict()], mirror, { minGroups: 1 }).fired).toBeNull()
+    const raw = applyConfluenceBar([verdict()], mirror, { minGroups: 1 }, 'raw')
+    expect(raw.fired).not.toBeNull()
+    expect(raw.bar?.detail).toContain('raw count')
+  })
+
+  it('raw basis still refuses an unreadable feed and an unmentioned contract', () => {
+    expect(applyConfluenceBar([verdict()], EMPTY_CONFLUENCE('x'), { minGroups: 1 }, 'raw').fired).toBeNull()
+    const absent = confOf({ present: false, groups: [], groupCount: 0, effectiveGroupCount: 0 })
+    expect(applyConfluenceBar([verdict()], absent, { minGroups: 1 }, 'raw').fired).toBeNull()
+  })
+})
+
+describe('clearsRawGroups', () => {
+  // The raw basis exists for one reason: an operator who names the groups by
+  // hand wants a named group to count even when the caller weighting has
+  // zeroed it. These pin that it stays a COUNT of names, never a discount.
+  it('counts group names, so a weighted-out mirror still satisfies the bar', () => {
+    const mirror = confOf({ groups: ['whaleBuyBotFree'], groupCount: 1, effectiveGroupCount: 0 })
+    expect(clearsRawGroups(mirror, 1).pass).toBe(true)
+    expect(clearsConfluence(mirror, 1).pass).toBe(false)
+  })
+
+  it('still refuses an unreadable feed and an unmentioned contract', () => {
+    const dead = clearsRawGroups(confOf({ available: false, present: false, groupCount: 0 }), 1)
+    expect(dead.pass).toBe(false)
+    expect(dead.detail).toContain('unreadable')
+    const absent = clearsRawGroups(confOf({ present: false, groups: [], groupCount: 0 }), 1)
+    expect(absent.pass).toBe(false)
+    expect(absent.detail).toContain('no call group flagged it')
+    expect(clearsRawGroups(undefined, 1).pass).toBe(false)
+  })
+
+  it('trusted-only narrows the raw count to the named groups', () => {
+    const c = confOf({ groups: ['A', 'B', 'C'], groupCount: 3, trustedGroups: ['A'] })
+    expect(clearsRawGroups(c, 3).pass).toBe(true)
+    expect(clearsRawGroups(c, 3, true).pass).toBe(false)
+    expect(clearsRawGroups(c, 1, true).pass).toBe(true)
+  })
+
+  it('labels the basis so a raw pass can never be read as a weighted one', () => {
+    expect(clearsRawGroups(confOf({ groupCount: 2 }), 2).detail).toContain('raw count')
+    expect(clearsConfluence(confOf({ groupCount: 2, effectiveGroupCount: 2 }), 2).detail).not.toContain('raw')
+  })
+})
+
+describe('batch confluence seam', () => {
+  it('uses the injected confluence and never reads the feed', async () => {
+    const feedLoaderCalls = { n: 0 }
+    const seam = () => {
+      feedLoaderCalls.n++
+      return Promise.resolve({ rows: [], readOk: true })
+    }
+    const precomputed = confOf({ groups: ['A', 'B', 'C'], groupCount: 3, effectiveGroupCount: 3 })
+    // Any real fetch attempt rejects, so the test never touches the network
+    // while still exercising the intake's failure-tolerant legs.
+    const fetchFn = (() => {
+      return Promise.reject(new Error('network disabled in test'))
+    }) as unknown as typeof fetch
+    const out = await evaluateStrategiesFor({
+      contract: 'x',
+      buyers: [],
+      buyerStatus: new Map(),
+      market: null,
+      fetchFn,
+      callFeedSeam: seam,
+      confluence: precomputed,
+    })
+    expect(feedLoaderCalls.n).toBe(0)
+    expect(out.confluence).toBe(precomputed)
+    expect(out.confluence.groupCount).toBe(3)
   })
 })

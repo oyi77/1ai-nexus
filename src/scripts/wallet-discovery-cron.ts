@@ -18,6 +18,8 @@ import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 //   WALLET_DISCOVERY_BUDGET_MS      wall-clock budget per pass (default 120000)
 //   WALLET_DISCOVERY_MAX_STAT       stat re-measurements per pass (default 150)
 //   WALLET_DISCOVERY_MIN_HOLDER_USD  min high-cap holder position size (default 10_000)
+//   WALLET_DISCOVERY_MIN_CALL_GROUPS origin-weighted call groups for a confluence tag (default 2)
+//   WALLET_DISCOVERY_TRUSTED_GROUPS  comma-separated groups that always count
 //   WALLET_DISCOVERY_DRY            "1" = report only, no DB writes
 // ─────────────────────────────────────────────────────────────
 import 'dotenv/config'
@@ -36,6 +38,16 @@ function numEnv(name: string, fallback: number): number {
   return Number.isFinite(n) ? n : fallback
 }
 
+function listEnv(name: string, fallback: string[] | null): string[] | null {
+  const raw = process.env[name]
+  if (raw === undefined) return fallback
+  const items = raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0)
+  return items.length > 0 ? items : fallback
+}
+
 async function main(): Promise<void> {
   const dry = process.env.WALLET_DISCOVERY_DRY === '1'
   const filters: Partial<DiscoveryFilters> = {
@@ -51,6 +63,8 @@ async function main(): Promise<void> {
     maxEmptyHolderTokens: numEnv('WALLET_DISCOVERY_MAX_EMPTY', DISCOVERY_DEFAULTS.maxEmptyHolderTokens),
     minHolderValueUsd: numEnv('WALLET_DISCOVERY_MIN_HOLDER_USD', DISCOVERY_DEFAULTS.minHolderValueUsd),
     maxRateLimitedTokens: numEnv('WALLET_DISCOVERY_MAX_429', DISCOVERY_DEFAULTS.maxRateLimitedTokens),
+    minCallGroups: numEnv('WALLET_DISCOVERY_MIN_CALL_GROUPS', DISCOVERY_DEFAULTS.minCallGroups),
+    trustedCallGroups: listEnv('WALLET_DISCOVERY_TRUSTED_GROUPS', DISCOVERY_DEFAULTS.trustedCallGroups),
   }
 
   console.log(
@@ -66,6 +80,12 @@ async function main(): Promise<void> {
     `[wallet-discovery] legs: leaderboard=${result.leaderboardLeg} highCapHolders=${result.highCapLeg} ` +
       `→ accepted=${result.discovered.length} ` +
       `refused(bot=${result.refused.bot} noMeasure=${result.refused.noMeasure} filters=${result.refused.filters})`,
+  )
+  console.log(
+    `[wallet-discovery] call-groups: available=${result.callGroups.feedAvailable} ` +
+      `queried=${result.callGroups.tokensQueried} matched=${result.callGroups.tokensMatched} ` +
+      `aboveBar=${result.callGroups.tokensAboveBar} effective=${result.callGroups.effectiveGroups} ` +
+      `groups=${result.callGroups.groupsSeen.slice(0, 6).join('|') || 'none'}`,
   )
   const buckets = Object.entries(result.filterReasons)
     .map(([rule, summary]) => ({ rule, summary }))
@@ -83,7 +103,7 @@ async function main(): Promise<void> {
     const pnl = w.pnl30d === null ? 'unmeasured' : w.pnl30d.toFixed(2)
     console.log(
       `  ${w.address.slice(0, 8)}… wr=${wr} pnl=${pnl} leg=${w.leg} ` +
-        `admission=${w.admission} human=${w.human.verdict} — ${w.reason}`,
+        `admission=${w.admission} human=${w.human.verdict} (${w.reason})`,
     )
   }
   // Every measured refusal, address first: an aggregate count cannot answer

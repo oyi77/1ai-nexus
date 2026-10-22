@@ -40,6 +40,7 @@ import {
 import { isAccumulationSeen, markAccumulationSeen, markSent, pruneAccumulationState, readState, writeState } from '@/lib/modules/derived/accumulation-state'
 import { loadMarkets } from '@/lib/modules/derived/accumulation-markets'
 import { evaluateStrategiesFor } from '@/lib/modules/derived/strategy-intake'
+import { loadCallConfluence } from '@/lib/modules/derived/call-confluence'
 import { STRATEGY_DEFAULTS } from '@/lib/modules/derived/strategy-evaluator'
 import type { WalletBuyCandidate } from '@/lib/modules/derived/wallet-discovery'
 import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
@@ -246,6 +247,14 @@ async function main() {
         }
       : undefined
   let strategyRefused = 0
+  // ONE feed read for the whole batch. Per-contract reads cost a Postgres
+  // round trip per candidate for the same snapshot, and — worse — the alert
+  // screen and the hard bar could then observe different snapshots.
+  const confluenceBasis = (process.env.ACCUMULATION_CONFLUENCE_BASIS ?? '') === 'raw' ? 'raw' : 'effective'
+  const confluenceByContract = await loadCallConfluence(
+    events.map((e) => e.token.contract),
+    { trustedGroups: trustedCallGroups },
+  )
 
   for (const event of events) {
     const tagSummary = event.categories.join('+')
@@ -266,6 +275,8 @@ async function main() {
       sizing: capitalUsd > 0 ? { capitalUsd, riskPct } : undefined,
       trustedCallGroups,
       requireConfluence,
+      confluence: confluenceByContract.get(event.token.contract),
+      confluenceBasis,
     })
     event.strategy = intake.fired
     event.ladder = intake.ladder

@@ -35,6 +35,7 @@ import {
   loadCallConfluence,
   describeConfluence,
   clearsConfluence,
+  clearsRawGroups,
   EMPTY_CONFLUENCE,
   type CallConfluence,
 } from './call-confluence'
@@ -63,11 +64,27 @@ export interface StrategyIntakeInput {
   /** Inject the call-feed loader (tests / batched reads). */
   callFeedSeam?: (nowMs: number, maxAgeMin?: number) => Promise<CallFeedRead>
   /**
+   * Confluence already resolved for this contract by a batch caller (the
+   * cron reads ONE feed for all candidates). When present the per-contract
+   * feed read is skipped: without this the cron issued one Postgres read
+   * per candidate, and a bar evaluated here could disagree with the same
+   * bar evaluated by the alert screen.
+   */
+  confluence?: CallConfluence
+  /**
    * Make call-group confluence a HARD gate: a contract that does not clear
    * the bar fires no strategy, exactly as if the structure rules failed.
    * Omit to keep confluence as reported evidence only.
    */
   requireConfluence?: { minGroups: number; trustedOnly?: boolean }
+  /**
+   * Which group set the bar counts: 'effective' (default) is the
+   * origin-weighted group count the feeder uses everywhere else - a pure
+   * mirror group contributes ~0. 'raw' counts distinct group names, which a
+   * single mirror can satisfy alone. 'raw' exists so the two readings can
+   * never disagree silently between the alert screen and the cron gate.
+   */
+  confluenceBasis?: 'effective' | 'raw'
 }
 export interface StrategyIntakeResult {
   contract: string
@@ -271,10 +288,13 @@ export async function evaluateStrategiesFor(
   const independence = await independenceOf(input.buyers)
   // One feed read per contract; the loader is injected in tests and by the
   // cron when it batches (see evaluateStrategiesFor's callFeedSeam).
-  const confluence = (await loadCallConfluence([input.contract], {
-    trustedGroups: input.trustedCallGroups,
-    loadFeed: input.callFeedSeam,
-  })).get(input.contract) ?? EMPTY_CONFLUENCE(input.contract)
+  const confluence =
+    input.confluence ??
+    (await loadCallConfluence([input.contract], {
+      trustedGroups: input.trustedCallGroups,
+      loadFeed: input.callFeedSeam,
+    })).get(input.contract) ??
+    EMPTY_CONFLUENCE(input.contract)
 
   const verdicts: StrategyVerdict[] = [
     evaluateSecondWave(sctx, market, holders, input.config),
@@ -285,7 +305,7 @@ export async function evaluateStrategiesFor(
   const firedList = verdicts
     .filter((v) => v.fired)
     .sort((a, b) => b.confidence - a.confidence)
-  const gated = applyConfluenceBar(firedList, confluence, input.requireConfluence)
+  const gated = applyConfluenceBar(firedList, confluence, input.requireConfluence, input.confluenceBasis)
   const fired = gated.fired
 
   let ladder: LadderPlan | null = null
@@ -343,8 +363,13 @@ export function applyConfluenceBar(
   firedList: StrategyVerdict[],
   confluence: CallConfluence,
   bar: { minGroups: number; trustedOnly?: boolean } | undefined,
+  basis: 'effective' | 'raw' = 'effective',
 ): { fired: StrategyVerdict | null; bar: { pass: boolean; detail: string } | null; refusals: string[] } {
-  const cleared = bar ? clearsConfluence(confluence, bar.minGroups, bar.trustedOnly === true) : null
+  const cleared = bar
+    ? basis === 'raw'
+      ? clearsRawGroups(confluence, bar.minGroups, bar.trustedOnly === true)
+      : clearsConfluence(confluence, bar.minGroups, bar.trustedOnly === true)
+    : null
   const suppressed = cleared !== null && !cleared.pass
   return {
     fired: suppressed ? null : (firedList[0] ?? null),

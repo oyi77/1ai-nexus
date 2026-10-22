@@ -12,8 +12,11 @@ import {
   chainOfAddress,
   classifyHuman,
   DISCOVERY_DEFAULTS,
+  emptyCallGroups,
+  readGroups,
   type DiscoveryFilters,
 } from '../wallet-discovery-engine'
+import { EMPTY_CONFLUENCE, type CallConfluence } from '../call-confluence'
 
 const F: DiscoveryFilters = { ...DISCOVERY_DEFAULTS }
 
@@ -77,5 +80,58 @@ describe('chainOfAddress — a wallet is persisted on the chain it was measured 
 
   it('does not treat a truncated 0x string as EVM (it is not a valid key)', () => {
     expect(chainOfAddress('0x1d80392d')).toBe('solana')
+  })
+})
+
+describe('readGroups — the operator\'s "tag which group called each CA" join', () => {
+  const conf = (over: Partial<CallConfluence> = {}): CallConfluence => ({
+    ...EMPTY_CONFLUENCE('x'),
+    groups: ['A', 'B'],
+    groupCount: 2,
+    effectiveGroupCount: 2,
+    available: true,
+    present: true,
+    ...over,
+  })
+
+  it('counts weighted groups and names them across contracts', () => {
+    const report = emptyCallGroups()
+    readGroups(
+      report,
+      ['x', 'y'],
+      new Map<string, CallConfluence>([
+        ['x', conf()],
+        ['y', conf({ groups: ['C'], groupCount: 1, effectiveGroupCount: 0.15 })],
+      ]),
+      2,
+    )
+    expect(report.tokensQueried).toBe(2)
+    expect(report.tokensMatched).toBe(2)
+    expect(report.tokensAboveBar).toBe(1)
+    expect(report.effectiveGroups).toBe(2.15)
+    expect(report.groupsSeen).toEqual(['A', 'B', 'C'])
+    expect(report.feedAvailable).toBe(true)
+  })
+
+  it('separates "nobody called it" from "the feed was never read"', () => {
+    // A fresh feed with no entry and a dead feed produce the same zero rows.
+    // The report must not collapse them: one means the CA was never called,
+    // the other means the harvester is broken and the operator must fix it.
+    const fresh = emptyCallGroups()
+    readGroups(fresh, ['x'], new Map([['x', conf({ present: false, groups: [], groupCount: 0, effectiveGroupCount: 0 })]]), 2)
+    expect(fresh.feedAvailable).toBe(true)
+    expect(fresh.tokensMatched).toBe(0)
+
+    const dead = emptyCallGroups()
+    readGroups(dead, ['x'], new Map([['x', conf({ available: false, present: false, groups: [], groupCount: 0 })]]), 2)
+    expect(dead.feedAvailable).toBe(false)
+    expect(dead.tokensMatched).toBe(0)
+  })
+
+  it('reports no feed availability when it was never asked about anything', () => {
+    const report = emptyCallGroups()
+    readGroups(report, [], new Map(), 2)
+    expect(report.feedAvailable).toBe(false)
+    expect(report.tokensQueried).toBe(0)
   })
 })
