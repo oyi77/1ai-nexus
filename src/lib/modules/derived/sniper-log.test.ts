@@ -66,6 +66,8 @@ function result(decisions: SniperScanDecision[]): SniperScanResult {
     screened: decisions.filter((d) => d.status === 'SIGNAL').length,
     watchlisted: decisions.filter((d) => d.status === 'WATCHLIST').length,
     rejected: decisions.filter((d) => d.status === 'REJECT').length,
+    rejectAudited: decisions.filter((d) => d.status === 'REJECT' && d.auditsUsed.length > 0).length,
+    rejectPreGate: decisions.filter((d) => d.status === 'REJECT' && d.auditsUsed.length === 0).length,
     deduped: 0,
     delivered: decisions.filter((d) => d.delivered).length,
     decisions,

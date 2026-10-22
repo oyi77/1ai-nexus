@@ -74,6 +74,8 @@ function result(decisions: SniperScanDecision[]): SniperScanResult {
     screened: 0,
     watchlisted: 0,
     rejected: decisions.length,
+    rejectAudited: decisions.filter((d) => d.auditsUsed.length > 0).length,
+    rejectPreGate: decisions.filter((d) => d.auditsUsed.length === 0).length,
     deduped: 0,
     delivered: 0,
     decisions,

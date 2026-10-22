@@ -98,6 +98,8 @@ describe('env-gate decision (onRealtimeToken)', () => {
       screened: 0,
       watchlisted: 0,
       rejected: 1,
+      rejectAudited: 1,
+      rejectPreGate: 0,
       deduped: 0,
       delivered: 0,
       decisions: [],

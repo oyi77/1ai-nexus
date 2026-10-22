@@ -235,6 +235,9 @@ export interface SniperScanResult {
   screened: number
   watchlisted: number
   rejected: number
+  /** Of `rejected`: rows the audit fan-out actually judged vs aborted pre-audit. */
+  rejectAudited: number
+  rejectPreGate: number
   deduped: number
   delivered: number
   decisions: SniperScanDecision[]
@@ -454,6 +457,8 @@ export async function runSniperScan(
     screened: decisions.filter((d) => d.status === 'SIGNAL').length,
     watchlisted: decisions.filter((d) => d.status === 'WATCHLIST').length,
     rejected: decisions.filter((d) => d.status === 'REJECT').length,
+    rejectAudited: decisions.filter((d) => d.status === 'REJECT' && d.auditsUsed.length > 0).length,
+    rejectPreGate: decisions.filter((d) => d.status === 'REJECT' && d.auditsUsed.length === 0).length,
     deduped: decisions.filter((d) => d.deduped).length,
     delivered,
     decisions,

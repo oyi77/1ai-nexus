@@ -119,7 +119,8 @@ async function main() {
   const topSignals = res.decisions.filter((d) => d.tier === 'HIGH_CONVICTION').length
   console.log(
     `[sniper] scanned=${res.scanned} signal=${res.screened} watchlist=${res.watchlisted} ` +
-      `reject=${res.rejected} deduped=${res.deduped} delivered=${res.delivered} top=${topSignals}`,
+      `reject=${res.rejected} (audited=${res.rejectAudited} pre-gate=${res.rejectPreGate}) ` +
+      `deduped=${res.deduped} delivered=${res.delivered} top=${topSignals}`,
   )
   for (const d of res.decisions) {
     const why = d.status === 'REJECT' ? `${d.rejections.length} breach(es)` : 'actionable'

@@ -126,6 +126,8 @@ describe('handleCommand', () => {
     screened: 2,
     watchlisted: 3,
     rejected: 5,
+    rejectAudited: 5,
+    rejectPreGate: 0,
     deduped: 1,
     delivered: 1,
     decisions: [],
@@ -209,6 +211,8 @@ describe('formatScanResult', () => {
       screened: 2,
       watchlisted: 1,
       rejected: 2,
+      rejectAudited: 2,
+      rejectPreGate: 0,
       deduped: 0,
       delivered: 1,
       decisions: [
