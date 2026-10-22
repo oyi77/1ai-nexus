@@ -17,7 +17,7 @@ import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 //   WALLET_DISCOVERY_CONCURRENCY    parallel GMGN stat calls (default 6)
 //   WALLET_DISCOVERY_BUDGET_MS      wall-clock budget per pass (default 120000)
 //   WALLET_DISCOVERY_MAX_STAT       stat re-measurements per pass (default 150)
-//   WALLET_DISCOVERY_MAX_EMPTY      holder leg stops after N empty tokens (default 2)
+//   WALLET_DISCOVERY_MIN_HOLDER_USD  min high-cap holder position size (default 10_000)
 //   WALLET_DISCOVERY_DRY            "1" = report only, no DB writes
 // ─────────────────────────────────────────────────────────────
 import 'dotenv/config'
@@ -49,6 +49,8 @@ async function main(): Promise<void> {
     budgetMs: numEnv('WALLET_DISCOVERY_BUDGET_MS', DISCOVERY_DEFAULTS.budgetMs),
     maxStatMeasurements: numEnv('WALLET_DISCOVERY_MAX_STAT', DISCOVERY_DEFAULTS.maxStatMeasurements),
     maxEmptyHolderTokens: numEnv('WALLET_DISCOVERY_MAX_EMPTY', DISCOVERY_DEFAULTS.maxEmptyHolderTokens),
+    minHolderValueUsd: numEnv('WALLET_DISCOVERY_MIN_HOLDER_USD', DISCOVERY_DEFAULTS.minHolderValueUsd),
+    maxRateLimitedTokens: numEnv('WALLET_DISCOVERY_MAX_429', DISCOVERY_DEFAULTS.maxRateLimitedTokens),
   }
 
   console.log(
@@ -65,14 +67,32 @@ async function main(): Promise<void> {
       `→ accepted=${result.discovered.length} ` +
       `refused(bot=${result.refused.bot} noMeasure=${result.refused.noMeasure} filters=${result.refused.filters})`,
   )
+  const buckets = Object.entries(result.filterReasons)
+    .map(([rule, summary]) => ({ rule, summary }))
+    .sort((a, b) => parseInt(b.summary, 10) - parseInt(a.summary, 10))
+  if (buckets.length > 0) {
+    console.log(
+      `[wallet-discovery] filter refusals: ${buckets
+        .map(({ rule, summary }) => `${rule} ${summary}`)
+        .join('; ')}`,
+    )
+  }
 
   for (const w of result.discovered.slice(0, 15)) {
-    const wr = ((w.winRate30d ?? 0) * 100).toFixed(1)
-    const pnl = (w.pnl30d ?? 0).toFixed(2)
+    const wr = w.winRate30d === null ? 'unmeasured' : `${(w.winRate30d * 100).toFixed(1)}%`
+    const pnl = w.pnl30d === null ? 'unmeasured' : w.pnl30d.toFixed(2)
     console.log(
-      `  ${w.address.slice(0, 8)}… wr=${wr}% pnl=${pnl} leg=${w.leg} verdict=${w.verdict ?? '-'} ` +
-        `human=${w.human.verdict}`,
+      `  ${w.address.slice(0, 8)}… wr=${wr} pnl=${pnl} leg=${w.leg} ` +
+        `admission=${w.admission} human=${w.human.verdict} — ${w.reason}`,
     )
+  }
+  // Every measured refusal, address first: an aggregate count cannot answer
+  // "why did this whale not make the pool".
+  for (const r of result.refusals.slice(0, 15)) {
+    console.log(`  REFUSED ${r.address.slice(0, 8)}… ${r.reason}`)
+  }
+  if (result.refusals.length > 15) {
+    console.log(`  … ${result.refusals.length - 15} more refusal(s)`)
   }
 
   if (dry) {

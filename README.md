@@ -28,6 +28,8 @@ NEXUS is an **open-source finance intelligence platform** for traders, analysts,
 - **DeFi Protocol Analytics** — Track TVL, yields, protocol revenue, and sector dominance
 - **Meme Token Detection** — Real-time Pump.fun / Raydium token creation with hype scoring engine
 - **DEX Sniper Scanner** — `/scanner` page with sub-second WebSocket updates showing new liquidity pools with risk scoring
+- **Strategy-Gated Accumulation Alerts** — Whale accumulation only fires when one of three entry playbooks actually triggers (Second Wave, Level Flip, Whale Comeback) on real MC history, with a ladder plan and a named rule for every refusal
+- **Measured Wallet Discovery** — Rebuilds the tracked pool from GMGN leaderboard sweeps plus holders of established (MC ≥ $1M) tokens; no wallet enters unless it clears the HUMAN check (fastTxRatio, sells > 0, ≥ 10 trades) and GMGN's own bundler/sniper/fresh/transfer-in flags
 ---
 
 ## Supported Blockchains

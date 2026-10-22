@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest'
 import {
+  chainOfAddress,
   classifyHuman,
   DISCOVERY_DEFAULTS,
   type DiscoveryFilters,
@@ -62,5 +63,19 @@ describe('DISCOVERY_DEFAULTS', () => {
     expect(DISCOVERY_DEFAULTS.minBuyVolumeUsd).toBe(250_000)
     expect(DISCOVERY_DEFAULTS.minEstablishedMc).toBe(1_000_000)
     expect(DISCOVERY_DEFAULTS.maxFastTxRatio).toBe(0.5)
+  })
+})
+
+describe('chainOfAddress — a wallet is persisted on the chain it was measured on', () => {
+  it('labels an EVM address as ethereum, never solana', () => {
+    expect(chainOfAddress('0x1d80392d12caaaf9e333bb0bb7f021eacf297fe6')).toBe('ethereum')
+  })
+
+  it('keeps a base58 mint-shaped address on solana', () => {
+    expect(chainOfAddress('FVZRwUp6JbBm8uqWy1cHwEoPPjPzFjLuL7YQZ7qzXyZq')).toBe('solana')
+  })
+
+  it('does not treat a truncated 0x string as EVM (it is not a valid key)', () => {
+    expect(chainOfAddress('0x1d80392d')).toBe('solana')
   })
 })
