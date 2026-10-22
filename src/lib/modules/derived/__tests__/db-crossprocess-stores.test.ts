@@ -372,6 +372,76 @@ describe('db-call-feed', () => {
     expect(result.map((r) => r.contract)).toEqual([real])
   })
 
+  it('loadCallFeed keeps a contract the artifact saw after the last DB sync', async () => {
+    // [REGRESSION 2026-10-22] The reader returned the DB rows alone whenever
+    // the DB had any. Live: the harvester had 57 candidates, the DB held 0
+    // inside the read window, and every single call made since the last sync
+    // reached no consumer. Freshness is per row, not per store.
+    findMany.mockResolvedValue([])
+    const fresh = new Date(Date.now() - 60_000).toISOString()
+    writeFileSync(
+      callFeedPath,
+      JSON.stringify({
+        generated_at: new Date().toISOString(),
+        window_min: 60,
+        candidates: [
+          {
+            contract: 'BaBDzVBE3pTxuCjU7gcqNENUCfJpo24hDxDEsufhpump',
+            chain: 'solana',
+            source_count: 3,
+            mentions: 15,
+            sources: ['CallAnalyser2', 'SeekrTrending'],
+            kinds: ['score'],
+            first_seen: fresh,
+            last_seen: fresh,
+          },
+        ],
+      }),
+    )
+    const result = await loadCallFeed()
+    expect(result.map((r) => r.contract)).toEqual(['BaBDzVBE3pTxuCjU7gcqNENUCfJpo24hDxDEsufhpump'])
+    expect(result[0].sourceCount).toBe(3)
+  })
+
+  it('loadCallFeed prefers the fresher row per contract, not the store', async () => {
+    const stale = new Date(Date.now() - 30 * 60_000)
+    findMany.mockResolvedValue([
+      {
+        contract: 'BaBDzVBE3pTxuCjU7gcqNENUCfJpo24hDxDEsufhpump',
+        chain: 'solana',
+        ticker: '',
+        marketCapUsd: null,
+        mentionCount: 2,
+        sources: ['CallAnalyser2'],
+        kinds: ['score'],
+        weightedScore: null,
+        lastSeenAt: stale,
+      },
+    ])
+    writeFileSync(
+      callFeedPath,
+      JSON.stringify({
+        generated_at: new Date().toISOString(),
+        window_min: 60,
+        candidates: [
+          {
+            contract: 'BaBDzVBE3pTxuCjU7gcqNENUCfJpo24hDxDEsufhpump',
+            chain: 'solana',
+            source_count: 2,
+            mentions: 9,
+            sources: ['CallAnalyser2', 'SeekrTrending'],
+            kinds: ['score', 'trend'],
+            first_seen: new Date(Date.now() - 50 * 60_000).toISOString(),
+            last_seen: new Date(Date.now() - 5 * 60_000).toISOString(),
+          },
+        ],
+      }),
+    )
+    const [row] = await loadCallFeed()
+    expect(row.mentions).toBe(9)
+    expect(row.sources).toEqual(['CallAnalyser2', 'SeekrTrending'])
+  })
+
   it('loadCallFeed falls back to JSON without throwing', async () => {
     findMany.mockRejectedValue(new Error('db down'))
     await expect(loadCallFeed()).resolves.toEqual([])

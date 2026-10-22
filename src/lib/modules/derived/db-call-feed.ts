@@ -54,6 +54,12 @@ export interface CallFeedRow {
   lastSeen: string
   weightedScore?: number
   callerWeights?: Record<string, number>
+  /**
+   * When this row's source artifact was produced. Set only by the JSON reader,
+   * so a DB row (which has no artifact of its own) can never be judged fresher
+   * than the snapshot it claims to describe.
+   */
+  artifactGeneratedAt?: number
 }
 
 /**
@@ -107,8 +113,10 @@ function readJsonArtifact(nowMs: number, maxAgeMin: number): CallFeedRow[] {
     if (!existsSync(p)) return []
     const raw = JSON.parse(readFileSync(p, 'utf8')) as CallFeedArtifact
     if (!raw || !Array.isArray(raw.candidates)) return []
-    const ageMin = (nowMs - Date.parse(raw.generated_at)) / 60_000
-    if (!Number.isFinite(ageMin) || ageMin > maxAgeMin || ageMin < -5) return []
+    const generatedAt = Date.parse(raw.generated_at)
+    if (!Number.isFinite(generatedAt)) return []
+    const fresh = (ageMin: number) => ageMin <= maxAgeMin && ageMin >= -5
+    if (!fresh((nowMs - generatedAt) / 60_000)) return []
     return raw.candidates
       .filter((c) => typeof c?.contract === 'string' && typeof c.source_count === 'number')
       .map((c) => ({
@@ -120,15 +128,40 @@ function readJsonArtifact(nowMs: number, maxAgeMin: number): CallFeedRow[] {
         kinds: Array.isArray(c.kinds) ? (c.kinds.filter((k): k is string => typeof k === 'string')) : [],
         firstSeen: typeof c.first_seen === 'string' ? c.first_seen : raw.generated_at,
         lastSeen: typeof c.last_seen === 'string' ? c.last_seen : raw.generated_at,
+        artifactGeneratedAt: generatedAt,
         ...(typeof c.weighted_score === 'number' && Number.isFinite(c.weighted_score) && {
           weightedScore: c.weighted_score as number,
         }),
         ...(isWeightMap(c.caller_weights) && { callerWeights: c.caller_weights }),
       }))
       .filter((c) => c.sourceCount >= 1)
+      .filter((c) => fresh((nowMs - Date.parse(c.lastSeen)) / 60_000))
   } catch {
     return []
   }
+}
+/**
+ * Union of the DB rows and the JSON artifact, keyed by contract, preferring
+ * whichever source is fresher FOR THAT ROW.
+ *
+ * Why not DB-only: the sync step runs on its own cadence, so a contract the
+ * Python harvester just picked up is absent from the DB for up to one sync
+ * interval. Returning "the DB had rows" therefore silently dropped the newest
+ * calls. Why not JSON-only: the artifact is rewritten on every harvest, so a
+ * burst that scrolls out of its window disappears from the file while the DB
+ * still holds the row (and its caller weights) for `maxAgeMin`.
+ *
+ * Every contract comes from exactly one winning source. The winner's own
+ * fields are used whole — mixing one source's mention count with another's
+ * `lastSeen` would describe a contract nobody observed.
+ */
+export function mergeCallFeedRows(fromDb: CallFeedRow[], fromArtifact: CallFeedRow[]): CallFeedRow[] {
+  const merged = new Map<string, CallFeedRow>()
+  for (const row of [...fromDb, ...fromArtifact]) {
+    const kept = merged.get(row.contract)
+    if (!kept || Date.parse(row.lastSeen) > Date.parse(kept.lastSeen)) merged.set(row.contract, row)
+  }
+  return [...merged.values()].sort((a, b) => Date.parse(b.lastSeen) - Date.parse(a.lastSeen))
 }
 
 // ── Public API ───────────────────────────────────────────────
@@ -179,9 +212,12 @@ export async function saveCallFeedRows(rows: CallFeedRow[]): Promise<void> {
 }
 
 /**
- * Load call-feed candidates. DB first; JSON fallback when the DB fails or
- * has no rows while JSON has data. Applies the same staleness gate as the
- * legacy JSON reader (>maxAgeMin → empty). Never throws.
+ * Load call-feed candidates: the DB rows UNION the JSON artifact, freshest
+ * row wins per contract. Merging (rather than DB-shadows-JSON) is required
+ * because the sync step lags the harvester by up to one interval — a
+ * DB-only read dropped every call made since the last sync. Staleness is
+ * still enforced: DB rows older than `maxAgeMin` are never queried, and the
+ * artifact reader drops its own stale rows. Never throws.
  *
  * NOTE: sources / kinds / weightedScore / callerWeights are all persisted
  * (callerWeights added 2026-10-22 so the DB path can weight groups by origin
@@ -198,14 +234,14 @@ export async function loadCallFeed(
       where: { lastSeenAt: { gte: cutoff } },
       orderBy: { lastSeenAt: 'desc' },
     })
-    if (dbRows.length > 0) {
-      // Rows written before the 2026-10-22 extractor fix can carry a contract
-      // that is not a mint at all (a `%3A` escape tail welded onto a real
-      // mint). A scanner handed one of those burns an audit on a token that
-      // does not exist, so they are dropped at the boundary rather than
-      // trusted because they happen to be fresh.
-      const usable = dbRows.filter((r) => !isSolanaChain(r.chain) || isPlausibleSolMint(r.contract))
-      return usable.map((r) => ({
+    // Rows written before the 2026-10-22 extractor fix can carry a contract
+    // that is not a mint at all (a `%3A` escape tail welded onto a real
+    // mint). A scanner handed one of those burns an audit on a token that
+    // does not exist, so they are dropped at the boundary rather than
+    // trusted because they happen to be fresh.
+    const usable = dbRows
+      .filter((r) => !isSolanaChain(r.chain) || isPlausibleSolMint(r.contract))
+      .map((r) => ({
         contract: r.contract,
         chain: r.chain,
         sources: r.sources,
@@ -220,8 +256,7 @@ export async function loadCallFeed(
         ...(r.weightedScore !== null && { weightedScore: r.weightedScore }),
         ...(isWeightMap(r.callerWeights) && { callerWeights: r.callerWeights }),
       }))
-    }
-    return readJsonArtifact(nowMs, maxAgeMin)
+    return mergeCallFeedRows(usable, readJsonArtifact(nowMs, maxAgeMin))
   } catch (err) {
     console.error(`[db-call-feed] DB read failed: ${errorMessage(err)}`)
     return readJsonArtifact(nowMs, maxAgeMin)

@@ -274,8 +274,13 @@ async function main() {
 
     if (!intake.fired) {
       strategyRefused += 1
+      // Confluence is logged on refusals too: it is the one input that does
+      // not come from on-chain structure, so seeing `callGroups=n/a` next to
+      // a structural refusal is how the operator tells "no group called it"
+      // apart from "the feed could not be read".
       console.log(
-        `[accumulation-alert] no strategy fired ${event.token.contract}: ${intake.refusals.join(' | ')}`,
+        `[accumulation-alert] no strategy fired ${event.token.contract}: ${intake.refusals.join(' | ')} ` +
+          `callGroups=${intake.confluence.available ? intake.confluence.groupCount : 'n/a'}`,
       )
       continue
     }
