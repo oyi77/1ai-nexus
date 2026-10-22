@@ -273,7 +273,17 @@ describe('meme-sniper momentum gates', () => {
   it('rejects a zero market cap instead of dividing by zero', () => {
     const d = evaluateSniper(clean({ momentum: { marketCap: 0, volume5m: 5e6 } }), { smartMoney: CONFIRMED })
     expect(d.status).toBe('REJECT')
-    expect(Number.isFinite(d.metrics.volMcRatio)).toBe(true)
+    expect(d.metrics.volMcRatio).toBeNull()
+    expect(d.rejections.join(' ')).toContain('ratio uncomputable')
+  })
+
+  it('reports an unknown volume as unmeasured, never as a 0.00x ratio', () => {
+    const d = evaluateSniper(clean({ momentum: { marketCap: 483_685, volume5m: null } }), { smartMoney: CONFIRMED })
+    expect(d.status).toBe('REJECT')
+    expect(d.metrics.volMcRatio).toBeNull()
+    expect(d.rejections.join(' ')).toContain('Volume is unknown')
+    expect(d.rejections.join(' ')).not.toContain('0.00x')
+    expect(d.alert).not.toContain('0.00x')
   })
 })
 

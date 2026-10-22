@@ -274,13 +274,15 @@ function distributionBreaches(p: SniperPayload): string[] {
   return out
 }
 
-function momentumBreaches(p: SniperPayload, stage: SniperStage): { breaches: string[]; ratio: number } {
+function momentumBreaches(p: SniperPayload, stage: SniperStage): { breaches: string[]; ratio: number | null } {
   const required = stage === 'new-pair' ? L.newPairVolMcRatio : L.postBondingVolMcRatio
   const mc = p.momentum.marketCap
   const vol = p.momentum.volume5m
-  if (!isPct(mc) || mc <= 0) return { breaches: ['Market cap is zero/unknown — ratio uncomputable'], ratio: 0 }
+  if (!isPct(mc) || mc <= 0) {
+    return { breaches: ['Market cap is zero/unknown — ratio uncomputable'], ratio: null }
+  }
   if (!isPct(vol) || vol < 0) {
-    return { breaches: ['Volume is unknown — momentum uncomputable'], ratio: 0 }
+    return { breaches: ['Volume is unknown — momentum uncomputable'], ratio: null }
   }
   const ratio = vol / mc
   const breaches: string[] = []
