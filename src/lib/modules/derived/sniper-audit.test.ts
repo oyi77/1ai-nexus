@@ -221,9 +221,17 @@ describe('accumulationReadings', () => {
     ])
   })
 
-  it('records distribution on each appended evaluation', () => {
-    const dist = { devPercent: 0, sniperPercent: 2, bundlerPercent: 3, insiderPercent: 1, top10Percent: 12, clusterPercent: 0.5 }
+  it('records the cohort exit ratio alongside the share it is read against', () => {
+    const dist = { devPercent: 0, sniperPercent: 2, bundlerPercent: 3, bundlerSoldPercent: 60, insiderPercent: 1, top10Percent: 12, clusterPercent: 0.5 }
     appendSniperAudit(result([decision({ distribution: dist })]))
     expect(readSniperAudit().entries[0].distribution).toEqual(dist)
+  })
+
+  it('persists an unreported exit ratio as null, never as a full exit', () => {
+    const dist = { devPercent: 0, sniperPercent: 2, bundlerPercent: null, insiderPercent: 1, top10Percent: 12, clusterPercent: 0.5 }
+    appendSniperAudit(result([decision({ distribution: dist })]))
+    const stored = readSniperAudit().entries[0].distribution
+    expect(stored?.bundlerSoldPercent).toBeNull()
+    expect(stored?.bundlerPercent).toBeNull()
   })
 })

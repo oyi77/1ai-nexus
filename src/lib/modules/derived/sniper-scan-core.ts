@@ -222,6 +222,8 @@ export interface SniperScanDecision extends SniperDecision {
     devPercent: number | null
     sniperPercent: number | null
     bundlerPercent: number | null
+    /** Launch-cohort exit ratio (0..100). null = the rate was not reported. */
+    bundlerSoldPercent?: number | null
     insiderPercent: number | null
     top10Percent: number | null
     clusterPercent: number | null
@@ -438,6 +440,7 @@ export async function runSniperScan(
           bundlerPercent: payload.distribution.bundlerPercent,
           insiderPercent: payload.distribution.insiderPercent,
           top10Percent: payload.distribution.top10Percent,
+          bundlerSoldPercent: payload.distribution.bundlerSoldPercent ?? null,
           clusterPercent: payload.distribution.clusterPercent ?? null,
         },
       })

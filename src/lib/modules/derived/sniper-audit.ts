@@ -42,6 +42,8 @@ export interface AuditEntry {
     devPercent: number | null
     sniperPercent: number | null
     bundlerPercent: number | null
+    /** Launch-cohort exit ratio (0..100). Absent on pre-fix entries. */
+    bundlerSoldPercent?: number | null
     insiderPercent: number | null
     top10Percent: number | null
     clusterPercent: number | null
@@ -125,7 +127,9 @@ function toEntry(d: SniperScanDecision, at: string, prev: AuditEntry | null): Au
     ...base,
     change: classifyChange(prev, base),
     previousStatus: prev?.status ?? null,
-    distribution: d.distribution ?? null,
+    distribution: d.distribution
+      ? { ...d.distribution, bundlerSoldPercent: d.distribution.bundlerSoldPercent ?? null }
+      : null,
   }
 }
 
