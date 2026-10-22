@@ -143,7 +143,7 @@ export default function MoonshotPage() {
                 {data?.updatedAt && <span className="text-text-tertiary"> · {new Date(data.updatedAt).toLocaleString("id-ID")}</span>}
               </p>
             </div>
-            <Link href="/saham-ideas" className="text-sm text-accent-blue hover:text-accent-blue/80">Watchlist Ideas →</Link>
+            <Link href="/saham?tab=ideas" className="text-sm text-accent-blue hover:text-accent-blue/80">Watchlist Ideas →</Link>
           </div>
           <div className="flex flex-wrap items-center gap-2 mt-4">
             {["All", "idx", "crypto", "lrfg", "launch", "copy", "predict"].map((l) => (

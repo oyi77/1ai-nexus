@@ -145,7 +145,7 @@ export default function SignalsHubPage() {
               />
             </Panel>
           ) : (
-            <Panel title={`IDX SIGNALS — ${idxView.toUpperCase()}`} href="/saham-signals">
+            <Panel title={`IDX SIGNALS — ${idxView.toUpperCase()}`} href="/saham?tab=signals">
               <MiniTable head={["Code", "Name/Info", "Signal"]}
                 rows={idx.map((r) => [
                   <span key={`${r.code}-s`} className="font-mono font-semibold text-teal-vivid">{r.code}</span>,

@@ -105,7 +105,6 @@ export function MobyScreening() {
   }, [chart])
 
   return (
-    <NexusLayout>
       <div className="space-y-4">
         <Panel title="Moby Screener" subtitle="Smart-money groups, launchpads, token boards, charts and trader PnL." liveStatus={status} onRefresh={() => void refresh()}>
           <div className="flex flex-wrap gap-2">
@@ -136,6 +135,5 @@ export function MobyScreening() {
           </Panel>
         </div>
       </div>
-    </NexusLayout>
   )
 }

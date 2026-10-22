@@ -16,7 +16,7 @@ const STATIC_ROUTES = [
   '/dashboard',
   '/ai-insights',
   '/moonshot',
-  '/saham-ideas',
+  '/saham',
 ]
 
 export default function sitemap(): MetadataRoute.Sitemap {

@@ -25,9 +25,14 @@ const CARDS: MemeCard[] = [
     desc: "Ranked meme-token discovery feed with price, volume, liquidity, holders and risk level.",
   },
   {
+    title: "Moby Screener",
+    href: "/meme/moby",
+    desc: "Moby smart-money groups, launchpads, token boards, contracts and trader PnL.",
+  },
+  {
     title: "Risk Audit",
     href: "/meme/risk",
-    desc: "Run a honeypot / rug-pull risk audit on any token contract: taxes, top-10 hold, LP lock, freeze/mint flags.",
+    desc: "Honeypot / rug-pull audit for any contract: taxes, top-10 hold, LP lock, freeze and mint flags — same engine as RugCheck.",
   },
 ]
 

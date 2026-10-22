@@ -67,10 +67,10 @@ export default function MarketsHubPage() {
         }
         out.push({
           title: "IDX — RS LEADERS",
-          href: "/saham-signals",
+          href: "/saham?tab=signals",
           lines: (d.items ?? []).map((s) => `${s.code} score ${(s.rsScore ?? 0).toFixed(0)}`),
         })
-      } catch { out.push({ title: "IDX — RS LEADERS", href: "/saham-signals", lines: [], error: "unavailable" }) }
+      } catch { out.push({ title: "IDX — RS LEADERS", href: "/saham?tab=signals", lines: [], error: "unavailable" }) }
       // US stocks
       try {
         const d = (await get("/api/v1/equities/universe?market=us")) as {

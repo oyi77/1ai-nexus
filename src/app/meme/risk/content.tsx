@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQueryParams } from "@/components/primitives/useQueryParams";
 import { Panel } from "@/components/shell/Panel";
 import { DataTable, type Column } from "@/components/shell/DataTable";
+import { RugcheckPageContent } from "@/app/rugcheck/content";
 import { LiveDot } from "@/components/primitives/LiveDot";
 import { riskColumns } from "../_shared";
 import type { MemeRiskAudit } from "@/lib/modules/meme/types";
@@ -26,6 +27,7 @@ function MemeRiskPanel() {
   const chainParam = params.get("chain") ?? "";
   const contractParam = params.get("contract") ?? "";
   const platformParam = (params.get("platform") ?? "all").toLowerCase();
+  const engineParam = params.get("engine") === "rugcheck" ? "rugcheck" : "aggregate";
 
   const [chain, setChain] = useState(chainParam);
   const [contract, setContract] = useState(contractParam);
@@ -37,6 +39,7 @@ function MemeRiskPanel() {
   const [audits, setAudits] = useState<MemeRiskAudit[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
   const [status, setStatus] = useState<"live" | "stale" | "error">("stale");
+  const [engine, setEngine] = useState<"aggregate" | "rugcheck">(engineParam);
 
   const runAudit = useCallback((c: string, k: string, p: RiskPlatform) => {
     if (!c.trim()) return;
@@ -73,12 +76,39 @@ function MemeRiskPanel() {
 
   return (
     <div className="space-y-4">
-      <Panel
-        title="Meme Risk Audit"
-        subtitle="Honeypot / rug-pull risk audit per token contract"
-        liveStatus={contractParam ? status : undefined}
-        onRefresh={() => contractParam && runAudit(contractParam, chainParam, platform)}
-      >
+      <div className="flex gap-2" role="tablist" aria-label="Risk engine">
+        {(["aggregate", "rugcheck"] as const).map((key) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={engine === key}
+            onClick={() => {
+              setEngine(key);
+              if (key === "rugcheck") router.push("/meme/risk?engine=rugcheck");
+              else router.push("/meme/risk");
+            }}
+            className={`inline-flex items-center justify-center h-9 px-3 rounded border text-xs font-mono uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/70 ${
+              engine === key
+                ? "bg-teal-vivid text-bg-base border-teal-vivid font-bold"
+                : "bg-bg-panel border-border-dim text-text-muted hover:border-border-active"
+            }`}
+          >
+            {key === "aggregate" ? "Aggregated audit" : "RugCheck"}
+          </button>
+        ))}
+      </div>
+
+      {engine === "rugcheck" ? (
+        <RugcheckPageContent />
+      ) : (
+      <>
+        <Panel
+          title="Meme Risk Audit"
+          subtitle="Honeypot / rug-pull risk audit per token contract"
+          liveStatus={contractParam ? status : undefined}
+          onRefresh={() => contractParam && runAudit(contractParam, chainParam, platform)}
+        >
         <form onSubmit={onSubmit} className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-xs text-text-muted">
             Chain
@@ -143,6 +173,8 @@ function MemeRiskPanel() {
             rowHeight={36}
           />
         </>
+      )}
+      </>
       )}
     </div>
   );

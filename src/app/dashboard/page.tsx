@@ -38,7 +38,7 @@ const HUB_GROUPS: Array<{ title: string; links: Array<{ label: string; href: str
       { label: 'Knowledge Graph', href: '/graph' },
       { label: 'Exchange Flow', href: '/exchange-flow' },
       { label: 'DEX Monitor', href: '/dex' },
-      { label: 'RugCheck', href: '/rugcheck' },
+      { label: 'RugCheck', href: '/meme/risk?engine=rugcheck' },
     ],
   },
   {

@@ -38,22 +38,22 @@ NEXUS is an **open-source finance intelligence platform** for traders, analysts,
 
 The shell is an **OPERATE / MONITOR surface**: dense, left-aligned, no hero sections, no marketing copy. Navigation lives in `src/lib/config/nav.ts` as a single typed structure — changing the source file is the only way to change the sidebar, so routes and nav can never drift apart.
 
-Eight collapsible sections, 112 unique destinations, zero duplicate `href` and zero duplicate React `key` (enforced by `src/lib/config/__tests__/nav.test.ts`).
+Eight collapsible sections, 108 unique destinations, zero duplicate `href` and zero duplicate React `key` (enforced by `src/lib/config/__tests__/nav.test.ts`).
 
 | Section | Purpose | Representative entries |
 |---|---|---|
 | Dashboard | Command center, holdings, operator state | `/dashboard`, `/watchlist`, `/alerts`, `/account`, `/following`, `/portfolio`, `/pnl`, `/status` |
 | Signals | One Signals hub with tabs instead of parallel top-level pages | `/signals` (`?tab=conviction`, `?tab=alpha`), `/intelligence/leaderboard`, `/composite-alerts`, `/market-score`, `/fear-greed` |
-| Markets | Cross-asset market terminal with hubs per asset class | `/markets`, `/screener`, `/saham`, `/derivatives`, `/options`, `/etf`, `/heatmap`, `/compare` |
-| On-Chain | Wallets, flows, DEX activity, safety | `/onchain`, `/smart-money`, `/whale-cluster`, `/top-traders`, `/copy-trading`, `/exchange-flow`, `/rugcheck`, `/dex` |
-| Meme | Sniper pipeline, risk scoring, moonshot board | `/meme`, `/meme/sniper`, `/meme/risk`, `/moonshot`, `/tokens/discover` |
+| Markets | Cross-asset market terminal with hubs per asset class | `/markets`, `/screener`, `/saham` (`?tab=signals`, `?tab=ideas`, `?tab=bandar`), `/derivatives`, `/options`, `/etf`, `/heatmap`, `/compare` |
+| On-Chain | Wallets, flows, DEX activity, safety | `/onchain`, `/smart-money`, `/whale-cluster`, `/top-traders`, `/copy-trading`, `/exchange-flow`, `/dex` |
+| Meme | Sniper pipeline, risk scoring, moonshot board | `/meme`, `/meme/sniper`, `/meme/risk` (`?engine=rugcheck`), `/moonshot`, `/tokens/discover` |
 | Macro | Rates, curve, sentiment | `/macro`, `/bonds`, `/forex`, `/commodities` |
 | Forecasts | Valuation and forward-looking models | `/dcf`, `/comps`, `/financials`, `/historical-financials` |
 | Research | Docs, widget, developer surface | `/api-docs`, `/widget`, `/entities`, `/graph` |
 
 Design rules for this shell:
 
-- **Tabs over parallel pages.** `/signals` absorbs what used to be four sibling signal pages; each tab is a distinct data mode, never a marketing variant of the same table.
+- **Tabs over parallel pages.** `/signals` absorbs what used to be four sibling signal pages, and `/saham` absorbs the former `/saham-signals`, `/saham-ideas` and `/bandarmology`; `/meme/risk` absorbed `/rugcheck` as its `rugcheck` engine. Each tab is a distinct data mode, never a marketing variant of the same table. Surviving routes are a hard invariant: every inbound link (`src/app/sitemap.ts`, `/markets`, `/signals`, `/moonshot`, `/dashboard`, `/landing`) and every nav entry points at a route directory that exists, and dead `src/app` directories are deleted in the same change that redirects their callers.
 - **Hubs over one-page-per-source.** `/markets` and `/saham` aggregate sibling data sources behind one route with internal tabs.
 - **Every destination is a real surface.** No placeholder routes; a page with no data renders its degradation state (for example `/api/v1/saham/signals` returns `503 No IDX snapshot yet — run the nightly harvests`) rather than a blank frame.
 - **No emoji in headings.** Iconography is inline SVG or a text label; the accent colour token carries the visual signal.

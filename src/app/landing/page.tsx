@@ -556,7 +556,7 @@ export default function LandingPage() {
             <ul className="space-y-2 text-text-secondary">
               <li><Link href="/dashboard" className="hover:text-text-primary">Terminal</Link></li>
               <li><Link href="/equities" className="hover:text-text-primary">Equities</Link></li>
-              <li><Link href="/bandarmology" className="hover:text-text-primary">Bandarmology</Link></li>
+              <li><Link href="/saham?tab=bandar" className="hover:text-text-primary">Bandarmology</Link></li>
               <li><Link href="/screener" className="hover:text-text-primary">Screener</Link></li>
             </ul>
           </div>
