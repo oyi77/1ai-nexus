@@ -120,7 +120,10 @@ async function main(): Promise<void> {
     return
   }
 
-  const written = await persistWallets(result.discovered)
+  const written = await persistWallets(result.discovered, {
+    ...DISCOVERY_DEFAULTS,
+    ...filters,
+  })
   console.log(`[wallet-discovery] persisted ${written}/${result.discovered.length} wallet(s)`)
 
   const bots = result.discovered.filter((w) => w.human.verdict !== 'HUMAN').length

@@ -6,11 +6,16 @@
 // the closed-episode count, so the §5 n≥15 / ≥5-token bars CANNOT be
 // verified here — this module therefore never claims
 // QUALIFIED_SMART_MONEY nor WHALE_AND_SMART_MONEY.
+// It MAY claim the standalone WHALE status, and only for a wallet that
+// cleared BOTH axes the pool actually uses: 30d buy volume ≥ $250k (the one
+// measurable §5 whale leg) AND the §5 quality bars (winRate ≥ 60%, pnl ≥ 70%).
 //
-// It MAY claim the standalone WHALE status, but ONLY for the single
-// measurable whale leg: 30d buy volume ≥ $250k. The other §5 whale legs
-// (single position ≥ $50k, portfolio ≥ $250k) need on-chain evidence this
-// bridge cannot see.
+// The volume leg alone is not enough. Live audit 2026-10-23: 274 rows carried
+// WHALE through the volume leg with measured PnL between -78% and +48%, none
+// of them clearing the quality bars — while `strategy-intake.DEFAULT_CLASSIFIED`
+// counts WHALE as a classified buyer. A proven loser therefore inflated every
+// signal's confluence. Volume-only wallets are now WATCHLIST, and an unmeasured
+// quality axis is UNKNOWN: neither can be quoted as quality.
 //
 // The label it writes is deliberately weaker than a full wallet-intel
 // classification, and the persist layer skips rows that already carry a
@@ -18,12 +23,13 @@
 // overwrite this bootstrap later.
 //
 // Statuses emitted:
-//   WHALE       — buyVolume30d ≥ $250k (§5 30d buy-volume whale leg only;
-//                 quality bars + episode count unverified)
+//   WHALE       — buyVolume30d ≥ $250k AND winRate30d ≥ 0.6 AND pnl30d ≥ 0.7
+//                 (§5 volume leg + quality bars; episode count unverified)
+//   WATCHLIST   — whale-scale volume but measured below the quality bars
+//                 (tracked for its buys, never quoted as quality)
 //   UNKNOWN     — winRate30d or pnl30d unmeasured (never assume safe)
 //   PROVISIONAL — winRate30d ≥ 0.6 AND pnl30d ≥ 0.7, but episode count
 //                 unverified
-//   WATCHLIST   — measured, but not meeting the §5 quality bars
 // ─────────────────────────────────────────────────────────────
 
 import { SMART_MONEY_DEFAULTS, type WalletStatus } from './wallet-intel'
@@ -86,46 +92,74 @@ export function gmgnBootstrapInput(w: {
 /**
  * Map GMGN-measured stats to a bootstrap status. Pure + deterministic.
  *
- * Priority: the measurable §5 whale leg first — buyVolume30d ≥ $250k →
- * WHALE (the only leg this bridge can verify). Otherwise falls through to
- * the quality-bar mapping. Never emits QUALIFIED_SMART_MONEY or
- * WHALE_AND_SMART_MONEY: the GMGN leaderboard has no episode count, so
- * the §5 n≥15 / ≥5-token bars cannot be verified.
+ * WHALE needs BOTH axes: the measurable §5 whale leg (buyVolume30d ≥ $250k)
+ * AND the quality bars (winRate ≥ 0.6, pnl ≥ 0.7). A volume-only wallet is
+ * WATCHLIST — it is tracked for its buys, never quoted as a classified
+ * buyer, because `strategy-intake.DEFAULT_CLASSIFIED` counts WHALE as one.
+ * An unmeasured quality axis is UNKNOWN, never a pass.
+ *
+ * Never emits QUALIFIED_SMART_MONEY or WHALE_AND_SMART_MONEY: the GMGN
+ * leaderboard has no episode count, so the §5 n≥15 / ≥5-token bars cannot
+ * be verified here.
  */
 export function gmgnStatusFor(row: GmgnBootstrapRow): GmgnBootstrapVerdict {
   const limitations = [BOOTSTRAP_LIMITATION]
-
-  if (
+  const volumeLeg =
     row.buyVolume30d !== null &&
     row.buyVolume30d >= GMGN_BOOTSTRAP_WHALE_BUY_VOLUME_USD
-  ) {
-    return {
-      status: 'WHALE',
-      confidence: 'medium',
-      reasons: [
-        `GMGN 30d buy volume $${Math.round(row.buyVolume30d).toLocaleString('en-US')} ≥ $250k whale leg; quality bars unverified`,
-      ],
-      limitations,
-    }
-  }
+  const volumeText =
+    row.buyVolume30d === null
+      ? 'no 30d buy volume measured'
+      : `$${Math.round(row.buyVolume30d).toLocaleString('en-US')} 30d buy volume`
 
   if (row.winRate30d === null || row.pnl30d === null) {
     return {
       status: 'UNKNOWN',
       confidence: 'low',
-      reasons: ['GMGN leaderboard did not measure winrate or pnl'],
+      reasons: [
+        `GMGN leaderboard did not measure winrate or pnl; ${volumeText}`,
+      ],
       limitations,
     }
   }
 
-  if (
+  const clearsQuality =
     row.winRate30d >= GMGN_BOOTSTRAP_WIN_RATE_MIN &&
     row.pnl30d >= GMGN_BOOTSTRAP_PNL_MIN
-  ) {
+  const qualityText =
+    `WR ${(row.winRate30d * 100).toFixed(0)}% (bar 60%), ` +
+    `PnL ${(row.pnl30d * 100).toFixed(0)}% (bar 70%)`
+
+  if (volumeLeg && clearsQuality) {
+    return {
+      status: 'WHALE',
+      confidence: 'medium',
+      reasons: [
+        `GMGN ${volumeText} ≥ $250k whale leg AND ${qualityText}; episode count unverified`,
+      ],
+      limitations,
+    }
+  }
+
+  if (volumeLeg) {
+    return {
+      status: 'WATCHLIST',
+      confidence: 'low',
+      reasons: [
+        `GMGN ${volumeText} ≥ $250k whale leg, but ${qualityText} — ` +
+          'volume is not performance, so this wallet is not a classified buyer',
+      ],
+      limitations,
+    }
+  }
+
+  if (clearsQuality) {
     return {
       status: 'PROVISIONAL',
       confidence: 'medium',
-      reasons: ['GMGN leaderboard winrate/pnl; episode count unverified'],
+      reasons: [
+        `GMGN ${qualityText}; below the $250k volume leg, episode count unverified`,
+      ],
       limitations,
     }
   }
@@ -133,7 +167,7 @@ export function gmgnStatusFor(row: GmgnBootstrapRow): GmgnBootstrapVerdict {
   return {
     status: 'WATCHLIST',
     confidence: 'low',
-    reasons: ['GMGN-measured winrate/pnl below §5 quality bars'],
+    reasons: [`GMGN ${qualityText} — below §5 quality bars`],
     limitations,
   }
 }

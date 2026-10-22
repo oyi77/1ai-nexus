@@ -9,11 +9,13 @@
 // ─────────────────────────────────────────────────────────────
 import { describe, it, expect } from 'vitest'
 import {
+  admissionStatus,
   chainOfAddress,
   classifyHuman,
   DISCOVERY_DEFAULTS,
   emptyCallGroups,
   readGroups,
+  type DiscoveredWallet,
   type DiscoveryFilters,
 } from '../wallet-discovery-engine'
 import { EMPTY_CONFLUENCE, type CallConfluence } from '../call-confluence'
@@ -82,6 +84,57 @@ describe('chainOfAddress — a wallet is persisted on the chain it was measured 
     expect(chainOfAddress('0x1d80392d')).toBe('solana')
   })
 })
+describe('admissionStatus — WHALE requires the quality axis, not just volume', () => {
+  const w = (over: Partial<DiscoveredWallet>): DiscoveredWallet => ({
+    address: 'So11111111111111111111111111111111111111112',
+    chain: 'solana',
+    name: null,
+    source: 'gmgn',
+    winRate30d: 0.7,
+    pnl30d: 0.9,
+    realizedProfit30d: null,
+    buyVolume30d: 500_000,
+    buyCount30d: 40,
+    sellCount30d: 30,
+    tags: [],
+    verdict: 'WHALE',
+    admission: 'QUALIFIED',
+    reason: 'test',
+    leg: 'leaderboard',
+    human: { verdict: 'HUMAN', reason: 'test' },
+    ...over,
+  })
+
+  it('keeps a quality whale labelled WHALE', () => {
+    expect(admissionStatus(w({}), F)).toBe('WHALE')
+  })
+
+  it('demotes a $250k-volume wallet with bad PnL to WATCHLIST', () => {
+    // The verifier's volume leg admits it; the pool must not call a proven
+    // loser a whale, because the strategy gate counts WHALE as a classified
+    // buyer.
+    expect(admissionStatus(w({ pnl30d: -0.78 }), F)).toBe('WATCHLIST')
+  })
+
+  it('demotes a volume wallet whose win rate is under the floor', () => {
+    expect(admissionStatus(w({ winRate30d: 0.3 }), F)).toBe('WATCHLIST')
+  })
+
+  it('never promotes a WATCHLIST admission, even with perfect numbers', () => {
+    expect(admissionStatus(w({ admission: 'WATCHLIST', winRate30d: 1, pnl30d: 5 }), F)).toBe(
+      'WATCHLIST',
+    )
+  })
+
+  it('treats an unmeasured win rate as not clearing quality', () => {
+    expect(admissionStatus(w({ winRate30d: null }), F)).toBe('WATCHLIST')
+  })
+
+  it('maps a QUALITY verdict to QUALIFIED_SMART_MONEY', () => {
+    expect(admissionStatus(w({ verdict: 'QUALITY' }), F)).toBe('QUALIFIED_SMART_MONEY')
+  })
+})
+
 
 describe('readGroups — the operator\'s "tag which group called each CA" join', () => {
   const conf = (over: Partial<CallConfluence> = {}): CallConfluence => ({

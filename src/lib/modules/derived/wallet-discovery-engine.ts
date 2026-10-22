@@ -851,8 +851,29 @@ function reasonList(raw: unknown, next: string): string[] {
   return [...merged, next].slice(-MAX_REASONS)
 }
 
+/**
+ * The status one admission earns in the tracked pool.
+ *
+ * 'WHALE' is reserved for wallets that cleared the QUALITY axis — winRate >=
+ * min AND pnl >= min. A volume-only wallet (the verifier's $250k leg) is
+ * whale-scale ACTIVITY, not whale-scale performance: the live pass admitted
+ * rows tagged WHALE at pnl -0.78. Storing that as WHALE invited a proven
+ * loser into the classification set the strategy gate reads, so a volume-only
+ * admission is WATCHLIST — tracked for its buys, never quoted as quality.
+ */
+export function admissionStatus(w: DiscoveredWallet, f: DiscoveryFilters): string {
+  if (w.admission === 'WATCHLIST') return 'WATCHLIST'
+  const clearsQuality =
+    (w.winRate30d ?? -1) >= f.minWinRate && (w.pnl30d ?? -1) >= f.minPnl
+  if (!clearsQuality) return 'WATCHLIST'
+  return w.verdict === 'WHALE' ? 'WHALE' : 'QUALIFIED_SMART_MONEY'
+}
+
 /** Persist through the Wallet → SmartMoneyWallet one-to-one. Idempotent. */
-export async function persistWallets(discovered: DiscoveredWallet[]): Promise<number> {
+export async function persistWallets(
+  discovered: DiscoveredWallet[],
+  f: DiscoveryFilters = DISCOVERY_DEFAULTS,
+): Promise<number> {
   let written = 0
   for (const w of discovered) {
     try {
@@ -877,16 +898,7 @@ export async function persistWallets(discovered: DiscoveredWallet[]): Promise<nu
           data: { labels: { push: w.source } },
         })
       }
-      // Status follows ADMISSION, never the nullable verdict label. A
-      // WATCHLIST row (high-cap holder, or whale-volume with a weak win
-      // rate) has verdict=null by construction, and mapping that to WHALE
-      // claimed whale status the measurement never proved.
-      const status =
-        w.admission === 'WATCHLIST'
-          ? 'WATCHLIST'
-          : w.verdict === 'WHALE'
-            ? 'WHALE'
-            : 'QUALIFIED_SMART_MONEY'
+      const status = admissionStatus(w, f)
       const reason = `discovered:${w.leg}:${w.source};${w.admission};${w.human.verdict};${w.reason}`
       // 0..70: a 100% win rate and a 700% pnl both sit at the top of the band,
       // so no single wallet can pin the ranking with one extreme number. The

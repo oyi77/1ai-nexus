@@ -24,31 +24,46 @@ describe('gmgnStatusFor', () => {
     expect(gmgnStatusFor(row({ winRate30d: null, pnl30d: null })).status).toBe('UNKNOWN')
   })
 
-  it('maps buyVolume30d >= $250k to WHALE even when winrate/pnl are below bars', () => {
-    const verdict = gmgnStatusFor(
-      row({ buyVolume30d: 300_000, winRate30d: 0.4, pnl30d: 0.2 }),
-    )
+  it('maps volume ≥ $250k AND quality bars to WHALE', () => {
+    const verdict = gmgnStatusFor(row({ buyVolume30d: 300_000 }))
 
     expect(verdict.status).toBe('WHALE')
     expect(verdict.confidence).toBe('medium')
     expect(verdict.reasons.some((r) => r.includes('whale leg'))).toBe(true)
   })
 
-  it('keeps the whale verdict even when winrate/pnl are null (volume leg is independent)', () => {
+  it('demotes a $250k-volume wallet with bad PnL to WATCHLIST', () => {
+    // 274 live rows carried WHALE on volume alone with PnL as low as -78%.
+    const verdict = gmgnStatusFor(
+      row({ buyVolume30d: 300_000, winRate30d: 0.4, pnl30d: 0.2 }),
+    )
+
+    expect(verdict.status).toBe('WATCHLIST')
+    expect(verdict.reasons.some((r) => r.includes('volume is not performance'))).toBe(true)
+    expect(verdict.reasons.some((r) => r.includes('WR 40%'))).toBe(true)
+  })
+
+  it('demotes a volume wallet whose win rate is under the floor', () => {
+    expect(
+      gmgnStatusFor(row({ buyVolume30d: 300_000, winRate30d: 0.55, pnl30d: 0.9 })).status,
+    ).toBe('WATCHLIST')
+  })
+
+  it('returns UNKNOWN when the quality axis is unmeasured (volume is independent)', () => {
     expect(
       gmgnStatusFor(
         row({ buyVolume30d: 400_000, winRate30d: null, pnl30d: null }),
       ).status,
-    ).toBe('WHALE')
+    ).toBe('UNKNOWN')
   })
 
   it('is boundary-inclusive at exactly $250k and excludes $249,999.99', () => {
     expect(gmgnStatusFor(row({ buyVolume30d: 250_000 })).status).toBe('WHALE')
     expect(
       gmgnStatusFor(
-        row({ buyVolume30d: 249_999.99, winRate30d: 0.6, pnl30d: 0.7 }),
+        row({ buyVolume30d: 249_999.99, winRate30d: 0.8, pnl30d: 0.9 }),
       ).status,
-    ).not.toBe('WHALE')
+    ).toBe('PROVISIONAL')
   })
 
   it('lets high-quality wallets below the volume threshold fall through to PROVISIONAL', () => {
@@ -83,6 +98,7 @@ describe('gmgnStatusFor', () => {
     expect(verdict.status).not.toBe('WHALE_AND_SMART_MONEY')
     expect(verdict.status).not.toBe('QUALIFIED_SMART_MONEY')
   })
+
 
   it('maps winrate>=0.6 && pnl>=0.7 to PROVISIONAL with medium confidence', () => {
     const verdict = gmgnStatusFor(row({ winRate30d: 0.8, pnl30d: 0.9 }))
