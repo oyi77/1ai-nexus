@@ -1,19 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
-function readSearch(): string {
-  return typeof window === "undefined" ? "" : window.location.search;
+function subscribe(onChange: () => void): () => void {
+  window.addEventListener("popstate", onChange);
+  return () => window.removeEventListener("popstate", onChange);
+}
+
+function snapshot(): string {
+  return window.location.search;
 }
 
 export function useQueryParams(): URLSearchParams {
-  const [search, setSearch] = useState(readSearch);
-
-  useEffect(() => {
-    const sync = () => setSearch(readSearch());
-    window.addEventListener("popstate", sync);
-    return () => window.removeEventListener("popstate", sync);
-  }, []);
-
+  const search = useSyncExternalStore(subscribe, snapshot, () => "");
   return new URLSearchParams(search);
 }

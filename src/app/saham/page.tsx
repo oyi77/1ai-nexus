@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { useQueryParams } from "@/components/primitives/useQueryParams"
 import { NexusLayout } from "@/components/layout/NexusLayout"
 import { LiveDot } from "@/components/primitives/LiveDot"
@@ -24,9 +25,23 @@ const isTab = (value: string | null): value is Tab =>
 
 export default function SahamHubPage() {
   const query = useQueryParams()
+  const router = useRouter()
   const shown = query.get("tab")
   const [tab, setTab] = useState<Tab>(isTab(shown) ? shown : "ideas")
+  const [syncedTab, setSyncedTab] = useState<Tab>(tab)
   const [filter, setFilter] = useState("")
+
+  if (shown !== syncedTab && query.get("tab") !== syncedTab) {
+    const next = isTab(shown) ? shown : "ideas"
+    setSyncedTab(next)
+    if (next !== tab) setTab(next)
+  }
+
+  const selectTab = (next: Tab) => {
+    setTab(next)
+    setSyncedTab(next)
+    router.replace(`/saham?tab=${next}`, { scroll: false })
+  }
 
   return (
     <NexusLayout>
@@ -41,7 +56,7 @@ export default function SahamHubPage() {
           <div className="flex flex-wrap items-center gap-3 mt-4">
             <div className="flex gap-2">
               {TABS.map((t) => (
-                <button key={t} onClick={() => setTab(t)}
+                <button key={t} onClick={() => selectTab(t)}
                   aria-pressed={tab === t}
                   className={`inline-flex items-center justify-center h-9 px-3 text-xs font-mono uppercase rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/70 ${
                     tab === t
