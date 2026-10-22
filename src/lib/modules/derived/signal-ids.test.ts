@@ -147,6 +147,12 @@ describe('rejectionId', () => {
   it('leaves an unproven cohort exit ratio out of the sentence when unmeasured', () => {
     expect(rejectionId('Bundler share unproven')).not.toContain('%')
   })
+
+  it('translates the singular breach count the evaluator emits for one gate', () => {
+    expect(rejectionId('1 hard-rule breach — Mint authority unproven (must be disabled)')).toBe(
+      '1 pelanggaran hard-rule — Mint authority belum terbukti mati',
+    )
+  })
 })
 
 describe('reasonId', () => {

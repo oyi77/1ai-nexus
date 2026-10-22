@@ -43,6 +43,13 @@ export function boolOrNull(v: unknown): boolean | null {
   return null;
 }
 
+/** Gate values reach operators as text: shares round, booleans spell out. */
+function fmtGateValue(v: number | boolean | null): string {
+  if (v === null) return '?'
+  if (typeof v === 'boolean') return v ? 'true' : 'false'
+  return String(Math.round(v * 100) / 100)
+}
+
 // ─── Metric bag: one flat, already-trusted shape ──────────────
 // All fields optional. Missing -> null -> gate 'unknown'.
 export interface SniperMetrics {
@@ -278,9 +285,10 @@ export function evaluateProfile(profile: CriteriaProfile, m: SniperMetrics): Eva
     ...profile.numRules.map((r) => numGate(m, r)),
     ...profile.boolRules.map((r) => boolGate(m, r)),
   ];
-  const rejects = gates.filter((g) => g.verdict === 'reject').map((g) => `${g.label} (${g.value ?? '?'} vs ${g.rule})`);
-  const unknowns = gates.filter((g) => g.verdict === 'unknown').map((g) => g.label);
-  const warns = gates.filter((g) => g.verdict === 'warn').map((g) => `${g.label} (${g.value ?? '?'} vs ${g.rule})`);
+  const line = (g: GateResult): string => `${g.label} (${fmtGateValue(g.value)} vs ${g.rule})`
+  const rejects = gates.filter((g) => g.verdict === 'reject').map(line)
+  const unknowns = gates.filter((g) => g.verdict === 'unknown').map((g) => g.label)
+  const warns = gates.filter((g) => g.verdict === 'warn').map(line)
   const verdict: EvaluateResult['verdict'] =
     rejects.length > 0 ? 'reject' : unknowns.length > 0 || warns.length > 0 ? 'watch' : 'pass';
   return { profile: profile.id, verdict, gates, unknowns, rejects, warns };

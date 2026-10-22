@@ -114,6 +114,16 @@ describe('Golden Second — New Pairs (doc matrix)', () => {
     expect(r.rejects).toEqual([]);
     expect(r.warns.some((x) => x.includes('Volume vs MC'))).toBe(true);
   });
+
+  it('prints a measured share as a reading, not a raw float dump', () => {
+    const r = evaluateProfile(GOLDEN_NEW_PAIRS, { ...clean, singleWhalePct: 49.10175247 });
+    expect(r.rejects).toEqual(['Single Whale (49.1 vs single-whale ≤ 5%)']);
+  });
+
+  it('spells a boolean gate breach instead of leaking its field name', () => {
+    const r = evaluateProfile(BONDING_POST, { ...clean, mintEnabled: true, freezeEnabled: false });
+    expect(r.rejects).toContain('Mint disabled (true vs mint-off must be false)');
+  });
 });
 
 describe('Golden Second — Post-Migrated', () => {

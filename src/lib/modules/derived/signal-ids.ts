@@ -42,6 +42,9 @@ export function rejectionId(s: string): string {
   out = out.replace(/^(\d+) hard-rule breaches — (.+)$/, (_m, n: string, first: string) => {
     return `${n} pelanggaran hard-rule — ${rejectionId(first)}`
   })
+  out = out.replace(/^1 hard-rule breach — (.+)$/, (_m, first: string) => {
+    return `1 pelanggaran hard-rule — ${rejectionId(first)}`
+  })
   out = out.replace(
     /^Screening passed but security evidence is incomplete — (.+) \(not a rejection, but never a top signal on missing data\)$/,
     (_m, missing: string) =>

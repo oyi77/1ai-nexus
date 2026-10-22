@@ -92,6 +92,16 @@ describe('meme-sniper hard filters', () => {
     expect(neither.alert).not.toContain('n/a%')
   })
 
+  it('renders an unmeasured distribution share without a percent sign', () => {
+    const d = evaluateSniper(
+      clean({
+        distribution: { ...clean().distribution, bundlerPercent: null, top10Percent: 67.7 },
+      }),
+    )
+    expect(d.alert).toContain('<b>Bundler:</b> n/a ❓')
+    expect(d.alert).not.toContain('n/a%')
+  })
+
   it('accepts 100% locked with burn unproven; caps fully-unproven LP at WATCHLIST (UNKNOWN)', () => {
     const lockedOnly = evaluateSniper(clean({ security: { ...clean().security, lpBurnedPercent: null, lpLockedPercent: 100 } }), { smartMoney: CONFIRMED })
     expect(lockedOnly.status).toBe('SIGNAL')
@@ -435,6 +445,37 @@ describe('ebook criteria cross-check (opts.criteriaProfiles)', () => {
     )
     expect(d.rejections.some((r) => r.includes('[golden-new-pairs]'))).toBe(true)
     expect(d.rejections.some((r) => r.includes('Bundlers'))).toBe(true)
+  })
+
+  it('never charges the 5% whale ceiling to a holder whose share was not reported', () => {
+    // GMGN's status endpoint returns percent: 0 for every holder when the
+    // richer holders call refuses. A placeholder zero is not a measured
+    // small holder: the maximum over the rest is still 4%.
+    const placeholder = evaluateSniper(
+      clean({
+        distribution: {
+          ...clean().distribution,
+          topWallets: [
+            { address: 'Sniper111111111111111111111111111111111111', percent: 0, kind: 'holder' },
+            { address: 'Holder222222222222222222222222222222222222', percent: 4, kind: 'holder' },
+          ],
+        },
+      }),
+      { criteriaProfiles: ['golden-new-pairs'] },
+    )
+    expect(placeholder.rejections.some((r) => r.includes('Single Whale'))).toBe(false)
+
+    // A measured 6% single holder is still a real breach.
+    const measured = evaluateSniper(
+      clean({
+        distribution: {
+          ...clean().distribution,
+          topWallets: [{ address: 'Whale1111111111111111111111111111111111111', percent: 6, kind: 'holder' }],
+        },
+      }),
+      { criteriaProfiles: ['golden-new-pairs'] },
+    )
+    expect(measured.rejections).toContain('[golden-new-pairs] Single Whale (6 vs single-whale ≤ 5%)')
   })
 
   it('sniper-launch rejects dev above its 3% documented ceiling', () => {

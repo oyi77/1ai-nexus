@@ -316,13 +316,13 @@ function buildAlert(
   const mintStatus = s.mintable === false ? '🟢 MATI' : s.mintable === true ? '🔴 HIDUP' : '❓ UNPROVEN'
   const freezeStatus = s.freezeAuthority === false ? '🟢 MATI' : s.freezeAuthority === true ? '🔴 HIDUP' : '❓ UNPROVEN'
   // 2-decimal percents like the template (1.8 → 1.80), so a partially locked
-  // LP never renders with a stray trailing zero from fmtPct.
-  const pct2 = (v: number | null | undefined): string =>
-    v === null || v === undefined ? 'n/a' : v.toFixed(2)
+  // LP never renders with a stray trailing zero from fmtPct. UNKNOWN stays
+  // 'n/a' with no unit: "n/a%" would read as a measured percentage.
+  const pct = (v: number | null | undefined): string =>
+    v === null || v === undefined ? 'n/a' : `${v.toFixed(2)}%`
   const burned = s.lpBurnedPercent ?? 0
   const locked = s.lpLockedPercent ?? 0
-  const lpLeg = (v: number | null | undefined): string =>
-    v === null || v === undefined ? 'n/a' : `${pct2(v)}%`
+  const lpLeg = (v: number | null | undefined): string => pct(v)
   const lpStatus =
     s.lpBurnedPercent != null && burned >= 99.5
       ? 'LP 100% BURNT ✅'
@@ -330,7 +330,7 @@ function buildAlert(
         ? 'LP 100% LOCKED ✅'
         : s.lpBurnedPercent == null || s.lpLockedPercent == null
           ? `LP burn ${lpLeg(s.lpBurnedPercent)} + lock ${lpLeg(s.lpLockedPercent)} ❓`
-          : `LP ${pct2(burned + locked)}% 🔴`
+          : `LP ${pct(burned + locked)} 🔴`
 
   // Dev annotation: "(Dev Out)" when proven 0, "(Dev In)" when holding.
   const devNote = m.devPercent === 0 ? ' (Dev Keluar ✅)' : m.devPercent != null && m.devPercent > 0 ? ' (Dev PEGANG 🔴)' : ' (UNPROVEN ❓)'
@@ -383,10 +383,10 @@ function buildAlert(
     `<b>Stage:</b> ${escapeHtml(m.stageLabel)}${stageExtra} | <b>Usia:</b> ${escapeHtml(m.ageLabel)}`,
     '',
     '📊 <b>AUDIT &amp; INTEGRITAS ON-CHAIN</b>',
-    `• <b>Dev Holding:</b> ${pct2(m.devPercent)}% ${passEmoji(m.devPercent, L.devHardCeilingPercent)}${devNote}`,
-    `• <b>Sniper:</b> ${pct2(m.sniperPercent)}% ${passEmoji(m.sniperPercent, L.sniperPercent)} | <b>Bundler:</b> ${pct2(m.bundlerPercent)}%${bundlerNote} ${passEmoji(m.bundlerPercent, L.bundlerPercent)}`,
-    `• <b>Insider:</b> ${pct2(m.insiderPercent)}% ${passEmoji(m.insiderPercent, L.insiderPercent)} | <b>Top 10 Supply:</b> ${pct2(m.top10Percent)}% ${passEmoji(m.top10Percent, L.top10Percent)}`,
-    `• <b>Cluster:</b> ${pct2(m.clusterPercent)}%${clusterNote} ${passEmoji(m.clusterPercent, L.clusterPercent)}`,
+    `• <b>Dev Holding:</b> ${pct(m.devPercent)} ${passEmoji(m.devPercent, L.devHardCeilingPercent)}${devNote}`,
+    `• <b>Sniper:</b> ${pct(m.sniperPercent)} ${passEmoji(m.sniperPercent, L.sniperPercent)} | <b>Bundler:</b> ${pct(m.bundlerPercent)}${bundlerNote} ${passEmoji(m.bundlerPercent, L.bundlerPercent)}`,
+    `• <b>Insider:</b> ${pct(m.insiderPercent)} ${passEmoji(m.insiderPercent, L.insiderPercent)} | <b>Top 10 Supply:</b> ${pct(m.top10Percent)} ${passEmoji(m.top10Percent, L.top10Percent)}`,
+    `• <b>Cluster:</b> ${pct(m.clusterPercent)}${clusterNote} ${passEmoji(m.clusterPercent, L.clusterPercent)}`,
     `• <b>LP &amp; Keamanan:</b> Mint ${mintStatus} | Freeze ${freezeStatus} | ${lpStatus}`,
     '',
     '📈 <b>DINAMIKA MARKET</b>',
@@ -567,8 +567,13 @@ export function evaluateSniper(rawPayload: SniperPayload, opts: EvaluateOptions 
     const topWallets = Array.isArray(payload.distribution.topWallets)
       ? payload.distribution.topWallets
       : []
-    const singleWhalePct =
-      topWallets.length > 0 ? Math.max(...topWallets.map((w) => w.percent)) : null
+    // A wallet whose share was never reported (GMGN's status endpoint fills
+    // percent with 0 and says so) is not a proven-small holder. Averaging it
+    // in would report a whale cap that no source measured.
+    const measuredShares = topWallets
+      .map((w) => w.percent)
+      .filter((p) => typeof p === 'number' && Number.isFinite(p) && p > 0)
+    const singleWhalePct = measuredShares.length > 0 ? Math.max(...measuredShares) : null
     const cm: CriteriaMetrics = {
       devHoldingPct: payload.distribution.devPercent,
       sniperPct: payload.distribution.sniperPercent,
