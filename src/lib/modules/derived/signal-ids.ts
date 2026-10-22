@@ -65,6 +65,10 @@ export function rejectionId(s: string): string {
   out = out.replace(/^Top-10 concentration unproven$/, 'Konsentrasi top-10 belum terbukti')
   out = out.replace(/^Insider share unproven$/, 'Porsi insider belum terbukti')
   out = out.replace(/^Sniper share unproven$/, 'Porsi sniper belum terbukti')
+  out = out.replace(
+    /^Bundler share unproven — launch cohort sold ([\d.]+)% of its position$/,
+    'Porsi bundler belum terbukti — kohort peluncuran sudah keluar $1% dari posisinya',
+  )
   out = out.replace(/^Bundler share unproven$/, 'Porsi bundler belum terbukti')
   out = out.replace(/^Dev holding unproven \(must be 0%\)$/, 'Porsi dev belum terbukti (harus 0%)')
   out = out.replace(/^Market cap is zero\/unknown — ratio uncomputable$/, 'Market cap nol/tidak diketahui — ratio tidak bisa dihitung')

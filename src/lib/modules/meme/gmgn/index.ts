@@ -126,10 +126,6 @@ interface GmgnTopBuyersResponse {
         hold?: number; bought_more?: number; sold_part?: number; sold?: number
         transfered?: number; bought_rate?: string | number; holding_rate?: string | number
         top_10_holder_rate?: number
-        /** Raw token units still held by the cohort (live-proven 2026-10-22). */
-        hold_amount?: string | number
-        /** Raw token units the cohort bought at launch (live-proven 2026-10-22). */
-        bought_amount?: string | number
       }
       holderInfo?: GmgnHolderEntry[]
     }
