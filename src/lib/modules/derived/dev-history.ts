@@ -9,17 +9,22 @@
 // (from GET /api/v2/token/{chain}/{address}/dev-tokens).
 //
 // Rules (evaluated in order, first match wins):
-//   1. previousTokens === 0            → UNPROVEN
-//      (dev is brand new — no history to judge, NOT safe by default)
-//   2. previousTokens >= serialMinTokens && migrations === 0
+//   0. drop tokens younger than matureMinAgeSeconds from the migration math
+//      (a token a few minutes old has not had the chance to migrate; counting
+//      it as "never migrated" invents a failure out of missing time)
+//   1. matureTokens === 0              → UNPROVEN
+//      (nothing has had time to mature — NOT safe by default)
+//   2. matureTokens >= serialMinTokens && migrations === 0
 //                                      → SERIAL_RUGGER
-//      (deployed 3+ tokens, none ever migrated = never serious)
+//      (deployed 3+ mature tokens, none ever migrated = never serious)
 //   3. ruggedCount >= ruggedSerialMin  → SERIAL_RUGGER
-//   4. migrationRate < suspectRateMax && previousTokens >= suspectMinTokens
+//   4. migrationRate < suspectRateMax && matureTokens >= suspectMinTokens
 //                                      → SUSPECT
-//      (migrationRate = migrations / previousTokens; null when no history)
+//      (migrationRate = migrations / matureTokens; null when nothing matured)
 //   5. otherwise                       → CLEAN
 //
+// The verdict always reports both counts, so a rejection can say how many
+// tokens were set aside as too young instead of hiding that evidence.
 // UNPROVEN ≠ CLEAN. SUSPECT ≠ banned. SERIAL_RUGGER = hard reject.
 // ─────────────────────────────────────────────────────────────
 
@@ -32,7 +37,13 @@ export interface ResolvedDevHistoryConfig {
   /** Migration rate below which a dev with >= suspectMinTokens is suspect. */
   suspectRateMax: number
   /** Min deployed tokens for the suspect-rate rule to apply. */
+  /** Min deployed tokens for the suspect-rate rule to apply. */
   suspectMinTokens: number
+  /**
+   * Age at which a token is old enough to have migrated. Younger tokens are
+   * set aside: their "not migrated yet" says nothing about the developer.
+   */
+  matureMinAgeSeconds: number
 }
 
 export const DEV_HISTORY_DEFAULTS: ResolvedDevHistoryConfig = {
@@ -40,6 +51,7 @@ export const DEV_HISTORY_DEFAULTS: ResolvedDevHistoryConfig = {
   ruggedSerialMin: 2,
   suspectRateMax: 0.34,
   suspectMinTokens: 2,
+  matureMinAgeSeconds: 3_600, // 1 hour — younger tokens cannot be judged on migration failure
 };
 
 export type DevHistoryConfig = Partial<ResolvedDevHistoryConfig>;
@@ -56,6 +68,7 @@ export interface DevHistoryToken {
   migrated: boolean
   migrationPct: number | null
   rugged?: boolean
+  createdAtAgeSeconds?: number | null
 }
 
 /** Input: the dev-tokens endpoint payload (caller does the fetching). */
@@ -94,12 +107,20 @@ export function assessDevHistory(
   };
   const tokens = Array.isArray(input?.tokens) ? input.tokens : [];
   const previousTokens = tokens.length;
+  // A token younger than matureMinAgeSeconds has not had the time to migrate;
+  // treating it as a failed migration invents guilt out of missing time.
+  const matureTokensList = tokens.filter((t) => {
+    if (!t) return false;
+    if (t.migrated) return true; // migrated tokens count regardless of age
+    if (t.createdAtAgeSeconds == null || !Number.isFinite(t.createdAtAgeSeconds)) return true;
+    return t.createdAtAgeSeconds >= C.matureMinAgeSeconds;
+  });
+  const matureTokensCount = matureTokensList.length;
   const migrations = tokens.filter((t) => t && t.migrated === true).length;
   const ruggedCount = tokens.filter((t) => t && t.rugged === true).length;
-  // Round to 4dp so boundary tests are stable against float artifacts.
   const migrationRate =
-    previousTokens > 0
-      ? Math.round((migrations / previousTokens) * 10_000) / 10_000
+    matureTokensCount > 0
+      ? Math.round((migrations / matureTokensCount) * 10_000) / 10_000
       : null;
 
   // 1. Brand-new dev — nothing to judge.
@@ -116,8 +137,8 @@ export function assessDevHistory(
     };
   }
 
-  // 2. 3+ deploys, zero migrations — never finished anything seriously.
-  if (previousTokens >= C.serialMinTokens && migrations === 0) {
+  // 2. 3+ mature deploys, zero migrations — never finished anything seriously.
+  if (matureTokensCount >= C.serialMinTokens && migrations === 0) {
     return {
       tier: 'SERIAL_RUGGER',
       previousTokens,
@@ -125,7 +146,7 @@ export function assessDevHistory(
       migrationRate,
       ruggedCount,
       reasons: [
-        `${previousTokens} prior tokens deployed and 0 ever migrated (threshold: >=${C.serialMinTokens} deploys, 0 migrations)`,
+        `${matureTokensCount} mature prior tokens deployed (out of ${previousTokens} total) and 0 ever migrated (threshold: >=${C.serialMinTokens} mature deploys, 0 migrations)`,
       ],
     };
   }
@@ -144,11 +165,11 @@ export function assessDevHistory(
     };
   }
 
-  // 4. Low migration rate across a meaningful sample.
+  // 4. Low migration rate across a meaningful mature sample.
   if (
     migrationRate !== null &&
     migrationRate < C.suspectRateMax &&
-    previousTokens >= C.suspectMinTokens
+    matureTokensCount >= C.suspectMinTokens
   ) {
     return {
       tier: 'SUSPECT',
@@ -157,7 +178,7 @@ export function assessDevHistory(
       migrationRate,
       ruggedCount,
       reasons: [
-        `migration rate ${migrationRate} < ${C.suspectRateMax} across ${previousTokens} deploys (threshold: >=${C.suspectMinTokens} deploys)`,
+        `migration rate ${migrationRate} < ${C.suspectRateMax} across ${matureTokensCount} mature deploys (out of ${previousTokens} total, threshold: >=${C.suspectMinTokens} mature deploys)`,
       ],
     };
   }
