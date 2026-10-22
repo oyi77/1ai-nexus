@@ -30,6 +30,34 @@ NEXUS is an **open-source finance intelligence platform** for traders, analysts,
 - **DEX Sniper Scanner** — `/scanner` page with sub-second WebSocket updates showing new liquidity pools with risk scoring
 - **Strategy-Gated Accumulation Alerts** — Whale accumulation only fires when one of three entry playbooks actually triggers (Second Wave, Level Flip, Whale Comeback) on real MC history, with a ladder plan and a named rule for every refusal
 - **Measured Wallet Discovery** — Rebuilds the tracked pool from GMGN leaderboard sweeps plus holders of established (MC ≥ $1M) tokens; no wallet enters unless it clears the HUMAN check (fastTxRatio, sells > 0, ≥ 10 trades) and GMGN's own bundler/sniper/fresh/transfer-in flags
+- **Measured Signal Outcomes** — Every delivered sniper signal is scored on its own horizon: TARGET at +100%, STOPPED at −50%, FLAT inside the ±10% noise band, and WIN/LOSS for real moves outside it. Hit rate counts targets only; win rate counts every decided direction. PENDING and UNPRICEABLE are reported separately and never counted as misses
+- **Tier Calibration** — Per-tier hit rates turn into delivery demotions once a tier has `minScored` (default 5) scored signals below `SNIPER_CALIBRATION_FLOOR_PCT` (default 50). Off by default; `SNIPER_ADAPTIVE_POLICY_DRY_RUN=true` logs the verdict without touching delivery
+---
+
+## Information Architecture
+
+The shell is an **OPERATE / MONITOR surface**: dense, left-aligned, no hero sections, no marketing copy. Navigation lives in `src/lib/config/nav.ts` as a single typed structure — changing the source file is the only way to change the sidebar, so routes and nav can never drift apart.
+
+Eight collapsible sections, 112 unique destinations, zero duplicate `href` and zero duplicate React `key` (enforced by `src/lib/config/__tests__/nav.test.ts`).
+
+| Section | Purpose | Representative entries |
+|---|---|---|
+| Dashboard | Command center, holdings, operator state | `/dashboard`, `/watchlist`, `/alerts`, `/account`, `/following`, `/portfolio`, `/pnl`, `/status` |
+| Signals | One Signals hub with tabs instead of parallel top-level pages | `/signals` (`?tab=conviction`, `?tab=alpha`), `/intelligence/leaderboard`, `/composite-alerts`, `/market-score`, `/fear-greed` |
+| Markets | Cross-asset market terminal with hubs per asset class | `/markets`, `/screener`, `/saham`, `/derivatives`, `/options`, `/etf`, `/heatmap`, `/compare` |
+| On-Chain | Wallets, flows, DEX activity, safety | `/onchain`, `/smart-money`, `/whale-cluster`, `/top-traders`, `/copy-trading`, `/exchange-flow`, `/rugcheck`, `/dex` |
+| Meme | Sniper pipeline, risk scoring, moonshot board | `/meme`, `/meme/sniper`, `/meme/risk`, `/moonshot`, `/tokens/discover` |
+| Macro | Rates, curve, sentiment | `/macro`, `/bonds`, `/forex`, `/commodities` |
+| Forecasts | Valuation and forward-looking models | `/dcf`, `/comps`, `/financials`, `/historical-financials` |
+| Research | Docs, widget, developer surface | `/api-docs`, `/widget`, `/entities`, `/graph` |
+
+Design rules for this shell:
+
+- **Tabs over parallel pages.** `/signals` absorbs what used to be four sibling signal pages; each tab is a distinct data mode, never a marketing variant of the same table.
+- **Hubs over one-page-per-source.** `/markets` and `/saham` aggregate sibling data sources behind one route with internal tabs.
+- **Every destination is a real surface.** No placeholder routes; a page with no data renders its degradation state (for example `/api/v1/saham/signals` returns `503 No IDX snapshot yet — run the nightly harvests`) rather than a blank frame.
+- **No emoji in headings.** Iconography is inline SVG or a text label; the accent colour token carries the visual signal.
+
 ---
 
 ## Supported Blockchains

@@ -324,6 +324,8 @@ async function discoverCallFeed(limit: number): Promise<SniperEnrichedToken[]> {
     (a, b) =>
       (b.createdAt ?? 0) - (a.createdAt ?? 0) ||
       (b.volume5m ?? 0) - (a.volume5m ?? 0) ||
+      (b.discoveryEvidence?.[0]?.weightedScore ?? 0) -
+        (a.discoveryEvidence?.[0]?.weightedScore ?? 0) ||
       (b.discoveryEvidence?.[0]?.independentGroups ?? 0) -
         (a.discoveryEvidence?.[0]?.independentGroups ?? 0),
   )
