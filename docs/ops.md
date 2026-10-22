@@ -722,6 +722,20 @@ Simulates a **10 SOL demo balance** (\$1,500 @ \$150/SOL) over delivered signals
 - `FORWARD_FEE_PCT=0.005` — fee per leg
 - `FORWARD_LIMIT=5` — max new positions opened per run
 - `FORWARD_HORIZON=h4` — holding period (`h1`, `h4`, `h24`, `d7`)
+- `FORWARD_FETCH_DELAY_MS=4200` — pause between GeckoTerminal calls
+- `FORWARD_MODE=close` — skip the open leg entirely, only mature positions
+
+**Rate limits.** GeckoTerminal throttles per IP, so other crons on the same host
+extend the cooldown beyond any fixed backoff. On a `429` the runner probes the
+free `/tokens/.../pools` endpoint from a child process every 15s (up to 180s)
+and resumes only when it answers `200`; a position that still has no price is
+left open, never scored.
+
+**Exit bars are fetched at `now`, not at the horizon boundary.** A pool whose
+history starts after the due instant returns an empty window for
+`before_timestamp=due`, which left matured positions open forever (measured:
+five of six). The exit is still the bar covering `dueAt`, so the price is
+unchanged; only the fetch anchor moved.
 
 **Honesty bounds**: demo balance is virtual (no exchange order is ever placed); positions with no resolvable price stay open rather than being scored as losses; win rate is `n/a` when nothing has closed.
 

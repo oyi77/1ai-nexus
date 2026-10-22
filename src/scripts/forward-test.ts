@@ -15,6 +15,7 @@
  */
 import 'dotenv/config'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { spawn } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fetchTokenBarSeries, type OhlcvBar } from '@/lib/modules/derived/historical-price'
 import { DEMO_HORIZONS, type DeliveredSignal } from '@/lib/modules/derived/signal-backtest'
@@ -79,6 +80,37 @@ function readDeliveredSignals(): DeliveredSignal[] {
 }
 
 /**
+ * Block until the upstream cooldown has really elapsed.
+ *
+ * GeckoTerminal rate-limits per IP, so another cron or a manual probe on the
+ * same host can extend the window past any fixed backoff. Sleeping as a child
+ * process keeps the event loop free, and the run resumes only once the free
+ * endpoint answers again - a fixed sleep under a long ban just burns attempts.
+ */
+async function waitForRateLimit(timeoutMs = 180_000): Promise<void> {
+  const startedAt = Date.now()
+  while (Date.now() - startedAt < timeoutMs) {
+    const free = await new Promise<boolean>((done) => {
+      const child = spawn(
+        'curl',
+        ['-s', '-o', '/dev/null', '-w', '%{http_code}', '--max-time', '10',
+          'https://api.geckoterminal.com/api/v2/networks/solana/tokens/' +
+            'So11111111111111111111111111111111111111112/pools'],
+        { stdio: ['ignore', 'pipe', 'ignore'] },
+      )
+      let out = ''
+      child.stdout.on('data', (chunk: Buffer) => {
+        out += chunk.toString()
+      })
+      child.on('error', () => done(true))
+      child.on('close', () => done(out.trim() === '200'))
+    })
+    if (free) return
+    await new Promise((r) => setTimeout(r, 15_000))
+  }
+}
+
+/**
  * Entry price = close of the bar covering the signal timestamp, with retries.
  *
  * Returns `[price, reason]` so the caller can log WHY a signal was skipped:
@@ -119,6 +151,10 @@ async function main(): Promise<void> {
     feePct: numEnv('FORWARD_FEE_PCT', FORWARD_DEFAULTS.feePct),
     verdicts: FORWARD_DEFAULTS.verdicts,
   }
+  // FORWARD_MODE=close skips the discovery leg entirely, so a run under a rate
+  // limit still matures the positions it can instead of spending the budget on
+  // open attempts that yield nothing.
+  const mode = process.env.FORWARD_MODE === 'close' ? 'close' : 'full'
   const limit = Math.max(1, Math.trunc(numEnv('FORWARD_LIMIT', 5)))
   const fetchDelayMs = numEnv('FORWARD_FETCH_DELAY_MS', 4200)
   const horizon = (process.env.FORWARD_HORIZON ?? 'h4') as keyof typeof DEMO_HORIZONS
@@ -132,13 +168,29 @@ async function main(): Promise<void> {
   console.log(`[forward] open=${state.open.length} closed=${state.closed.length} cash=$${state.cashUsd.toFixed(2)}`)
 
   // ── 1. CLOSE matured positions ─────────────────────────────
+  // Bars are requested at `now`, not at the due time: GeckoTerminal's
+  // before_timestamp normally returns bars ENDING at or before it, but for a
+  // pool whose history starts after that instant the window is empty and the
+  // position can never close. Fetching up to now and picking the bar that
+  // covers `dueAt` is the same exit price with no blind window.
   const due = duePositions(state, nowMs)
   for (const [i, pos] of due.entries()) {
     if (i > 0) await new Promise((r) => setTimeout(r, fetchDelayMs))
     const dueMs = Date.parse(pos.dueAt)
-    const bars: OhlcvBar[] = (await fetchTokenBarSeries(pos.contract, { timeframe: 'hour', atMs: dueMs })).bars
+    let bars: OhlcvBar[] = []
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      const res = await fetchTokenBarSeries(pos.contract, { timeframe: 'hour', atMs: nowMs })
+      if (res.bars.length > 0) {
+        bars = res.bars
+        break
+      }
+      if (res.source !== 'geckoterminal:rate-limited') break
+      console.log(`[forward] ${pos.contract.slice(0, 10)}: rate limited — waiting for cooldown`)
+      await waitForRateLimit()
+      await new Promise((r) => setTimeout(r, fetchDelayMs))
+    }
     if (bars.length === 0) {
-      console.warn(`[forward] ${pos.contract.slice(0, 10)}: no bars at exit — position stays open`)
+      console.warn(`[forward] ${pos.contract.slice(0, 10)}: no bars at exit yet — position stays open`)
       continue
     }
     // Exit price = the bar covering the horizon boundary: what the market
@@ -146,7 +198,7 @@ async function main(): Promise<void> {
     const exitBar = barCovering(bars, dueMs)
     const exit = exitBar?.close ?? null
     if (exit === null || !(exit > 0)) {
-      console.warn(`[forward] ${pos.contract.slice(0, 10)}: exit unpriceable — position stays open`)
+      console.warn(`[forward] ${pos.contract.slice(0, 10)}: no bar covers ${pos.dueAt} — position stays open`)
       continue
     }
     const closed = closeForwardPosition(pos, exit, cfg)
@@ -161,37 +213,41 @@ async function main(): Promise<void> {
   }
 
   // ── 2. OPEN new paper positions ────────────────────────────
-  const signals = readDeliveredSignals()
-  // Deduplicate by contract: the delivery log repeats a token when it is
-  // re-alerted, and two entries for the same mint must not become two
-  // positions (or two API round-trips for the same token).
-  const uniqueByContract = new Map<string, DeliveredSignal>()
-  for (const sig of signals) {
-    if (!uniqueByContract.has(sig.contract)) uniqueByContract.set(sig.contract, sig)
-  }
-  const fresh = untradedSignals([...uniqueByContract.values()], state, limit, 30)
-  console.log(`[forward] candidates: ${fresh.length} of ${uniqueByContract.size} unique delivered signal(s)`)
+  if (mode === 'full') {
+    const signals = readDeliveredSignals()
+    // Deduplicate by contract: the delivery log repeats a token when it is
+    // re-alerted, and two entries for the same mint must not become two
+    // positions (or two API round-trips for the same token).
+    const uniqueByContract = new Map<string, DeliveredSignal>()
+    for (const sig of signals) {
+      if (!uniqueByContract.has(sig.contract)) uniqueByContract.set(sig.contract, sig)
+    }
+    const fresh = untradedSignals([...uniqueByContract.values()], state, limit, 30)
+    console.log(`[forward] candidates: ${fresh.length} of ${uniqueByContract.size} unique delivered signal(s)`)
 
-  for (const [i, signal] of fresh.entries()) {
-    if (i > 0 || due.length > 0) await new Promise((r) => setTimeout(r, fetchDelayMs))
-    const atMs = Date.parse(signal.at)
-    const [entry, why] = await entryPriceAt(signal.contract, atMs, fetchDelayMs)
-    if (entry === null) {
-      console.warn(`[forward] ${signal.contract.slice(0, 10)}: no entry price (${why}) — skipped`)
-      continue
+    for (const [i, signal] of fresh.entries()) {
+      if (i > 0 || due.length > 0) await new Promise((r) => setTimeout(r, fetchDelayMs))
+      const atMs = Date.parse(signal.at)
+      const [entry, why] = await entryPriceAt(signal.contract, atMs, fetchDelayMs)
+      if (entry === null) {
+        console.warn(`[forward] ${signal.contract.slice(0, 10)}: no entry price (${why}) — skipped`)
+        continue
+      }
+      const pos = openForwardPosition(state, signal, entry, horizon, cfg)
+      if (!pos) {
+        console.warn(`[forward] ${signal.contract.slice(0, 10)}: not opened (duplicate or no cash)`)
+        continue
+      }
+      state.cashUsd -= pos.notionalUsd
+      state.open.push(pos)
+      state.seenContracts.push(pos.contract)
+      console.log(
+        `[forward] OPEN   ${pos.contract.slice(0, 10)} ${pos.horizon} ` +
+          `$${pos.notionalUsd.toFixed(2)} @ $${entry.toPrecision(6)} due ${pos.dueAt}`,
+      )
     }
-    const pos = openForwardPosition(state, signal, entry, horizon, cfg)
-    if (!pos) {
-      console.warn(`[forward] ${signal.contract.slice(0, 10)}: not opened (duplicate or no cash)`)
-      continue
-    }
-    state.cashUsd -= pos.notionalUsd
-    state.open.push(pos)
-    state.seenContracts.push(pos.contract)
-    console.log(
-      `[forward] OPEN   ${pos.contract.slice(0, 10)} ${pos.horizon} ` +
-        `$${pos.notionalUsd.toFixed(2)} @ $${entry.toPrecision(6)} due ${pos.dueAt}`,
-    )
+  } else {
+    console.log('[forward] mode=close — discovery skipped')
   }
 
   // ── 3. REPORT ──────────────────────────────────────────────

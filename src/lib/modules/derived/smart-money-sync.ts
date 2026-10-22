@@ -598,42 +598,80 @@ export function filterAlertableTrades(trades: SmartMoneyTrade[]): SmartMoneyTrad
 
 // ── 4. Write results to Google Sheet ──────────────────────────
 
+export const SHEET_OUTCOMES = ['ALERT', 'OBSERVATION'] as const
+export type SheetOutcome = (typeof SHEET_OUTCOMES)[number]
+
+const RESULTS_HEADER = [
+  'Timestamp', 'Wallet', 'Alias', 'Status',
+  'Action', 'Token', 'Amount USD', 'Token Age (h)', 'Market Cap USD',
+  'Outcome', 'Why not alerted',
+] as const
+
+function lastColumn(headerLength: number): string {
+  return String.fromCharCode(64 + headerLength)
+}
+
 /**
- * Append screening results to the SmartMoneyActivity sheet tab.
- * Creates the tab if it doesn't exist.
+ * Decide what each row MEANS before writing it.
+ *
+ * Every trade reaches this sheet (it is the audit trail), but only a gated
+ * trade becomes an alert. Without the outcome column a WATCHLIST or
+ * DISQUALIFIED buy sat in the same table as a classified one and read as a
+ * signal; the reason column makes a rejection auditable instead of inferred.
  */
+export function classifyForSheet(trade: SmartMoneyTrade): { outcome: SheetOutcome; reason: string } {
+  if (!isBullishWalletStatus(trade.walletStatus)) {
+    return { outcome: 'OBSERVATION', reason: `wallet status ${trade.walletStatus ?? 'NULL'} is not a qualifying classification` }
+  }
+  const reasons: string[] = []
+  if (trade.tokenAgeHours !== null && trade.tokenAgeHours > ALERT_THRESHOLDS.maxTokenAgeHours) {
+    reasons.push(`token age ${trade.tokenAgeHours.toFixed(1)}h over ${ALERT_THRESHOLDS.maxTokenAgeHours}h`)
+  }
+  if (trade.amountUsd < ALERT_THRESHOLDS.minAmountUsd) {
+    reasons.push(`amount $${trade.amountUsd.toFixed(0)} under $${ALERT_THRESHOLDS.minAmountUsd}`)
+  }
+  if (trade.marketCapUsd !== null && trade.marketCapUsd > ALERT_THRESHOLDS.maxMarketCapUsd) {
+    reasons.push(`market cap $${trade.marketCapUsd.toFixed(0)} over $${ALERT_THRESHOLDS.maxMarketCapUsd}`)
+  }
+  if (reasons.length > 0) return { outcome: 'OBSERVATION', reason: reasons.join('; ') }
+  return { outcome: 'ALERT', reason: '' }
+}
+
 export async function writeResultsToSheet(trades: SmartMoneyTrade[]): Promise<boolean> {
   if (trades.length === 0) return true
   const api = await getSheetsApi()
   if (!api) return false
 
+  const last = lastColumn(RESULTS_HEADER.length)
   try {
-    // Ensure the results tab exists (ignore error if already exists)
     await api.batchUpdate([{ addSheet: { properties: { title: RESULTS_TAB } } }])
 
-    // Write header if empty
-    const header = await api.get(`${RESULTS_TAB}!A1:I1`).catch(() => [] as string[][])
-    if (header.length === 0) {
-      await api.update(`${RESULTS_TAB}!A1:I1`, [[
-        'Timestamp', 'Wallet', 'Alias', 'Status',
-        'Action', 'Token', 'Amount USD', 'Token Age (h)', 'Market Cap USD',
-      ]])
+    const header = await api.get(`${RESULTS_TAB}!A1:${last}1`).catch(() => [] as string[][])
+    const existing = Array.isArray(header[0]) ? header[0] : []
+    const headerMissing = existing.length === 0
+    const headerOutdated = !headerMissing && existing[9] !== RESULTS_HEADER[9]
+    if (headerMissing || headerOutdated) {
+      await api.update(`${RESULTS_TAB}!A1:${last}1`, [[...RESULTS_HEADER]])
     }
 
-    // Append rows
-    const rows = trades.map((t) => [
-      t.timestamp.toISOString(),
-      t.walletAddress,
-      t.walletAlias ?? '',
-      t.walletStatus ?? '',
-      t.action,
-      t.tokenSymbol ?? t.tokenAddress,
-      t.amountUsd.toFixed(2),
-      t.tokenAgeHours !== null ? t.tokenAgeHours.toFixed(1) : '',
-      t.marketCapUsd !== null ? t.marketCapUsd.toFixed(0) : '',
-    ])
+    const rows = trades.map((t) => {
+      const verdict = classifyForSheet(t)
+      return [
+        t.timestamp.toISOString(),
+        t.walletAddress,
+        t.walletAlias ?? '',
+        t.walletStatus ?? '',
+        t.action,
+        t.tokenSymbol ?? t.tokenAddress,
+        t.amountUsd.toFixed(2),
+        t.tokenAgeHours !== null ? t.tokenAgeHours.toFixed(1) : '',
+        t.marketCapUsd !== null ? t.marketCapUsd.toFixed(0) : '',
+        verdict.outcome,
+        verdict.reason,
+      ]
+    })
 
-    await api.append(`${RESULTS_TAB}!A:I`, rows)
+    await api.append(`${RESULTS_TAB}!A:${last}`, rows)
 
     return true
   } catch (err) {

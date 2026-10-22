@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  classifyForSheet,
   filterAlertableTrades,
   renderSmartMoneyAlert,
   ALERT_THRESHOLDS,
@@ -97,6 +98,29 @@ describe('filterAlertableTrades', () => {
     for (const status of ['WHALE', 'QUALIFIED_SMART_MONEY', 'WHALE_AND_SMART_MONEY']) {
       expect(filterAlertableTrades([trade({ walletStatus: status })])).toHaveLength(1)
     }
+  })
+})
+
+describe('classifyForSheet', () => {
+  it('marks an alertable trade ALERT with no reason', () => {
+    expect(classifyForSheet(trade())).toEqual({ outcome: 'ALERT', reason: '' })
+  })
+
+  it('marks a non-qualifying wallet OBSERVATION and names the status', () => {
+    const v = classifyForSheet(trade({ walletStatus: 'WATCHLIST' }))
+    expect(v.outcome).toBe('OBSERVATION')
+    expect(v.reason).toContain('WATCHLIST')
+  })
+
+  it('names the exact numeric gate that blocked a qualified wallet', () => {
+    expect(classifyForSheet(trade({ amountUsd: 400 })).reason).toContain('amount $400 under $1000')
+    expect(classifyForSheet(trade({ tokenAgeHours: 40 })).reason).toContain('token age 40.0h over 24h')
+    expect(classifyForSheet(trade({ marketCapUsd: 5_000_000 })).reason).toContain('market cap $5000000 over $1000000')
+  })
+
+  it('leaves the reason empty only when the trade really alerts', () => {
+    const t = trade({ walletStatus: 'WHALE', amountUsd: 1000, tokenAgeHours: 24, marketCapUsd: 1_000_000 })
+    expect(classifyForSheet(t)).toEqual({ outcome: 'ALERT', reason: '' })
   })
 })
 
