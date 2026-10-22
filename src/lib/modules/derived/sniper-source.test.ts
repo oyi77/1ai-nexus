@@ -141,6 +141,15 @@ describe('sniper-source mapping', () => {
     expect(p.distribution.top10Percent).toBeNull()
   })
 
+  it('maps an unmeasured 5m volume to null, never a measured zero', () => {
+    const absent = toSniperPayload(token({ volume5m: undefined }), []).payload
+    const nulled = toSniperPayload(token({ volume5m: null }), []).payload
+    expect(absent.momentum.volume5m).toBeNull()
+    expect(nulled.momentum.volume5m).toBeNull()
+    const dead = toSniperPayload(token({ volume5m: 0 }), []).payload
+    expect(dead.momentum.volume5m).toBe(0)
+  })
+
   it('passes through GMGN top-holder addresses with kind holder', () => {
     const { payload: p } = toSniperPayload(
       token(),

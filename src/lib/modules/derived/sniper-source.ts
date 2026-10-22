@@ -291,7 +291,7 @@ export function toSniperPayload(
     },
     momentum: {
       marketCap: token.marketCap,
-      volume5m: token.volume5m ?? 0,
+      volume5m: token.volume5m ?? null,
       top5AvgPnlPercent: sec.top5AvgPnlPercent, // GMGN holders endpoint (null = neutral, never faked)
       narrative: token.narrative ?? undefined,
     },

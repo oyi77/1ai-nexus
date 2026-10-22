@@ -366,7 +366,7 @@ async function hydrateFromDexscreener(chain: string, contract: string): Promise<
       top10HolderPercent: 0,
       social: {},
       audited: false,
-      volume5m: best.volume?.m5 ?? 0,
+      volume5m: best.volume?.m5 ?? null,
       riskKnown: false,
     }
   } catch {
