@@ -39,10 +39,16 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
-const FRESH = (n: string) =>
-  'aaa.' +
-  Buffer.from(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600, n })).toString('base64url') +
-  '.bbb'
+// The mock signs with a fixed exp, so the expectation must match byte for
+// byte. Deriving exp from Date.now() at assertion time made this test fail
+// whenever the second ticked over between the fetch and the expect.
+function freshToken(n: string): string {
+  return (
+    'aaa.' +
+    Buffer.from(JSON.stringify({ exp: 1_900_000_000, n })).toString('base64url') +
+    '.bbb'
+  )
+}
 
 function mockPrivy(primaryOk: boolean): void {
   vi.stubGlobal(
@@ -53,14 +59,14 @@ function mockPrivy(primaryOk: boolean): void {
       if (rt.startsWith('rt-fb')) {
         // Fallback account: always rotates fine.
         return new Response(
-          JSON.stringify({ token: FRESH('fb'), refresh_token: 'rt-fb-rotated' }),
+          JSON.stringify({ token: freshToken('fb'), refresh_token: 'rt-fb-rotated' }),
           { status: 200 },
         )
       }
       // Primary account: behavior per test.
       if (primaryOk) {
         return new Response(
-          JSON.stringify({ token: FRESH('primary'), refresh_token: 'rt-p-rotated' }),
+          JSON.stringify({ token: freshToken('primary'), refresh_token: 'rt-p-rotated' }),
           { status: 200 },
         )
       }
@@ -77,7 +83,7 @@ describe('moby dual-account fallback', () => {
     process.env.MOBY_FALLBACK_REFRESH_TOKEN = 'rt-fb'
     mockPrivy(true)
     const tok = await resolveMobyAccessToken()
-    expect(tok).toBe(FRESH('primary'))
+    expect(tok).toBe(freshToken('primary'))
     expect(hasMobyFallbackCredentials()).toBe(true)
   })
 
@@ -88,7 +94,7 @@ describe('moby dual-account fallback', () => {
     process.env.MOBY_FALLBACK_REFRESH_TOKEN = 'rt-fb'
     mockPrivy(false)
     const tok = await resolveMobyAccessToken()
-    expect(tok).toBe(FRESH('fb'))
+    expect(tok).toBe(freshToken('fb'))
   })
 
   it('both dead → primary error surfaces, not fallback shadow', async () => {
