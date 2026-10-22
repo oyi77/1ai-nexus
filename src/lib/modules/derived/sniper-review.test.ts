@@ -8,6 +8,7 @@ import {
   REVIEW_VOLMC_FLOOR,
   assessReview,
   renderReviewDigestForTest,
+  pushReviewDigest,
 } from './sniper-review'
 import type { SniperScanDecision } from './sniper-scan'
 
@@ -200,5 +201,25 @@ describe('renderReviewDigestForTest (TAHAP 7 fixtures)', () => {
     const msgs = renderReviewDigestForTest(flood)
     expect(msgs.length).toBeGreaterThan(1)
     assertHtmlSafe(msgs)
+  })
+})
+
+describe('pushReviewDigest skip reasons', () => {
+  it('names unmeasured flow separately from below-floor and empty scans', async () => {
+    const unmeasured = [
+      decision({ contract: 'u1', metrics: { ...decision({}).metrics, volMcRatio: null } }),
+      decision({ contract: 'u2', metrics: { ...decision({}).metrics, volMcRatio: null } }),
+    ]
+    const below = vol('b1', REVIEW_VOLMC_FLOOR - 0.01)
+    const sent = decision({ contract: 's1', status: 'SIGNAL', tier: 'HIGH_CONVICTION' })
+
+    expect((await pushReviewDigest(unmeasured)).skipped).toBe(
+      'no near-miss: 2 reject(es) had no measurable 5m flow',
+    )
+    expect((await pushReviewDigest([below])).skipped).toBe(
+      `no near-miss: all 1 reject(es) below the ${REVIEW_VOLMC_FLOOR}x floor`,
+    )
+    expect((await pushReviewDigest([sent])).skipped).toBe('no near-miss: nothing was rejected')
+    expect((await pushReviewDigest([])).skipped).toBe('no near-miss: nothing was rejected')
   })
 })

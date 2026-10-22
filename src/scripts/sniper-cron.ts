@@ -107,7 +107,9 @@ async function main() {
   // chat is configured.
   const review = await pushReviewDigest(res.decisions, { forceContracts: forceReReview })
   if (review.sent) console.log(`[sniper] review digest sent (${review.candidates} near-miss, ${forceReReview.size} re-review)`)
-  else if (review.candidates > 0) console.log(`[sniper] review digest skipped: ${review.skipped}`)
+  // Always print the reason: a silent review path and an empty review path
+  // look identical in production otherwise.
+  else console.log(`[sniper] review digest skipped: ${review.skipped ?? 'unknown'}`)
 
   // TAHAP 2: classify each contract's holder-tier phase and persist it
   // (previously stdout-only). Non-UNKNOWN verdicts are appended to

@@ -261,7 +261,21 @@ export async function pushReviewDigest(
   opts: { scanAt?: string; limit?: number; forceContracts?: Set<string> } = {},
 ): Promise<ReviewDigestResult> {
   const picks = pickReviewCandidates(decisions)
-  if (picks.length === 0) return { candidates: 0, sent: false, skipped: 'no near-miss' }
+  if (picks.length === 0) {
+    // Two very different silences: no flow at all, versus flow nobody could
+    // measure. Collapsing them hid today's case — every REJECT carried an
+    // unknown 5m volume, so the digest stayed empty while the operator saw a
+    // non-zero scan count and assumed the review path was broken.
+    const rejects = decisions.filter((d) => d.status === 'REJECT' && !d.deduped)
+    const unmeasured = rejects.filter((d) => d.metrics.volMcRatio === null).length
+    const skipped =
+      rejects.length === 0
+        ? 'no near-miss: nothing was rejected'
+        : unmeasured === rejects.length
+          ? `no near-miss: ${rejects.length} reject(es) had no measurable 5m flow`
+          : `no near-miss: all ${rejects.length} reject(es) below the ${REVIEW_VOLMC_FLOOR}x floor`
+    return { candidates: 0, sent: false, skipped }
+  }
   const max = opts.limit ?? 10
   const shown = picks.slice(0, max)
   const seen = readReviewSeen()
