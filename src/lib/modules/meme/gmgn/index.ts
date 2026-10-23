@@ -141,7 +141,7 @@ interface GmgnTokenHoldersResponse {
     next?: string | null
     list?: Array<{
       address?: string
-      amount_percentage?: number
+      amount_percentage?: number | null
       avg_cost?: number | null
       cost_cur?: number
       usd_value?: number
@@ -550,10 +550,18 @@ export async function discoverEstablishedGmgnTokens(
 
 // ── Risk audit ----
 
-/** One holder row as GMGN reports it, for wallet tracing. */
+/**
+ * One holder row as GMGN reports it, for wallet tracing.
+ *
+ * `amountPercentage` is the holder's share of supply as a 0..1 fraction and is
+ * NULL when the row carried no `amount_percentage`. A measured 0 and an absent
+ * measurement are different facts: the first is a holder with nothing, the
+ * second is a row nobody can size, and collapsing them would let a missing
+ * field enter a share floor as a passing zero.
+ */
 export interface GmgnHolderRow {
   address: string
-  amountPercentage: number
+  amountPercentage: number | null
   costCur: number
   usdValue: number
   unrealizedProfit: number | null
@@ -579,7 +587,10 @@ export async function listGmgnTokenHolders(chain: string, contract: string): Pro
       .filter((h) => typeof h.address === 'string' && h.address.length > 0)
       .map((h) => ({
         address: h.address as string,
-        amountPercentage: h.amount_percentage ?? 0,
+        amountPercentage:
+          typeof h.amount_percentage === 'number' && Number.isFinite(h.amount_percentage)
+            ? h.amount_percentage
+            : null,
         costCur: h.cost_cur ?? 0,
         usdValue: h.usd_value ?? 0,
         unrealizedProfit: typeof h.unrealized_profit === 'number' ? h.unrealized_profit : null,

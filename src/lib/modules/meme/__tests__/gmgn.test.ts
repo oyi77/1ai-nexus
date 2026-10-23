@@ -12,6 +12,7 @@ import {
   discoverGmgnTokens,
   discoverEstablishedGmgnTokens,
   auditGmgnToken,
+  listGmgnTokenHolders,
   __resetGmgnRateLimiterForTests,
   __resetGmgnCookieForTests,
   __gmgnSessionCookieForTests,
@@ -842,5 +843,35 @@ describe('MEME_REGISTRY session-file gating', () => {
 
     delete process.env.GMGN_SESSION_PATH
     delete process.env.FOMO_SESSION_PATH
+  })
+})
+
+describe('listGmgnTokenHolders share mapping', () => {
+  it('keeps an absent amount_percentage null instead of fabricating zero', async () => {
+    mockFetchSequence([
+      {
+        status: 200,
+        body: {
+          code: 0,
+          data: {
+            list: [
+              { address: 'Absent1111111111111111111111111111111111', usd_value: 5_000, cost_cur: 10 },
+              { address: 'Null111111111111111111111111111111111111', amount_percentage: null, usd_value: 7_500, cost_cur: 10 },
+              { address: 'Zero111111111111111111111111111111111111', amount_percentage: 0, usd_value: 0, cost_cur: 10 },
+              { address: 'Real111111111111111111111111111111111111', amount_percentage: 0.042, usd_value: 90_000, cost_cur: 10 },
+            ],
+          },
+        },
+      },
+    ])
+
+    const rows = await listGmgnTokenHolders('solana', 'Mint1111111111111111111111111111111111111111')
+    const byAddress = new Map(rows.map((r) => [r.address, r]))
+
+    // Unmeasured is null, a MEASURED zero stays 0 - the two are different facts.
+    expect(byAddress.get('Absent1111111111111111111111111111111111')?.amountPercentage ?? null).toBeNull()
+    expect(byAddress.get('Null111111111111111111111111111111111111')?.amountPercentage ?? null).toBeNull()
+    expect(byAddress.get('Zero111111111111111111111111111111111111')?.amountPercentage).toBe(0)
+    expect(byAddress.get('Real111111111111111111111111111111111111')?.amountPercentage).toBeCloseTo(0.042, 6)
   })
 })

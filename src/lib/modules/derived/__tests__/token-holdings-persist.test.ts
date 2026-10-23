@@ -107,6 +107,14 @@ describe('validateHolder', () => {
   it('accepts zero usdValue (real zero is not fabricated)', () => {
     expect(validateHolder(holder({ usdValue: 0 }))).not.toBeNull()
   })
+
+  it('rejects an unmeasured share of supply (TokenHolding.amount cannot hold "unknown")', () => {
+    expect(validateHolder(holder({ amountPercentage: null }))).toBeNull()
+  })
+
+  it('accepts a measured zero share (a real zero is not fabricated)', () => {
+    expect(validateHolder(holder({ amountPercentage: 0 }))).not.toBeNull()
+  })
 })
 
 describe('loadRecentWhaleTokens', () => {
@@ -229,6 +237,22 @@ describe('persistTokenHoldings', () => {
       expect(Number.isFinite(u.create.usdValue as number)).toBe(true)
       expect(u.create.usdValue as number).toBeGreaterThanOrEqual(0)
     }
+  })
+
+  it('skips holders with no measured share of supply (unmeasured ≠ zero)', async () => {
+    const { db, holdingUpserts } = makeDb([{ contract: TOKEN_A, chain: 'solana' }])
+    const fetchHolders = async () => [
+      holder({ address: WALLET_1, amountPercentage: null }),
+      holder({ address: WALLET_2, amountPercentage: Number.NaN }),
+      holder({ address: 'ok3333333333333333333333333333333333333333', amountPercentage: 0.05 }),
+    ]
+
+    const res = await persistTokenHoldings({ db, fetchHolders })
+
+    expect(res.holdingsUpserted).toBe(1)
+    expect(res.holdersSkipped).toBe(2)
+    // The valid upsert must carry the share that was measured
+    expect(holdingUpserts[0].create.amount as number).toBe(0.05)
   })
 
   it('caps holders per token at holderLimit', async () => {

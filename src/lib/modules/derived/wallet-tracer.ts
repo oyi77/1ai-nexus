@@ -95,9 +95,13 @@ export async function fetchTopHolders(mint: string, limit = 25): Promise<HolderS
 async function fetchGmgnHolders(mint: string, limit: number): Promise<HolderSeed[]> {
   const { listGmgnTokenHolders } = await import('@/lib/modules/meme/gmgn')
   const rows = await listGmgnTokenHolders('solana', mint)
+  // A row with no `amount_percentage` cannot be sized, and `fetchTopHolders`
+  // already documents that an address-only source leaves `usdValue` at 0 so the
+  // fast path records nothing. An absent share gets the same treatment rather
+  // than a fabricated 0, which would read as "this wallet holds nothing".
   return rows.slice(0, limit).map((h) => ({
     owner: h.address,
-    amount: h.amountPercentage,
+    amount: h.amountPercentage ?? 0,
     decimals: 9,
     usdValue: h.usdValue,
     costCur: h.costCur,

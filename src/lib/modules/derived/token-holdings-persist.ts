@@ -129,15 +129,22 @@ export async function loadRecentWhaleTokens(
 
 /**
  * Validate a holder row: address must be non-empty, usdValue must be a
- * finite non-negative number. Returns the cleaned holder or null if invalid.
+ * finite non-negative number, and the share of supply must be measured.
+ * Returns the cleaned holder or null if invalid.
  *
  * NEVER writes NaN or negative usdValue — the schema column is Float and
- * NaN would corrupt downstream cross-token context resolution.
+ * NaN would corrupt downstream cross-token context resolution. An unmeasured
+ * `amountPercentage` is refused for the same reason: `TokenHolding.amount` is
+ * a non-null Float, so the only alternatives are an honest skip or a fake 0.
  */
 export function validateHolder(h: GmgnHolderRow): GmgnHolderRow | null {
   if (!h.address || typeof h.address !== 'string' || h.address.length < 8) return null
   const usd = h.usdValue
   if (!Number.isFinite(usd) || usd < 0) return null
+  // `TokenHolding.amount` is a non-null Float, so an unmeasured share has no
+  // honest value to write: 0 would claim the wallet holds nothing, and the
+  // column cannot hold "unknown". The row is skipped, never coerced.
+  if (h.amountPercentage === null || !Number.isFinite(h.amountPercentage)) return null
   return h
 }
 
@@ -227,8 +234,19 @@ async function persistTokenHolders(
       continue
     }
 
+    const share = h.amountPercentage
+    if (share === null || !Number.isFinite(share)) {
+      skipped++
+      continue
+    }
+
     const walletId = await resolveWalletId(db, h.address, chain)
     if (!walletId) {
+      skipped++
+      continue
+    }
+
+    if (!tokenId) {
       skipped++
       continue
     }
@@ -239,11 +257,11 @@ async function persistTokenHolders(
         create: {
           walletId,
           tokenId,
-          amount: h.amountPercentage,
+          amount: share,
           usdValue: h.usdValue,
         },
         update: {
-          amount: h.amountPercentage,
+          amount: share,
           usdValue: h.usdValue,
         },
       })
