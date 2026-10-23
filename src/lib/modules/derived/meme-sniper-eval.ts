@@ -36,6 +36,19 @@ function fmtPct(v: unknown): string {
   return isPct(v) ? `${Math.round(v * 10) / 10}` : 'n/a'
 }
 
+/**
+ * Share formatter for REJECTION text. A rejected share is by definition
+ * non-zero, yet `fmtPct` rounds 0.0319 to "0" — which printed
+ * "Dev holds 0% (must be 0%)" and read as a contradiction. Signal text
+ * keeps `fmtPct`; only breach strings widen their precision.
+ */
+function fmtPctBreach(v: unknown): string {
+  if (!isPct(v)) return 'n/a'
+  const rounded = Math.round(v * 10) / 10
+  if (rounded > 0) return `${rounded}`
+  return `<${0.1}`
+}
+
 function fmtUsd(n: unknown): string {
   return isPct(n) ? `$${Math.round(n).toLocaleString('en-US')}` : '$n/a'
 }
@@ -196,8 +209,8 @@ function distributionBreaches(p: SniperPayload): string[] {
   else if (d.devPercent > L.devPercent) {
     out.push(
       d.devPercent < L.devHardCeilingPercent
-        ? `Dev holds ${fmtPct(d.devPercent)}% (must be 0%; hard ceiling ${L.devHardCeilingPercent}%)`
-        : `Dev holds ${fmtPct(d.devPercent)}% — beyond hard ceiling`,
+        ? `Dev holds ${fmtPctBreach(d.devPercent)}% (must be 0%; hard ceiling ${L.devHardCeilingPercent}%)`
+        : `Dev holds ${fmtPctBreach(d.devPercent)}% — beyond hard ceiling`,
     )
   }
 

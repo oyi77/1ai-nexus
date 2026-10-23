@@ -140,6 +140,18 @@ describe('meme-sniper hard filters', () => {
     expect(d.rejections.join(' ')).toContain('beyond hard ceiling')
   })
 
+  it('never prints a rejected dev share as "0%" when the reading is real dust', () => {
+    const d = evaluateSniper(clean({ distribution: { ...clean().distribution, devPercent: 0.0319 } }))
+    const dev = d.rejections.find((r) => r.startsWith('Dev holds'))
+    expect(dev).toBe('Dev holds <0.1% (must be 0%; hard ceiling 2%)')
+    expect(dev).not.toContain('0% (')
+  })
+
+  it('keeps full precision for a rejected dev share above the rounding step', () => {
+    const d = evaluateSniper(clean({ distribution: { ...clean().distribution, devPercent: 0.48 } }))
+    expect(d.rejections).toContain('Dev holds 0.5% (must be 0%; hard ceiling 2%)')
+  })
+
   it('rejects snipers at the 6% ceiling', () => {
     const d = evaluateSniper(clean({ distribution: { ...clean().distribution, sniperPercent: 6 } }))
     expect(d.status).toBe('REJECT')
