@@ -83,6 +83,7 @@ export function rejectionId(s: string): string {
     /^Linked cluster holds ([\d.]+)% \(ceiling ([\d.]+)%\)$/,
     'Cluster terhubung pegang $1% (batas $2%)',
   )
+  out = out.replace(/^Dev holds (<[\d.]+)%(.*)$/, 'Dev pegang $1%$2')
   out = out.replace(/^Dev holds ([\d.]+)%(.*)$/, 'Dev pegang $1%$2')
   out = out.replace(/^Snipers hold ([\d.]+)%(.*)$/, 'Sniper pegang $1%$2')
   out = out.replace(

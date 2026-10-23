@@ -11,6 +11,7 @@ const REJECTIONS: Array<[string, string]> = [
   ['Linked cluster holds 33.3% (ceiling 15%)', 'Cluster terhubung pegang 33.3% (batas 15%)'],
   ['Dev holds 4.5% (must be 0%; hard ceiling 10%)', 'Dev pegang 4.5% (must be 0%; hard ceiling 10%)'],
   ['Dev holds 12.3% — beyond hard ceiling', 'Dev pegang 12.3% — beyond hard ceiling'],
+  ['Dev holds <0.1% (must be 0%; hard ceiling 10%)', 'Dev pegang <0.1% (must be 0%; hard ceiling 10%)'],
   ['Snipers hold 31.2% (ceiling 20%)', 'Sniper pegang 31.2% (ceiling 20%)'],
   [
     'Launch cohort still holds 25% (sold 75%, needs 100%)',
