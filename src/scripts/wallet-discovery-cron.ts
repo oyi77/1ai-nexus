@@ -18,12 +18,19 @@ import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 //   WALLET_DISCOVERY_BUDGET_MS      wall-clock budget per pass (default 120000)
 //   WALLET_DISCOVERY_MAX_STAT       stat re-measurements per pass (default 150)
 //   WALLET_DISCOVERY_MIN_HOLDER_USD  min high-cap holder position size (default 10_000)
+//   WALLET_DISCOVERY_MAX_HOLDER_SHARE ceiling share of a called mint's supply (default 0.004)
+//   WALLET_DISCOVERY_HOLDER_SHARE_USD USD size that ceiling stands for (default 1_000)
+//   WALLET_DISCOVERY_MIN_LIQUIDITY    min DexScreener liquidity for a called mint (default 50_000)
 //   WALLET_DISCOVERY_MAX_CALLED     call-feed contracts swept (default 8)
 //   WALLET_DISCOVERY_MAX_PERSISTED  established contracts replayed from
 //                                   TokenHolding (default 10)
 //   WALLET_DISCOVERY_MIN_CALL_GROUPS origin-weighted call groups for a confluence tag (default 2)
 //   WALLET_DISCOVERY_TRUSTED_GROUPS  comma-separated groups that always count
 //   WALLET_DISCOVERY_DRY            "1" = report only, no DB writes
+//
+// Runs under a run lock: a measured pass takes 4-7 minutes (leaderboard sweep
+// plus holder reads), so a schedule shorter than the pass would otherwise pile
+// up concurrent passes fighting the same GMGN quota.
 // ─────────────────────────────────────────────────────────────
 import 'dotenv/config'
 import {
@@ -32,7 +39,13 @@ import {
   runWalletDiscovery,
   type DiscoveryFilters,
 } from '@/lib/modules/derived/wallet-discovery-engine'
+import { acquireRunLock } from '@/lib/modules/derived/run-lock'
 import { primeGmgnCookieFromDb } from '@/lib/modules/meme/gmgn'
+
+const LOCK_PATH = 'data/.wallet-discovery.lock'
+// A pass measures ~4-7 minutes; the budget knob can raise it, and a crashed
+// pass must never wedge the schedule. 30 min matches the other run locks.
+const LOCK_STALE_MS = 30 * 60 * 1000
 
 function numEnv(name: string, fallback: number): number {
   const raw = process.env[name]
@@ -65,6 +78,9 @@ async function main(): Promise<void> {
     maxStatMeasurements: numEnv('WALLET_DISCOVERY_MAX_STAT', DISCOVERY_DEFAULTS.maxStatMeasurements),
     maxEmptyHolderTokens: numEnv('WALLET_DISCOVERY_MAX_EMPTY', DISCOVERY_DEFAULTS.maxEmptyHolderTokens),
     minHolderValueUsd: numEnv('WALLET_DISCOVERY_MIN_HOLDER_USD', DISCOVERY_DEFAULTS.minHolderValueUsd),
+    maxHolderSharePct: numEnv('WALLET_DISCOVERY_MAX_HOLDER_SHARE', DISCOVERY_DEFAULTS.maxHolderSharePct),
+    holderShareTargetUsd: numEnv('WALLET_DISCOVERY_HOLDER_SHARE_USD', DISCOVERY_DEFAULTS.holderShareTargetUsd),
+    minLiquidityUsd: numEnv('WALLET_DISCOVERY_MIN_LIQUIDITY', DISCOVERY_DEFAULTS.minLiquidityUsd),
     maxRateLimitedTokens: numEnv('WALLET_DISCOVERY_MAX_429', DISCOVERY_DEFAULTS.maxRateLimitedTokens),
     minCallGroups: numEnv('WALLET_DISCOVERY_MIN_CALL_GROUPS', DISCOVERY_DEFAULTS.minCallGroups),
     trustedCallGroups: listEnv('WALLET_DISCOVERY_TRUSTED_GROUPS', DISCOVERY_DEFAULTS.trustedCallGroups),
@@ -78,6 +94,19 @@ async function main(): Promise<void> {
       `wr>=${filters.minWinRate} pnl>=${filters.minPnl} maxFastTx=${filters.maxFastTxRatio} dry=${dry})`,
   )
 
+  const lock = acquireRunLock(LOCK_PATH, LOCK_STALE_MS)
+  if (!lock.acquired) {
+    console.log('[wallet-discovery] another pass holds the lock — skipping')
+    return
+  }
+  try {
+    await runDiscovery(dry, filters)
+  } finally {
+    lock.release()
+  }
+}
+
+async function runDiscovery(dry: boolean, filters: Partial<DiscoveryFilters>): Promise<void> {
   await primeGmgnCookieFromDb().catch(() => undefined)
 
   const result = await runWalletDiscovery(filters)
@@ -93,6 +122,18 @@ async function main(): Promise<void> {
       `aboveBar=${result.callGroups.tokensAboveBar} effective=${result.callGroups.effectiveGroups} ` +
       `groups=${result.callGroups.groupsSeen.slice(0, 6).join('|') || 'none'}`,
   )
+  // Admitted/0 alone reads the same for "the feed named nothing", "every
+  // holder was dust" and "every mint was too thin to trade". The per-leg
+  // counters are the only way to tell those three apart from a log.
+  for (const [leg, c] of Object.entries(result.holderLegs)) {
+    console.log(
+      `[wallet-discovery] leg ${leg}: contracts=${c.contracts} thinMarket=${c.marketSkipped} ` +
+        `candidates=${c.candidates} admitted=${c.admitted} measured=${c.measured} ` +
+        `underFloor=${c.underFloor} noMark=${c.missing} thinShare=${c.thinShare} ` +
+        `bestShare=${(c.bestShare * 100).toFixed(3)}% ` +
+        `bestMark=$${Math.round(c.bestUsd).toLocaleString('en-US')} in ${c.ms}ms`,
+    )
+  }
   const buckets = Object.entries(result.filterReasons)
     .map(([rule, summary]) => ({ rule, summary }))
     .sort((a, b) => parseInt(b.summary, 10) - parseInt(a.summary, 10))

@@ -42,7 +42,7 @@ import { WHALE_HARVEST_TAGS, mergeRowGmgn, type HarvestedWallet } from '@/lib/mo
 import { SMART_MONEY_DEFAULTS } from './wallet-intel'
 import { loadCallConfluence, type CallConfluence } from './call-confluence'
 import { loadCallFeed } from './db-call-feed'
-import { fetchDexTokenMeta } from './dex-token-meta'
+import { fetchDexTokenMeta, type TokenMeta } from './dex-token-meta'
 
 /**
  * Run `fn` over `items` with bounded concurrency. The discovery legs call a
@@ -116,6 +116,25 @@ export interface DiscoveryFilters {
    */
   minHolderValueUsd: number
   /**
+   * Ceiling for the share floor (0.004 = never demand more than 0.4% of a
+   * mint). The floor is a USD TARGET expressed as a share of the mint's own
+   * market cap: `min(ceiling, targetUsd / marketCapUsd)`. A fixed share is
+   * wrong in both directions — 0.5% demanded a $3,606 position on a $721k
+   * mint (8.4% of supply, refused a real $577 whale holding 8%), while the
+   * same 0.5% would let $50k of noise into a $10M mint. Measured live on
+   * `WXMRyRZ…`: 20 holders summing to 27% of supply, top holder 3.12%.
+   */
+  maxHolderSharePct: number
+  /** USD size the share floor stands for before clamping (default $1,000). */
+  holderShareTargetUsd: number
+  /**
+   * Min DexScreener liquidity (USD) a called mint needs before its holders
+   * are swept at all. A mint with no tradeable book produces positions whose
+   * mark-to-market is a guess, and the pass spends its holder budget on a
+   * shill that cannot be exited.
+   */
+  minLiquidityUsd: number
+  /**
    * Holder-leg stop after this many consecutive rate-limited calls. The
    * limiter is per-account, so once it blocks us every further token costs a
    * retry storm and returns nothing — but the pass must say so instead of
@@ -166,6 +185,9 @@ export const DISCOVERY_DEFAULTS: DiscoveryFilters = {
   maxEmptyHolderTokens: 2,
   maxStatMeasurements: 150,
   minHolderValueUsd: 10_000,
+  maxHolderSharePct: 0.004,
+  holderShareTargetUsd: 1_000,
+  minLiquidityUsd: 50_000,
   maxRateLimitedTokens: 3,
   trustedCallGroups: null,
   minCallGroups: 2,
@@ -540,6 +562,20 @@ export function buildHolderReason(c: HolderCandidate, conf: CallConfluence | und
   )
 }
 
+/**
+ * The share of a called mint's supply a holder must own to count.
+ *
+ * A fixed share is wrong in both directions: 0.5% of a $721k mint is a $3.6k
+ * position (it refused a real $577 whale holding 8%), while the same 0.5% of
+ * a $10M mint is $50k of noise. So the floor is a USD target restated as a
+ * share of THIS mint's cap, clamped at the ceiling. No measured cap means no
+ * measurement, and the ceiling (the strictest value) applies.
+ */
+export function holderShareFloor(marketCapUsd: number | null, f: DiscoveryFilters): number {
+  if (marketCapUsd === null || !(marketCapUsd > 0)) return f.maxHolderSharePct
+  return Math.min(f.maxHolderSharePct, f.holderShareTargetUsd / marketCapUsd)
+}
+
 
 /**
  * Counters for the holder leg. `missing`/`underFloor`/`bestUsd` describe why
@@ -554,6 +590,12 @@ interface HolderLegAudit {
   underFloor: number
   bestUsd: number
   admitted: number
+  /** Called mints dropped before their holders were read (thin or unmeasured market). */
+  marketSkipped: number
+  /** Holders refused for holding too small a SHARE of the mint they were found in. */
+  thinShare: number
+  /** Largest share seen, as a fraction of supply (0 when none was measured). */
+  bestShare: number
   /** Called-mint holders whose stats call returned (measured past the floor). */
   measured: number
   /** Holders the called-mint sweep produced before any grading. */
@@ -576,6 +618,12 @@ export interface HolderLegCounters {
   underFloor: number
   /** Holders refused because their position value was unmeasured. */
   missing: number
+  /** Called mints dropped for a thin/unmeasured market before their holders were read. */
+  marketSkipped: number
+  /** Holders refused for holding a negligible share of the mint. */
+  thinShare: number
+  /** Largest share of supply seen, as a fraction (0 when none was measured). */
+  bestShare: number
   /** Largest measured position seen, USD (0 when none was measured). */
   bestUsd: number
   ms: number
@@ -799,16 +847,6 @@ async function sweepHighCapHolders(
     const c = feedConf.get(contract)
     return c && c.available && c.present ? c.effectiveGroupCount : 0
   }
-  const calledContracts = [...feedMints]
-    .sort((a, b) => rankOf(b) - rankOf(a) || a.localeCompare(b))
-    .slice(0, f.maxCalledTokens)
-  // The feed's LIVE contracts are all pump.fun-origin, and that is exactly the
-  // shape GMGN's holder endpoint serves — while the established-token leg just
-  // spent `maxEmptyHolderTokens` empty responses on mints it can never read.
-  // Passing that budget in as spent would skip every called mint unmeasured,
-  // so this leg starts from zero: its contracts are known-servable by
-  // construction, and the two legs must not share a stop condition that only
-  // one of them can hit.
   const calledAudit: HolderLegAudit = {
     refused: audit.refused,
     marksPicked: 0,
@@ -816,26 +854,83 @@ async function sweepHighCapHolders(
     underFloor: 0,
     bestUsd: 0,
     admitted: 0,
+    marketSkipped: 0,
+    thinShare: 0,
+    bestShare: 0,
     measured: 0,
     candidates: 0,
-    contracts: calledContracts.length,
+    contracts: 0,
+  }
+  // Liquidity, not confluence, decides WHO gets the budget: measured live,
+  // every one of the feed's top-ranked calls sat at $3k-$38k liquidity and the
+  // leg therefore swept 0 of 6 contracts, while mints with $61k-$110k books
+  // were ranked below them and never looked at. A mint too thin to trade is a
+  // skipped mint whatever the call weight, so the market rows are fetched for
+  // the whole feed and the qualifying ones are ranked by confluence after.
+  const calledMarkets = await fetchDexTokenMeta(feedMints).catch(
+    () => new Map<string, TokenMeta>(),
+  )
+  const calledMarketFloor = (contract: string): string | null => {
+    const row = calledMarkets.get(contract)
+    if (!row) return `market unmeasured by DexScreener (cannot prove a tradeable book)`
+    if (row.liquidityUsd === null) return `liquidity unreported by DexScreener (cannot prove $${Math.round(f.minLiquidityUsd).toLocaleString('en-US')})`
+    if (row.liquidityUsd < f.minLiquidityUsd) {
+      return `mint liquidity $${Math.round(row.liquidityUsd).toLocaleString('en-US')} (BELOW $${Math.round(f.minLiquidityUsd).toLocaleString('en-US')} floor)`
+    }
+    return null
+  }
+  const tradeable = feedMints.filter((c) => calledMarketFloor(c) === null)
+  const calledContracts = [...tradeable]
+    .sort((a, b) => rankOf(b) - rankOf(a) || a.localeCompare(b))
+    .slice(0, f.maxCalledTokens)
+  // Holdings in a quoted price USD, not size ON ITS OWN: measured live, a
+  // $73.6M call-feed mint returned a $463k holder whose share was 0.6% —
+  // concentrated in raw dollars and irrelevant to the token's price. A thin
+  // mint returns the opposite shape: $100k total value, the same wallet
+  // holding 6%. Raw USD alone cannot separate the two, so a called mint must
+  // also show a real market and a real SHARE before its holders are sized.
+  const servedCalls: string[] = []
+  const skippedCalls: Array<{ contract: string; reason: string }> = []
+  for (const c of calledContracts) {
+    const short = calledMarketFloor(c)
+    if (short === null) {
+      servedCalls.push(c)
+      continue
+    }
+    skippedCalls.push({ contract: c, reason: short })
+  }
+  // The feed's LIVE contracts are all pump.fun-origin, and that is exactly the
+  // shape GMGN's holder endpoint serves — while the established-token leg just
+  // spent `maxEmptyHolderTokens` empty responses on mints it can never read.
+  // Passing that budget in as spent would skip every called mint unmeasured,
+  // so this leg starts from zero: its contracts are known-servable by
+  // construction, and the two legs must not share a stop condition that only
+  // one of them can hit.
+  calledAudit.contracts = servedCalls.length
+  // Thin mints are reported even when they were never budgeted: a log that
+  // only counts the sliced contracts makes "the feed called nothing tradeable"
+  // and "the legs were never asked" produce the same line.
+  calledAudit.marketSkipped = skippedCalls.length
+  for (const s of skippedCalls) {
+    audit.refused.push({ address: s.contract, reason: `called mint not swept: ${s.reason}` })
   }
   const tC = Date.now()
-  const calledHolders = await collectCalledHolders(calledContracts, f, calledAudit, calledContracts.length)
+  const calledHolders = await collectCalledHolders(servedCalls, f, calledAudit, servedCalls.length)
   const cMs = Date.now() - tC
   calledAudit.candidates = calledHolders.length
-  if (calledContracts.length > 0) {
-    // `confluence` is the holder leg's lookup; the feed-wide map is already
-    // keyed by the same contracts, so it is reused rather than re-read.
-    for (const [contract, conf] of feedConf) {
-      if (calledContracts.includes(contract) && !confluence.has(contract)) confluence.set(contract, conf)
+  if (servedCalls.length > 0) {
+    // Only SWEPT contracts enter: a skipped mint's holders were never read, so
+    // tagging it would claim evidence the pass does not have.
+    for (const c of servedCalls) {
+      const conf = feedConf.get(c)
+      if (conf && !confluence.has(c)) confluence.set(c, conf)
     }
     const calledConf = new Map<string, CallConfluence>()
-    for (const c of calledContracts) {
+    for (const c of servedCalls) {
       const conf = feedConf.get(c)
       if (conf) calledConf.set(c, conf)
     }
-    readGroups(callGroups, calledContracts, calledConf, f.minCallGroups)
+    readGroups(callGroups, servedCalls, calledConf, f.minCallGroups)
   }
   // Leg B2 — persisted holdings of established tokens. The live established
   // leg above cannot produce holders: GMGN serves the holders endpoint only
@@ -889,6 +984,39 @@ async function sweepHighCapHolders(
             `(BELOW $${Math.round(f.minHolderValueUsd).toLocaleString('en-US')} floor)`,
         })
         continue
+      }
+      // Size in USD alone cannot tell a whale from dust on a called mint: a
+      // $73.6M mint's $463k holder is 0.6% of it (irrelevant to price), while
+      // a $100k mint's $577 holder is 8% (the whole trade). The share is the
+      // price-guard question the operator's "10 wallets holding" rule asks,
+      // per wallet — but a FIXED share is wrong in both directions, so the
+      // floor is a USD target expressed in the mint's own supply:
+      // `min(ceiling, targetUsd / marketCapUsd)`. A mint with no measured cap
+      // gets the ceiling (strict), never a free pass. An unmeasured share is
+      // not a pass.
+      if (c.leg === 'called-contracts') {
+        if (c.pctOfSupply === null) {
+          counter.missing++
+          audit.refused.push({
+            address: c.address,
+            reason: 'holder share unmeasured - GMGN row carried no supply percentage',
+          })
+          continue
+        }
+        counter.bestShare = Math.max(counter.bestShare, c.pctOfSupply)
+        const mc = calledMarkets.get(c.tokenContract)?.marketCapUsd ?? null
+        const floor = holderShareFloor(mc, f)
+        if (c.pctOfSupply < floor) {
+          counter.thinShare++
+          audit.refused.push({
+            address: c.address,
+            reason:
+              `holder share ${(c.pctOfSupply * 100).toFixed(3)}% of supply ` +
+              `(BELOW ${(floor * 100).toFixed(3)}% share floor` +
+              `${mc === null ? ', mint cap unmeasured so the ceiling applies' : ` at MC $${Math.round(mc).toLocaleString('en-US')}`})`,
+          })
+          continue
+        }
       }
     }
     const stats = statsList[i]
@@ -978,6 +1106,9 @@ async function sweepHighCapHolders(
       measured: calledAudit.measured,
       underFloor: calledAudit.underFloor,
       missing: calledAudit.missing,
+      marketSkipped: calledAudit.marketSkipped,
+      thinShare: calledAudit.thinShare,
+      bestShare: calledAudit.bestShare,
       bestUsd: calledAudit.bestUsd,
       ms: cMs,
     },
@@ -988,6 +1119,9 @@ async function sweepHighCapHolders(
       measured: persisted.measured,
       underFloor: persisted.underFloor,
       missing: persisted.missing,
+      marketSkipped: persisted.marketSkipped,
+      thinShare: persisted.thinShare,
+      bestShare: persisted.bestShare,
       bestUsd: persisted.bestUsd,
       ms: pMs,
     },
@@ -1090,6 +1224,9 @@ interface PersistedHoldings {
   measured: number
   underFloor: number
   missing: number
+  marketSkipped: number
+  thinShare: number
+  bestShare: number
   bestUsd: number
 }
 
@@ -1127,6 +1264,9 @@ async function sweepPersistedHoldings(
     measured: 0,
     underFloor: 0,
     missing: 0,
+    marketSkipped: 0,
+    thinShare: 0,
+    bestShare: 0,
     bestUsd: 0,
   }
   // Token selection happens BEFORE any slice. Ordering the groupBy so the
@@ -1238,6 +1378,13 @@ export interface DiscoveryResult {
    * (sized over the USD floor, HUMAN). Owned by its own leg because the live
    * established leg cannot return holders at all. */
   persistedHoldingLeg: number
+  /**
+   * Per-leg audit of the called and replayed holder legs. The leg totals
+   * above are just `admitted`; without these the operator cannot tell a
+   * thin-market refusal (skipped before any holder read) from a size or
+   * share refusal, and all three print as "0 admitted".
+   */
+  holderLegs: { called: HolderLegCounters; persisted: HolderLegCounters }
   /** Call-group join outcome for the holder leg; see CallGroupsReport. */
   callGroups: CallGroupsReport
 }
@@ -1268,6 +1415,9 @@ export async function runWalletDiscovery(
     underFloor: 0,
     bestUsd: 0,
     admitted: 0,
+    marketSkipped: 0,
+    thinShare: 0,
+    bestShare: 0,
     measured: 0,
     candidates: 0,
     contracts: 0,
@@ -1324,8 +1474,10 @@ export async function runWalletDiscovery(
     `wallet discovery legs: leaderboard=${leaderboard.length} in ${aMs}ms, ` +
       `highCapHolders=${holderSweep.highCapAdmitted} admitted of ${holderSweep.wallets.length - holderSweep.called.admitted - holderSweep.persisted.admitted} graded in ${bMs}ms, ` +
       `calledHolders=${holderSweep.called.admitted} of ${holderSweep.called.candidates} swept ` +
-      `from ${holderSweep.called.contracts} feed contract(s) ` +
-      `(underFloor=${holderSweep.called.underFloor} noMark=${holderSweep.called.missing} ` +
+      `from ${holderSweep.called.contracts}/${holderSweep.called.marketSkipped + holderSweep.called.contracts} ` +
+      `feed contract(s) (thinMarket=${holderSweep.called.marketSkipped} ` +
+      `thinShare=${holderSweep.called.thinShare} bestShare=${(holderSweep.called.bestShare * 100).toFixed(2)}% ` +
+      `underFloor=${holderSweep.called.underFloor} noMark=${holderSweep.called.missing} ` +
       `bestMark=$${Math.round(holderSweep.called.bestUsd).toLocaleString('en-US')} ` +
       `statsMeasured=${holderSweep.called.measured}) ` +
       `in ${holderSweep.called.ms}ms, ` +
@@ -1388,6 +1540,7 @@ export async function runWalletDiscovery(
     highCapLeg: holderSweep.highCapAdmitted,
     calledContractLeg: holderSweep.called.admitted,
     persistedHoldingLeg: holderSweep.persisted.admitted,
+    holderLegs: { called: holderSweep.called, persisted: holderSweep.persisted },
     callGroups,
   }
 }

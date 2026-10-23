@@ -15,6 +15,7 @@ import {
   classifyHuman,
   DISCOVERY_DEFAULTS,
   emptyCallGroups,
+  holderShareFloor,
   readGroups,
   type DiscoveredWallet,
   type DiscoveryFilters,
@@ -250,5 +251,32 @@ describe('readGroups — the operator\'s "tag which group called each CA" join',
     readGroups(report, [], new Map(), 2)
     expect(report.feedAvailable).toBe(false)
     expect(report.tokensQueried).toBe(0)
+  })
+})
+
+describe('holderShareFloor — a USD target restated in the mint\'s own supply', () => {
+  it('demands a real share on a thin mint (a $1k target is 8.3% of a $12k cap)', () => {
+    // Clamped by the ceiling: a $12k mint cannot be asked for 8% of supply.
+    expect(holderShareFloor(12_000, F)).toBe(F.maxHolderSharePct)
+  })
+
+  it('lets a 0.8% holder of a $721k mint through (floor is $1k of that cap)', () => {
+    const floor = holderShareFloor(721_088, F)
+    expect(floor).toBeCloseTo(1_000 / 721_088, 10)
+    expect(0.008).toBeGreaterThan(floor)
+  })
+
+  it('keeps a 0.8% holder of a $73.6M mint out (0.8% there is $589k, not $577)', () => {
+    // The same share means a wildly different position: $1k of a $73.6M cap is
+    // 0.00136%, so a wallet at 0.8% of it holds ~$589k and is a real whale.
+    const floor = holderShareFloor(73_600_000, F)
+    expect(floor).toBeCloseTo(1_000 / 73_600_000, 12)
+    expect(0.008).toBeGreaterThan(floor)
+  })
+
+  it('applies the ceiling when the cap is unmeasured (no measurement is not a pass)', () => {
+    expect(holderShareFloor(null, F)).toBe(F.maxHolderSharePct)
+    expect(holderShareFloor(0, F)).toBe(F.maxHolderSharePct)
+    expect(holderShareFloor(Number.NaN, F)).toBe(F.maxHolderSharePct)
   })
 })
