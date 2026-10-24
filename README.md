@@ -59,6 +59,10 @@ Eight collapsible sections, 108 unique destinations, zero duplicate `href` and z
   - **Persistence**: User mode preference persists across reloads via `localStorage` (`nexus_nav_mode`).
   - **Visual Badges**: Subtle indicator pills (`HOT`, `ID`, `PRO`, `AI`) highlight key Indonesian (`/saham`), high-conviction, and trending tools.
 
+- **Unified Mega Search Popup & Command Palette (`GlobalSearch.tsx` + `CommandBar.tsx`)**:
+  - **Click & Keyboard Triggers**: Clicking the TopBar search bar or pressing `⌘K` / `Ctrl+K` or `/` opens a centralized, full-screen overlay modal (`max-w-4xl`).
+  - **Raycast/Linear Split-View**: Left column provides keyboard-navigable (`↑`/`↓`) categorized results across Navigation Pages, Market Assets (Indices, Stocks, Commodities, Crypto), Trader Profiles, and Bloomberg Terminal Commands. Right column provides a real-time Preview Pane displaying item descriptions, target destinations, and execution syntax.
+  - **Zero-Query Quick Jumps**: Opening the modal with an empty query displays curated essential shortcuts (`Dashboard`, `AI Signals`, `IDX Saham`, `Smart Money`, `Meme Sniper`) and top executable commands (`KIMCHI`, `FEAR`, `NEWS ID`, `SCREENER`) instead of a blank frame.
 | Section | Purpose | Representative entries |
 |---|---|---|
 | Dashboard | Command center, holdings, operator state | `/dashboard`, `/watchlist`, `/alerts`, `/account`, `/following`, `/portfolio`, `/pnl`, `/status` |
