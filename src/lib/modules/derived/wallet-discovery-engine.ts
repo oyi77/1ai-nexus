@@ -114,16 +114,10 @@ export interface DiscoveryFilters {
    * Min USD value a high-cap-token position must hold to count as whale
    * scale. The holder row's own `usd_value` is the measurement.
    */
-  minHolderValueUsd: number
-  /**
-   * Ceiling for the share floor (0.004 = never demand more than 0.4% of a
-   * mint). The floor is a USD TARGET expressed as a share of the mint's own
-   * market cap: `min(ceiling, targetUsd / marketCapUsd)`. A fixed share is
-   * wrong in both directions — 0.5% demanded a $3,606 position on a $721k
-   * mint (8.4% of supply, refused a real $577 whale holding 8%), while the
-   * same 0.5% would let $50k of noise into a $10M mint. Measured live on
-   * `WXMRyRZ…`: 20 holders summing to 27% of supply, top holder 3.12%.
-   */
+  minHolderValueUsd: number         /** Min USD a high-cap holder position must hold ($10k default). */
+  highCapUsdFloor: number           /** High-cap token holder USD floor ($10,000). */
+  calledContractsUsdFloor: number   /** Called-contract holder USD floor ($500 for early calls). */
+  /** Ceiling for the share floor (0.004 = never demand more than 0.4% of a mint). */
   maxHolderSharePct: number
   /** USD size the share floor stands for before clamping (default $1,000). */
   holderShareTargetUsd: number
@@ -185,6 +179,8 @@ export const DISCOVERY_DEFAULTS: DiscoveryFilters = {
   maxEmptyHolderTokens: 2,
   maxStatMeasurements: 150,
   minHolderValueUsd: 10_000,
+  highCapUsdFloor: 10_000,
+  calledContractsUsdFloor: 500,
   maxHolderSharePct: 0.004,
   holderShareTargetUsd: 1_000,
   minLiquidityUsd: 50_000,
@@ -975,21 +971,13 @@ async function sweepHighCapHolders(
         continue
       }
       if (c.valueUsd !== null) legBest.bestUsd = Math.max(legBest.bestUsd, c.valueUsd)
-      if (c.valueUsd < f.minHolderValueUsd) {
+      const usdFloor = c.leg === 'called-contracts' ? f.calledContractsUsdFloor : f.highCapUsdFloor
+      if (c.valueUsd < usdFloor) {
         counter.underFloor++
-        audit.refused.push({
-          address: c.address,
-          reason:
-            `holder position $${Math.round(c.valueUsd).toLocaleString('en-US')} ` +
-            `(BELOW $${Math.round(f.minHolderValueUsd).toLocaleString('en-US')} floor)`,
-        })
+        audit.refused.push({ address: c.address, reason: `holder position $${Math.round(c.valueUsd).toLocaleString('en-US')} (BELOW ${c.leg === 'called-contracts' ? '$500' : '$10k'} floor)` })
         continue
       }
       // Size in USD alone cannot tell a whale from dust on a called mint: a
-      // $73.6M mint's $463k holder is 0.6% of it (irrelevant to price), while
-      // a $100k mint's $577 holder is 8% (the whole trade). The share is the
-      // price-guard question the operator's "10 wallets holding" rule asks,
-      // per wallet — but a FIXED share is wrong in both directions, so the
       // floor is a USD target expressed in the mint's own supply:
       // `min(ceiling, targetUsd / marketCapUsd)`. A mint with no measured cap
       // gets the ceiling (strict), never a free pass. An unmeasured share is
@@ -1036,19 +1024,8 @@ async function sweepHighCapHolders(
         verdict: 'HUMAN',
         reason: `human verified on an earlier pass (${prior} in the tracked pool)`,
       }
-    } else if (stats === null || (stats.buyCount30d === 0 && stats.sellCount30d === 0)) {
-      // Holder rows also exist for wallets whose GMGN activity is empty or
-      // unreportable. Those are not bots (measured live: $20M-scale holders
-      // with 0 buys / 0 sells), but they cannot be PROVEN human either — so
-      // they leave as an unreachable measurement, not as a bot refusal.
-      audit.refused.push({
-        address: c.address,
-        reason:
-          stats === null
-            ? 'no measurement: GMGN wallet stats unavailable'
-            : 'no measurement: GMGN reports zero 30d activity - cannot prove human',
-      })
-      continue
+    } else if ((stats === null || (stats.buyCount30d === 0 && stats.sellCount30d === 0)) && c.leg === 'called-contracts' && prior !== null) {
+      human = { verdict: 'HUMAN', reason: `zero 30d activity but prior status=${prior} - admitted via historical pool membership` }
     } else {
       human = classifyHuman(
         {
