@@ -228,9 +228,84 @@ async function fearGreed(): Promise<{ score: number; regime: string } | null> {
   } catch { return null }
 }
 
+/** US Treasury yield curve slope (10Y-2Y and 10Y-3M). */
+async function macroYieldCurve(): Promise<{
+  spread2y: number
+  spread3m: number
+  regime: 'inverted' | 'steepening' | 'normalizing'
+  date: string
+} | null> {
+  try {
+    const rows = await prisma.macroDataPoint.findMany({
+      where: { seriesId: { in: ['T10Y2Y', 'T10Y3M'] } },
+      orderBy: { date: 'desc' },
+      take: 4,
+    })
+    const row2y = rows.find((r) => r.seriesId === 'T10Y2Y')
+    const row3m = rows.find((r) => r.seriesId === 'T10Y3M')
+    if (!row2y || !row3m) return null
+
+    const spread2y = Math.round(row2y.value * 100) / 100
+    const spread3m = Math.round(row3m.value * 100) / 100
+
+    let regime: 'inverted' | 'steepening' | 'normalizing' = 'normalizing'
+    if (spread2y < 0 || spread3m < 0) {
+      regime = 'inverted'
+    } else if (spread2y >= 0.5 || spread3m >= 1.0) {
+      regime = 'steepening'
+    }
+
+    const d = row2y.date ? new Date(row2y.date).toISOString().slice(0, 10) : ''
+    return { spread2y, spread3m, regime, date: d }
+  } catch {
+    return null
+  }
+}
+
+/** US Corporate Baa credit spread over 10Y Treasury (BAA10Y). */
+async function macroCreditSpread(): Promise<{
+  spread: number
+  z: number | null
+  regime: 'widening_stress' | 'compressed_calm' | 'moderate'
+  date: string
+} | null> {
+  try {
+    const rows = await prisma.macroDataPoint.findMany({
+      where: { seriesId: 'BAA10Y' },
+      orderBy: { date: 'desc' },
+      take: 30,
+    })
+    if (!rows.length) return null
+    const current = Math.round(rows[0].value * 100) / 100
+
+    let z: number | null = null
+    if (rows.length >= 10) {
+      const vals = rows.map((r) => r.value)
+      const mean = vals.reduce((a, b) => a + b, 0) / vals.length
+      const variance = vals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (vals.length - 1)
+      const sd = Math.sqrt(variance)
+      if (sd > 0) {
+        z = Math.round(((current - mean) / sd) * 100) / 100
+      }
+    }
+
+    let regime: 'widening_stress' | 'compressed_calm' | 'moderate' = 'moderate'
+    if (current >= 2.0 || (z != null && z >= 1.5)) {
+      regime = 'widening_stress'
+    } else if (current <= 1.5 || (z != null && z <= -1.0)) {
+      regime = 'compressed_calm'
+    }
+
+    const d = rows[0].date ? new Date(rows[0].date).toISOString().slice(0, 10) : ''
+    return { spread: current, z, regime, date: d }
+  } catch {
+    return null
+  }
+}
+
 export async function buildInsightBrief(): Promise<InsightBrief> {
-  const { data } = await getCached<InsightBrief>('insight-brief:v8', CACHE_TTL, async () => {
-    const [tails, funding, foreign, sectors, fg, fCells, sCells, gCells] = await Promise.all([
+  const { data } = await getCached<InsightBrief>('insight-brief:v9', CACHE_TTL, async () => {
+    const [tails, funding, foreign, sectors, fg, fCells, sCells, gCells, curve, credit] = await Promise.all([
       idxTailRates(),
       fundingExtremes(),
       idxForeignFlow(),
@@ -239,6 +314,8 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
       getFundingCells(),
       getSectorCells(),
       getForeignCells(),
+      macroYieldCurve(),
+      macroCreditSpread(),
     ])
 
     const tx: Transmission[] = []
@@ -336,6 +413,56 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
         ],
         confidence: 50,
         unproven: true,
+      })
+    }
+
+    // 5) Macro Yield Curve regime → macro transmission to Equities and Risk Assets
+    if (curve) {
+      const isBearish = curve.regime === 'inverted'
+      const isBullish = curve.regime === 'steepening'
+      const dir = isBearish ? 'bearish' : isBullish ? 'bullish' : 'neutral'
+      tx.push({
+        id: 'macro-yield-curve',
+        from: `US yield curve (10Y-2Y ${curve.spread2y >= 0 ? '+' : ''}${curve.spread2y.toFixed(2)}%, 10Y-3M ${curve.spread3m >= 0 ? '+' : ''}${curve.spread3m.toFixed(2)}%)`,
+        to: ['Global Equities', 'IDX Financials', 'Crypto Liquidity'],
+        direction: dir,
+        narrative: isBearish
+          ? `Yield curve inverted (10Y-2Y at ${curve.spread2y}%). Tighter monetary conditions; late-cycle recession signal.`
+          : isBullish
+            ? `Yield curve steepening (10Y-2Y at +${curve.spread2y}%). Un-inversion expansion tailwind for banks and cyclical equities.`
+            : `Yield curve normalizing in positive territory (10Y-2Y at +${curve.spread2y}%). Neutral macro monetary backdrop.`,
+        evidence: [
+          { metric: '10Y-2Y spread', value: `${curve.spread2y}%`, source: 'FRED T10Y2Y' },
+          { metric: '10Y-3M spread', value: `${curve.spread3m}%`, source: 'FRED T10Y3M' },
+          { metric: 'curve regime', value: curve.regime, source: 'MacroDataPoint' },
+        ],
+        confidence: isBearish || isBullish ? 65 : 50,
+        unproven: false,
+      })
+    }
+
+    // 6) Macro Credit Spread regime → credit risk and liquidity transmission
+    if (credit) {
+      const isStress = credit.regime === 'widening_stress'
+      const isCalm = credit.regime === 'compressed_calm'
+      const dir = isStress ? 'bearish' : isCalm ? 'bullish' : 'neutral'
+      tx.push({
+        id: 'macro-credit-spread',
+        from: `Baa credit spread ${credit.spread.toFixed(2)}% (${credit.z != null ? `${credit.z >= 0 ? '+' : ''}${credit.z}σ` : credit.regime})`,
+        to: ['Corporate Debt', 'Growth Equities', 'High-Beta Crypto'],
+        direction: dir,
+        narrative: isStress
+          ? `Baa corporate credit spread widened to ${credit.spread}%. Rising default risk premia; headwind for high-beta and corporate credit.`
+          : isCalm
+            ? `Baa corporate credit spread compressed at ${credit.spread}%. Benign credit default risk; supportive liquidity backdrop.`
+            : `Baa corporate credit spread moderate at ${credit.spread}%. Neutral credit transmission.`,
+        evidence: [
+          { metric: 'Baa-10Y spread', value: `${credit.spread}%`, source: 'FRED BAA10Y' },
+          ...(credit.z != null ? [{ metric: 'spread z-score', value: `${credit.z}σ`, source: 'MacroDataPoint' }] : []),
+          { metric: 'credit regime', value: credit.regime, source: 'MacroDataPoint' },
+        ],
+        confidence: isStress || isCalm ? 62 : 50,
+        unproven: false,
       })
     }
 

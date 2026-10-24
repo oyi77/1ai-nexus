@@ -46,6 +46,7 @@ vi.mock('@/lib/db', () => ({
     alphaTrackRecord: { findMany: vi.fn() },
     idxSahamSession: { findMany: vi.fn() },
     sentimentSnapshot: { findMany: vi.fn() },
+    macroDataPoint: { findMany: vi.fn() },
     $queryRaw: vi.fn(),
   },
 }))
@@ -79,6 +80,7 @@ describe('insight-brief transmission engine', () => {
     m(prisma.alphaTrackRecord.findMany).mockResolvedValue([] as never)
     m(prisma.idxSahamSession.findMany).mockResolvedValue([] as never)
     m(prisma.sentimentSnapshot.findMany).mockResolvedValue([] as never)
+    m(prisma.macroDataPoint.findMany).mockResolvedValue([] as never)
     mockRaw({})
   })
 
@@ -193,6 +195,76 @@ describe('insight-brief transmission engine', () => {
     expect(leg!.measured!.n).toBe(216)
   })
 
+
+  it('emits macro-yield-curve transmission with correct regime and direction', async () => {
+    // Inverted curve scenario: 10Y-2Y < 0
+    m(prisma.macroDataPoint.findMany).mockImplementation(((args: { where?: { seriesId?: unknown } }) => {
+      const sid = args?.where?.seriesId
+      if (typeof sid === 'object' && sid !== null && 'in' in sid) {
+        return Promise.resolve([
+          { seriesId: 'T10Y2Y', value: -0.25, date: new Date('2026-10-23') },
+          { seriesId: 'T10Y3M', value: -0.45, date: new Date('2026-10-23') },
+        ])
+      }
+      return Promise.resolve([])
+    }) as never)
+
+    let brief = await buildInsightBrief()
+    let curveLeg = brief.transmissions.find((t) => t.id === 'macro-yield-curve')
+    expect(curveLeg).toBeDefined()
+    expect(curveLeg!.direction).toBe('bearish')
+    expect(curveLeg!.evidence.some((e) => e.metric === '10Y-2Y spread' && e.value === '-0.25%')).toBe(true)
+
+    // Steepening expansion scenario: 10Y-2Y >= 0.5
+    m(prisma.macroDataPoint.findMany).mockImplementation(((args: { where?: { seriesId?: unknown } }) => {
+      const sid = args?.where?.seriesId
+      if (typeof sid === 'object' && sid !== null && 'in' in sid) {
+        return Promise.resolve([
+          { seriesId: 'T10Y2Y', value: 0.65, date: new Date('2026-10-23') },
+          { seriesId: 'T10Y3M', value: 1.15, date: new Date('2026-10-23') },
+        ])
+      }
+      return Promise.resolve([])
+    }) as never)
+
+    brief = await buildInsightBrief()
+    curveLeg = brief.transmissions.find((t) => t.id === 'macro-yield-curve')
+    expect(curveLeg).toBeDefined()
+    expect(curveLeg!.direction).toBe('bullish')
+  })
+
+  it('emits macro-credit-spread transmission when credit spread points exist', async () => {
+    // Stressed spread scenario: BAA10Y >= 2.0%
+    m(prisma.macroDataPoint.findMany).mockImplementation(((args: { where?: { seriesId?: unknown } }) => {
+      if (args?.where?.seriesId === 'BAA10Y') {
+        return Promise.resolve([
+          { seriesId: 'BAA10Y', value: 2.35, date: new Date('2026-10-22') },
+        ])
+      }
+      return Promise.resolve([])
+    }) as never)
+
+    let brief = await buildInsightBrief()
+    let creditLeg = brief.transmissions.find((t) => t.id === 'macro-credit-spread')
+    expect(creditLeg).toBeDefined()
+    expect(creditLeg!.direction).toBe('bearish')
+    expect(creditLeg!.evidence.some((e) => e.metric === 'Baa-10Y spread' && e.value === '2.35%')).toBe(true)
+
+    // Compressed calm scenario: BAA10Y <= 1.5%
+    m(prisma.macroDataPoint.findMany).mockImplementation(((args: { where?: { seriesId?: unknown } }) => {
+      if (args?.where?.seriesId === 'BAA10Y') {
+        return Promise.resolve([
+          { seriesId: 'BAA10Y', value: 1.42, date: new Date('2026-10-22') },
+        ])
+      }
+      return Promise.resolve([])
+    }) as never)
+
+    brief = await buildInsightBrief()
+    creditLeg = brief.transmissions.find((t) => t.id === 'macro-credit-spread')
+    expect(creditLeg).toBeDefined()
+    expect(creditLeg!.direction).toBe('bullish')
+  })
   it('survives empty data — brief still returns a regime, no throw', async () => {
     const brief = await buildInsightBrief()
     expect(['risk-on', 'risk-off', 'mixed']).toContain(brief.regime)
