@@ -47,8 +47,15 @@ NEXUS is an **open-source finance intelligence platform** for traders, analysts,
 ## Information Architecture
 
 The shell is an **OPERATE / MONITOR surface**: dense, left-aligned, no hero sections, no marketing copy. Navigation lives in `src/lib/config/nav.ts` as a single typed structure — changing the source file is the only way to change the sidebar, so routes and nav can never drift apart.
-
 Eight collapsible sections, 108 unique destinations, zero duplicate `href` and zero duplicate React `key` (enforced by `src/lib/config/__tests__/nav.test.ts`).
+
+### Progressive Disclosure & Active Matcher Engine
+- **Precision Active Matcher (`src/lib/config/nav-matcher.ts`)**: Resolves active navigation items via deterministic specificity scoring (`getActiveNavHref`). Eliminates prefix collisions (navigating to `/meme/sniper` activates `/meme/sniper` and never greedily matches `/meme`) and handles query parameter tabs (navigating to `/signals?tab=alpha` activates `/signals?tab=alpha` over base `/signals`). Only one navigation item across the entire sidebar receives active status.
+- **Simple vs Pro Navigation Modes**: Integrated segmented mode toggle in the sidebar header:
+  - **Simple Mode**: Curated 14 primary essential tools across core sections (`/dashboard`, `/watchlist`, `/portfolio`, `/signals`, `/signals?tab=alpha`, `/fear-greed`, `/screener`, `/saham`, `/trending`, `/smart-money`, `/whale-cluster`, `/copy-trading`, `/meme/sniper`, `/meme/risk`). Eliminates cognitive overload for casual users.
+  - **Pro Mode**: Full 108 instruments and forensic tools with visual sub-category headers (`Core & Screeners`, `Indonesian & Equities`, `Crypto & Tokens`, `TradFi & Derivatives`, `Whales & Smart Money`, `DEX Radar & Scanners`, `DeFi & Yields`, `Ecosystem & Macro`).
+  - **Persistence**: User mode preference persists across reloads via `localStorage` (`nexus_nav_mode`).
+  - **Visual Badges**: Subtle indicator pills (`HOT`, `ID`, `PRO`, `AI`) highlight key Indonesian (`/saham`), high-conviction, and trending tools.
 
 | Section | Purpose | Representative entries |
 |---|---|---|
