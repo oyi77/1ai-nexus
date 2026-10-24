@@ -22,7 +22,8 @@ import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 //   WALLET_DISCOVERY_CALLED_HOLDER_USD min called-contract holder position size USD (default 500)
 //   WALLET_DISCOVERY_MAX_HOLDER_SHARE ceiling share of a called mint's supply (default 0.004)
 //   WALLET_DISCOVERY_HOLDER_SHARE_USD USD size that ceiling stands for (default 1_000)
-//   WALLET_DISCOVERY_MIN_LIQUIDITY    min DexScreener liquidity for a called mint (default 50_000)
+//   WALLET_DISCOVERY_MIN_LIQUIDITY    min DexScreener liquidity for high-cap mints (default 50_000)
+//   WALLET_DISCOVERY_CALLED_MIN_LIQUIDITY min DexScreener liquidity for called mints (default 10_000)
 //   WALLET_DISCOVERY_MAX_CALLED     call-feed contracts swept (default 8)
 //   WALLET_DISCOVERY_MAX_PERSISTED  established contracts replayed from
 //                                   TokenHolding (default 10)
@@ -91,6 +92,10 @@ async function main(): Promise<void> {
     maxHolderSharePct: numEnv('WALLET_DISCOVERY_MAX_HOLDER_SHARE', DISCOVERY_DEFAULTS.maxHolderSharePct),
     holderShareTargetUsd: numEnv('WALLET_DISCOVERY_HOLDER_SHARE_USD', DISCOVERY_DEFAULTS.holderShareTargetUsd),
     minLiquidityUsd: numEnv('WALLET_DISCOVERY_MIN_LIQUIDITY', DISCOVERY_DEFAULTS.minLiquidityUsd),
+    calledMinLiquidityUsd: numEnv(
+      'WALLET_DISCOVERY_CALLED_MIN_LIQUIDITY',
+      DISCOVERY_DEFAULTS.calledMinLiquidityUsd,
+    ),
     maxRateLimitedTokens: numEnv('WALLET_DISCOVERY_MAX_429', DISCOVERY_DEFAULTS.maxRateLimitedTokens),
     minCallGroups: numEnv('WALLET_DISCOVERY_MIN_CALL_GROUPS', DISCOVERY_DEFAULTS.minCallGroups),
     trustedCallGroups: listEnv('WALLET_DISCOVERY_TRUSTED_GROUPS', DISCOVERY_DEFAULTS.trustedCallGroups),

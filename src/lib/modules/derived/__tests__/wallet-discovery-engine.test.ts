@@ -280,3 +280,24 @@ describe('holderShareFloor — a USD target restated in the mint\'s own supply',
     expect(holderShareFloor(Number.NaN, F)).toBe(F.maxHolderSharePct)
   })
 })
+describe('per-leg floors and liquidity decoupling', () => {
+  it('DISCOVERY_DEFAULTS specifies distinct USD floors for high-cap vs called mints', () => {
+    expect(DISCOVERY_DEFAULTS.highCapUsdFloor).toBe(10_000)
+    expect(DISCOVERY_DEFAULTS.calledContractsUsdFloor).toBe(500)
+    expect(DISCOVERY_DEFAULTS.calledMinLiquidityUsd).toBe(10_000)
+    expect(DISCOVERY_DEFAULTS.minLiquidityUsd).toBe(50_000)
+  })
+
+  it('permits called mints with $15k liquidity to pass when high-cap floor demands $50k', () => {
+    const calledLiquidity = 15_000
+    const highCapLiquidity = 15_000
+    expect(calledLiquidity).toBeGreaterThanOrEqual(DISCOVERY_DEFAULTS.calledMinLiquidityUsd)
+    expect(highCapLiquidity).toBeLessThan(DISCOVERY_DEFAULTS.minLiquidityUsd)
+  })
+
+  it('permits early call-feed holders with $800 position to pass calledContractsUsdFloor', () => {
+    const earlyHolderPositionUsd = 800
+    expect(earlyHolderPositionUsd).toBeGreaterThanOrEqual(DISCOVERY_DEFAULTS.calledContractsUsdFloor)
+    expect(earlyHolderPositionUsd).toBeLessThan(DISCOVERY_DEFAULTS.highCapUsdFloor)
+  })
+})

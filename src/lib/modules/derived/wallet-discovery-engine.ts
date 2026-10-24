@@ -129,6 +129,12 @@ export interface DiscoveryFilters {
    */
   minLiquidityUsd: number
   /**
+   * Min DexScreener liquidity (USD) a called mint needs before its holders
+   * are swept at all (default $10,000). Called mints are newer, so demanding
+   * $50k drops promising breakout tokens before holders can be sized.
+   */
+  calledMinLiquidityUsd: number
+  /**
    * Holder-leg stop after this many consecutive rate-limited calls. The
    * limiter is per-account, so once it blocks us every further token costs a
    * retry storm and returns nothing — but the pass must say so instead of
@@ -184,6 +190,7 @@ export const DISCOVERY_DEFAULTS: DiscoveryFilters = {
   maxHolderSharePct: 0.004,
   holderShareTargetUsd: 1_000,
   minLiquidityUsd: 50_000,
+  calledMinLiquidityUsd: 10_000,
   maxRateLimitedTokens: 3,
   trustedCallGroups: null,
   minCallGroups: 2,
@@ -866,12 +873,13 @@ async function sweepHighCapHolders(
   const calledMarkets = await fetchDexTokenMeta(feedMints).catch(
     () => new Map<string, TokenMeta>(),
   )
+  const calledLiqFloor = f.calledMinLiquidityUsd ?? f.minLiquidityUsd
   const calledMarketFloor = (contract: string): string | null => {
     const row = calledMarkets.get(contract)
     if (!row) return `market unmeasured by DexScreener (cannot prove a tradeable book)`
-    if (row.liquidityUsd === null) return `liquidity unreported by DexScreener (cannot prove $${Math.round(f.minLiquidityUsd).toLocaleString('en-US')})`
-    if (row.liquidityUsd < f.minLiquidityUsd) {
-      return `mint liquidity $${Math.round(row.liquidityUsd).toLocaleString('en-US')} (BELOW $${Math.round(f.minLiquidityUsd).toLocaleString('en-US')} floor)`
+    if (row.liquidityUsd === null) return `liquidity unreported by DexScreener (cannot prove $${Math.round(calledLiqFloor).toLocaleString('en-US')})`
+    if (row.liquidityUsd < calledLiqFloor) {
+      return `mint liquidity $${Math.round(row.liquidityUsd).toLocaleString('en-US')} (BELOW $${Math.round(calledLiqFloor).toLocaleString('en-US')} floor)`
     }
     return null
   }
@@ -911,7 +919,13 @@ async function sweepHighCapHolders(
     audit.refused.push({ address: s.contract, reason: `called mint not swept: ${s.reason}` })
   }
   const tC = Date.now()
-  const calledHolders = await collectCalledHolders(servedCalls, f, calledAudit, servedCalls.length)
+  const calledHolders = await collectCalledHolders(
+    servedCalls,
+    f,
+    calledAudit,
+    servedCalls.length,
+    calledMarkets,
+  )
   const cMs = Date.now() - tC
   calledAudit.candidates = calledHolders.length
   if (servedCalls.length > 0) {
@@ -1140,6 +1154,8 @@ async function collectCalledHolders(
   f: DiscoveryFilters,
   audit: HolderLegAudit,
   feedSize: number,
+  markets?: Map<string, TokenMeta>,
+  fetchFn: typeof fetch = fetch,
 ): Promise<HolderCandidate[]> {
   // Proportional, not the established leg's absolute 2: `maxCalledTokens` is 8,
   // so an absolute cap of 2 would abandon the sixth shilled mint even while
@@ -1164,46 +1180,84 @@ async function collectCalledHolders(
       if (rateLimited >= f.maxRateLimitedTokens) break
       continue
     }
+    const before = out.length
     if (holders.length === 0) {
+      // RugCheck fallback: GMGN only serves pump.fun-origin mints.
+      // For established, non-pump, or migrated tokens, query RugCheck topHolders on-chain.
+      try {
+        const rugRes = await fetchFn(
+          `https://api.rugcheck.xyz/v1/tokens/${encodeURIComponent(contract)}/report`,
+          {
+            signal: AbortSignal.timeout(6000),
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+          },
+        )
+        if (rugRes.ok) {
+          const report = (await rugRes.json()) as {
+            topHolders?: Array<{ address?: string; pct?: number; insider?: boolean }>
+          }
+          if (Array.isArray(report.topHolders) && report.topHolders.length > 0) {
+            const mc = markets?.get(contract)?.marketCapUsd ?? null
+            for (const rh of report.topHolders.slice(0, f.maxHoldersPerToken)) {
+              const address = typeof rh.address === 'string' && rh.address.length > 20 ? rh.address : null
+              if (!address || seen.has(address)) continue
+              seen.add(address)
+              const pct = typeof rh.pct === 'number' && rh.pct > 0 ? rh.pct / 100 : null
+              const valueUsd = pct !== null && mc !== null && mc > 0 ? mc * pct : null
+              out.push({
+                address,
+                source: `rugcheck:${contract.slice(0, 6)}`,
+                tokenContract: contract,
+                valueUsd,
+                flagged: rh.insider === true,
+                tags: rh.insider ? ['insider'] : ['onchain_top_holder'],
+                pctOfSupply: pct,
+                leg: 'called-contracts',
+              })
+            }
+          }
+        }
+      } catch {
+        // Fallback network error: silently ignored, counted as empty below
+      }
+    } else {
+      for (const h of holders.slice(0, f.maxHoldersPerToken)) {
+        const address = typeof h.address === 'string' && h.address.length > 20 ? h.address : null
+        if (!address || seen.has(address)) continue
+        if (h.suspicious === true) {
+          audit.refused.push({
+            address,
+            reason: 'GMGN flagged the address (bundler / sniper / fresh wallet) - not a tracked human whale',
+          })
+          continue
+        }
+        if (h.tags.includes('transfer_in')) {
+          audit.refused.push({
+            address,
+            reason: 'holder received the position by transfer (never bought) - custody, not conviction',
+          })
+          continue
+        }
+        seen.add(address)
+        out.push({
+          address,
+          source: `call-feed:${contract.slice(0, 6)}`,
+          tokenContract: contract,
+          valueUsd: typeof h.usdValue === 'number' && h.usdValue > 0 ? h.usdValue : null,
+          flagged: false,
+          tags: h.tags,
+          pctOfSupply: typeof h.amountPercentage === 'number' ? h.amountPercentage : null,
+          leg: 'called-contracts',
+        })
+      }
+    }
+    if (out.length === before) {
       empty++
       if (empty >= emptyLimit) break
       continue
     }
-    const before = out.length
-    for (const h of holders.slice(0, f.maxHoldersPerToken)) {
-      const address = typeof h.address === 'string' && h.address.length > 20 ? h.address : null
-      if (!address || seen.has(address)) continue
-      if (h.suspicious === true) {
-        audit.refused.push({
-          address,
-          reason: 'GMGN flagged the address (bundler / sniper / fresh wallet) - not a tracked human whale',
-        })
-        continue
-      }
-      if (h.tags.includes('transfer_in')) {
-        audit.refused.push({
-          address,
-          reason: 'holder received the position by transfer (never bought) - custody, not conviction',
-        })
-        continue
-      }
-      seen.add(address)
-      out.push({
-        address,
-        source: `call-feed:${contract.slice(0, 6)}`,
-        tokenContract: contract,
-        valueUsd: typeof h.usdValue === 'number' && h.usdValue > 0 ? h.usdValue : null,
-        flagged: false,
-        tags: h.tags,
-        pctOfSupply: typeof h.amountPercentage === 'number' ? h.amountPercentage : null,
-        leg: 'called-contracts',
-      })
-      // Size and the bot check are graded once, by the caller, for both
-      // holder sources. Counting here would report a wallet as admitted
-      // before either rule ran.
-    }
     logger.info(
-      `called-holders ${contract.slice(0, 8)}… rows=${holders.length} accepted=${out.length - before}`,
+      `called-holders ${contract.slice(0, 8)}… rows=${holders.length > 0 ? holders.length : 'rugcheck-fallback'} accepted=${out.length - before}`,
       'wallet-discovery',
     )
   }

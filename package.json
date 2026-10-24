@@ -61,6 +61,8 @@
     "cron:whale-buy-scan": "tsx src/scripts/whale-buy-scan-cron.ts",
     "cron:whale-sheet-sync": "tsx src/scripts/whale-sheet-sync-cron.ts",
     "backtest:signals": "tsx src/scripts/backtest-signals.ts",
+    "backtest:strategies": "tsx src/scripts/strategy-backtest-cron.ts",
+    "cron:strategy-backtest": "tsx src/scripts/strategy-backtest-cron.ts",
     "cron:zero-issue": "tsx src/scripts/zero-issue-cron.ts",
     "forward:test": "tsx src/scripts/forward-test.ts"
   },
