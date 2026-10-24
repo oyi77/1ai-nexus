@@ -75,6 +75,9 @@ export async function GET(request: Request) {
     return resp
   } catch (error) {
     console.error('DEX new pairs error:', error)
-    return NextResponse.json({ data: null, error: 'Failed to fetch new DEX pairs' }, { status: 502 })
+    return NextResponse.json(
+      { data: { items: [], count: 0 }, error: null, notice: 'DEX pairs temporarily unavailable' },
+      { status: 200, headers: { 'Cache-Control': 'public, max-age=15, stale-while-revalidate=30' } }
+    )
   }
 }

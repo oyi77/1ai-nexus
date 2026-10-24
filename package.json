@@ -34,6 +34,7 @@
     "verify-re": "npx tsx src/scripts/verify-re-modules.ts",
     "deploy": "bash scripts/deploy.sh",
     "seed:feeds": "tsx prisma/seed-feeds.ts",
+    "ingest:news": "tsx src/scripts/ingest-feeds.ts",
     "realtime:consumer": "tsx src/scripts/realtime-sniper-consumer.ts",
     "backtest:audit": "tsx src/scripts/audit-backtest.ts",
     "import:wallets": "tsx scripts/import-wallets.ts",
