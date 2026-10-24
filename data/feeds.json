@@ -150,11 +150,6 @@
     "category": "tradfi"
   },
   {
-    "id": "yahoo-fin",
-    "url": "https://finance.yahoo.com/news/rssindex",
-    "category": "tradfi"
-  },
-  {
     "id": "techcrunch",
     "url": "https://techcrunch.com/feed/",
     "category": "tech"
@@ -197,11 +192,6 @@
   {
     "id": "congress",
     "url": "https://www.congress.gov/rss/most-viewed-bills.xml",
-    "category": "political"
-  },
-  {
-    "id": "eu-commission",
-    "url": "https://ec.europa.eu/commission/presscorner/api/rss?language=en",
     "category": "political"
   },
   {
@@ -481,7 +471,7 @@
   },
   {
     "id": "nasa-breaking",
-    "url": "https://www.nasa.gov/rss/dyn/breaking_news.rss",
+    "url": "https://www.nasa.gov/news-release/feed/",
     "category": "science"
   },
   {

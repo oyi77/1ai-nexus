@@ -1,9 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { DataTable, type Column } from '@/components/shell/DataTable'
 import { Panel } from '@/components/shell/Panel'
-import { NexusLayout } from '@/components/layout/NexusLayout'
+import { PriceTag } from '@/components/primitives/PriceTag'
+import { fmtUsd } from '../_shared'
 import type {
   MobyChartPoint,
   MobyLaunchpad,
@@ -26,22 +28,119 @@ async function load<T>(surface: Surface, params: Record<string, string> = {}): P
   return body.data as T
 }
 
+const riskBadgeClass = (lvl: number) => {
+  if (lvl >= 3) return 'bg-data-bear/15 text-data-bear border-data-bear/30'
+  if (lvl === 2) return 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+  if (lvl === 1) return 'bg-teal-vivid/15 text-teal-vivid border-teal-vivid/30'
+  return 'bg-bg-raised text-text-muted border-border-subtle'
+}
+
 const tokenColumns: Column<MemeAlphaToken>[] = [
-  { key: 'symbol', header: 'Token', accessor: (row) => row.symbol },
-  { key: 'price', header: 'Price', align: 'right', accessor: (row) => row.price },
-  { key: 'volume', header: '24h volume', align: 'right', accessor: (row) => row.volume24h },
-  { key: 'change', header: '24h', align: 'right', accessor: (row) => row.change24h },
-  { key: 'risk', header: 'Risk', accessor: (row) => row.riskLevel },
+  {
+    key: 'symbol',
+    header: 'Token',
+    width: 140,
+    render: (row) => (
+      <div className="flex flex-col min-w-0">
+        <span className="font-mono font-bold text-xs text-text-primary truncate">{row.symbol}</span>
+        {row.name && <span className="text-[10px] text-text-muted truncate">{row.name}</span>}
+      </div>
+    ),
+  },
+  {
+    key: 'price',
+    header: 'Price',
+    width: 110,
+    align: 'right',
+    render: (row) => <PriceTag value={row.price} size="sm" />,
+  },
+  {
+    key: 'volume',
+    header: '24h Volume',
+    width: 110,
+    align: 'right',
+    render: (row) => (
+      <span className="text-xs font-mono text-text-secondary tabular-nums">
+        {fmtUsd(row.volume24h)}
+      </span>
+    ),
+  },
+  {
+    key: 'change',
+    header: '24h Change',
+    width: 100,
+    align: 'right',
+    render: (row) => {
+      const chg = row.change24h
+      const isUp = chg >= 0
+      return (
+        <span className={`text-xs font-mono tabular-nums ${isUp ? 'text-data-bull' : 'text-data-bear'}`}>
+          {isUp ? '+' : ''}{(chg * 100).toFixed(1)}%
+        </span>
+      )
+    },
+  },
+  {
+    key: 'risk',
+    header: 'Risk',
+    width: 90,
+    render: (row) => (
+      <span className={`px-1.5 py-0.5 text-[10px] font-mono rounded border ${riskBadgeClass(row.riskLevel)}`}>
+        Lvl {row.riskLevel}
+      </span>
+    ),
+  },
 ]
 
 const pnlColumns: Column<MobyPnlEntry>[] = [
-  { key: 'rank', header: '#', accessor: (row) => row.rank },
-  { key: 'trader', header: 'Trader', accessor: (row) => row.displayIdentifier || row.memberNumber || row.userId },
-  { key: 'pnl', header: 'PnL', align: 'right', accessor: (row) => row.pnl, render: (row) => `$${row.pnl.toLocaleString()}` },
-  { key: 'twitter', header: 'X', accessor: (row) => row.twitterUsername ?? '' },
+  {
+    key: 'rank',
+    header: '#',
+    width: 60,
+    render: (row) => <span className="font-mono text-xs text-text-muted">#{row.rank}</span>,
+  },
+  {
+    key: 'trader',
+    header: 'Trader',
+    render: (row) => (
+      <span className="font-mono text-xs text-text-primary truncate">
+        {row.displayIdentifier || row.memberNumber || row.userId}
+      </span>
+    ),
+  },
+  {
+    key: 'pnl',
+    header: 'PnL',
+    align: 'right',
+    width: 130,
+    render: (row) => (
+      <span className={`font-mono text-xs font-bold tabular-nums ${row.pnl >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+        {row.pnl >= 0 ? '+' : ''}${row.pnl.toLocaleString()}
+      </span>
+    ),
+  },
+  {
+    key: 'twitter',
+    header: 'X Profile',
+    width: 120,
+    render: (row) =>
+      row.twitterUsername ? (
+        <a
+          href={`https://x.com/${row.twitterUsername}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs font-mono text-teal-vivid hover:underline truncate"
+        >
+          @{row.twitterUsername}
+        </a>
+      ) : (
+        <span className="text-xs font-mono text-text-muted">—</span>
+      ),
+  },
 ]
 
 export function MobyScreening() {
+  const router = useRouter()
   const [network, setNetwork] = useState('solana')
   const [groups, setGroups] = useState<MobyScreenerGroup[]>([])
   const [launchpads, setLaunchpads] = useState<MobyLaunchpad[]>([])
@@ -124,7 +223,19 @@ export function MobyScreening() {
         </div>
 
         <Panel title="Group tokens" subtitle={groupId ? `Group ${groupId}` : 'Select a group'}>
-          <DataTable columns={tokenColumns} data={tokens} sortable filterable filterPlaceholder="Filter tokens" />
+          <DataTable
+            columns={tokenColumns}
+            data={tokens}
+            sortable
+            filterable
+            filterPlaceholder="Filter tokens"
+            onRowClick={(row) => {
+              const t = row as MemeAlphaToken
+              if (t?.contract) {
+                router.push(`/meme/risk?chain=${encodeURIComponent(t.chain || network)}&contract=${encodeURIComponent(t.contract)}`)
+              }
+            }}
+          />
         </Panel>
 
         <div className="grid gap-4 lg:grid-cols-2">

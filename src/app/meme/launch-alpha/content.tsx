@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Panel } from "@/components/shell/Panel";
 import { DataTable, type Column } from "@/components/shell/DataTable";
 import { LiveDot } from "@/components/primitives/LiveDot";
@@ -19,6 +20,7 @@ type Meta = {
 };
 
 export function MemeLaunchAlphaPageContent() {
+  const router = useRouter();
   const [platform, setPlatform] = useState<MemePlatformFilter>("all");
   const [tokens, setTokens] = useState<MemeAlphaToken[]>([]);
   const [meta, setMeta] = useState<Meta | null>(null);
@@ -96,6 +98,14 @@ export function MemeLaunchAlphaPageContent() {
         filterable
         filterPlaceholder="Filter tokens…"
         rowHeight={36}
+        onRowClick={(row) => {
+          const t = row as unknown as MemeAlphaToken;
+          router.push(
+            `/meme/risk?chain=${encodeURIComponent(
+              t.chain
+            )}&contract=${encodeURIComponent(t.contract)}`
+          );
+        }}
       />
     </div>
   );

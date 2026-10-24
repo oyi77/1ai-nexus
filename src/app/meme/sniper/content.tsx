@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useQueryParams } from "@/components/primitives/useQueryParams";
 import { Panel } from "@/components/shell/Panel";
 import { DataTable, type Column } from "@/components/shell/DataTable";
 import { LiveDot } from "@/components/primitives/LiveDot";
@@ -259,8 +260,9 @@ const columns: Column<Entry>[] = [
           </div>
         )}
         {r.warnings.some((w) => w.includes('mismatch')) && (
-          <div className="text-[10px] text-amber-400 truncate" title={r.warnings.join("; ")}>
-            ⚠ {r.warnings.find((w) => w.includes('mismatch'))}
+          <div className="text-[10px] text-amber-400 truncate flex items-center" title={r.warnings.join("; ")}>
+            <AlertTriangle className="w-3 h-3 inline mr-1 shrink-0 text-amber-400" />
+            <span className="truncate">{r.warnings.find((w) => w.includes('mismatch'))}</span>
           </div>
         )}
       </div>
@@ -281,13 +283,21 @@ const columns: Column<Entry>[] = [
 ];
 
 export function MemeSniperPageContent() {
+  const queryParams = useQueryParams();
+  const filterParam = queryParams.get("filter") ?? queryParams.get("tab");
+  const contractParam = queryParams.get("contract");
+
   const [payload, setPayload] = useState<Payload | null>(null);
   const [status, setStatus] = useState<"live" | "stale" | "error">("stale");
   const [scanning, setScanning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   type FilterType = Status | "all" | "trenches" | "near-miss";
-  const [filter, setFilter] = useState<FilterType>("all");
-
+  const [filter, setFilter] = useState<FilterType>(() => {
+    if (filterParam && ["all", "SIGNAL", "WATCHLIST", "REJECT", "near-miss", "trenches"].includes(filterParam)) {
+      return filterParam as FilterType;
+    }
+    return "all";
+  });
   // Live Pulse / auto-refresh state
   const [pollInterval, setPollInterval] = useState<"10s" | "60s">("60s");
   const [refreshing, setRefreshing] = useState(false);
@@ -326,6 +336,19 @@ export function MemeSniperPageContent() {
     const t = setInterval(() => void load(), intervalMs);
     return () => clearInterval(t);
   }, [load, pollInterval]);
+
+  useEffect(() => {
+    let alive = true;
+    if (filterParam && ["all", "SIGNAL", "WATCHLIST", "REJECT", "near-miss", "trenches"].includes(filterParam)) {
+      queueMicrotask(() => {
+        if (alive) setFilter(filterParam as FilterType);
+      });
+    }
+    return () => {
+      alive = false;
+    };
+  }, [filterParam]);
+
 
   const runAudit = useCallback(async (address: string) => {
     const cleanAddress = address.trim();
@@ -390,9 +413,9 @@ export function MemeSniperPageContent() {
       const isTop10High = top10Val !== null && top10Val > 30;
 
       let verdict: AuditVerdict = "Passed";
-      if (isHoneypot || riskLevel >= 3 || canFreeze) {
+      if (isHoneypot || riskLevel >= 3 || canFreeze || canMint) {
         verdict = "High Risk";
-      } else if (riskLevel === 2 || isTop10High || canMint) {
+      } else if (riskLevel === 2 || isTop10High) {
         verdict = "Caution";
       } else {
         verdict = "Passed";
@@ -424,6 +447,22 @@ export function MemeSniperPageContent() {
       setAuditLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    if (contractParam && contractParam.trim()) {
+      const target = contractParam.trim();
+      queueMicrotask(() => {
+        if (alive) {
+          setAuditInput(target);
+          void runAudit(target);
+        }
+      });
+    }
+    return () => {
+      alive = false;
+    };
+  }, [contractParam, runAudit]);
 
   const handleAuditSubmit = useCallback(
     (e: React.FormEvent) => {
@@ -662,6 +701,12 @@ export function MemeSniperPageContent() {
                 )}
                 <span>{auditResult.verdict}</span>
               </span>
+              {auditResult.isHoneypot && (
+                <span className="px-2 py-0.5 text-xs font-mono font-bold rounded flex items-center gap-1 border bg-rose-950/60 text-rose-300 border-rose-500/70 animate-pulse">
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  <span>HONEYPOT (SELLS BLOCKED)</span>
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
@@ -699,7 +744,13 @@ export function MemeSniperPageContent() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 text-xs">
+            <div className="bg-bg-base/70 p-2 rounded border border-bg-border/60">
+              <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">Honeypot</div>
+              <div className={`font-mono text-sm font-medium mt-0.5 ${auditResult.isHoneypot ? "text-rose-400 font-bold" : "text-emerald-400"}`}>
+                {auditResult.isHoneypot ? "YES (Blocked)" : "No Honeypot"}
+              </div>
+            </div>
             <div className="bg-bg-base/70 p-2 rounded border border-bg-border/60">
               <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">Risk Level</div>
               <div className={`font-mono text-sm font-medium mt-0.5 ${auditResult.riskLevel >= 3 ? "text-rose-400" : auditResult.riskLevel === 2 ? "text-amber-400" : "text-emerald-400"}`}>
@@ -708,14 +759,14 @@ export function MemeSniperPageContent() {
             </div>
             <div className="bg-bg-base/70 p-2 rounded border border-bg-border/60">
               <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">Mint Auth</div>
-              <div className={`font-mono text-sm font-medium mt-0.5 ${auditResult.canMint ? "text-amber-400" : "text-emerald-400"}`}>
-                {auditResult.canMint ? "Enabled" : "Renounced"}
+              <div className={`font-mono text-sm font-medium mt-0.5 ${auditResult.canMint ? "text-rose-400" : "text-emerald-400"}`}>
+                {auditResult.canMint ? "Enabled (Risk)" : "Renounced"}
               </div>
             </div>
             <div className="bg-bg-base/70 p-2 rounded border border-bg-border/60">
               <div className="text-[10px] text-text-muted font-mono uppercase tracking-wider">Freeze Auth</div>
               <div className={`font-mono text-sm font-medium mt-0.5 ${auditResult.canFreeze ? "text-rose-400" : "text-emerald-400"}`}>
-                {auditResult.canFreeze ? "Enabled" : "Disabled"}
+                {auditResult.canFreeze ? "Enabled (Risk)" : "Disabled"}
               </div>
             </div>
             <div className="bg-bg-base/70 p-2 rounded border border-bg-border/60">
@@ -747,6 +798,13 @@ export function MemeSniperPageContent() {
           sortable
           filterable
           filterPlaceholder="Filter by token, status, rationale…"
+          onRowClick={(row) => {
+            const entry = row as Entry;
+            if (entry?.contract) {
+              setAuditInput(entry.contract);
+              void runAudit(entry.contract);
+            }
+          }}
           emptyState={
             <div className="p-6 text-center text-xs text-text-muted">
               No decisions logged yet. The cron runs every 10 minutes — or press Scan to evaluate now.

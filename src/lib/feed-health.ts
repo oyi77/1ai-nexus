@@ -3,6 +3,9 @@
 // reports status. Used by the cron + the health dashboard.
 // ─────────────────────────────────────────────────────────────
 import { loadFeeds } from '@/lib/feed-config'
+import dns from 'node:dns'
+try { dns.setDefaultResultOrder('ipv4first') } catch {}
+
 
 export interface FeedHealth {
   id: string
@@ -47,22 +50,33 @@ export async function checkFeed(url: string, timeoutMs = 12000): Promise<Omit<Fe
     return { url, ok: false, status: 0, items: 0, entries: 0, isFeed: false, bytes: 0, error: String(e).slice(0, 80), ms: Date.now() - t0 }
   }
 }
+let cachedReport: { report: FeedReport; timestamp: number } | null = null
+const REPORT_TTL_MS = 60_000
 
-export async function checkAllFeeds(): Promise<FeedReport> {
+
+export async function checkAllFeeds(force = false): Promise<FeedReport> {
+  if (!force && cachedReport && Date.now() - cachedReport.timestamp < REPORT_TTL_MS) {
+    return cachedReport.report
+  }
   const feeds = await loadFeeds()
-  const results = await Promise.all(feeds.map(async (f) => {
-    const r = await checkFeed(f.url)
+  const results: FeedHealth[] = await Promise.all(feeds.map(async (f) => {
+    let r = await checkFeed(f.url, 7000)
+    if (!r.ok) {
+      r = await checkFeed(f.url, 7000)
+    }
     return { id: f.id, category: f.category, ...r } satisfies FeedHealth
   }))
-  return {
+  const report: FeedReport = {
     generated: new Date().toISOString(),
     total: results.length,
     working: results.filter((r) => r.ok).length,
     atomOnly: results.filter((r) => r.ok && r.entries > 0 && r.items === 0).length,
     dead: results.filter((r) => !r.ok).length,
-    leakSuspect: 0, // markup check requires parsing; done in cron
+    leakSuspect: 0,
     feeds: results,
   }
+  cachedReport = { report, timestamp: Date.now() }
+  return report
 }
 
 /** Check a single feed's parsed items for markup leaks. */

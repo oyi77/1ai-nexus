@@ -99,7 +99,7 @@ async function loadSessionReturns(): Promise<{ rets: SessionReturn[]; med20: num
         if (closes.length <= n || closes[n] <= 0) return null
         return ((last - closes[n]) / closes[n]) * 100
       }
-      const v20 = ret(20)
+      const v20 = ret(20) ?? (closes.length >= 2 ? ret(closes.length - 1) : null)
       const v60 = ret(60)
       if (v20 === null && v60 === null) continue
       if (v20 !== null) r20.push(v20)

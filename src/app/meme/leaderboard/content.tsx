@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { TrendingUp } from "lucide-react";
 import { Panel } from "@/components/shell/Panel";
 import { DataTable, type Column } from "@/components/shell/DataTable";
 import { LiveDot } from "@/components/primitives/LiveDot";
@@ -78,8 +79,9 @@ export function MemeLeaderboardPageContent() {
               </span>
             ))}
             {ex.flowSignal && (
-              <span className="text-[10px] font-mono text-data-bull">
-                ⤴ {ex.flowSignal.label}
+              <span className="text-[10px] font-mono text-data-bull inline-flex items-center gap-1">
+                <TrendingUp className="w-3 h-3 shrink-0" />
+                <span>{ex.flowSignal.label}</span>
               </span>
             )}
           </div>

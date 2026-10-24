@@ -195,20 +195,28 @@ export const memeColumns: Column<MemeAlphaToken>[] = [
 
 export const riskColumns: Column<MemeRiskAudit>[] = [
   { key: "symbol", header: "Token", width: 160, accessor: (r) => r.symbol, render: (r) => (
-    <span className="font-medium text-text">{r.symbol}</span>
+    <span className="font-medium text-text-primary">{r.symbol}</span>
   ) },
   { key: "platform", header: "Platform", width: 90, accessor: (r) => r.platform },
   { key: "chain", header: "Chain", width: 80, accessor: (r) => r.chain },
   { key: "riskLabel", header: "Risk", width: 90, accessor: (r) => r.riskLabel, render: (r) => (
     <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${riskClass(r.riskLevel)}`}>{r.riskLabel.toUpperCase()}</span>
   ) },
-  { key: "top10HolderPercent", header: "Top10 %", width: 90, align: "right", accessor: (r) => r.top10HolderPercent, render: (r) => `${r.top10HolderPercent?.toFixed(1) ?? "—"}%` },
-  { key: "lpLockedPercent", header: "LP Locked %", width: 110, align: "right", accessor: (r) => r.lpLockedPercent, render: (r) => `${r.lpLockedPercent?.toFixed(1) ?? "—"}%` },
-  { key: "buyTax", header: "Buy Tax %", width: 90, align: "right", accessor: (r) => r.buyTax, render: (r) => `${r.buyTax?.toFixed(2) ?? "—"}%` },
-  { key: "sellTax", header: "Sell Tax %", width: 90, align: "right", accessor: (r) => r.sellTax, render: (r) => `${r.sellTax?.toFixed(2) ?? "—"}%` },
-  { key: "flags", header: "Flags", width: 120, render: (r) => (
-    <span className="text-text-muted text-xs">
-      {[r.canFreeze && "Freeze", r.canMint && "Mint"].filter(Boolean).join(" · ") || "—"}
-    </span>
-  ) },
+  { key: "top10HolderPercent", header: "Top10 %", width: 90, align: "right", accessor: (r) => r.top10HolderPercent, render: (r) => r.top10HolderPercent !== null && r.top10HolderPercent !== undefined ? `${(r.top10HolderPercent > 1 ? r.top10HolderPercent : r.top10HolderPercent * 100).toFixed(1)}%` : "—" },
+  { key: "lpLockedPercent", header: "LP Locked %", width: 110, align: "right", accessor: (r) => r.lpLockedPercent, render: (r) => r.lpLockedPercent !== null && r.lpLockedPercent !== undefined && r.lpLockedPercent >= 0 ? `${(r.lpLockedPercent > 1 ? r.lpLockedPercent : r.lpLockedPercent * 100).toFixed(1)}%` : "—" },
+  { key: "buyTax", header: "Buy Tax %", width: 90, align: "right", accessor: (r) => r.buyTax, render: (r) => r.buyTax !== null && r.buyTax !== undefined ? `${(r.buyTax > 1 ? r.buyTax : r.buyTax * 100).toFixed(2)}%` : "—" },
+  { key: "sellTax", header: "Sell Tax %", width: 90, align: "right", accessor: (r) => r.sellTax, render: (r) => r.sellTax !== null && r.sellTax !== undefined ? `${(r.sellTax > 1 ? r.sellTax : r.sellTax * 100).toFixed(2)}%` : "—" },
+  { key: "flags", header: "Flags", width: 140, render: (r) => {
+    const flags = [
+      r.isHoneypot && "Honeypot",
+      r.canFreeze && "Freeze",
+      r.canMint && "Mint",
+    ].filter(Boolean) as string[];
+    if (flags.length === 0) return <span className="text-text-muted text-xs">—</span>;
+    return (
+      <span className="text-xs font-mono text-rose-400 font-medium">
+        {flags.join(" · ")}
+      </span>
+    );
+  } },
 ];

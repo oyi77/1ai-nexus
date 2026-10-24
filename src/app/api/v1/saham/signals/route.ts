@@ -57,7 +57,9 @@ export async function GET(request: NextRequest) {
     }
     return apiSuccess({ view: 'rs', ...(await getRSSignals(limit)) })
   } catch (error) {
-    if (error instanceof EmptySnapshotError) return apiError(NO_DATA, 503)
+    if (error instanceof EmptySnapshotError) {
+      return apiSuccess({ view, signals: [], items: [], notice: NO_DATA })
+    }
     return apiError((error as Error).message, 500)
   }
 }

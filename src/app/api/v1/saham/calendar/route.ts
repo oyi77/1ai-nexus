@@ -21,6 +21,10 @@ export async function GET(request: NextRequest) {
       }
       return apiError('Temporarily unavailable — showing again after the next data sync.', 503)
     }
-    return apiError((error as Error).message, 500)
+    return apiSuccess({
+      capturedAt: new Date().toISOString(),
+      dividends: [],
+      error: 'Calendar data temporarily unavailable',
+    })
   }
 }
