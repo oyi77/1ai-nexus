@@ -8,6 +8,7 @@ import { csrfFetch } from "@/lib/csrf";
 import type { MemeRiskAudit } from "@/lib/modules/meme/types";
 import type { DevHistoryVerdict } from "@/lib/modules/derived/dev-history";
 import type { SniperLogEntry } from "@/lib/modules/derived/sniper-log";
+import { isNearMissCandidate } from "@/lib/modules/derived/meme-sniper-types";
 import {
   RefreshCw,
   ExternalLink,
@@ -141,7 +142,6 @@ const columns: Column<Entry>[] = [
     accessor: (r) => r.ticker,
     render: (r) => (
       <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
           <span className="text-text-primary truncate">{r.ticker}</span>
           {isTrenchCandidate(r) && (
             <span
@@ -151,7 +151,14 @@ const columns: Column<Entry>[] = [
               trenches
             </span>
           )}
-        </div>
+          {isNearMissCandidate(r) && (
+            <span
+              className="text-[9px] px-1 py-0.2 rounded bg-amber-500/15 text-amber-300 font-mono border border-amber-500/30"
+              title="Near-miss review candidate (momentum flow or <=2 rule breaches)"
+            >
+              near-miss
+            </span>
+          )}
         <div className="text-[10px] text-text-muted font-mono">{shortAddr(r.contract)}</div>
       </div>
     ),
@@ -278,7 +285,7 @@ export function MemeSniperPageContent() {
   const [status, setStatus] = useState<"live" | "stale" | "error">("stale");
   const [scanning, setScanning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  type FilterType = Status | "all" | "trenches";
+  type FilterType = Status | "all" | "trenches" | "near-miss";
   const [filter, setFilter] = useState<FilterType>("all");
 
   // Live Pulse / auto-refresh state
@@ -465,6 +472,8 @@ export function MemeSniperPageContent() {
       ? payload.entries
       : filter === "trenches"
       ? payload.entries.filter(isTrenchCandidate)
+      : filter === "near-miss"
+      ? payload.entries.filter(isNearMissCandidate)
       : payload.entries.filter((e) => e.status === filter)
     : [];
 
@@ -556,6 +565,7 @@ export function MemeSniperPageContent() {
               { id: "SIGNAL" as const, label: `signals ${payload?.counts.SIGNAL ?? 0}` },
               { id: "WATCHLIST" as const, label: `watchlist ${payload?.counts.WATCHLIST ?? 0}` },
               { id: "REJECT" as const, label: `rejected ${payload?.counts.REJECT ?? 0}` },
+              { id: "near-miss" as const, label: `near-miss ${payload ? payload.entries.filter(isNearMissCandidate).length : 0}` },
               { id: "trenches" as const, label: `trenches ${payload ? payload.entries.filter(isTrenchCandidate).length : 0}` },
             ]).map((t) => (
               <button

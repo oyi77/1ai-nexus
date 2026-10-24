@@ -2,6 +2,7 @@
 // and Telegram message safety. Pure evaluator — zero network, zero DB.
 import { describe, it, expect } from 'vitest'
 import { evaluateSniper, escapeHtml, type SniperPayload } from './meme-sniper'
+import { isNearMissCandidate } from './meme-sniper-types'
 
 /** Verified buyer — the only path to SIGNAL now that execution is gone. */
 const CONFIRMED = { verdict: 'pass' as const, reason: 'verified buyer', strongest: 'QUALIFIED_SMART_MONEY' }
@@ -521,5 +522,56 @@ describe('ebook criteria cross-check (opts.criteriaProfiles)', () => {
     )
     expect(d.status).toBe('REJECT')
     expect(d.rejections.some((r) => r.includes('Mint authority'))).toBe(true)
+  })
+})
+
+describe('isNearMissCandidate — review channel classification', () => {
+  it('identifies rejected token with real 5m flow as a near-miss review candidate', () => {
+    const candidate = isNearMissCandidate({
+      status: 'REJECT',
+      metrics: { volMcRatio: 1.2 },
+      rejections: ['Dead momentum: 5m vol/mcap 1.20x < required 2x'],
+    })
+    expect(candidate).toBe(true)
+  })
+
+  it('identifies rejected token with <=2 non-critical rejections as a near-miss', () => {
+    const candidate = isNearMissCandidate({
+      status: 'REJECT',
+      metrics: { volMcRatio: 0.2 },
+      rejections: [
+        'Top 10 hold 34.0% (ceiling 30%)',
+        'Dev holds 0.5% (ceiling 0%)',
+      ],
+    })
+    expect(candidate).toBe(true)
+  })
+
+  it('never admits critical security risks (honeypot, mintable, freezable) as near-miss', () => {
+    const honeypot = isNearMissCandidate({
+      status: 'REJECT',
+      metrics: { volMcRatio: 3.5 },
+      rejections: ['Honeypot risk detected'],
+    })
+    expect(honeypot).toBe(false)
+
+    const freeze = isNearMissCandidate({
+      status: 'REJECT',
+      metrics: { volMcRatio: 2.1 },
+      rejections: ['Freeze authority enabled — risk of trading halt'],
+    })
+    expect(freeze).toBe(false)
+
+    const mint = isNearMissCandidate({
+      status: 'REJECT',
+      metrics: { volMcRatio: 2.5 },
+      rejections: ['Mint authority enabled — supply dilution risk'],
+    })
+    expect(mint).toBe(false)
+  })
+
+  it('never flags non-REJECT status (SIGNAL / WATCHLIST)', () => {
+    expect(isNearMissCandidate({ status: 'SIGNAL', metrics: { volMcRatio: 2.5 } })).toBe(false)
+    expect(isNearMissCandidate({ status: 'WATCHLIST', metrics: { volMcRatio: 1.5 } })).toBe(false)
   })
 })

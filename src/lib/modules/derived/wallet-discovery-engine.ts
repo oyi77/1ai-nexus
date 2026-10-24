@@ -767,27 +767,68 @@ async function sweepHighCapHolders(
       continue
     }
     if (holders.length === 0) {
+      // RugCheck fallback: GMGN only serves pump.fun-origin mints.
+      // For established, non-pump, or migrated tokens, query RugCheck topHolders on-chain.
+      try {
+        const rugRes = await fetch(
+          `https://api.rugcheck.xyz/v1/tokens/${encodeURIComponent(tok.contract)}/report`,
+          {
+            signal: AbortSignal.timeout(6000),
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+          },
+        )
+        if (rugRes.ok) {
+          const report = (await rugRes.json()) as {
+            topHolders?: Array<{ address?: string; pct?: number; insider?: boolean }>
+          }
+          if (Array.isArray(report.topHolders) && report.topHolders.length > 0) {
+            for (const rh of report.topHolders.slice(0, f.maxHoldersPerToken)) {
+              const address = typeof rh.address === 'string' && rh.address.length > 20 ? rh.address : null
+              if (!address || seen.has(address)) continue
+              seen.add(address)
+              const pct = typeof rh.pct === 'number' && rh.pct > 0 ? rh.pct / 100 : null
+              const valueUsd = pct !== null && mc !== null && mc > 0 ? mc * pct : null
+              candidates.push({
+                address,
+                source: `rugcheck-highcap:${tok.contract.slice(0, 6)}`,
+                tokenContract: tok.contract,
+                valueUsd,
+                flagged: rh.insider === true,
+                tags: rh.insider ? ['insider'] : ['onchain_top_holder'],
+                pctOfSupply: pct,
+                leg: 'high-cap-holders',
+              })
+            }
+          }
+        }
+      } catch {
+        // Fallback network error: silently ignored, counted as empty below
+      }
+    }
+
+    if (holders.length === 0 && !candidates.some((c) => c.tokenContract === tok.contract)) {
       emptyHolderTokens++
       if (emptyHolderTokens >= f.maxEmptyHolderTokens) break
       continue
     }
-    // The holder row carries the position's own mark-to-market, so no supply
-    // arithmetic and no extra request are needed to size the wallet.
-    for (const h of holders.slice(0, f.maxHoldersPerToken)) {
-      const address = typeof h.address === 'string' && h.address.length > 20 ? h.address : null
-      if (!address || seen.has(address)) continue
-      seen.add(address)
-      const usd = typeof h.usdValue === 'number' && h.usdValue > 0 ? h.usdValue : null
-      candidates.push({
-        address,
-        source: `gmgn-holder:${tok.contract.slice(0, 6)}`,
-        tokenContract: tok.contract,
-        valueUsd: usd,
-        flagged: h.suspicious === true,
-        tags: h.tags,
-        pctOfSupply: typeof h.amountPercentage === 'number' ? h.amountPercentage : null,
-        leg: 'high-cap-holders',
-      })
+
+    if (holders.length > 0) {
+      for (const h of holders.slice(0, f.maxHoldersPerToken)) {
+        const address = typeof h.address === 'string' && h.address.length > 20 ? h.address : null
+        if (!address || seen.has(address)) continue
+        seen.add(address)
+        const usd = typeof h.usdValue === 'number' && h.usdValue > 0 ? h.usdValue : null
+        candidates.push({
+          address,
+          source: `gmgn-holder:${tok.contract.slice(0, 6)}`,
+          tokenContract: tok.contract,
+          valueUsd: usd,
+          flagged: h.suspicious === true,
+          tags: h.tags,
+          pctOfSupply: typeof h.amountPercentage === 'number' ? h.amountPercentage : null,
+          leg: 'high-cap-holders',
+        })
+      }
     }
   }
 

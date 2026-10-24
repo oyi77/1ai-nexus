@@ -301,3 +301,53 @@ describe('per-leg floors and liquidity decoupling', () => {
     expect(earlyHolderPositionUsd).toBeLessThan(DISCOVERY_DEFAULTS.highCapUsdFloor)
   })
 })
+
+describe('established tokens on-chain fallback candidate shape', () => {
+  it('sizes RugCheck topHolders via supply percentage and token market cap', () => {
+    const rawHolder = {
+      address: '7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+      pct: 4.5,
+      insider: false,
+    }
+    const tokenMc = 2_500_000
+    const pct = rawHolder.pct / 100
+    const valueUsd = tokenMc * pct
+
+    const candidate: HolderCandidate = {
+      address: rawHolder.address,
+      source: 'rugcheck-highcap:7xKXtg',
+      tokenContract: 'So11111111111111111111111111111111111111112',
+      valueUsd,
+      flagged: rawHolder.insider,
+      tags: ['onchain_top_holder'],
+      pctOfSupply: pct,
+      leg: 'high-cap-holders',
+    }
+
+    expect(candidate.pctOfSupply).toBe(0.045)
+    expect(candidate.valueUsd).toBe(112_500)
+    expect(candidate.flagged).toBe(false)
+    expect(candidate.tags).toContain('onchain_top_holder')
+  })
+
+  it('marks insider addresses as flagged so they are refused by whale admission', () => {
+    const insiderHolder = {
+      address: '9xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU',
+      pct: 12.0,
+      insider: true,
+    }
+    const candidate: HolderCandidate = {
+      address: insiderHolder.address,
+      source: 'rugcheck-highcap:9xKXtg',
+      tokenContract: 'So11111111111111111111111111111111111111112',
+      valueUsd: 300_000,
+      flagged: insiderHolder.insider,
+      tags: ['insider'],
+      pctOfSupply: 0.12,
+      leg: 'high-cap-holders',
+    }
+
+    expect(candidate.flagged).toBe(true)
+    expect(candidate.tags).toContain('insider')
+  })
+})

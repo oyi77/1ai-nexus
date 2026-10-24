@@ -142,3 +142,24 @@ export function escapeHtml(s: string | null | undefined): string {
 export function profileForStage(stage: SniperStage): CriteriaProfileId {
   return stage === 'new-pair' ? 'golden-new-pairs' : 'golden-post-migrated'
 }
+
+/**
+ * Detects near-miss candidate for manual operator review.
+ * Flags rejected tokens that exhibited real 5m momentum flow (vol/mcap >= 0.5x)
+ * or only breached <=2 non-critical rules without honeypot/freeze/mint risk.
+ */
+export function isNearMissCandidate(entry: {
+  status: string
+  metrics?: { volMcRatio?: number | null } | null
+  rejections?: string[] | null
+}): boolean {
+  if (entry.status !== 'REJECT') return false
+  const rejections = entry.rejections ?? []
+  const isCritical = rejections.some((r) =>
+    /honeypot|freeze authority enabled|mint authority enabled/i.test(r),
+  )
+  if (isCritical) return false
+  const ratio = entry.metrics?.volMcRatio
+  if (ratio != null && Number.isFinite(ratio) && ratio >= 0.5) return true
+  return rejections.length > 0 && rejections.length <= 2
+}
