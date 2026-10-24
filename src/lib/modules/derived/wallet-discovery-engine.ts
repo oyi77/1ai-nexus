@@ -1024,8 +1024,24 @@ async function sweepHighCapHolders(
         verdict: 'HUMAN',
         reason: `human verified on an earlier pass (${prior} in the tracked pool)`,
       }
-    } else if ((stats === null || (stats.buyCount30d === 0 && stats.sellCount30d === 0)) && c.leg === 'called-contracts' && prior !== null) {
-      human = { verdict: 'HUMAN', reason: `zero 30d activity but prior status=${prior} - admitted via historical pool membership` }
+    } else if (
+      (stats === null || (stats.buyCount30d === 0 && stats.sellCount30d === 0)) &&
+      c.leg === 'called-contracts' &&
+      prior !== null
+    ) {
+      human = {
+        verdict: 'HUMAN',
+        reason: `zero 30d activity but prior status=${prior} - admitted via historical pool membership`,
+      }
+    } else if (stats === null || (stats.buyCount30d === 0 && stats.sellCount30d === 0)) {
+      audit.refused.push({
+        address: c.address,
+        reason:
+          stats === null
+            ? 'no measurement: GMGN wallet stats unavailable'
+            : 'no measurement: GMGN reports zero 30d activity - cannot prove human',
+      })
+      continue
     } else {
       human = classifyHuman(
         {

@@ -17,7 +17,9 @@ import { recordPipelineRun } from '@/lib/modules/derived/pipeline-heartbeat'
 //   WALLET_DISCOVERY_CONCURRENCY    parallel GMGN stat calls (default 6)
 //   WALLET_DISCOVERY_BUDGET_MS      wall-clock budget per pass (default 120000)
 //   WALLET_DISCOVERY_MAX_STAT       stat re-measurements per pass (default 150)
-//   WALLET_DISCOVERY_MIN_HOLDER_USD  min high-cap holder position size (default 10_000)
+//   WALLET_DISCOVERY_MIN_HOLDER_USD  legacy alias for high-cap holder position size (default 10_000)
+//   WALLET_DISCOVERY_HIGH_CAP_USD    min high-cap holder position size USD (default 10_000)
+//   WALLET_DISCOVERY_CALLED_HOLDER_USD min called-contract holder position size USD (default 500)
 //   WALLET_DISCOVERY_MAX_HOLDER_SHARE ceiling share of a called mint's supply (default 0.004)
 //   WALLET_DISCOVERY_HOLDER_SHARE_USD USD size that ceiling stands for (default 1_000)
 //   WALLET_DISCOVERY_MIN_LIQUIDITY    min DexScreener liquidity for a called mint (default 50_000)
@@ -77,6 +79,14 @@ async function main(): Promise<void> {
     budgetMs: numEnv('WALLET_DISCOVERY_BUDGET_MS', DISCOVERY_DEFAULTS.budgetMs),
     maxStatMeasurements: numEnv('WALLET_DISCOVERY_MAX_STAT', DISCOVERY_DEFAULTS.maxStatMeasurements),
     maxEmptyHolderTokens: numEnv('WALLET_DISCOVERY_MAX_EMPTY', DISCOVERY_DEFAULTS.maxEmptyHolderTokens),
+    highCapUsdFloor: numEnv(
+      'WALLET_DISCOVERY_HIGH_CAP_USD',
+      numEnv('WALLET_DISCOVERY_MIN_HOLDER_USD', DISCOVERY_DEFAULTS.highCapUsdFloor),
+    ),
+    calledContractsUsdFloor: numEnv(
+      'WALLET_DISCOVERY_CALLED_HOLDER_USD',
+      DISCOVERY_DEFAULTS.calledContractsUsdFloor,
+    ),
     minHolderValueUsd: numEnv('WALLET_DISCOVERY_MIN_HOLDER_USD', DISCOVERY_DEFAULTS.minHolderValueUsd),
     maxHolderSharePct: numEnv('WALLET_DISCOVERY_MAX_HOLDER_SHARE', DISCOVERY_DEFAULTS.maxHolderSharePct),
     holderShareTargetUsd: numEnv('WALLET_DISCOVERY_HOLDER_SHARE_USD', DISCOVERY_DEFAULTS.holderShareTargetUsd),
