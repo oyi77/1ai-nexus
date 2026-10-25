@@ -1,7 +1,7 @@
 import { prisma } from "../db";
 import { publishEvent } from "../publisher";
 
-const BLOCKSTREAM_API = "https://blockstream.info/api";
+const ESPLORA_APIS = ["https://mempool.space/api", "https://blockstream.info/api"];
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
 
 // Cached BTC price (refreshed every 5 minutes)
@@ -15,7 +15,7 @@ async function getBtcPrice(): Promise<number> {
     return cachedBtcPrice;
   }
   try {
-    const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd");
+    const res = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd", { signal: AbortSignal.timeout(8_000) });
     if (res.ok) {
       const data = await res.json() as { bitcoin?: { usd?: number } };
       if (data.bitcoin?.usd) {
@@ -57,7 +57,7 @@ async function pollBitcoin() {
     const tipHeight = await fetchTipHeight();
     if (tipHeight) {
       await prisma.indexerCheckpoint.upsert({
-        where: { chain: "bitcoin" },
+        where: { chain: "btc" },
         update: { lastBlock: BigInt(tipHeight), updatedAt: new Date() },
         create: { chain: "btc", lastBlock: BigInt(tipHeight) },
       });
@@ -69,21 +69,30 @@ async function pollBitcoin() {
   setTimeout(pollBitcoin, POLL_INTERVAL_MS);
 }
 
-async function fetchTipHeight(): Promise<number | null> {
-  try {
-    const res = await fetch(`${BLOCKSTREAM_API}/blocks/tip/height`);
-    if (!res.ok) return null;
-    const text = await res.text();
-    return parseInt(text, 10);
-  } catch {
-    return null;
+async function fetchEsplora(path: string): Promise<Response | null> {
+  for (const base of ESPLORA_APIS) {
+    try {
+      const res = await fetch(`${base}${path}`, { signal: AbortSignal.timeout(8_000) });
+      if (res.ok) return res;
+    } catch {
+      // Try the next Esplora provider.
+    }
   }
+  return null;
+}
+
+async function fetchTipHeight(): Promise<number | null> {
+  const res = await fetchEsplora("/blocks/tip/height");
+  if (!res) return null;
+  const height = Number(await res.text());
+  return Number.isSafeInteger(height) && height > 0 ? height : null;
 }
 
 async function checkWallet(address: string) {
   try {
-    const res = await fetch(`${BLOCKSTREAM_API}/address/${address}/txs`);
-    if (!res.ok) return;
+    const res = await fetchEsplora(`/address/${address}/txs`);
+    if (!res) return;
+
 
     const txs = (await res.json()) as Array<{
       txid: string;

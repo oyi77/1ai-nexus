@@ -2,6 +2,7 @@ import { type NextRequest } from 'next/server'
 import { apiJson } from '@/lib/api/response'
 import { SCREENER_STOCKS } from '@/lib/config/universe'
 import { getIdxUniverse } from '@/lib/modules/market/provider/idx-universe'
+import { getScreenerSnapshot } from '@/lib/modules/market/provider/idx-screener'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,10 +62,49 @@ export async function GET(request: NextRequest) {
   if (sector) filtered = filtered.filter(s => s.sector.toLowerCase() === sector.toLowerCase())
   if (exchange) filtered = filtered.filter(s => s.exchange.toLowerCase() === exchange.toLowerCase())
 
-  // Fetch real prices. Keep request latency below public proxy limits.
-  const currencies = new Set(filtered.map(stock => EXCHANGE_CURRENCY[stock.exchange] ?? 'USD'))
+  const snapshot = await getScreenerSnapshot().catch(() => null)
+  let idrToUsd: number | null = null
+  if (minMarketCap && filtered.some(stock => stock.exchange === 'IDX')) {
+    try {
+      const fxRes = await fetch(
+        `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:4400'}/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=IDRUSD=X`,
+        {
+          signal: AbortSignal.timeout(4_000),
+          headers: { Authorization: `Bearer ${process.env.NEXUS_API_KEYS?.split(',')[0] ?? ''}` },
+        },
+      )
+      const fxData = fxRes.ok ? await fxRes.json() : null
+      const rate = fxData?.data?.[0]?.regularMarketPrice
+      idrToUsd = typeof rate === 'number' && Number.isFinite(rate) && rate > 0 ? rate : null
+    } catch { /* unavailable FX keeps all snapshot candidates eligible */ }
+  }
+
+  const candidates = filtered.filter(stock => {
+    const row = stock.exchange === 'IDX' ? snapshot?.data[stock.symbol.replace(/\.JK$/, '')] : undefined
+    if (!row) return true
+    if (minMarketCap && idrToUsd != null && row.marketCap != null && row.marketCap * idrToUsd < minMarketCap) return false
+    if (maxPE && row.per != null && row.per > maxPE) return false
+    return true
+  })
+  const snapshotSortKeys: Record<string, 'marketCap' | 'volume' | 'per' | 'price' | 'change1d'> = {
+    marketCap: 'marketCap', volume: 'volume', pe: 'per', price: 'price', changePercent: 'change1d',
+  }
+  const snapshotSortKey = snapshotSortKeys[sortBy]
+  const ranked = candidates.filter(stock => stock.exchange === 'IDX' && snapshot?.data[stock.symbol.replace(/\.JK$/, '')])
+  ranked.sort((a, b) => {
+    const aRow = snapshot!.data[a.symbol.replace(/\.JK$/, '')]
+    const bRow = snapshot!.data[b.symbol.replace(/\.JK$/, '')]
+    const av = snapshotSortKey ? Number(aRow[snapshotSortKey]) || 0 : 0
+    const bv = snapshotSortKey ? Number(bRow[snapshotSortKey]) || 0 : 0
+    if (av !== bv) return sortOrder === 'desc' ? bv - av : av - bv
+    return a.symbol.localeCompare(b.symbol)
+  })
+  const unranked = candidates.filter(stock => !ranked.includes(stock))
+  const quoteScopeSize = Math.min(candidates.length, Math.max(50, limit * 2))
+  const quoteUniverse = [...unranked, ...ranked].slice(0, quoteScopeSize)
+  const currencies = new Set(quoteUniverse.map(stock => EXCHANGE_CURRENCY[stock.exchange] ?? 'USD'))
   const fxSymbols = Object.entries(FX_SYMBOL_BY_CURRENCY).filter(([currency]) => currencies.has(currency)).map(([, symbol]) => symbol)
-  const symbols = [...new Set([...filtered.map(s => s.symbol), ...fxSymbols])].join(',')
+  const symbols = [...new Set([...quoteUniverse.map(s => s.symbol), ...fxSymbols])].join(',')
   try {
     const quoteRes = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:4400'}/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${symbols}`,
@@ -92,8 +132,9 @@ export async function GET(request: NextRequest) {
       return rate == null ? null : value * rate
     }
 
-    const results: ScreenerResult[] = filtered.map(stock => {
+    const results: ScreenerResult[] = quoteUniverse.map(stock => {
       const q = quoteMap[stock.symbol] ?? {}
+      const row = stock.exchange === 'IDX' ? snapshot?.data[stock.symbol.replace(/\.JK$/, '')] : undefined
       const currency = typeof q.currency === 'string' ? q.currency : EXCHANGE_CURRENCY[stock.exchange] ?? 'USD'
       return {
         symbol: stock.symbol,
@@ -104,9 +145,9 @@ export async function GET(request: NextRequest) {
         price: usd(q.regularMarketPrice, currency),
         change: usd(q.regularMarketChange, currency),
         changePercent: (q.regularMarketChangePercent as number) ?? null,
-        marketCap: usd(q.marketCap, currency),
+        marketCap: usd(q.marketCap ?? row?.marketCap ?? null, currency),
         volume: (q.regularMarketVolume as number) ?? null,
-        pe: (q.trailingPE as number) ?? null,
+        pe: (q.trailingPE as number) ?? row?.per ?? null,
         dividend: (q.dividendYield as number) ?? null,
       }
     })
@@ -121,27 +162,90 @@ export async function GET(request: NextRequest) {
     finalResults.sort((a, b) => {
       const av = Number((a as unknown as Record<string, unknown>)[sortBy]) || 0
       const bv = Number((b as unknown as Record<string, unknown>)[sortBy]) || 0
-      return sortOrder === 'desc' ? bv - av : av - bv
+      if (av !== bv) return sortOrder === 'desc' ? bv - av : av - bv
+      return a.symbol.localeCompare(b.symbol)
     })
 
     // Limit
     finalResults = finalResults.slice(0, limit)
 
+    const notices: string[] = []
+    if (sortBy === 'dividend') notices.push('Dividend data unavailable in snapshot; results reflect live quotes on initial candidate pool')
+    if (minDividend) notices.push('Dividend filtering is evaluated only against the bounded live-quoted subset')
+    if (snapshotSortKey && unranked.length > 0 && ranked.length > 0) {
+      notices.push('Snapshot ranking is partial; results reflect live quotes on bounded candidate pool')
+    }
+
     return apiJson({
       results: finalResults,
       count: finalResults.length,
       filters: { sector, exchange, minMarketCap, maxPE, minDividend, sortBy, sortOrder, limit },
+      notice: notices.length > 0 ? notices.join(' ') : undefined,
+      quoteScope: {
+        mode: snapshotSortKey && ranked.length === candidates.length && ranked.length > 0 ? 'snapshot-ranked' : 'bounded',
+        considered: quoteScopeSize,
+        available: filtered.length,
+      },
     }, {
       headers: { 'Cache-Control': 'public, max-age=120, stale-while-revalidate=240' },
     })
   } catch (err) {
+    const quoteError = (err as Error).message
+    if (currencies.has('IDR') && snapshot) {
+      try {
+        const fxRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:4400'}/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=IDRUSD=X`, { signal: AbortSignal.timeout(4_000) }).catch(() => null)
+        const fxData = fxRes?.ok ? await fxRes.json() : null
+        const fxRate = fxData?.data?.[0]?.regularMarketPrice
+        const idrToUsd = typeof fxRate === 'number' && Number.isFinite(fxRate) && fxRate > 0 ? fxRate : null
+        const usd = (value: number | null) => value != null && idrToUsd != null ? value * idrToUsd : null
+        let results: ScreenerResult[] = filtered.flatMap((stock) => {
+          const row = snapshot.data[stock.symbol.replace(/\.JK$/, '')]
+          if (!row) return []
+          return [{
+            symbol: stock.symbol,
+            name: row.name || stock.name,
+            sector: stock.sector,
+            exchange: stock.exchange,
+            currency: 'USD',
+            price: usd(row.price),
+            change: null,
+            changePercent: row.change1d,
+            marketCap: usd(row.marketCap),
+            volume: row.volume,
+            pe: row.per,
+            dividend: null,
+          }]
+        })
+        if (minMarketCap) results = results.filter(r => r.marketCap != null && r.marketCap >= minMarketCap)
+        if (maxPE) results = results.filter(r => r.pe != null && r.pe <= maxPE)
+        if (minDividend) results = results.filter(r => r.dividend != null && r.dividend >= minDividend)
+        results.sort((a, b) => {
+          const av = Number((a as unknown as Record<string, unknown>)[sortBy]) || 0
+          const bv = Number((b as unknown as Record<string, unknown>)[sortBy]) || 0
+          return sortOrder === 'desc' ? bv - av : av - bv
+        })
+        results = results.slice(0, limit)
+        if (results.length > 0) {
+          return apiJson({
+            results,
+            count: results.length,
+            notice: 'Live quotes unavailable; showing IDX snapshot',
+            snapshot: { source: snapshot.source, capturedAt: snapshot.capturedAt, fxAvailable: idrToUsd != null },
+            filters: { sector, exchange, minMarketCap, maxPE, minDividend, sortBy, sortOrder, limit },
+          }, {
+            error: quoteError,
+            headers: { 'Cache-Control': 'public, max-age=120, stale-while-revalidate=240' },
+          })
+        }
+      } catch { /* retain empty degradation when no snapshot exists */ }
+    }
     return apiJson({
       results: [],
       count: 0,
       notice: 'Screener quotes temporarily unavailable',
       filters: { sector, exchange, minMarketCap, maxPE, minDividend, sortBy, sortOrder, limit },
     }, {
-      error: (err as Error).message,
+      error: quoteError,
       headers: { 'Cache-Control': 'no-store' },
     })
   }

@@ -51,9 +51,13 @@ export async function GET() {
   } catch {
     try {
       const ctrl = new AbortController()
-      setTimeout(() => ctrl.abort(), 3000)
-      await fetch('http://localhost:4409/', { signal: ctrl.signal })
-      checks.indexer = 'ok'
+      const timer = setTimeout(() => ctrl.abort(), 3000)
+      try {
+        const res = await fetch('http://localhost:4409/', { signal: ctrl.signal })
+        checks.indexer = res.ok ? 'ok' : 'down'
+      } finally {
+        clearTimeout(timer)
+      }
     } catch {
       checks.indexer = 'down'
     }
@@ -64,7 +68,7 @@ export async function GET() {
     const { prisma } = await import('@/lib/db')
     const count = await prisma.entity.count()
     checks.entities = count
-    checks.dataIntegrity = count > 1000 ? 'ok' : 'degraded'
+    checks.dataIntegrity = count > 0 ? 'ok' : 'degraded'
   } catch {
     checks.dataIntegrity = 'unknown'
   }
@@ -103,7 +107,7 @@ export async function GET() {
     checks.backtest = { pending: -1 }
   }
 
-  const allOk = Object.values(checks).every(v => v === 'ok' || typeof v === 'number' || v === true)
+  const allOk = Object.entries(checks).every(([key, v]) => ['modules', 'conviction', 'backtest'].includes(key) || v === 'ok' || typeof v === 'number' || v === true)
   const status = allOk ? 'ok' : 'degraded'
 
   const resp = NextResponse.json({

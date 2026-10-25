@@ -161,13 +161,17 @@ async function fetchYahooFinance(params: FetchParams): Promise<unknown> {
   switch (action) {
     case 'quote': {
       const symbols = (params.symbols as string) ?? 'BTC-USD,ETH-USD,SOL-USD'
-      // Chart endpoint is more reliable from server IPs; fetch each symbol individually
+      // Chart endpoint is more reliable from server IPs; fetch with bounded concurrency.
       const list = symbols.split(',').map(s => s.trim()).filter(Boolean)
-      const results = await Promise.allSettled(list.map(s => chartQuote(s)))
-      const quotes = results
-        .filter(r => r.status === 'fulfilled' && r.value !== null)
-        .map(r => (r as PromiseFulfilledResult<Record<string, unknown>>).value)
-      return quotes
+      const quotes: Array<Record<string, unknown> | null> = new Array(list.length)
+      let next = 0
+      await Promise.all(Array.from({ length: Math.min(12, list.length) }, async () => {
+        while (next < list.length) {
+          const index = next++
+          quotes[index] = await chartQuote(list[index])
+        }
+      }))
+      return quotes.filter((quote): quote is Record<string, unknown> => quote !== null)
     }
     case 'chart': {
       const symbol = (params.symbol as string) ?? 'BTC-USD'

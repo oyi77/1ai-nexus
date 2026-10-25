@@ -77,9 +77,9 @@ async function main() {
   // Health check HTTP server
   const server = http.createServer(async (req, res) => {
     if (req.url === "/health") {
-      const health = await buildHealthResponse(config);
-      res.writeHead(health.status === "ok" ? 200 : 503, { "Content-Type": "application/json" });
-      res.end(JSON.stringify(health));
+      // Liveness must not wait on slow external integration probes.
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ status: "ok", uptime: process.uptime() }));
     } else if (req.url === "/integrations") {
       const statuses = await checkIntegrations(config);
       res.writeHead(200, { "Content-Type": "application/json" });
@@ -96,15 +96,6 @@ async function main() {
   });
 }
 
-async function buildHealthResponse(config: IntegrationConfig) {
-  const checks = await checkIntegrations(config);
-  const allOk = checks.every((c) => c.status === "ok");
-  return {
-    status: allOk ? "ok" : "degraded",
-    uptime: process.uptime(),
-    integrations: checks,
-  };
-}
 
 async function checkIntegrations(config: IntegrationConfig) {
   const results: Array<{ name: string; status: string; details?: string }> = [];

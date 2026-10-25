@@ -11,6 +11,10 @@ vi.mock('@/lib/modules/market/provider/idx-universe', () => ({
   getIdxUniverse: vi.fn(async () => ({ stocks: [] })),
 }))
 
+vi.mock('@/lib/modules/market/provider/idx-screener', () => ({
+  getScreenerSnapshot: vi.fn(async () => ({ capturedAt: '', source: 'test', total: 0, count: 0, data: {} })),
+}))
+
 function jsonResponse(body: unknown, ok = true): Response {
   return { ok, status: ok ? 200 : 500, json: async () => body } as Response
 }
