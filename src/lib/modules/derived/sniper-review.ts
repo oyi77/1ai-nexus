@@ -70,7 +70,14 @@ export function pickReviewCandidates(decisions: SniperScanDecision[]): SniperSca
 
 function vOrU(v: number | null | undefined, suffix = '%'): string {
   if (v == null || !Number.isFinite(v)) return 'UNKNOWN'
-  return `${Math.round(v * 10) / 10}${suffix}`
+  const rounded = Math.round(v * 10) / 10
+  return `${v !== 0 && rounded === 0 ? '<0.1' : rounded}${suffix}`
+}
+
+export function volMcOrU(v: number | null): string {
+  if (v == null || !Number.isFinite(v)) return 'UNKNOWN'
+  const rounded = v.toFixed(2)
+  return `${v !== 0 && Number(rounded) === 0 ? '<0.01' : rounded}x`
 }
 
 function usdOrU(v: number | null | undefined): string {
@@ -153,7 +160,7 @@ export function assessReview(d: SniperScanDecision): ReviewAssessment {
         : 'WATCHLIST'
   const reevaluateReasons: string[] = []
   if (finalStatus === 'RE-EVALUATE' && m.volMcRatio !== null) {
-    reevaluateReasons.push(`vol/mcap ${m.volMcRatio.toFixed(2)}x ≥ syarat 2x tetapi tidak ada breach kritis — layak dinilai ulang saat data segar`)
+    reevaluateReasons.push(`vol/mcap ${volMcOrU(m.volMcRatio)} ≥ syarat 2x tetapi tidak ada breach kritis — layak dinilai ulang saat data segar`)
   }
 
   return {
@@ -186,14 +193,14 @@ function tokenBlock(d: SniperScanDecision): string {
     L.push(`Catatan: label INFLUENCER = tag channel call-feed, bukan verifikasi jangkauan/pengikut KOL`)
   }
   L.push(`Usia: ${escapeSignalHtml(m.ageLabel)}`)
-  L.push(`Vol/MC: ${m.volMcRatio === null ? 'UNKNOWN' : m.volMcRatio.toFixed(2) + 'x'}`)
+  L.push(`Vol/MC: ${escapeSignalHtml(volMcOrU(m.volMcRatio))}`)
   L.push(`Market cap: ${usdOrU(mk.marketCapUsd)} (${verified(mk.marketCapUsd as number | null)})`)
   L.push(`Liquidity: ${usdOrU(mk.liquidityUsd)} (${verified(mk.liquidityUsd as number | null)})`)
-  L.push(`Top 10 holders: ${vOrU(m.top10Percent)} (${verified(m.top10Percent)})`)
-  L.push(`Dev holding: ${vOrU(m.devPercent)} (${verified(m.devPercent)})`)
-  L.push(`Sniper: ${vOrU(m.sniperPercent)} (${verified(m.sniperPercent)})`)
-  L.push(`Insider: ${vOrU(m.insiderPercent)} (${verified(m.insiderPercent)})`)
-  L.push(`Bundler/cluster: ${vOrU(m.clusterPercent ?? null)} (${verified(m.clusterPercent ?? null)})`)
+  L.push(`Top 10 holders: ${escapeSignalHtml(vOrU(m.top10Percent))} (${verified(m.top10Percent)})`)
+  L.push(`Dev holding: ${escapeSignalHtml(vOrU(m.devPercent))} (${verified(m.devPercent)})`)
+  L.push(`Sniper: ${escapeSignalHtml(vOrU(m.sniperPercent))} (${verified(m.sniperPercent)})`)
+  L.push(`Insider: ${escapeSignalHtml(vOrU(m.insiderPercent))} (${verified(m.insiderPercent)})`)
+  L.push(`Bundler/cluster: ${escapeSignalHtml(vOrU(m.clusterPercent ?? null))} (${verified(m.clusterPercent ?? null)})`)
   for (const line of smBlock(d)) L.push(`Smart money: ${line}`)
   L.push(`Whale activity: ${d.smartMoneyStrongest === 'WHALE' || d.smartMoneyStrongest === 'WHALE_AND_SMART_MONEY' ? `terdeteksi (${d.smartMoneyStrongest})` : 'tidak ada bukti whale terklasifikasi'}`)
   L.push(`Security: mint ${d.rejections.some((r) => r.startsWith('Mint authority')) ? '❓/🔴 bermasalah' : '✅ MATI terverifikasi'} · ` +

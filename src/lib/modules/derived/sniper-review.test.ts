@@ -9,6 +9,7 @@ import {
   assessReview,
   renderReviewDigestForTest,
   pushReviewDigest,
+  volMcOrU,
 } from './sniper-review'
 import type { SniperScanDecision } from './sniper-scan'
 
@@ -159,6 +160,26 @@ describe('renderReviewDigestForTest (TAHAP 7 fixtures)', () => {
     assertHtmlSafe(msgs)
   })
 
+  it.each([
+    [0.0319, 'Dev holding: &lt;0.1%'],
+    [0, 'Dev holding: 0%'],
+    [14.5, 'Dev holding: 14.5%'],
+  ])('renders percentage %s without hiding nonzero dust', (devPercent, expected) => {
+    const d = decision({
+      metrics: { ...decision({}).metrics, volMcRatio: 3, devPercent },
+    })
+    const msgs = renderReviewDigestForTest([d])
+    expect(msgs[0]).toContain(expected)
+    assertHtmlSafe(msgs)
+  })
+
+  it.each([
+    [0.001, '<0.01x'],
+    [0, '0.00x'],
+    [14.5, '14.50x'],
+  ])('formats vol/mcap %s without hiding nonzero dust', (volMcRatio, expected) => {
+    expect(volMcOrU(volMcRatio)).toBe(expected)
+  })
   it('duplicate: a deduped row is never rendered into the digest', () => {
     const rows = [
       vol('dup1', 3),
