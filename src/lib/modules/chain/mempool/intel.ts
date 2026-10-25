@@ -14,85 +14,28 @@ interface MempoolEvent {
   metadata: Record<string, unknown>
 }
 
-// ─── Bitcoin Mempool ───────────────────────────────────────
-
-async function fetchBitcoinMempool(): Promise<MempoolEvent[]> {
-  try {
-    const res = await fetch('https://mempool.space/api/mempool', { signal: AbortSignal.timeout(10_000) })
-    if (!res.ok) return []
-    const data = await res.json() as { count?: number; vsize?: number; total_fee?: number }
-
-    const events: MempoolEvent[] = []
-    if (data.count && data.count > 50000) {
-      events.push({
-        chain: 'bitcoin',
-        type: 'large_transfer',
-        asset: 'BTC',
-        estUsd: null,
-        detectedAt: new Date().toISOString(),
-        confirmedAt: null,
-        metadata: {
-          mempoolSize: data.count,
-          vsize: data.vsize,
-          totalFee: data.total_fee,
-          signal: 'High mempool congestion — potential volatility',
-        },
-      })
-    }
-    return events
-  } catch { return [] }
-}
-
-// ─── Ethereum Mempool (via public endpoint) ────────────────
-
-async function fetchEthereumMempool(): Promise<MempoolEvent[]> {
-  try {
-    const res = await fetch('https://api.etherscan.io/api?module=gastracker&action=gasoracle', {
-      signal: AbortSignal.timeout(10_000),
-    })
-    if (!res.ok) return []
-    const data = await res.json() as { result?: { SafeGasPrice?: string; ProposeGasPrice?: string; FastGasPrice?: string } }
-    const gas = data.result
-    if (!gas) return []
-
-    const events: MempoolEvent[] = []
-    const fastGas = parseFloat(gas.FastGasPrice ?? '0')
-
-    // High gas = congestion = potential large pending txs
-    if (fastGas > 50) {
-      events.push({
-        chain: 'ethereum',
-        type: 'large_transfer',
-        asset: 'ETH',
-        estUsd: null,
-        detectedAt: new Date().toISOString(),
-        confirmedAt: null,
-        metadata: {
-          safeGas: gas.SafeGasPrice,
-          proposeGas: gas.ProposeGasPrice,
-          fastGas: gas.FastGasPrice,
-          signal: `High gas (${fastGas} gwei) — large pending activity`,
-        },
-      })
-    }
-    return events
-  } catch { return [] }
-}
-
-// ─── Aggregate ─────────────────────────────────────────────
-
 export async function fetchMempoolEvents(): Promise<MempoolEvent[]> {
-  const [btc, eth] = await Promise.allSettled([
-    fetchBitcoinMempool(),
-    fetchEthereumMempool(),
-  ])
-
-  return [
-    ...(btc.status === 'fulfilled' ? btc.value : []),
-    ...(eth.status === 'fulfilled' ? eth.value : []),
-  ].sort((a, b) => new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime())
+  const res = await fetch('https://blockchain.info/unconfirmed-transactions?format=json', { signal: AbortSignal.timeout(10_000) })
+  if (!res.ok) throw new Error(`Unconfirmed transaction source returned HTTP ${res.status}`)
+  const data = await res.json() as { txs?: Array<{ hash?: unknown; out?: unknown; time?: unknown }> }
+  if (!Array.isArray(data.txs)) throw new Error('Unconfirmed transaction source shape invalid')
+  return data.txs.flatMap(tx => {
+    if (typeof tx.hash !== 'string') return []
+    const outputs = Array.isArray(tx.out) ? tx.out as Array<{ value?: unknown }> : []
+    const valueBtc = outputs.reduce((sum, output) => sum + (Number(output.value) || 0), 0) / 1e8
+    if (valueBtc < 10) return []
+    const seenAt = Number(tx.time)
+    return [{
+      chain: 'BTC',
+      type: 'large_transfer' as const,
+      asset: 'BTC',
+      estUsd: null,
+      detectedAt: new Date(Number.isFinite(seenAt) && seenAt > 0 ? seenAt * 1000 : Date.now()).toISOString(),
+      confirmedAt: null,
+      metadata: { txid: tx.hash, valueBtc, signal: `${valueBtc.toFixed(2)} BTC unconfirmed transfer` },
+    }]
+  }).sort((a, b) => Number(b.metadata.valueBtc) - Number(a.metadata.valueBtc)).slice(0, 20)
 }
-
 import { prisma } from '@/lib/db'
 
 export async function persistMempoolEvents(events: MempoolEvent[]): Promise<number> {

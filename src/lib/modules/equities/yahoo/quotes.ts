@@ -57,7 +57,101 @@ async function chartQuote(symbol: string): Promise<Record<string, unknown> | nul
       currency: meta.currency ?? 'USD',
       marketState: meta.marketState ?? 'REGULAR',
       shortName: meta.shortName ?? symbol,
+      longName: meta.longName ?? meta.shortName ?? symbol,
+      regularMarketVolume: meta.regularMarketVolume ?? null,
+      fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh ?? null,
+      fiftyTwoWeekLow: meta.fiftyTwoWeekLow ?? null,
+      averageVolume: meta.averageDailyVolume3Month ?? null,
     }
+  } catch { return null }
+}
+
+const FUNDAMENTAL_TYPES = [
+  'trailingMarketCap', 'trailingPeRatio', 'trailingForwardPeRatio', 'trailingPegRatio',
+  'trailingPsRatio', 'trailingPbRatio', 'trailingEnterprisesValueEBITDARatio',
+  'trailingEnterprisesValueRevenueRatio', 'trailingTotalRevenue', 'trailingNetIncome',
+  'trailingOperatingIncome', 'trailingGrossProfit', 'trailingEBITDA',
+  'trailingOperatingCashFlow', 'trailingFreeCashFlow', 'annualTotalAssets',
+  'annualStockholdersEquity', 'annualTotalLiabilities', 'annualTotalDebt',
+  'annualCashCashEquivalentsAndShortTermInvestments', 'annualCurrentAssets',
+  'annualCurrentLiabilities', 'annualDilutedAverageShares', 'annualTotalRevenue',
+  'annualNetIncome', 'annualCashDividendsPaid', 'annualCapitalExpenditure',
+]
+
+function ratio(numerator: number | null, denominator: number | null): number | null {
+  return numerator != null && denominator != null && denominator !== 0 ? numerator / denominator : null
+}
+
+async function fundamentalQuote(symbol: string): Promise<Record<string, unknown> | null> {
+  try {
+  const period2 = Math.floor(Date.now() / 1000) + 86_400
+  const period1 = period2 - 5 * 365 * 86_400
+  const [quote, response] = await Promise.all([
+    chartQuote(symbol),
+    yfFetch<{ timeseries?: { result?: Array<Record<string, unknown> & { meta?: { type?: string[] } }> } }>(
+      `/ws/fundamentals-timeseries/v1/finance/timeseries/${encodeURIComponent(symbol)}?symbol=${encodeURIComponent(symbol)}&type=${FUNDAMENTAL_TYPES.join(',')}&period1=${period1}&period2=${period2}`
+    ),
+  ])
+  const series = new Map<string, number[]>()
+  for (const item of response.timeseries?.result ?? []) {
+    const type = item.meta?.type?.[0]
+    if (!type) continue
+    const points = item[type]
+    if (!Array.isArray(points)) continue
+    series.set(type, points.map(point => Number((point as { reportedValue?: { raw?: unknown } })?.reportedValue?.raw)).filter(Number.isFinite))
+  }
+  const latest = (type: string) => series.get(type)?.at(-1) ?? null
+  const previous = (type: string) => series.get(type)?.at(-2) ?? null
+  const shares = latest('annualDilutedAverageShares')
+  const revenue = latest('trailingTotalRevenue')
+  const netIncome = latest('trailingNetIncome')
+  const equity = latest('annualStockholdersEquity')
+  const assets = latest('annualTotalAssets')
+  const annualRevenue = latest('annualTotalRevenue')
+  const previousRevenue = previous('annualTotalRevenue')
+  const marketCap = latest('trailingMarketCap') ?? (quote?.regularMarketPrice != null && shares != null ? Number(quote.regularMarketPrice) * shares : null)
+  return {
+    ...quote,
+    symbol: quote?.symbol ?? symbol,
+    marketCap,
+    enterpriseValue: null,
+    trailingPE: latest('trailingPeRatio'),
+    forwardPE: latest('trailingForwardPeRatio'),
+    pegRatio: latest('trailingPegRatio'),
+    priceToBook: latest('trailingPbRatio'),
+    priceToSalesTrailing12Months: latest('trailingPsRatio'),
+    enterpriseToRevenue: latest('trailingEnterprisesValueRevenueRatio'),
+    enterpriseToEbitda: latest('trailingEnterprisesValueEBITDARatio'),
+    totalRevenue: revenue,
+    revenueGrowth: annualRevenue != null && previousRevenue != null && previousRevenue !== 0 ? (annualRevenue - previousRevenue) / Math.abs(previousRevenue) : null,
+    grossProfits: latest('trailingGrossProfit'),
+    grossMargins: ratio(latest('trailingGrossProfit'), revenue),
+    operatingIncome: latest('trailingOperatingIncome'),
+    operatingMargins: ratio(latest('trailingOperatingIncome'), revenue),
+    netIncomeToCommon: netIncome,
+    profitMargins: ratio(netIncome, revenue),
+    ebitda: latest('trailingEBITDA'),
+    ebitdaMargins: ratio(latest('trailingEBITDA'), revenue),
+    trailingEps: ratio(netIncome, shares),
+    returnOnEquity: ratio(netIncome, equity),
+    returnOnAssets: ratio(netIncome, assets),
+    totalAssets: assets,
+    totalLiabilities: latest('annualTotalLiabilities'),
+    totalEquity: equity,
+    bookValue: ratio(equity, shares),
+    totalCash: latest('annualCashCashEquivalentsAndShortTermInvestments'),
+    totalDebt: latest('annualTotalDebt'),
+    debtToEquity: ratio(latest('annualTotalDebt'), equity) != null ? Number(ratio(latest('annualTotalDebt'), equity)) * 100 : null,
+    currentRatio: ratio(latest('annualCurrentAssets'), latest('annualCurrentLiabilities')),
+    operatingCashflow: latest('trailingOperatingCashFlow'),
+    capitalExpenditure: latest('annualCapitalExpenditure'),
+    freeCashflow: latest('trailingFreeCashFlow'),
+    sharesOutstanding: shares,
+    dividendYield: null,
+    payoutRatio: latest('annualCashDividendsPaid') != null ? ratio(Math.abs(Number(latest('annualCashDividendsPaid'))), latest('annualNetIncome')) : null,
+    beta: null,
+    shortRatio: null,
+  }
   } catch { return null }
 }
 
@@ -89,6 +183,12 @@ async function fetchYahooFinance(params: FetchParams): Promise<unknown> {
         timestamps: result.timestamp ?? [],
         quote: result.indicators?.quote?.[0] ?? {},
       }
+    }
+    case 'fundamentals': {
+      const symbols = (params.symbols as string) ?? 'AAPL'
+      const list = symbols.split(',').map(s => s.trim()).filter(Boolean).slice(0, 50)
+      const results = await Promise.allSettled(list.map(fundamentalQuote))
+      return results.filter(r => r.status === 'fulfilled' && r.value !== null).map(r => (r as PromiseFulfilledResult<Record<string, unknown>>).value)
     }
     case 'commodities': {
       // Gold, Silver, Oil, Natural Gas

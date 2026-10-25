@@ -69,7 +69,7 @@ function estimateExchangeFlow(exchange: string, tickers: ExchangeTicker[]): Exch
   const symbolVolumes: Array<{ symbol: string; volume: number; priceChange: number }> = []
 
   for (const t of tickers) {
-    const vol = t.volume24h * t.price // volume in USD
+    const vol = t.volume24h
     totalVolume += vol
     weightedPriceChange += t.priceChange24h * vol
 
@@ -117,7 +117,7 @@ function detectWhaleEvents(exchange: string, tickers: ExchangeTicker[]): WhaleFl
   const events: WhaleFlowEvent[] = []
 
   for (const t of tickers) {
-    const vol = t.volume24h * t.price
+    const vol = t.volume24h
     if (vol < HIGH_VOLUME_SYMBOL_THRESHOLD) continue
 
     const isDrop = t.priceChange24h < -1

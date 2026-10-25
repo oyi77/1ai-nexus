@@ -213,6 +213,8 @@ describe('insight-brief transmission engine', () => {
     let curveLeg = brief.transmissions.find((t) => t.id === 'macro-yield-curve')
     expect(curveLeg).toBeDefined()
     expect(curveLeg!.direction).toBe('bearish')
+    expect(curveLeg!.unproven).toBe(true)
+    expect(curveLeg!.confidence).toBe(50)
     expect(curveLeg!.evidence.some((e) => e.metric === '10Y-2Y spread' && e.value === '-0.25%')).toBe(true)
 
     // Steepening expansion scenario: 10Y-2Y >= 0.5
@@ -231,6 +233,8 @@ describe('insight-brief transmission engine', () => {
     curveLeg = brief.transmissions.find((t) => t.id === 'macro-yield-curve')
     expect(curveLeg).toBeDefined()
     expect(curveLeg!.direction).toBe('bullish')
+    expect(curveLeg!.unproven).toBe(true)
+    expect(curveLeg!.confidence).toBe(50)
   })
 
   it('emits macro-credit-spread transmission when credit spread points exist', async () => {
@@ -248,6 +252,8 @@ describe('insight-brief transmission engine', () => {
     let creditLeg = brief.transmissions.find((t) => t.id === 'macro-credit-spread')
     expect(creditLeg).toBeDefined()
     expect(creditLeg!.direction).toBe('bearish')
+    expect(creditLeg!.unproven).toBe(true)
+    expect(creditLeg!.confidence).toBe(50)
     expect(creditLeg!.evidence.some((e) => e.metric === 'Baa-10Y spread' && e.value === '2.35%')).toBe(true)
 
     // Compressed calm scenario: BAA10Y <= 1.5%
@@ -264,6 +270,8 @@ describe('insight-brief transmission engine', () => {
     creditLeg = brief.transmissions.find((t) => t.id === 'macro-credit-spread')
     expect(creditLeg).toBeDefined()
     expect(creditLeg!.direction).toBe('bullish')
+    expect(creditLeg!.unproven).toBe(true)
+    expect(creditLeg!.confidence).toBe(50)
   })
   it('survives empty data — brief still returns a regime, no throw', async () => {
     const brief = await buildInsightBrief()

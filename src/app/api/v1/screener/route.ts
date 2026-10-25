@@ -9,14 +9,21 @@ interface ScreenerResult {
   symbol: string
   name: string
   exchange: string
-  sector: string
-  price: number
-  change: number
-  changePercent: number
-  marketCap: number
-  volume: number
+  currency: 'USD'
+  price: number | null
+  change: number | null
+  changePercent: number | null
+  marketCap: number | null
+  volume: number | null
   pe: number | null
   dividend: number | null
+}
+
+const EXCHANGE_CURRENCY: Record<string, string> = {
+  NASDAQ: 'USD', NYSE: 'USD', IDX: 'IDR', XETRA: 'EUR', Euronext: 'EUR', TSE: 'JPY', HKEX: 'HKD',
+}
+const FX_SYMBOL_BY_CURRENCY: Record<string, string> = {
+  IDR: 'IDRUSD=X', EUR: 'EURUSD=X', JPY: 'JPYUSD=X', HKD: 'HKDUSD=X',
 }
 
 // GET /api/v1/screener — Multi-asset stock screener
@@ -37,7 +44,11 @@ export async function GET(request: NextRequest) {
   const universe: Array<{ symbol: string; name: string; sector: string; exchange: string }> = [...SCREENER_STOCKS]
   if (!exchange || exchange.toLowerCase() === 'idx') {
     try {
-      const { stocks } = await getIdxUniverse()
+      // Bound discovery so discovery + quotes cannot exceed public proxy deadlines.
+      const { stocks } = await Promise.race([
+        getIdxUniverse(),
+        new Promise<{ stocks: [] }>(resolve => setTimeout(() => resolve({ stocks: [] }), 6_000)),
+      ])
       const curated = new Set(universe.map((s) => s.symbol))
       universe.push(
         ...stocks
@@ -50,34 +61,51 @@ export async function GET(request: NextRequest) {
   if (sector) filtered = filtered.filter(s => s.sector.toLowerCase() === sector.toLowerCase())
   if (exchange) filtered = filtered.filter(s => s.exchange.toLowerCase() === exchange.toLowerCase())
 
-  // Fetch real prices
-  const symbols = filtered.map(s => s.symbol).join(',')
+  // Fetch real prices. Keep request latency below public proxy limits.
+  const currencies = new Set(filtered.map(stock => EXCHANGE_CURRENCY[stock.exchange] ?? 'USD'))
+  const fxSymbols = Object.entries(FX_SYMBOL_BY_CURRENCY).filter(([currency]) => currencies.has(currency)).map(([, symbol]) => symbol)
+  const symbols = [...new Set([...filtered.map(s => s.symbol), ...fxSymbols])].join(',')
   try {
     const quoteRes = await fetch(
       `${process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:4400'}/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${symbols}`,
       {
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(12_000),
         headers: { Authorization: `Bearer ${process.env.NEXUS_API_KEYS?.split(',')[0] ?? ''}` },
       }
     )
+    if (!quoteRes.ok) throw new Error(`Quote source returned HTTP ${quoteRes.status}`)
     const quoteData = await quoteRes.json()
     const quoteMap: Record<string, Record<string, unknown>> = {}
     for (const q of quoteData.data ?? []) {
-      quoteMap[q.symbol as string] = q
+      if (typeof q.symbol === 'string') quoteMap[q.symbol] = q
+    }
+    const fxRates: Record<string, number | null> = {}
+    for (const [currency, symbol] of Object.entries(FX_SYMBOL_BY_CURRENCY)) {
+      if (!currencies.has(currency)) continue
+      const rate = quoteMap[symbol]?.regularMarketPrice
+      fxRates[currency] = typeof rate === 'number' && Number.isFinite(rate) && rate > 0 ? rate : null
+    }
+    const usd = (value: unknown, currency: string): number | null => {
+      if (typeof value !== 'number' || !Number.isFinite(value)) return null
+      if (currency === 'USD') return value
+      const rate = fxRates[currency]
+      return rate == null ? null : value * rate
     }
 
     const results: ScreenerResult[] = filtered.map(stock => {
       const q = quoteMap[stock.symbol] ?? {}
+      const currency = typeof q.currency === 'string' ? q.currency : EXCHANGE_CURRENCY[stock.exchange] ?? 'USD'
       return {
         symbol: stock.symbol,
         name: (q.shortName as string) ?? stock.name,
-        exchange: stock.exchange,
         sector: stock.sector,
-        price: (q.regularMarketPrice as number) ?? 0,
-        change: (q.regularMarketChange as number) ?? 0,
-        changePercent: (q.regularMarketChangePercent as number) ?? 0,
-        marketCap: (q.marketCap as number) ?? 0,
-        volume: (q.regularMarketVolume as number) ?? 0,
+        exchange: stock.exchange,
+        currency: 'USD',
+        price: usd(q.regularMarketPrice, currency),
+        change: usd(q.regularMarketChange, currency),
+        changePercent: (q.regularMarketChangePercent as number) ?? null,
+        marketCap: usd(q.marketCap, currency),
+        volume: (q.regularMarketVolume as number) ?? null,
         pe: (q.trailingPE as number) ?? null,
         dividend: (q.dividendYield as number) ?? null,
       }
@@ -85,7 +113,7 @@ export async function GET(request: NextRequest) {
 
     // Apply post-fetch filters
     let finalResults = results
-    if (minMarketCap) finalResults = finalResults.filter(r => r.marketCap >= minMarketCap)
+    if (minMarketCap) finalResults = finalResults.filter(r => r.marketCap != null && r.marketCap >= minMarketCap)
     if (maxPE) finalResults = finalResults.filter(r => r.pe != null && r.pe <= maxPE)
     if (minDividend) finalResults = finalResults.filter(r => r.dividend != null && r.dividend >= minDividend)
 
@@ -107,6 +135,14 @@ export async function GET(request: NextRequest) {
       headers: { 'Cache-Control': 'public, max-age=120, stale-while-revalidate=240' },
     })
   } catch (err) {
-    return apiJson(null, { error: (err as Error).message, status: 502 })
+    return apiJson({
+      results: [],
+      count: 0,
+      notice: 'Screener quotes temporarily unavailable',
+      filters: { sector, exchange, minMarketCap, maxPE, minDividend, sortBy, sortOrder, limit },
+    }, {
+      error: (err as Error).message,
+      headers: { 'Cache-Control': 'no-store' },
+    })
   }
 }

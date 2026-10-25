@@ -1,10 +1,6 @@
 import { prisma } from '@/lib/db'
 
-// ─────────────────────────────────────────────────────────────
-// Staking Queue Monitor Module
-// Tracks ETH staking entry/exit queue from beaconcha.in
-// Zero API keys — public beaconcha.in API
-// ─────────────────────────────────────────────────────────────
+// Public Beacon Node API; netStaked stays null unless a source reports total balance.
 
 export interface StakingSnapshot {
   asset: string
@@ -18,55 +14,20 @@ export interface StakingSnapshot {
 
 export async function fetchStakingQueue(): Promise<StakingSnapshot> {
   const result: StakingSnapshot = {
-    asset: 'ETH',
-    entryQueue: null,
-    exitQueue: null,
-    netStaked: null,
-    entryWaitDays: null,
-    exitWaitDays: null,
-    timestamp: new Date().toISOString(),
+    asset: 'ETH', entryQueue: null, exitQueue: null, netStaked: null,
+    entryWaitDays: null, exitWaitDays: null, timestamp: new Date().toISOString(),
   }
-
-  try {
-    // beaconcha.in public API for ETH staking queue
-    const res = await fetch('https://beaconcha.in/api/v1/validators/queue', {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(10_000),
-    })
-    if (!res.ok) return result
-
-    const data = await res.json() as { data?: { beaconchain_entering?: number; beaconchain_exiting?: number } }
-    const queue = data.data
-    if (!queue) return result
-
-    result.entryQueue = queue.beaconchain_entering ?? null
-    result.exitQueue = queue.beaconchain_exiting ?? null
-
-    // Estimate wait times (rough: ~1000 validators per epoch = ~6.4 min per 32 ETH)
-    if (result.entryQueue && result.entryQueue > 0) {
-      result.entryWaitDays = Math.ceil(result.entryQueue * 32 * 6.4 / (60 * 24 * 1000))
-    }
-    if (result.exitQueue && result.exitQueue > 0) {
-      result.exitWaitDays = Math.ceil(result.exitQueue * 32 * 6.4 / (60 * 24 * 1000))
-    }
-  } catch {
-    // beaconcha.in may be unavailable
-  }
-
-  // Fetch total staked ETH from beaconcha.in
-  try {
-    const res = await fetch('https://beaconcha.in/api/v1/epoch/latest', {
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(10_000),
-    })
-    if (res.ok) {
-      const data = await res.json() as { data?: { totalvalidatorbalance?: number } }
-      if (data.data?.totalvalidatorbalance) {
-        result.netStaked = data.data.totalvalidatorbalance / 1e9 // Convert Gwei to ETH
-      }
-    }
-  } catch { /* optional */ }
-
+  const beacon = 'https://ethereum-beacon-api.publicnode.com/eth/v1/beacon'
+  const [entering, exiting] = await Promise.all([
+    fetch(`${beacon}/states/head/validators?status=pending_queued`, { signal: AbortSignal.timeout(15_000) }),
+    fetch(`${beacon}/states/head/validators?status=active_exiting`, { signal: AbortSignal.timeout(15_000) }),
+  ])
+  if (!entering.ok || !exiting.ok) throw new Error('Beacon validator queue unavailable')
+  const enteringData = await entering.json() as { data?: Array<{ validator?: { activation_epoch?: string } }> }
+  const exitingData = await exiting.json() as { data?: Array<{ validator?: { exit_epoch?: string } }> }
+  if (!Array.isArray(enteringData.data) || !Array.isArray(exitingData.data)) throw new Error('Beacon validator queue shape invalid')
+  result.entryQueue = enteringData.data.length
+  result.exitQueue = exitingData.data.length
   return result
 }
 

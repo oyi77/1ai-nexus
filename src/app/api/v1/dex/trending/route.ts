@@ -18,8 +18,10 @@ interface TrendingPair {
   fdv: number
   volume24h: number
   priceChange24h: number
-  buys24h: number
-  sells24h: number
+  buys24h: number | null
+  sells24h: number | null
+  liquidity: number | null
+  dex: string | null
   source: string
   fetchedAt: number
 }
@@ -43,7 +45,7 @@ async function fetchGeckoTerminal(network: string): Promise<SourceResult> {
     })
     if (!res.ok) return { source: 'geckoterminal', data: [], success: false, latencyMs: Date.now() - start, error: `HTTP ${res.status}` }
 
-    const data = (await res.json()) as { data?: Array<{ attributes?: Record<string, unknown> }> }
+    const data = (await res.json()) as { data?: Array<{ attributes?: Record<string, unknown>; relationships?: { dex?: { data?: { id?: string } } } }> }
     const pools = data.data ?? []
     if (pools.length === 0) return { source: 'geckoterminal', data: [], success: true, latencyMs: Date.now() - start }
 
@@ -58,8 +60,10 @@ async function fetchGeckoTerminal(network: string): Promise<SourceResult> {
         fdv: parseFloat((a.fdv_usd as string) ?? '0') || 0,
         volume24h: parseFloat(((a.volume_usd as Record<string, string>)?.h24) ?? '0') || 0,
         priceChange24h: parseFloat(((a.price_change_percentage as Record<string, string>)?.h24) ?? '0') || 0,
-        buys24h: ((a.transactions as Record<string, Record<string, number>>)?.h24?.buys) ?? 0,
-        sells24h: ((a.transactions as Record<string, Record<string, number>>)?.h24?.sells) ?? 0,
+        buys24h: ((a.transactions as Record<string, Record<string, number>>)?.h24?.buys) ?? null,
+        sells24h: ((a.transactions as Record<string, Record<string, number>>)?.h24?.sells) ?? null,
+        liquidity: parseFloat((a.reserve_in_usd as string) ?? '0') || null,
+        dex: pool.relationships?.dex?.data?.id ?? null,
         source: 'geckoterminal',
         fetchedAt: now,
       }
@@ -92,7 +96,8 @@ async function fetchDexScreener(network: string): Promise<SourceResult> {
       const baseToken = pair.baseToken as Record<string, string> | undefined
       const volume = pair.volume as Record<string, number> | undefined
       const priceChange = pair.priceChange as Record<string, number> | undefined
-      const txns = pair.txns as Record<string, Record<string, number>> | undefined
+      const liquidity = pair.liquidity as { usd?: number } | undefined
+      const txns = pair.txns as Record<string, { buys?: number; sells?: number }> | undefined
 
       return {
         address: (pair.pairAddress as string) ?? '',
@@ -102,8 +107,10 @@ async function fetchDexScreener(network: string): Promise<SourceResult> {
         fdv: (pair.fdv as number) ?? 0,
         volume24h: volume?.h24 ?? 0,
         priceChange24h: priceChange?.h24 ?? 0,
-        buys24h: txns?.h24?.buys ?? 0,
-        sells24h: txns?.h24?.sells ?? 0,
+        buys24h: txns?.h24?.buys ?? null,
+        sells24h: txns?.h24?.sells ?? null,
+        liquidity: liquidity?.usd ?? null,
+        dex: (pair.dexId as string) ?? null,
         source: 'dexscreener',
         fetchedAt: now,
       }
@@ -115,6 +122,13 @@ async function fetchDexScreener(network: string): Promise<SourceResult> {
   }
 }
 
+function numericValue(value: number | string | undefined): number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0
+  if (typeof value !== 'string') return 0
+  const parsed = Number(value.replace(/[$,]/g, ''))
+  return Number.isFinite(parsed) ? parsed : 0
+}
+
 async function fetchCoinGeckoTrending(): Promise<SourceResult> {
   const start = Date.now()
   try {
@@ -124,7 +138,7 @@ async function fetchCoinGeckoTrending(): Promise<SourceResult> {
     if (!res.ok) return { source: 'coingecko', data: [], success: false, latencyMs: Date.now() - start, error: `HTTP ${res.status}` }
 
     const data = (await res.json()) as {
-      coins?: Array<{ item?: { name?: string; symbol?: string; data?: { price?: number; price_change_percentage_24h?: { usd?: number }; market_cap?: number; total_volume?: number } } }>
+      coins?: Array<{ item?: { name?: string; symbol?: string; data?: { price?: number; price_change_percentage_24h?: { usd?: number }; market_cap?: number | string; total_volume?: number | string } } }>
     }
     const now = Date.now()
 
@@ -133,11 +147,13 @@ async function fetchCoinGeckoTrending(): Promise<SourceResult> {
       name: coin.item?.name ?? '',
       symbol: coin.item?.symbol?.toUpperCase() ?? '?',
       priceUsd: coin.item?.data?.price ?? 0,
-      fdv: coin.item?.data?.market_cap ?? 0,
-      volume24h: coin.item?.data?.total_volume ?? 0,
+      fdv: numericValue(coin.item?.data?.market_cap),
+      volume24h: numericValue(coin.item?.data?.total_volume),
       priceChange24h: coin.item?.data?.price_change_percentage_24h?.usd ?? 0,
-      buys24h: 0,
-      sells24h: 0,
+      buys24h: null,
+      sells24h: null,
+      liquidity: null,
+      dex: null,
       source: 'coingecko',
       fetchedAt: now,
     }))

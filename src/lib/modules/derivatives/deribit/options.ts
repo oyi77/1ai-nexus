@@ -233,6 +233,8 @@ async function fetchOptionsChain(params: FetchParams): Promise<OptionsChainData>
     .slice(0, 3)
 
   // Step 4: For each expiry, fetch tickers for ~20 strikes around ATM
+  if (!(indexPrice > 0) || sortedExpiries.length === 0) throw new Error('Deribit options chain unavailable')
+
   const chainExpiries: OptionsChainData['expiries'] = []
   let totalOI = 0
   let totalCalls = 0
@@ -335,7 +337,8 @@ const deribitModule: DataModule = {
     })
   },
 
-  async fallbackFn<T>(_params: FetchParams): Promise<ModuleResult<T>> {
+  async fallbackFn<T>(params: FetchParams): Promise<ModuleResult<T>> {
+    if (params.action === 'options-chain') throw new Error('Deribit options chain unavailable')
     return {
       data: {
         btc: { indexPrice: null, fundingRate: null, openInterest: null, volumeUsd: null, markPrice: null },

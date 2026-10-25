@@ -33,12 +33,12 @@ interface MempoolStatsResponse {
 
 interface WhaleTx {
   txid: string
-  fee: number
-  vsize: number
+  fee: number | null
+  vsize: number | null
   valueBtc: number
-  valueUsd: number
-  rate: number
-  age: number
+  valueUsd: number | null
+  rate: number | null
+  age: number | null
 }
 
 interface WhaleResponse {
@@ -48,33 +48,36 @@ interface WhaleResponse {
   note?: string
 }
 
-// ── Helpers ───────────────────────────────────────────────
-
-function formatSats(sats: number): string {
-  if (sats == null || isNaN(sats)) return '—'
-  if (sats >= 1_000_000) return `${(sats / 1_000_000).toFixed(1)}M`
-  if (sats >= 1_000) return `${(sats / 1_000).toFixed(1)}K`
-  return String(sats)
+function formatSats(sats: number | null): string {
+  if (!Number.isFinite(sats)) return '—'
+  const value = sats as number
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`
+  return String(value)
 }
 
-function formatVsize(vb: number): string {
-  if (vb == null || isNaN(vb)) return '—'
-  if (vb >= 1_000_000) return `${(vb / 1_000_000).toFixed(1)} MB`
-  if (vb >= 1_000) return `${(vb / 1_000).toFixed(0)} KB`
-  return `${vb} vB`
+function formatVsize(vb: number | null): string {
+  if (!Number.isFinite(vb)) return '—'
+  const value = vb as number
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)} MB`
+  if (value >= 1_000) return `${(value / 1_000).toFixed(0)} KB`
+  return `${value} vB`
 }
 
-function formatAge(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`
-  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
+function formatAge(seconds: number | null): string {
+  if (!Number.isFinite(seconds) || (seconds as number) < 0) return '—'
+  const value = seconds as number
+  if (value < 60) return `${Math.floor(value)}s`
+  if (value < 3600) return `${Math.floor(value / 60)}m`
+  return `${Math.floor(value / 3600)}h ${Math.floor((value % 3600) / 60)}m`
 }
 
-function formatUsd(n: number): string {
-  if (n == null || isNaN(n)) return '—'
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`
-  return `$${n.toFixed(0)}`
+function formatUsd(n: number | null): string {
+  if (!Number.isFinite(n)) return '—'
+  const value = n as number
+  if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`
+  if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`
+  return `$${value.toFixed(0)}`
 }
 
 function congestionBg(level: string): string {
@@ -172,7 +175,7 @@ function MempoolPageInner() {
       align: 'right',
       render: r => (
         <span className="font-mono text-xs text-text-muted tabular-nums">
-          {formatSats(r.fee)} sat
+          {r.fee === null ? '—' : `${formatSats(r.fee)} sat`}
         </span>
       ),
     },
@@ -183,8 +186,8 @@ function MempoolPageInner() {
       align: 'right',
       sortable: true,
       render: r => (
-        <span className={`font-mono text-xs tabular-nums ${r.rate > 50 ? 'text-data-bear' : r.rate > 20 ? 'text-data-warn' : 'text-data-bull'}`}>
-          {(r.rate ?? 0).toFixed(1)}
+        <span className={`font-mono text-xs tabular-nums ${r.rate !== null && r.rate > 50 ? 'text-data-bear' : r.rate !== null && r.rate > 20 ? 'text-data-warn' : 'text-text-muted'}`}>
+          {r.rate === null ? '—' : r.rate.toFixed(1)}
         </span>
       ),
     },
@@ -206,7 +209,7 @@ function MempoolPageInner() {
       align: 'right',
       sortable: true,
       render: r => (
-        <span className={`font-mono text-xs tabular-nums ${r.age > 600 ? 'text-data-bear' : 'text-text-muted'}`}>
+        <span className={`font-mono text-xs tabular-nums ${r.age !== null && r.age > 600 ? 'text-data-bear' : 'text-text-muted'}`}>
           {formatAge(r.age)}
         </span>
       ),
@@ -248,6 +251,7 @@ function MempoolPageInner() {
               )
             })}
           </div>
+          {fees.length === 0 && <div className="p-4 text-center text-xs text-text-muted">{statsStatus === 'error' ? 'Fee estimates temporarily unavailable' : 'Loading fee estimates…'}</div>}
         </Panel>
 
         {/* Stats Strip */}
@@ -255,22 +259,22 @@ function MempoolPageInner() {
           {[
             {
               label: 'Pending Txs',
-              value: (statsData?.count ?? 0).toLocaleString(),
+              value: statsData ? statsData.count.toLocaleString() : '—',
               color: 'text-text-primary',
             },
             {
               label: 'Mempool Size',
-              value: formatVsize(statsData?.vsize ?? 0),
+              value: statsData ? formatVsize(statsData.vsize) : '—',
               color: 'text-text-primary',
             },
             {
               label: 'Total Fees',
-              value: `${formatSats(statsData?.totalFee ?? 0)} sat`,
+              value: statsData ? `${formatSats(statsData.totalFee)} sat` : '—',
               color: 'text-data-bull',
             },
             {
               label: 'Avg Fee',
-              value: `${formatSats(statsData?.avgFee ?? 0)} sat`,
+              value: statsData ? `${formatSats(statsData.avgFee)} sat` : '—',
               color: 'text-data-warn',
             },
             {
@@ -296,7 +300,7 @@ function MempoolPageInner() {
         {/* Whale Pending Txs */}
         <Panel
           title="Pending Whale Transactions"
-          subtitle={`Unconfirmed txs ≥ 10 BTC · ${whales.length} found`}
+          subtitle={whaleStatus === 'error' ? 'Unconfirmed transaction source unavailable' : `Unconfirmed txs ≥ 10 BTC · ${whales.length} found`}
           liveStatus={whaleStatus}
           onRefresh={refreshWhales}
           maxHeight={600}
@@ -310,8 +314,8 @@ function MempoolPageInner() {
             rowHeight={36}
             emptyState={
               <div className="p-8 text-center">
-                <div className="text-[14px] text-text-primary mb-2">No whale transactions in mempool</div>
-                <div className="text-xs text-text-muted">Pending txs ≥ 10 BTC will appear here before confirmation</div>
+                <div className="text-[14px] text-text-primary mb-2">{whaleStatus === 'error' ? 'Whale data temporarily unavailable' : 'No whale transactions in mempool'}</div>
+                <div className="text-xs text-text-muted">{whaleStatus === 'error' ? 'Could not retrieve unconfirmed transactions. Refresh to retry.' : 'Pending txs ≥ 10 BTC will appear here before confirmation'}</div>
                 <div className="text-xs text-text-muted mt-1">Auto-refreshes every 10 seconds</div>
               </div>
             }

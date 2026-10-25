@@ -10,14 +10,6 @@ import { useLiveFetch } from '@/lib/hooks/useLiveFetch'
 
 // ── Types ─────────────────────────────────────────────────
 
-interface HeatmapBin {
-  priceLevel: number
-  density: number
-  longLiquidations: number
-  shortLiquidations: number
-  symbol: string
-  totalUsd?: number
-}
 
 interface FundingEntry {
   symbol: string
@@ -39,9 +31,16 @@ interface LeaderboardEntry {
   volume: number
 }
 
+interface LiquidationZone {
+  priceLevel: number
+  leverage: number
+  side: 'long' | 'short'
+  maintenanceMarginRate: number
+  model: string
+}
+
 interface LiquidationsResponse {
-  spotlight: { symbol: string; price: number; markPrice: number; openInterest: number; fundingRate: number; maxLeverage: number; priceChange24h: number }
-  heatmap: HeatmapBin[]
+  spotlight: { symbol: string; price: number; markPrice: number; openInterest: number; fundingRate: number; maxLeverage: number; priceChange24h: number; liquidationZones: LiquidationZone[] } | null
   fundingStrip: FundingEntry[]
   topPositions: PositionEntry[]
   leaderboard: LeaderboardEntry[]
@@ -56,14 +55,15 @@ interface Cluster {
 
 interface BinanceHeatmapData {
   symbol: string
-  currentPrice: number
-  markPrice: number
-  fundingRate: number
-  openInterest: number
+  currentPrice: number | null
+  markPrice: number | null
+  fundingRate: number | null
+  openInterest: number | null
   heatmap: Array<{ priceLevel: number; density: number; longLiquidations: number; shortLiquidations: number; totalUsd: number }>
   clusters: Cluster[]
   recentLiquidations: Array<{ price: number; quantity: number; usdValue: number; side: string; usdFormatted: string; timestamp: number }>
   range: { start: number; end: number; binSize: number }
+  unavailableReason: string | null
 }
 
 // ── Helpers ────────────────────────────────────────────────
@@ -103,6 +103,7 @@ export default function LiquidationsPage() {
   }, [])
   const [tab, setTab] = useState<'heatmap' | 'clusters' | 'funding' | 'leaderboard'>('heatmap')
   const [binanceData, setBinanceData] = useState<BinanceHeatmapData | null>(null)
+  const [binanceError, setBinanceError] = useState<string | null>(null)
 
   // Hyperliquid data
   const { data: hlData, status: hlStatus, refresh } = useLiveFetch<LiquidationsResponse>({
@@ -115,8 +116,13 @@ export default function LiquidationsPage() {
     try {
       const res = await fetch(`/api/v1/liquidations/heatmap?symbol=${selectedSymbol}`)
       const d = await res.json()
-      if (d.data) setBinanceData(d.data as BinanceHeatmapData)
-    } catch { /* silent */ }
+      if (!res.ok || !d.data) throw new Error(d.error ?? `Heatmap request failed: HTTP ${res.status}`)
+      setBinanceData(d.data as BinanceHeatmapData)
+      setBinanceError(null)
+    } catch (error) {
+      setBinanceData(null)
+      setBinanceError(error instanceof Error ? error.message : 'Binance heatmap unavailable')
+    }
   }, [selectedSymbol])
 
   useEffect(() => {
@@ -127,14 +133,13 @@ fetchBinance()
   }, [fetchBinance])
 
   const spotlight = hlData?.spotlight ?? null
-  const heatmap = hlData?.heatmap ?? []
+  const zones = spotlight?.liquidationZones ?? []
   const fundingStrip = hlData?.fundingStrip ?? []
   const topPositions = hlData?.topPositions ?? []
   const leaderboard = hlData?.leaderboard ?? []
   const marketCount = hlData?.topPositions?.length ?? 0
-
-  const totalLongLiq = heatmap.reduce((s, b) => s + b.longLiquidations, 0)
-  const totalShortLiq = heatmap.reduce((s, b) => s + b.shortLiquidations, 0)
+  const nearestLongZone = zones.filter(zone => zone.side === 'long').at(-1)?.priceLevel
+  const nearestShortZone = zones.filter(zone => zone.side === 'short').at(-1)?.priceLevel
 
   const posColumns: Column<PositionEntry>[] = [
     { key: 'symbol', header: 'Pair', width: 80, render: r => (
@@ -195,23 +200,23 @@ fetchBinance()
         {/* KPI Strip */}
         <div className="grid grid-cols-6 gap-1">
           <KPI label="Spot Price" value={spotlight ? `$${spotlight.price.toLocaleString()}` : '—'} />
-          <KPI label="Mark Price" value={binanceData ? `$${binanceData.markPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'} />
-          <KPI label="Open Interest" value={binanceData ? formatUsd(binanceData.openInterest * binanceData.currentPrice) : '—'} />
-          <KPI label="Funding" value={binanceData ? `${(binanceData.fundingRate * 100).toFixed(4)}%` : '—'} color={binanceData && binanceData.fundingRate > 0 ? 'text-data-bear' : 'text-data-bull'} />
-          <KPI label="Long Liq Zone" value={formatUsd(totalLongLiq)} color="text-data-bull" />
-          <KPI label="Short Liq Zone" value={formatUsd(totalShortLiq)} color="text-data-bear" />
+          <KPI label="Mark Price" value={binanceData?.markPrice != null ? `$${binanceData.markPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'} />
+          <KPI label="Open Interest" value={binanceData?.openInterest != null && binanceData.currentPrice != null ? formatUsd(binanceData.openInterest * binanceData.currentPrice) : '—'} />
+          <KPI label="Funding" value={binanceData?.fundingRate != null ? `${(binanceData.fundingRate * 100).toFixed(4)}%` : '—'} color={binanceData?.fundingRate != null ? (binanceData.fundingRate > 0 ? 'text-data-bear' : 'text-data-bull') : undefined} />
+          <KPI label="Nearest Long Zone" value={nearestLongZone != null ? formatUsd(nearestLongZone) : '—'} color="text-data-bull" />
+          <KPI label="Nearest Short Zone" value={nearestShortZone != null ? formatUsd(nearestShortZone) : '—'} color="text-data-bear" />
         </div>
 
         {/* ── TAB: Heatmap ── */}
         {tab === 'heatmap' && (
           <div className="space-y-3">
             {/* Binance Real Heatmap */}
-            <Panel title={`Liquidation Heatmap — ${selectedSymbol}`} subtitle="Price levels ±20% • Real-time from Binance Futures" liveStatus={binanceData ? 'live' : 'stale'}>
+            <Panel title={`Liquidation Heatmap — ${selectedSymbol}`} subtitle="Price levels ±20% • Real-time from Binance Futures" liveStatus={binanceData?.unavailableReason ? 'stale' : binanceData ? 'live' : 'stale'}>
               {binanceData && binanceData.heatmap.length > 0 ? (
                 <div className="p-4 space-y-1 max-h-[500px] overflow-y-auto">
                   <div className="flex items-center justify-center mb-2">
                     <div className="px-3 py-1 bg-teal-vivid/20 border border-teal-vivid rounded text-xs font-mono font-bold text-teal-vivid">
-                      Current: ${binanceData.currentPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                      Current: {binanceData.currentPrice != null ? `$${binanceData.currentPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : 'unavailable'}
                     </div>
                   </div>
                   {binanceData.heatmap
@@ -240,54 +245,33 @@ fetchBinance()
                     ))}
                 </div>
               ) : (
-                <div className="p-8 text-text-muted text-[12px] font-mono text-center">Loading heatmap...</div>
+                <div className="p-8 text-text-muted text-[12px] font-mono text-center">
+                  {binanceData?.unavailableReason ?? binanceError ?? 'Loading heatmap...'}
+                </div>
               )}
             </Panel>
 
             {/* Hyperliquid Heatmap (grid style) */}
-            <Panel title={`Hyperliquid Zones — ${selectedSymbol}`} subtitle="Estimated liquidation zones by leverage tier" liveStatus={hlStatus}>
-              {heatmap.length > 0 && heatmap.some(b => b.density > 0) ? (
-                <div className="p-2">
-                  <div className="flex">
-                    <div className="flex flex-col justify-between pr-2 shrink-0 w-16">
-                      {[...heatmap].reverse().filter((_, i) => i % 5 === 0).map((bin, i) => (
-                        <span key={i} className="text-[8px] font-mono text-text-muted tabular-nums text-right leading-none">
-                          ${bin.priceLevel.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                        </span>
+            <Panel title={`Hyperliquid Zones — ${selectedSymbol}`} subtitle="Theoretical isolated-margin zones • no liquidation density inferred" liveStatus={hlStatus}>
+              {zones.length > 0 ? (
+                <div className="p-3 overflow-x-auto">
+                  <table className="w-full text-xs font-mono">
+                    <thead><tr className="text-text-muted border-b border-bg-border"><th className="py-2 text-left">SIDE</th><th className="py-2 text-right">LEVERAGE</th><th className="py-2 text-right">ESTIMATED PRICE</th><th className="py-2 text-right">MAINTENANCE MARGIN</th></tr></thead>
+                    <tbody>
+                      {zones.map(zone => (
+                        <tr key={`${zone.side}-${zone.leverage}`} className="border-b border-bg-border/30">
+                          <td className={`py-2 font-bold ${zone.side === 'long' ? 'text-data-bull' : 'text-data-bear'}`}>{zone.side.toUpperCase()}</td>
+                          <td className="py-2 text-right">{zone.leverage}×</td>
+                          <td className="py-2 text-right text-text-primary">${zone.priceLevel.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                          <td className="py-2 text-right text-text-muted">{(zone.maintenanceMarginRate * 100).toFixed(1)}%</td>
+                        </tr>
                       ))}
-                    </div>
-                    <div className="flex-1 grid gap-px" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(12px, 1fr))', gridTemplateRows: `repeat(${heatmap.length}, 18px)` }}>
-                      {[...heatmap].reverse().map((bin, i) => {
-                        const longD = bin.longLiquidations
-                        const shortD = bin.shortLiquidations
-                        const intensity = Math.min(1, bin.density)
-                        return (
-                          <div key={i} className="rounded-sm transition-colors"
-                            style={{
-                              background: longD > shortD
-                                ? `rgba(38, 166, 154, ${intensity * 0.7})`
-                                : shortD > longD
-                                ? `rgba(239, 83, 80, ${intensity * 0.7})`
-                                : `rgba(100, 100, 100, ${intensity * 0.2})`,
-                              borderLeft: longD > 0 ? '2px solid rgba(38, 166, 154, 0.4)' : undefined,
-                              borderRight: shortD > 0 ? '2px solid rgba(239, 83, 80, 0.4)' : undefined,
-                            }}
-                            title={`$${bin.priceLevel.toFixed(0)} | L:${longD.toFixed(2)} S:${shortD.toFixed(2)} | Density:${(bin.density * 100).toFixed(0)}%`}
-                          />
-                        )
-                      })}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-bg-border">
-                    <div className="flex items-center gap-4">
-                      <span className="flex items-center gap-1.5 text-xs font-mono text-text-muted"><span className="w-3 h-3 rounded-sm bg-data-bull/60" />Long Liqs</span>
-                      <span className="flex items-center gap-1.5 text-xs font-mono text-text-muted"><span className="w-3 h-3 rounded-sm bg-data-bear/60" />Short Liqs</span>
-                    </div>
-                    <span className="text-[8px] font-mono text-text-muted">{heatmap.length} bins</span>
-                  </div>
+                    </tbody>
+                  </table>
+                  <p className="mt-3 text-[10px] text-text-muted">{zones[0].model}</p>
                 </div>
               ) : (
-                <div className="text-text-muted text-xs p-4 text-center font-mono">Computing liquidation zones…</div>
+                <div className="text-text-muted text-xs p-4 text-center font-mono">{hlStatus === 'error' || hlData ? 'Hyperliquid liquidation zones unavailable' : 'Loading liquidation zones…'}</div>
               )}
             </Panel>
           </div>

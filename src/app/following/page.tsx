@@ -41,19 +41,17 @@ export default function FollowingPage() {
         fetch('/api/v1/follows/feed?limit=20'),
       ])
 
-      if (followsRes.status === 401) {
+      if (followsRes.status === 401 || feedRes.status === 401) {
         setAuth('unauthenticated')
         return
       }
-
-      if (followsRes.ok) {
-        const fd = await followsRes.json()
-        setFollows(fd?.data?.follows ?? [])
+      if (!followsRes.ok || !feedRes.ok) {
+        setStatus('error')
+        return
       }
-      if (feedRes.ok) {
-        const fd = await feedRes.json()
-        setFeed(fd?.data?.items ?? [])
-      }
+      const [followsData, feedData] = await Promise.all([followsRes.json(), feedRes.json()])
+      setFollows(followsData?.data?.follows ?? [])
+      setFeed(feedData?.data?.items ?? [])
       setAuth('authenticated')
       setStatus('live')
     } catch {
@@ -141,7 +139,7 @@ export default function FollowingPage() {
             </div>
           ) : (
             <div className="text-[12px] font-mono text-text-muted p-8 text-center">
-              {auth === 'loading' ? 'Loading...' : 'No follows yet. Browse entities and wallets to follow traders.'}
+              {auth === 'loading' ? 'Loading...' : status === 'error' ? 'Followed traders unavailable. Try again later.' : 'No follows yet. Browse entities and wallets to follow traders.'}
             </div>
           )}
         </Panel>
@@ -185,7 +183,7 @@ export default function FollowingPage() {
             </div>
           ) : (
             <div className="text-[12px] font-mono text-text-muted p-8 text-center">
-              {status === 'live' ? 'No recent activity from followed traders.' : 'Loading feed...'}
+              {status === 'error' ? 'Activity feed unavailable. Try again later.' : status === 'live' ? 'No recent activity from followed traders.' : 'Loading feed...'}
             </div>
           )}
         </Panel>

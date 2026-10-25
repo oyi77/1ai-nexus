@@ -402,7 +402,7 @@ export async function middleware(request: NextRequest) {
   // no credential. Allowlisted data modules are treated the same because they
   // are read-only market data. Any other route is readable by a first-party
   // browser so the app's own UI keeps working without an allowlist edit per
-  // new endpoint; third parties fall through to the API-key gate below.
+  // new endpoint.
   if (isPublic(pathname) || isSameOriginBrowser(request) || isPublicModuleFetch(request)) {
     const key = request.headers.get('authorization')?.startsWith('Bearer ')
       ? request.headers.get('authorization')!.slice(7)
@@ -422,7 +422,7 @@ export async function middleware(request: NextRequest) {
     response.headers.set('X-RateLimit-Remaining', String(remaining))
     response.headers.set('X-RateLimit-Limit', '600')
     response.headers.set('X-Request-Duration-Ms', String(Date.now() - startTime))
-    return addCorsHeaders(response, request)
+    return addCorsHeaders(response, request, isPublic(pathname) || isPublicModuleFetch(request))
   }
 
   // ── Everything else: external API consumer, require a valid key ──
@@ -467,11 +467,11 @@ export async function middleware(request: NextRequest) {
   )
 }
 
-function addCorsHeaders(response: NextResponse, request: NextRequest): NextResponse {
+function addCorsHeaders(response: NextResponse, request: NextRequest, allowAnyOrigin = false): NextResponse {
   const origin = request.headers.get('origin')
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    response.headers.set('Access-Control-Allow-Origin', origin)
-    response.headers.set('Vary', 'Origin')
+  if (origin && (allowAnyOrigin || ALLOWED_ORIGINS.includes(origin))) {
+    response.headers.set('Access-Control-Allow-Origin', allowAnyOrigin ? '*' : origin)
+    if (!allowAnyOrigin) response.headers.set('Vary', 'Origin')
   }
   response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS')
   response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-csrf-token')

@@ -580,7 +580,10 @@ function filterAndSort(data: AggregatedResult, opts: {
   sort?: string
   order?: string
 }): AggregatedResult {
-  let markets = data.markets
+  let markets = data.markets.filter((m) => {
+    const question = m.question.trim()
+    return question.length > 0 && question.toLowerCase() !== 'unknown'
+  })
 
   // Filter by source
   if (opts.source && opts.source !== 'all') {

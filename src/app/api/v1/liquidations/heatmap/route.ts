@@ -52,9 +52,13 @@ async function fetchLiquidationHeatmap(symbol: string) {
     fundingRate = parseFloat(ticker.lastFundingRate)
   }
 
-  // If no real liquidation data, build a synthetic heatmap from current price + OI
+  const unavailableReasons: string[] = []
+  if (!(currentPrice > 0) || !(markPrice > 0)) unavailableReasons.push('Binance mark/index price unavailable')
+
   let liquidations: LiquidationEvent[] = []
-  if (liqRes.ok) {
+  if (!liqRes.ok) {
+    unavailableReasons.push(`Binance forced-liquidation source returned HTTP ${liqRes.status}`)
+  } else {
     const raw = (await liqRes.json()) as Array<{
       symbol: string
       side: string
@@ -62,81 +66,51 @@ async function fetchLiquidationHeatmap(symbol: string) {
       origQty: string
       time: number
     }>
-    liquidations = raw.map(liq => ({
+    liquidations = raw.map((liq): LiquidationEvent => ({
       symbol: liq.symbol,
-      side: liq.side === 'BUY' ? 'long' : 'short',
+      side: liq.side === 'BUY' ? 'short' as const : 'long' as const,
       price: parseFloat(liq.price),
       quantity: parseFloat(liq.origQty),
       usdValue: parseFloat(liq.price) * parseFloat(liq.origQty),
       timestamp: liq.time,
-    }))
+    })).filter(liq => Number.isFinite(liq.price) && liq.price > 0 && Number.isFinite(liq.quantity) && liq.quantity > 0)
   }
 
-  // Fetch open interest distribution for the heatmap
   const oiRes = await fetch(`https://fapi.binance.com/fapi/v1/openInterest?symbol=${binanceSymbol}`, {
     signal: AbortSignal.timeout(10_000),
   })
 
-  let openInterest = 0
+  let openInterest: number | null = null
   if (oiRes.ok) {
     const oi = (await oiRes.json()) as { openInterest: string }
-    openInterest = parseFloat(oi.openInterest)
+    const value = parseFloat(oi.openInterest)
+    if (Number.isFinite(value)) openInterest = value
   }
+  if (openInterest == null) unavailableReasons.push('Binance open interest unavailable')
 
-  // Build heatmap bins around current price (±20%)
   const bins: HeatmapBin[] = []
-  const range = currentPrice * 0.20
-  const binSize = range / 20
-  const startPrice = currentPrice - range
-  const endPrice = currentPrice + range
+  const eventPrices = liquidations.map(liq => liq.price)
+  const startPrice = eventPrices.length > 0 ? Math.min(...eventPrices) : 0
+  const endPrice = eventPrices.length > 0 ? Math.max(...eventPrices) : 0
+  const binSize = eventPrices.length > 1 ? Math.max((endPrice - startPrice) / 40, Number.EPSILON) : 0
 
-  for (let i = 0; i < 40; i++) {
-    const priceLevel = startPrice + (i * binSize)
-    if (priceLevel <= 0) continue
-
-    // Estimate liquidation density based on leverage tiers
-    // Higher density near current price (lower leverage), lower density far away
-    const distance = Math.abs(priceLevel - currentPrice) / currentPrice
-    const density = Math.exp(-distance * 10) // Exponential decay
-
-    // Estimate long/short liquidations based on position relative to price
-    const isLongZone = priceLevel < currentPrice // Longs liquidated when price drops
-    const isShortZone = priceLevel > currentPrice // Shorts liquidated when price rises
-
-    const totalOiAtLevel = openInterest * density * 0.01 // 1% of OI per level
-    const longLiq = isLongZone ? totalOiAtLevel * 0.7 : 0
-    const shortLiq = isShortZone ? totalOiAtLevel * 0.7 : 0
-
-    bins.push({
-      priceLevel,
-      density,
-      longLiquidations: longLiq,
-      shortLiquidations: shortLiq,
-      totalUsd: (longLiq + shortLiq) * currentPrice,
-    })
-  }
-
-  // Aggregate actual liquidations by price level
   for (const liq of liquidations) {
-    const binIdx = Math.floor((liq.price - startPrice) / binSize)
-    if (binIdx >= 0 && binIdx < bins.length) {
-      if (liq.side === 'long') {
-        bins[binIdx].longLiquidations += liq.usdValue
-      } else {
-        bins[binIdx].shortLiquidations += liq.usdValue
-      }
-      bins[binIdx].totalUsd += liq.usdValue
+    const binIdx = binSize > 0 ? Math.min(39, Math.floor((liq.price - startPrice) / binSize)) : 0
+    let bin = bins[binIdx]
+    if (!bin) {
+      bin = { priceLevel: binSize > 0 ? startPrice + binIdx * binSize : liq.price, density: 0, longLiquidations: 0, shortLiquidations: 0, totalUsd: 0 }
+      bins[binIdx] = bin
     }
+    if (liq.side === 'long') bin.longLiquidations += liq.quantity
+    else bin.shortLiquidations += liq.quantity
+    bin.totalUsd += liq.usdValue
   }
+  const actualBins = bins.filter(Boolean)
+  const maxTotal = Math.max(...actualBins.map(bin => bin.totalUsd), 1)
+  for (const bin of actualBins) bin.density = bin.totalUsd / maxTotal
 
-  // Normalize density
-  const maxDensity = Math.max(...bins.map(b => b.totalUsd), 1)
-  for (const bin of bins) {
-    bin.density = bin.totalUsd / maxDensity
-  }
 
-  // Find liquidation clusters
-  const clusters = bins
+  const clusters = actualBins
     .filter(b => b.density > 0.5)
     .sort((a, b) => b.totalUsd - a.totalUsd)
     .slice(0, 5)
@@ -144,23 +118,23 @@ async function fetchLiquidationHeatmap(symbol: string) {
       priceLevel: b.priceLevel,
       usdValue: b.totalUsd,
       side: b.longLiquidations > b.shortLiquidations ? 'long' : 'short',
-      distance: ((b.priceLevel - currentPrice) / currentPrice * 100).toFixed(2),
+      distance: currentPrice > 0 ? ((b.priceLevel - currentPrice) / currentPrice * 100).toFixed(2) : null,
     }))
 
   return {
     symbol,
-    currentPrice,
-    markPrice,
-    fundingRate,
+    currentPrice: currentPrice > 0 ? currentPrice : null,
+    markPrice: markPrice > 0 ? markPrice : null,
+    fundingRate: Number.isFinite(fundingRate) ? fundingRate : null,
     openInterest,
-    heatmap: bins,
+    heatmap: actualBins,
     clusters,
     recentLiquidations: liquidations.slice(0, 20).map(l => ({
       ...l,
-      side: l.side,
       usdFormatted: l.usdValue >= 1e6 ? `$${(l.usdValue / 1e6).toFixed(2)}M` : `$${(l.usdValue / 1e3).toFixed(0)}K`,
     })),
     range: { start: startPrice, end: endPrice, binSize },
+    unavailableReason: unavailableReasons.length > 0 ? unavailableReasons.join('; ') : null,
     timestamp: Date.now(),
   }
 }

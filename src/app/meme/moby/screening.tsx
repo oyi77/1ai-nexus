@@ -215,10 +215,10 @@ export function MobyScreening() {
 
         <div className="grid gap-4 lg:grid-cols-2">
           <Panel title="Groups" subtitle={`${groups.length} available`}>
-            <div className="flex flex-wrap gap-2">{groups.map((group) => <button key={group.id} className={`rounded border px-3 py-2 text-left text-sm ${group.id === groupId ? 'border-data-bull text-data-bull' : 'border-border-subtle text-text-secondary'}`} onClick={() => setGroupId(group.id)}>{group.name || group.id}</button>)}</div>
+            <div className="flex flex-wrap gap-2">{groups.map((group) => <button key={group.id} className={`rounded border px-3 py-2 text-left text-sm ${group.id === groupId ? 'border-data-bull text-data-bull' : 'border-border-subtle text-text-secondary'}`} onClick={() => setGroupId(group.id)}>{group.name || group.id}</button>)}{!groups.length && <p className="py-3 text-xs text-text-muted">{status === 'error' ? 'Groups unavailable.' : 'No groups available.'}</p>}</div>
           </Panel>
           <Panel title="Launchpads" subtitle={`${launchpads.length} available`}>
-            <div className="flex flex-wrap gap-2">{launchpads.map((launchpad) => <span key={launchpad.id} className="rounded bg-bg-raised px-3 py-2 text-sm text-text-secondary">{launchpad.name || launchpad.id}</span>)}</div>
+            <div className="flex flex-wrap gap-2">{launchpads.map((launchpad) => <span key={launchpad.id} className="rounded bg-bg-raised px-3 py-2 text-sm text-text-secondary">{launchpad.name || launchpad.id}</span>)}{!launchpads.length && <p className="py-3 text-xs text-text-muted">{status === 'error' ? 'Launchpads unavailable.' : 'No launchpads available.'}</p>}</div>
           </Panel>
         </div>
 
@@ -235,11 +235,12 @@ export function MobyScreening() {
                 router.push(`/meme/risk?chain=${encodeURIComponent(t.chain || network)}&contract=${encodeURIComponent(t.contract)}`)
               }
             }}
+            emptyState={<p className="p-6 text-center text-xs text-text-muted">{!groupId ? 'Select a group to load tokens.' : error ? 'Group tokens unavailable.' : 'No group tokens available.'}</p>}
           />
         </Panel>
 
         <div className="grid gap-4 lg:grid-cols-2">
-          <Panel title="Trader PnL" subtitle={`${pnlWindow} leaderboard`}><DataTable columns={pnlColumns} data={pnl} sortable /></Panel>
+          <Panel title="Trader PnL" subtitle={`${pnlWindow} leaderboard`}><DataTable columns={pnlColumns} data={pnl} sortable emptyState={<p className="p-6 text-center text-xs text-text-muted">{status === 'error' ? 'Trader PnL unavailable.' : 'No trader PnL available.'}</p>} /></Panel>
           <Panel title="Token chart" subtitle={chartSummary}>
             <div className="flex gap-2"><select aria-label="Chart network" className="rounded border border-border-subtle bg-bg-base px-2 py-1 text-sm text-text-primary" value={chartChain} onChange={(event) => setChartChain(event.target.value)}>{NETWORKS.map((item) => <option key={item}>{item}</option>)}</select><input className="min-w-0 flex-1 rounded border border-border-subtle bg-bg-base px-2 py-1 text-sm text-text-primary" placeholder="Token contract" value={chartContract} onChange={(event) => setChartContract(event.target.value)} /><button className="rounded bg-data-bull px-3 py-1 text-sm text-bg-base" onClick={() => void fetchChart()}>Load</button></div>
             <div className="mt-3 max-h-48 overflow-auto text-xs text-text-muted">{chart.map((point) => <div className="flex justify-between border-b border-border-subtle py-1" key={`${point.ts}-${point.price}`}><span>{new Date(point.ts * 1000).toLocaleString()}</span><span>{point.price}</span></div>)}</div>

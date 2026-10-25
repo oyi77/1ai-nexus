@@ -131,8 +131,8 @@ export default function TopTradersPage() {
         <div className="grid grid-cols-4 gap-2">
           <KPI label="Total Traders" value={String(traders.length)} />
           <KPI label="Total Tx Count" value={String(totalTxs)} />
-          <KPI label="Total Volume" value={fmtUsd(totalVolume)} />
-          <KPI label="Identified Entities" value={`${knownTraders}/${traders.length}`} />
+          <KPI label="Total Volume" value={traders.length ? fmtUsd(totalVolume) : '—'} />
+          <KPI label="Identified Entities" value={traders.length ? `${knownTraders}/${traders.length}` : '—'} />
         </div>
 
         {/* Filter */}
@@ -159,7 +159,7 @@ export default function TopTradersPage() {
             rowHeight={36}
           filterable
           filterPlaceholder="Filter traders…"
-            emptyState={<div className="text-text-muted text-[12px] p-8 text-center">No traders yet. Indexer is collecting transactions...</div>}
+            emptyState={<div className="text-text-muted text-[12px] p-8 text-center">{status === 'error' ? 'Trader data temporarily unavailable. Refresh to retry.' : 'No indexed traders available.'}</div>}
           />
         </Panel>
       </div>

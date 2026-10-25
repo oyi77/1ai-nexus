@@ -49,26 +49,25 @@ async function fetchCoinbasePremium(): Promise<PremiumSnapshot | null> {
 
 async function fetchKoreaPremium(): Promise<PremiumSnapshot | null> {
   try {
-    const [upbitRes, binanceRes] = await Promise.all([
+    const [upbitRes, binanceRes, fxRes] = await Promise.all([
       fetch('https://api.upbit.com/v1/ticker?markets=KRW-BTC', { signal: AbortSignal.timeout(8_000) }),
       fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', { signal: AbortSignal.timeout(8_000) }),
-      fetch('https://open.er-api.com/v6/latest/KRW', { signal: AbortSignal.timeout(8_000) }),
+      fetch('https://open.er-api.com/v6/latest/USD', { signal: AbortSignal.timeout(8_000) }),
     ])
 
-    if (!upbitRes.ok || !binanceRes.ok) return null
+    if (!upbitRes.ok || !binanceRes.ok || !fxRes.ok) return null
 
     const upbitData = await upbitRes.json() as Array<{ trade_price?: number }>
     const bnData = await binanceRes.json() as { price?: string }
-    const fxRes = await fetch('https://open.er-api.com/v6/latest/KRW', { signal: AbortSignal.timeout(8_000) })
-    const fxData = await fxRes.json() as { rates?: { USD?: number } }
+    const fxData = await fxRes.json() as { rates?: { KRW?: number } }
 
     const upbitKRW = upbitData[0]?.trade_price ?? 0
     const bnUSD = parseFloat(bnData.price ?? '0')
-    const krwPerUSD = fxData.rates?.USD ? 1 / fxData.rates.USD : 0
+    const krwPerUSD = fxData.rates?.KRW ?? 0
 
     if (upbitKRW <= 0 || bnUSD <= 0 || krwPerUSD <= 0) return null
 
-    const upbitUSD = upbitKRW * krwPerUSD
+    const upbitUSD = upbitKRW / krwPerUSD
     const premium = ((upbitUSD - bnUSD) / bnUSD) * 100
 
     return {

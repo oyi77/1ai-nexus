@@ -13,10 +13,10 @@ type ETFData = {
   category: string
   expenseRatio: number | null
   aum: number | null
-  price: number
-  change: number
-  changePercent: number
-  volume: number
+  price: number | null
+  change: number | null
+  changePercent: number | null
+  volume: number | null
   yield: number | null
   ytdReturn: number | null
   oneYearReturn: number | null
@@ -80,12 +80,12 @@ export default function ETFPage() {
             symbol: q.symbol,
             name: q.shortName ?? meta?.name ?? q.symbol,
             category: meta?.category ?? 'Unknown',
-            expenseRatio: q.annualHoldingsTurnover ?? null,
+            expenseRatio: null,
             aum: q.totalAssets ?? null,
-            price: q.regularMarketPrice ?? 0,
-            change: q.regularMarketChange ?? 0,
-            changePercent: q.regularMarketChangePercent ?? 0,
-            volume: q.regularMarketVolume ?? 0,
+            price: q.regularMarketPrice ?? null,
+            change: q.regularMarketChange ?? null,
+            changePercent: q.regularMarketChangePercent ?? null,
+            volume: q.regularMarketVolume ?? null,
             yield: q.dividendYield ?? null,
             ytdReturn: null,
             oneYearReturn: null,
@@ -180,13 +180,13 @@ export default function ETFPage() {
                           <td className="py-2 font-mono text-accent-cyan">{d.symbol}</td>
                           <td className="py-2 text-text-dim max-w-40 truncate">{d.name}</td>
                           <td className="py-2 text-text-muted">{d.category}</td>
-                          <td className="py-2 text-right font-mono">${fmt(d.price)}</td>
-                          <td className={`py-2 text-right font-mono font-bold ${d.changePercent >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
-                            {d.changePercent >= 0 ? '+' : ''}{fmt(d.changePercent)}%
+                          <td className="py-2 text-right font-mono">{d.price != null ? `$${fmt(d.price)}` : '—'}</td>
+                          <td className={`py-2 text-right font-mono font-bold ${d.changePercent == null ? 'text-text-muted' : d.changePercent >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                            {d.changePercent != null ? `${d.changePercent >= 0 ? '+' : ''}${fmt(d.changePercent)}%` : '—'}
                           </td>
                           <td className="py-2 text-right font-mono">{fmtB(d.aum)}</td>
                           <td className="py-2 text-right font-mono">{d.yield != null ? `${(d.yield * 100).toFixed(2)}%` : '—'}</td>
-                          <td className="py-2 text-right font-mono">{d.volume.toLocaleString()}</td>
+                          <td className="py-2 text-right font-mono">{fmt(d.volume)}</td>
                         </tr>
                       )
                     })}
@@ -204,12 +204,12 @@ export default function ETFPage() {
             <div className="grid grid-cols-4 gap-4">
               <div>
                 <p className="text-xs text-text-muted">Price</p>
-                <p className="text-lg font-bold text-text-primary">${fmt(data[selected].price)}</p>
+                <p className="text-lg font-bold text-text-primary">{data[selected].price != null ? `$${fmt(data[selected].price)}` : '—'}</p>
               </div>
               <div>
                 <p className="text-xs text-text-muted">Change</p>
-                <p className={`text-lg font-bold font-mono ${data[selected].changePercent >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
-                  {data[selected].changePercent >= 0 ? '+' : ''}{fmt(data[selected].changePercent)}%
+                <p className={`text-lg font-bold font-mono ${data[selected].changePercent == null ? 'text-text-muted' : data[selected].changePercent! >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                  {data[selected].changePercent != null ? `${data[selected].changePercent! >= 0 ? '+' : ''}${fmt(data[selected].changePercent)}%` : '—'}
                 </p>
               </div>
               <div>
@@ -227,8 +227,8 @@ export default function ETFPage() {
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">
           <h2 className="text-xs text-accent-cyan mb-2">SOURCE</h2>
           <p className="text-xs text-text-dim">
-            Yahoo Finance — 24 ETFs across US Broad, Sector, International, Fixed Income, Commodities, Thematic.
-            AUM, yield, and volume are real-time. Holdings data requires ETF provider API integration.
+            Yahoo Finance — 24 ETFs across US Broad, Sector, International, Fixed Income, Commodity, Thematic.
+            AUM, yield, and volume are shown when Yahoo provides them; unavailable metrics are marked —. Holdings data requires ETF provider API integration.
           </p>
         </div>
       </div>

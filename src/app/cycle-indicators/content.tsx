@@ -10,15 +10,13 @@ import { Activity } from 'lucide-react'
 
 interface CycleIndicatorData {
   name: string
-  value: number
+  value: number | null
   zone: string
   description: string
   raw: {
     marketCap?: number
-    realizedCapProxy?: number
     btcMarketCap?: number
     stablecoinMarketCap?: number
-    stdDev?: number
   }
 }
 
@@ -215,14 +213,18 @@ function IndicatorCard({
   return (
     <Panel title={ind.name} subtitle={ind.description}>
       <div className="p-4 flex flex-col items-center gap-3">
-        <GaugeCircle
-          value={ind.value}
-          max={maxGauge}
-          label={ind.name}
-          zone={ind.zone}
-          unit={unit}
-          size={140}
-        />
+        {ind.value == null ? (
+          <div className="h-[140px] flex items-center justify-center text-center text-text-muted text-sm font-mono">Unavailable</div>
+        ) : (
+          <GaugeCircle
+            value={ind.value}
+            max={maxGauge}
+            label={ind.name}
+            zone={ind.zone}
+            unit={unit}
+            size={140}
+          />
+        )}
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded border text-xs font-mono font-bold ${zoneBg(ind.zone)}`}>
           {zoneLabel(ind.zone)}
         </span>
@@ -250,17 +252,7 @@ function CycleIndicatorsPageInner() {
     interval: 300_000, // 5 min
   })
 
-  const { data: mvrvHistory } = useLiveFetch<HistoryPoint[]>({
-    url: '/api/v1/cycle-indicators?action=history&indicator=mvrv&limit=50',
-    interval: 60_000,
-    initialData: [],
-  })
 
-  const { data: nuplHistory } = useLiveFetch<HistoryPoint[]>({
-    url: '/api/v1/cycle-indicators?action=history&indicator=nupl&limit=50',
-    interval: 60_000,
-    initialData: [],
-  })
 
   const { data: ssrHistory } = useLiveFetch<HistoryPoint[]>({
     url: '/api/v1/cycle-indicators?action=history&indicator=ssr&limit=50',
@@ -281,9 +273,9 @@ function CycleIndicatorsPageInner() {
     if (!indicators) return []
     return [
       {
-        label: 'Total Market Cap',
-        value: indicators.mvrv.raw.marketCap
-          ? `$${(indicators.mvrv.raw.marketCap / 1e12).toFixed(2)}T`
+        label: 'Total Crypto Market Cap',
+        value: indicators.dominance.raw.marketCap
+          ? `$${(indicators.dominance.raw.marketCap / 1e12).toFixed(2)}T`
           : '—',
         color: 'text-text-primary',
       },
@@ -302,10 +294,8 @@ function CycleIndicatorsPageInner() {
         color: 'text-teal-vivid',
       },
       {
-        label: 'Realized Cap (proxy)',
-        value: indicators.mvrv.raw.realizedCapProxy
-          ? `$${(indicators.mvrv.raw.realizedCapProxy / 1e12).toFixed(2)}T`
-          : '—',
+        label: 'Stablecoin Dominance',
+        value: indicators.dominance.value != null ? `${indicators.dominance.value.toFixed(2)}%` : '—',
         color: 'text-text-primary',
       },
     ]
@@ -321,7 +311,7 @@ function CycleIndicatorsPageInner() {
             <div>
               <h1 className="text-[20px] font-head font-bold text-text-primary">Cycle Indicators</h1>
               <p className="text-xs text-text-muted">
-                MVRV, NUPL, SSR — on-chain cycle position from CoinGecko data
+                BTC cycle metrics; unavailable on-chain metrics are never estimated from market prices
               </p>
             </div>
           </div>
@@ -342,8 +332,8 @@ function CycleIndicatorsPageInner() {
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           {indicators && (
             <>
-              <IndicatorCard ind={indicators.mvrv} history={mvrvHistory ?? []} />
-              <IndicatorCard ind={indicators.nupl} history={nuplHistory ?? []} />
+              <IndicatorCard ind={indicators.mvrv} history={[]} />
+              <IndicatorCard ind={indicators.nupl} history={[]} />
               <IndicatorCard ind={indicators.ssr} history={ssrHistory ?? []} />
               <IndicatorCard ind={indicators.dominance} history={domHistory ?? []} />
             </>
@@ -366,9 +356,8 @@ function CycleIndicatorsPageInner() {
                 </div>
                 <p className="text-xs leading-relaxed">
                   Measures how far market cap deviates from realized cap in standard deviations.
-                  Computed as: <span className="font-mono text-teal-vivid">(Market Cap − Realized Cap Proxy) / StdDev</span>.
-                  Uses FDV as a proxy for realized cap. &gt;7 = extreme overvaluation, &lt;−0.5 = capitulation.
-                  Academic research: Puell Multiple, Woo&apos;s Law.
+                  Requires realized cap and its historical volatility. Those inputs are not supplied by CoinGecko,
+                  so this metric is shown as unavailable instead of substituting FDV.
                 </p>
               </div>
               <div>
@@ -377,10 +366,8 @@ function CycleIndicatorsPageInner() {
                   <span className="text-xs font-mono text-text-muted">(Net Unrealized Profit/Loss)</span>
                 </div>
                 <p className="text-xs leading-relaxed">
-                  Ratio of unrealized profit to total market cap.
-                  Computed as: <span className="font-mono text-teal-vivid">1 − (Realized Cap / Market Cap)</span>.
-                  &gt;0.75 = euphoria (most holders in profit), &lt;0 = capitulation (aggregate loss).
-                  Source: Adaptive Capital / LookIntoBitcoin.
+                  Requires holder-level cost basis and realized cap. CoinGecko market prices cannot provide these inputs,
+                  so no proxy is calculated.
                 </p>
               </div>
               <div>
@@ -433,9 +420,9 @@ function CycleIndicatorsPageInner() {
               </div>
               <p className="text-xs leading-relaxed">
                 CoinGecko free API — <span className="font-mono">/api/v3/global</span> for total market cap,
-                <span className="font-mono"> /coins/bitcoin</span> for BTC market cap + FDV,
-                <span className="font-mono"> /global/decentralized_finance_defi</span> for stablecoin supply.
-                Realized cap uses FDV as a proxy (simplification). Refreshes every 5 minutes.
+                <span className="font-mono"> /coins/bitcoin</span> for BTC market cap, and
+                <span className="font-mono"> /coins/markets?category=stablecoins</span> for stablecoin supply.
+                Refreshes every 5 minutes.
               </p>
             </div>
           </div>

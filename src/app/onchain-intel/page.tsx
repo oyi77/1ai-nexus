@@ -12,14 +12,13 @@ interface MempoolEvent {
   asset: string
   estUsd: number | null
   detectedAt: string
+  confirmedAt: string | null
   metadata: Record<string, unknown>
 }
-
 interface BridgeStats {
   bridges: Array<{ name: string; volume24h: number; chains: string[] }>
   totalVolume24h: number
 }
-
 interface StakingSnapshot {
   asset: string
   entryQueue: number | null
@@ -27,7 +26,10 @@ interface StakingSnapshot {
   netStaked: number | null
   entryWaitDays: number | null
   exitWaitDays: number | null
+  timestamp: string
 }
+type SourceStatus = 'live' | 'stale' | 'unavailable'
+type Sources = Partial<Record<'mempool' | 'bridge' | 'staking', SourceStatus>>
 
 function fmtUsd(n: number): string {
   if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`
@@ -39,6 +41,8 @@ export default function OnchainIntelPage() {
   const [mempool, setMempool] = useState<MempoolEvent[]>([])
   const [bridge, setBridge] = useState<BridgeStats | null>(null)
   const [staking, setStaking] = useState<StakingSnapshot | null>(null)
+  const [sources, setSources] = useState<Sources>({})
+  const [requestFailed, setRequestFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   const tc = useTableControls(
     bridge?.bridges,
@@ -51,16 +55,25 @@ export default function OnchainIntelPage() {
       try {
         const res = await fetch('/api/v1/onchain-intel?action=all')
         const d = await res.json()
-        if (d.data?.mempool) setMempool(d.data.mempool)
-        if (d.data?.bridge) setBridge(d.data.bridge)
-        if (d.data?.staking) setStaking(d.data.staking)
-        setLoading(false)
-      } catch { setLoading(false) }
+        if (!res.ok || !d.data) throw new Error(d.error ?? 'On-chain intelligence unavailable')
+        setMempool(Array.isArray(d.data.mempool) ? d.data.mempool : [])
+        setBridge(d.data.bridge ?? null)
+        setStaking(d.data.staking ?? null)
+        setSources(d.data.sources ?? {})
+        setRequestFailed(false)
+      } catch { setRequestFailed(true) }
+      setLoading(false)
     }
     fetchData()
     const interval = setInterval(fetchData, 60_000)
     return () => clearInterval(interval)
   }, [])
+
+  const statuses = Object.values(sources)
+  const liveStatus = requestFailed || statuses.includes('unavailable') ? 'error' : loading || statuses.includes('stale') ? 'stale' : 'live'
+  const stakingStatus = sources.staking ?? 'unavailable'
+  const bridgeStatus = sources.bridge ?? 'unavailable'
+  const mempoolStatus = sources.mempool ?? 'unavailable'
 
   return (
     <NexusLayout>
@@ -68,87 +81,48 @@ export default function OnchainIntelPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="page-title">ON-CHAIN INTELLIGENCE</h1>
-            <p className="text-xs text-text-muted mt-1">
-              Mempool congestion, bridge flows, staking queue — all from public APIs
-            </p>
+            <p className="text-xs text-text-muted mt-1">Public API data with per-source availability</p>
           </div>
-          <LiveDot status={loading ? 'stale' : 'live'} label />
+          <LiveDot status={liveStatus} label />
         </div>
 
-        {/* Staking Queue */}
-        {staking && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-xs text-text-muted">NET STAKED ETH</p>
-              <p className="text-lg font-bold">{staking.netStaked ? `${(staking.netStaked / 1e6).toFixed(1)}M` : '—'}</p>
+        <Panel title="Beacon Validator Queue" subtitle={`${stakingStatus.toUpperCase()} · wait times require churn-rate calculation`}>
+          {staking ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-3">
+              <div><p className="text-xs text-text-muted">TOTAL STAKED ETH</p><p className="text-lg font-bold">{staking.netStaked === null ? '—' : `${(staking.netStaked / 1e6).toFixed(1)}M`}</p></div>
+              <div><p className="text-xs text-text-muted">PENDING ENTRY</p><p className="text-lg font-bold">{staking.entryQueue ?? '—'}</p></div>
+              <div><p className="text-xs text-text-muted">ACTIVE EXITING</p><p className="text-lg font-bold">{staking.exitQueue ?? '—'}</p></div>
             </div>
-            <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-xs text-text-muted">ENTRY QUEUE</p>
-              <p className="text-lg font-bold text-data-bull">{staking.entryQueue ?? '—'}</p>
-              <p className="text-xs text-text-dim">{staking.entryWaitDays ? `~${staking.entryWaitDays}d wait` : ''}</p>
-            </div>
-            <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-xs text-text-muted">EXIT QUEUE</p>
-              <p className="text-lg font-bold text-data-bear">{staking.exitQueue ?? '—'}</p>
-              <p className="text-xs text-text-dim">{staking.exitWaitDays ? `~${staking.exitWaitDays}d wait` : ''}</p>
-            </div>
-            <div className="bg-bg-panel border border-border-dim rounded-lg p-3">
-              <p className="text-xs text-text-muted">SIGNAL</p>
-              <p className="text-sm font-bold">
-                {(staking.exitQueue ?? 0) > 10000 ? 'Exit pressure — sell signal' : (staking.entryQueue ?? 0) > 10000 ? 'Entry demand — bullish' : 'Neutral'}
-              </p>
-            </div>
-          </div>
-        )}
+          ) : <div className="text-text-muted text-xs p-4 text-center">Beacon validator data unavailable</div>}
+        </Panel>
 
-        {/* Mempool Events */}
-        <Panel title="Mempool Alerts" subtitle={`${mempool.length} events`}>
+        <Panel title="Verified Transfer Events" subtitle={`${mempoolStatus.toUpperCase()} · ${mempool.length} events`}>
           {mempool.length === 0 ? (
-            <div className="text-text-muted text-xs p-4 text-center">No mempool alerts — normal conditions</div>
+            <div className="text-text-muted text-xs p-4 text-center">{mempoolStatus === 'unavailable' ? 'Transfer source unavailable' : 'No verified large-transfer events'}</div>
           ) : (
             <div className="divide-y divide-border-dim/30">
-              {mempool.map((e, i) => (
+              {mempool.map((event, i) => (
                 <div key={i} className="p-3">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-accent-amber/20 text-accent-amber">{e.chain}</span>
-                      <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-bg-raised text-text-muted">{e.type}</span>
-                    </div>
-                    <span className="text-xs text-text-dim">{new Date(e.detectedAt).toLocaleString()}</span>
+                    <div className="flex items-center gap-2"><span className="text-xs font-mono text-accent-amber">{event.chain}</span><span className="text-xs font-mono text-text-muted">{event.type}</span></div>
+                    <span className="text-xs text-text-dim">{new Date(event.detectedAt).toLocaleString()}</span>
                   </div>
-                  <p className="text-xs text-text-primary mt-1">{String(e.metadata?.signal ?? 'Mempool activity detected')}</p>
+                  <p className="text-xs text-text-primary mt-1">{String(event.metadata?.signal ?? 'Verified transfer event')}</p>
                 </div>
               ))}
             </div>
           )}
         </Panel>
 
-        {/* Bridge Flows */}
-        {bridge && bridge.bridges.length > 0 && (
-          <Panel title="Bridge Flows" subtitle={`Top bridges by 24h volume — ${fmtUsd(bridge.totalVolume24h)} total`}>
+        <Panel title="Bridge Volume" subtitle={`${bridgeStatus.toUpperCase()}${bridge ? ` · ${fmtUsd(bridge.totalVolume24h)}` : ''}`}>
+          {bridge && bridge.bridges.length > 0 ? <>
             <TableControlsBar idPrefix="onchain-intel" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-text-muted border-b border-border-dim">
-                    <SortableTh controls={tc} k="name" className="text-left py-2 px-2 font-mono">BRIDGE</SortableTh>
-                    <SortableTh controls={tc} k="volume24h" className="text-right py-2 px-2 font-mono">24H VOLUME</SortableTh>
-                    <SortableTh controls={tc} k="chains" className="text-left py-2 px-2 font-mono">CHAINS</SortableTh>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tc.visible.map(b => (
-                    <tr key={b.name} className="border-b border-border-dim/30 hover:bg-bg-elevated">
-                      <td className="py-2 px-2 font-mono font-bold text-teal-vivid">{b.name}</td>
-                      <td className="py-2 px-2 text-right font-mono">{fmtUsd(b.volume24h)}</td>
-                      <td className="py-2 px-2 text-text-dim">{b.chains.slice(0, 4).join(', ')}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Panel>
-        )}
+            <div className="overflow-x-auto"><table className="w-full text-xs">
+              <thead><tr className="text-text-muted border-b border-border-dim"><SortableTh controls={tc} k="name" className="text-left py-2 px-2 font-mono">BRIDGE</SortableTh><SortableTh controls={tc} k="volume24h" className="text-right py-2 px-2 font-mono">24H VOLUME</SortableTh><SortableTh controls={tc} k="chains" className="text-left py-2 px-2 font-mono">CHAINS</SortableTh></tr></thead>
+              <tbody>{tc.visible.map(b => <tr key={b.name} className="border-b border-border-dim/30"><td className="py-2 px-2 font-mono font-bold text-teal-vivid">{b.name}</td><td className="py-2 px-2 text-right font-mono">{fmtUsd(b.volume24h)}</td><td className="py-2 px-2 text-text-dim">{b.chains.slice(0, 4).join(', ')}</td></tr>)}</tbody>
+            </table></div>
+          </> : <div className="text-text-muted text-xs p-4 text-center">{bridgeStatus === 'unavailable' ? 'Bridge source unavailable' : 'No bridge volume reported'}</div>}
+        </Panel>
       </div>
     </NexusLayout>
   )

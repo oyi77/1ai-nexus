@@ -10,7 +10,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 // reached only via the mocked global fetch below.
 const gmgnHolders = vi.fn(async (): Promise<unknown[]> => []);
 vi.mock('@/lib/modules/meme/gmgn', () => ({
-  listGmgnTokenHolders: (...a: unknown[]) => gmgnHolders(),
+  listGmgnTokenHolders: () => gmgnHolders(),
 }));
 
 import { holderSource, fetchTopHolders } from './wallet-tracer';

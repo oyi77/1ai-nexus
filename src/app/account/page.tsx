@@ -101,6 +101,24 @@ export default function AccountPage() {
       </NexusLayout>
     )
   }
+  if (status !== 'live') {
+    return (
+      <NexusLayout>
+        <div className="max-w-4xl mx-auto p-6">
+          <Panel title="Account">
+            <p className="text-sm text-text-secondary">
+              {status === 'loading' ? 'Loading account…' : 'Account data is temporarily unavailable.'}
+            </p>
+            {status === 'error' && (
+              <button onClick={() => void fetchAccount()} className="mt-4 px-4 py-2 bg-bg-raised border border-bg-border rounded text-sm font-mono text-text-primary">
+                Retry
+              </button>
+            )}
+          </Panel>
+        </div>
+      </NexusLayout>
+    )
+  }
 
   const user = data?.user
   const subEnd = data?.subscription?.endDate ? new Date(data.subscription.endDate) : null

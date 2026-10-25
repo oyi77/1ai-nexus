@@ -132,6 +132,9 @@ export default function OptionsPage() {
   const fetchChain = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setChainData(null)
+    setAggData(null)
+    setSelectedExpiry(0)
     try {
       const [chainRes, aggRes] = await Promise.all([
         fetch(`/api/v1/modules/fetch?module=deribit-options&action=options-chain&currency=${currency}`),
@@ -140,10 +143,13 @@ export default function OptionsPage() {
       const chainJson = await chainRes.json()
       const aggJson = await aggRes.json()
 
-      if (chainJson.data) setChainData(chainJson.data)
-      else setError('Failed to load options chain')
+      if (!chainRes.ok || !chainJson.data || !Array.isArray(chainJson.data.expiries)) {
+        setError(chainJson.error ?? 'Failed to load options chain')
+      } else {
+        setChainData(chainJson.data)
+      }
 
-      if (aggJson.data) setAggData(aggJson.data)
+      if (aggRes.ok && aggJson.data) setAggData(aggJson.data)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -340,13 +346,13 @@ export default function OptionsPage() {
                       <td className="text-right py-1 px-1">{call?.markIv?.toFixed(1) ?? '—'}</td>
                       <td className={`text-right py-1 px-1 ${greekColor(call?.delta ?? 0)}`}>{call?.delta?.toFixed(3) ?? '—'}</td>
                       <td className="text-right py-1 px-1">{call?.openInterest ? fmt(call.openInterest, 0) : '—'}</td>
-                      <td className="text-right py-1 px-1 border-r border-border-dim">{call?.volume ?? '—'}</td>
+                      <td className="text-right py-1 px-1">{call?.volume != null ? fmt(call.volume, 0) : '—'}</td>
                       {/* Strike */}
                       <td className={`text-center py-1 px-2 font-bold ${isATM ? 'text-teal-vivid' : 'text-text-primary'}`}>
                         {strike.toLocaleString()} {isATM ? '*' : ''}
                       </td>
                       {/* Puts */}
-                      <td className="text-right py-1 px-1">{put?.volume ?? '—'}</td>
+                      <td className="text-right py-1 px-1">{put?.volume != null ? fmt(put.volume, 0) : '—'}</td>
                       <td className="text-right py-1 px-1">{put?.openInterest ? fmt(put.openInterest, 0) : '—'}</td>
                       <td className={`text-right py-1 px-1 ${greekColor(put?.delta ?? 0)}`}>{put?.delta?.toFixed(3) ?? '—'}</td>
                       <td className="text-right py-1 px-1">{put?.markIv?.toFixed(1) ?? '—'}</td>

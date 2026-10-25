@@ -9,7 +9,7 @@ type CompData = {
   symbol: string
   name: string
   sector: string
-  marketCap: number
+  marketCap: number | null
   price: number
   change: number
   pe: number | null
@@ -30,7 +30,7 @@ export default function ComparablesPage() {
   const [symbols, setSymbols] = useState<string[]>(PEER_GROUPS['us-tech'].symbols)
   const [data, setData] = useState<Record<string, CompData>>({})
   const [loading, setLoading] = useState(true)
-
+  const [error, setError] = useState<string | null>(null)
   // Membership: curated groups resolve from config; IDX groups are derived
   // server-side from the live universe (sector/industry predicates).
   useEffect(() => {
@@ -52,9 +52,10 @@ export default function ComparablesPage() {
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-        setLoading(true)
-    fetch(`/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${symbols.join(',')}`)
-      .then(r => r.json())
+    setLoading(true)
+    setError(null)
+    fetch(`/api/v1/modules/fetch?module=yahoo-finance&action=fundamentals&symbols=${symbols.join(',')}`)
+      .then(r => { if (!r.ok) throw new Error('Comparables data unavailable'); return r.json() })
       .then(d => {
         const map: Record<string, CompData> = {}
         for (const q of d.data ?? []) {
@@ -63,7 +64,7 @@ export default function ComparablesPage() {
             symbol: q.symbol,
             name: q.shortName ?? q.symbol,
             sector: q.sector ?? 'Unknown',
-            marketCap: q.marketCap ?? 0,
+            marketCap: q.marketCap ?? null,
             price: q.regularMarketPrice ?? 0,
             change: q.regularMarketChangePercent ?? 0,
             pe: q.trailingPE ?? null,
@@ -80,7 +81,7 @@ export default function ComparablesPage() {
         setData(map)
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(() => { setData({}); setError('Comparables data temporarily unavailable'); setLoading(false) })
   }, [symbols])
 
   const rows = useMemo(() => Object.values(data), [data])
@@ -97,7 +98,8 @@ export default function ComparablesPage() {
   }, [data])
 
   const fmt = (n: number | null, decimals = 2) => n != null ? n.toLocaleString(undefined, { maximumFractionDigits: decimals }) : '—'
-  const fmtB = (n: number) => {
+  const fmtB = (n: number | null) => {
+    if (n == null) return '—'
     if (Math.abs(n) >= 1e12) return `$${(n / 1e12).toFixed(2)}T`
     if (Math.abs(n) >= 1e9) return `$${(n / 1e9).toFixed(1)}B`
     if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(0)}M`
@@ -157,6 +159,8 @@ export default function ComparablesPage() {
         {/* Comparables Table */}
         {loading ? (
           <div className="text-text-dim text-xs p-8 text-center">Loading comparable data...</div>
+        ) : error ? (
+          <div className="text-data-bear text-xs p-8 text-center">{error}</div>
         ) : (
           <>
             <TableControlsBar idPrefix="comps" query={tc.query} onQueryChange={tc.setQuery} shown={tc.visible.length} total={tc.total} />

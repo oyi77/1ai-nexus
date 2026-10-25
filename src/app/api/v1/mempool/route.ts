@@ -37,58 +37,51 @@ export async function GET(request: Request) {
       }
 
       case 'whale': {
-        const { data, fromCache } = await getCached('mempool:whale', 15_000, async () => {
-          const WHALE_THRESHOLD_BTC = 2
-          const txs: Array<Record<string, unknown>> = []
+        const { data, fromCache } = await getCached('mempool:unconfirmed-whale:v2', 15_000, async () => {
+          const WHALE_THRESHOLD_BTC = 10
           let btcPrice = 0
-
-          // BTC price
           try {
             const priceRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:4400'}/api/v1/market/prices`, { signal: AbortSignal.timeout(10_000) })
             const priceData = await priceRes.json() as { data?: { tickers?: Array<Record<string, unknown>> } }
-            const btcTicker = priceData.data?.tickers?.find((t: Record<string, unknown>) => t.symbol === 'BTC')
-            if (btcTicker) btcPrice = typeof btcTicker.price === 'string' ? parseFloat(btcTicker.price.replace(/[$,]/g, '')) : (btcTicker.price as number) || 0
-          } catch { /* use 0 */ }
+            const btcTicker = priceData.data?.tickers?.find(t => t.symbol === 'BTC')
+            const rawPrice = btcTicker?.price
+            btcPrice = typeof rawPrice === 'string' ? Number(rawPrice.replace(/[$,]/g, '')) : Number(rawPrice) || 0
+          } catch { /* USD stays unknown when the price source fails */ }
 
-          // blockchain.info unconfirmed
-          try {
-            const bcRes = await fetch('https://blockchain.info/unconfirmed-transactions?format=json', { signal: AbortSignal.timeout(10_000) })
-            const bcData = await bcRes.json() as { txs: Array<Record<string, unknown>> }
-            for (const tx of (bcData.txs || [])) {
-              const totalOut = ((tx.out as Array<Record<string, unknown>>) || []).reduce((s: number, o: Record<string, unknown>) => s + ((o.value as number) || 0), 0) / 1e8
-              if (totalOut >= WHALE_THRESHOLD_BTC) {
-                txs.push({ txid: tx.hash, valueBtc: totalOut, valueUsd: totalOut * btcPrice, block: 'mempool', fee: (tx.fee as number) || 0, size: (tx.size as number) || 0 })
-              }
-            }
-          } catch { /* silent */ }
-
-          // mempool.space recent blocks
-          try {
-            const tipRes = await fetch('https://mempool.space/api/blocks/tip/height', { signal: AbortSignal.timeout(10_000) })
-            const tipHeight = parseInt(await tipRes.text(), 10)
-            for (let i = 0; i < 3 && tipHeight - i > 0; i++) {
-              const height = tipHeight - i
-              const hashRes = await fetch(`https://mempool.space/api/block-height/${height}`, { signal: AbortSignal.timeout(10_000) })
-              const blockHash = (await hashRes.text()).trim()
-              for (const startIndex of [0, 25]) {
-                const txRes = await fetch(`https://mempool.space/api/block/${blockHash}/txs/${startIndex}`, { signal: AbortSignal.timeout(15_000) })
-                if (!txRes.ok) continue
-                const blockTxs = await txRes.json() as Array<Record<string, unknown>>
-                for (const tx of blockTxs) {
-                  const totalOut = ((tx.vout as Array<Record<string, unknown>>) || []).reduce((s: number, o: Record<string, unknown>) => s + ((o.value as number) || 0), 0) / 1e8
-                  if (totalOut >= WHALE_THRESHOLD_BTC && !txs.some(existing => existing.txid === tx.txid)) {
-                    txs.push({ txid: tx.txid, valueBtc: totalOut, valueUsd: totalOut * btcPrice, block: height, fee: (tx.fee as number) || 0, size: (tx.size as number) || 0 })
-                  }
-                }
-              }
-            }
-          } catch { /* silent */ }
-
-          txs.sort((a, b) => (b.valueBtc as number) - (a.valueBtc as number))
-          return { transactions: txs.slice(0, 20), count: txs.length, threshold: `${WHALE_THRESHOLD_BTC} BTC (~$${btcPrice > 0 ? (WHALE_THRESHOLD_BTC * btcPrice / 1000).toFixed(0) : '?'}K)`, source: 'mempool.space + blockchain.info' }
+          const response = await fetch('https://blockchain.info/unconfirmed-transactions?format=json', { signal: AbortSignal.timeout(10_000) })
+          if (!response.ok) throw new Error(`Unconfirmed transaction source returned HTTP ${response.status}`)
+          const payload = await response.json() as { txs?: Array<Record<string, unknown>> }
+          if (!Array.isArray(payload.txs)) throw new Error('Unconfirmed transaction source shape invalid')
+          const transactions = payload.txs.flatMap(tx => {
+            const outputs = Array.isArray(tx.out) ? tx.out as Array<Record<string, unknown>> : []
+            const valueBtc = outputs.reduce((sum, output) => sum + (Number(output.value) || 0), 0) / 1e8
+            const txid = typeof tx.hash === 'string' ? tx.hash : ''
+            if (!txid || valueBtc < WHALE_THRESHOLD_BTC) return []
+            const rawVsize = Number(tx.weight) > 0 ? Math.ceil(Number(tx.weight) / 4) : null
+            const rawFee = Number(tx.fee)
+            const fee = Number.isFinite(rawFee) && rawFee >= 0 ? rawFee : null
+            const seenAt = Number(tx.time)
+            const age = Number.isFinite(seenAt) && seenAt > 0 ? Math.max(0, Math.floor(Date.now() / 1000 - seenAt)) : null
+            return [{
+              txid,
+              valueBtc,
+              valueUsd: btcPrice > 0 ? valueBtc * btcPrice : null,
+              fee,
+              vsize: rawVsize,
+              rate: fee !== null && rawVsize ? fee / rawVsize : null,
+              age,
+            }]
+          })
+          transactions.sort((a, b) => b.valueBtc - a.valueBtc)
+          return {
+            transactions: transactions.slice(0, 20),
+            count: transactions.length,
+            threshold: `${WHALE_THRESHOLD_BTC} BTC`,
+            source: 'blockchain.info',
+          }
         })
 
-        const resp = NextResponse.json({ data, error: null }, { headers: { 'Cache-Control': 'public, max-age=60' } })
+        const resp = NextResponse.json({ data, error: null }, { headers: { 'Cache-Control': 'public, max-age=15' } })
         resp.headers.set('X-Cache', fromCache ? 'HIT' : 'MISS')
         return resp
       }
@@ -118,22 +111,6 @@ export async function GET(request: Request) {
     }
   } catch (err) {
     console.error('[mempool] Error:', err)
-    const fallbackData = action === 'stats'
-      ? {
-          count: 0,
-          totalFee: 0,
-          fees: { fastestFee: 1, halfHourFee: 1, hourFee: 1, minimumFee: 1 },
-          congestion: { level: 'low', color: 'green', description: 'Mempool data temporarily unavailable' },
-          avgFee: 0,
-          vsize: 0,
-        }
-      : action === 'whale'
-      ? { transactions: [], count: 0, threshold: '2 BTC', source: 'offline-fallback' }
-      : action === 'blocks'
-      ? []
-      : action === 'hashrate'
-      ? { currentHashrate: 0 }
-      : null
-    return NextResponse.json({ data: fallbackData, error: null, notice: (err as Error).message }, { status: 200 })
+    return NextResponse.json({ data: null, error: (err as Error).message }, { status: 502 })
   }
 }

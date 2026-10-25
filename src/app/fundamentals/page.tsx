@@ -9,8 +9,8 @@ interface Fundamentals {
   name: string
   sector: string
   industry: string
-  marketCap: number
-  enterpriseValue: number
+  marketCap: number | null
+  enterpriseValue: number | null
   trailingPE: number | null
   forwardPE: number | null
   pegRatio: number | null
@@ -48,19 +48,20 @@ export default function FundamentalsPage() {
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<string>('AAPL')
   const [detail, setDetail] = useState<Fundamentals | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const symbols = WATCHLIST.join(',')
-    fetch(`/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${symbols}`)
-      .then(r => r.json())
+    fetch(`/api/v1/modules/fetch?module=yahoo-finance&action=fundamentals&symbols=${symbols}`)
+      .then(r => { if (!r.ok) throw new Error('Fundamental data unavailable'); return r.json() })
       .then(d => {
         const items: Fundamentals[] = (d.data ?? []).map((q: Record<string, unknown>) => ({
           symbol: q.symbol as string,
           name: (q.shortName ?? q.longName ?? q.symbol) as string,
           sector: (q.sector ?? 'Unknown') as string,
           industry: (q.industry ?? 'Unknown') as string,
-          marketCap: (q.marketCap ?? 0) as number,
-          enterpriseValue: (q.enterpriseValue ?? 0) as number,
+          marketCap: (q.marketCap ?? null) as number | null,
+          enterpriseValue: (q.enterpriseValue ?? null) as number | null,
           trailingPE: q.trailingPE as number | null,
           forwardPE: q.forwardPE as number | null,
           pegRatio: q.pegRatio as number | null,
@@ -94,7 +95,7 @@ export default function FundamentalsPage() {
         // setDetail is handled by the [selected, data] effect below.
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(() => { setError('Fundamental data temporarily unavailable'); setLoading(false) })
   }, [])
 
   useEffect(() => {
@@ -141,6 +142,8 @@ setDetail(data.find(i => i.symbol === selected) ?? null)
 
         {loading ? (
           <div className="text-text-dim text-xs p-8 text-center">Loading fundamentals...</div>
+        ) : error ? (
+          <div className="text-data-bear text-xs p-8 text-center">{error}</div>
         ) : detail ? (
           <div className="grid grid-cols-12 gap-4">
             {/* Header */}
@@ -228,7 +231,7 @@ setDetail(data.find(i => i.symbol === selected) ?? null)
             </div>
           </div>
         ) : (
-          <div className="text-text-dim text-xs p-8 text-center">Select a company above</div>
+          <div className="text-text-dim text-xs p-8 text-center">No fundamental data available</div>
         )}
 
         <div className="bg-bg-panel border border-border-dim rounded-lg p-4">

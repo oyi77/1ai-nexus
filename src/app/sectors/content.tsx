@@ -16,6 +16,7 @@ interface Protocol {
   change_1d: number | null
   change_7d: number | null
   category?: string
+  chainTvls?: Record<string, number>
 }
 
 interface ChainRow {
@@ -31,67 +32,61 @@ interface ChainRow {
 export function SectorsPageContent() {
   return <SectorsPageInner />
 }
-function SectorsPageInner() {
-  const { data: protocols, status, refresh } = useLiveFetch<Protocol[]>({
-    url: '/api/v1/modules/fetch?module=defillama&action=protocols',
-    interval: 300_000,
-    initialData: [],
-  })
+export function aggregateChains(list: Protocol[]): ChainRow[] {
+  const chainMap = new Map<string, { tvl: number; change1d: number; change7d: number; weight1d: number; weight7d: number; count: number; topTvl: number; topName: string }>()
+
+  for (const p of list) {
+    if (!p.chains || !p.chainTvls) continue
+    for (const chain of p.chains) {
+      const chainTvl = p.chainTvls[chain]
+      if (!Number.isFinite(chainTvl) || chainTvl <= 0) continue
+      let entry = chainMap.get(chain)
+      if (!entry) {
+        entry = { tvl: 0, change1d: 0, change7d: 0, weight1d: 0, weight7d: 0, count: 0, topTvl: 0, topName: '' }
+        chainMap.set(chain, entry)
+      }
+      entry.tvl += chainTvl
+      entry.count += 1
+      if (chainTvl > entry.topTvl) {
+        entry.topTvl = chainTvl
+        entry.topName = p.name
+      }
+      if (p.change_1d != null && isFinite(p.change_1d)) {
+        entry.change1d += p.change_1d * chainTvl
+        entry.weight1d += chainTvl
+      }
+      if (p.change_7d != null && isFinite(p.change_7d)) {
+        entry.change7d += p.change_7d * chainTvl
+        entry.weight7d += chainTvl
+      }
+    }
+  }
+
+  const totalTvl = Array.from(chainMap.values()).reduce((sum, entry) => sum + entry.tvl, 0)
+  return Array.from(chainMap.entries())
+    .map(([name, entry]): ChainRow => ({
+      name,
+      tvl: entry.tvl,
+      change1d: entry.weight1d > 0 ? entry.change1d / entry.weight1d : null,
+      change7d: entry.weight7d > 0 ? entry.change7d / entry.weight7d : null,
+      dominance: totalTvl > 0 ? (entry.tvl / totalTvl) * 100 : 0,
+      protocolCount: entry.count,
+      topProtocol: entry.topName,
+    }))
+    .sort((a, b) => b.tvl - a.tvl)
+    .slice(0, 30)
+}
+
+ function SectorsPageInner() {
+  const { data: protocols, status, refresh } = useLiveFetch<Protocol[] | { data?: Protocol[] }>({
+     url: '/api/v1/modules/fetch?module=defillama&action=protocols',
+     interval: 300_000,
+     initialData: [],
+   })
 
   const chains = useMemo(() => {
-    const list = Array.isArray(protocols) ? protocols : (protocols as unknown as { data: Protocol[] })?.data ?? []
-    if (!Array.isArray(list) || list.length === 0) return []
-
-    // Aggregate by chain
-    const chainMap = new Map<string, { tvl: number; weightedChange1d: number; weightedChange7d: number; totalWeight: number; count: number; topTvl: number; topName: string }>()
-
-    for (const p of list) {
-      if (!p.chains || p.tvl <= 0) continue
-      for (const chain of p.chains) {
-        let entry = chainMap.get(chain)
-        if (!entry) {
-          entry = { tvl: 0, weightedChange1d: 0, weightedChange7d: 0, totalWeight: 0, count: 0, topTvl: 0, topName: '' }
-          chainMap.set(chain, entry)
-        }
-        entry.tvl += p.tvl
-        entry.count += 1
-        if (p.tvl > entry.topTvl) {
-          entry.topTvl = p.tvl
-          entry.topName = p.name
-        }
-        // Weighted average of changes by TVL
-        if (p.change_1d != null && isFinite(p.change_1d)) {
-          entry.weightedChange1d += p.change_1d * p.tvl
-          entry.totalWeight += p.tvl
-        }
-      }
-    }
-
-    // Also compute weighted 7d change
-    for (const p of list) {
-      if (!p.chains || p.tvl <= 0 || p.change_7d == null || !isFinite(p.change_7d)) continue
-      for (const chain of p.chains) {
-        const entry = chainMap.get(chain)
-        if (entry) {
-          entry.weightedChange7d += p.change_7d * p.tvl
-        }
-      }
-    }
-
-    const totalTvl = Array.from(chainMap.values()).reduce((s, e) => s + e.tvl, 0)
-
-    return Array.from(chainMap.entries())
-      .map(([name, e]): ChainRow => ({
-        name,
-        tvl: e.tvl,
-        change1d: e.totalWeight > 0 ? e.weightedChange1d / e.totalWeight : null,
-        change7d: e.totalWeight > 0 ? e.weightedChange7d / e.totalWeight : null,
-        dominance: totalTvl > 0 ? (e.tvl / totalTvl) * 100 : 0,
-        protocolCount: e.count,
-        topProtocol: e.topName,
-      }))
-      .sort((a, b) => b.tvl - a.tvl)
-      .slice(0, 30)
+    const list = Array.isArray(protocols) ? protocols : protocols?.data ?? []
+    return aggregateChains(Array.isArray(list) ? list : [])
   }, [protocols])
 
   const columns: Column<ChainRow>[] = [

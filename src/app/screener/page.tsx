@@ -8,14 +8,15 @@ interface StockData {
   symbol: string
   name: string
   sector: string
-  marketCap: number
-  price: number
-  change: number
-  changePercent: number
+  marketCap: number | null
+  price: number | null
+  change: number | null
+  changePercent: number | null
   pe: number | null
   dividend: number | null
-  volume: number
+  volume: number | null
   exchange: string
+  currency: string
 }
 
 import { SCREENER_STOCKS } from '@/lib/config/universe'
@@ -26,6 +27,7 @@ const EXCHANGES = [...new Set(SCREENER_STOCKS.map(s => s.exchange))].sort()
 export default function ScreenerPage() {
   const [data, setData] = useState<Record<string, StockData>>({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [sector, setSector] = useState('All')
   const [exchange, setExchange] = useState('All')
   const [sortField, setSortField] = useState<keyof StockData>('marketCap')
@@ -33,31 +35,15 @@ export default function ScreenerPage() {
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    const symbols = SCREENER_STOCKS.map(s => s.symbol).join(',')
-    fetch(`/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${symbols}`)
-      .then(r => r.json())
+    fetch('/api/v1/screener?limit=200', { signal: AbortSignal.timeout(20_000) })
+      .then(r => { if (!r.ok) throw new Error('Screener data unavailable'); return r.json() })
       .then(d => {
         const map: Record<string, StockData> = {}
-        for (const q of d.data ?? []) {
-          const meta = SCREENER_STOCKS.find(s => s.symbol === q.symbol)
-          map[q.symbol] = {
-            symbol: q.symbol,
-            name: q.shortName ?? meta?.name ?? q.symbol,
-            sector: meta?.sector ?? 'Unknown',
-            marketCap: q.marketCap ?? 0,
-            price: q.regularMarketPrice ?? 0,
-            change: q.regularMarketChange ?? 0,
-            changePercent: q.regularMarketChangePercent ?? 0,
-            pe: q.trailingPE ?? null,
-            dividend: q.dividendYield ?? null,
-            volume: q.regularMarketVolume ?? 0,
-            exchange: meta?.exchange ?? 'Unknown',
-          }
-        }
+        for (const q of d.data?.results ?? []) map[q.symbol] = q
         setData(map)
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(() => { setError('Screener data temporarily unavailable'); setLoading(false) })
   }, [])
 
   const filtered = useMemo(() => {
@@ -93,11 +79,14 @@ export default function ScreenerPage() {
   }
 
   const fmt = (n: number | null, decimals = 2) => n != null ? n.toLocaleString(undefined, { maximumFractionDigits: decimals }) : '—'
-  const fmtMcap = (n: number) => {
-    if (n >= 1e12) return `$${(n / 1e12).toFixed(2)}T`
-    if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`
-    if (n >= 1e6) return `$${(n / 1e6).toFixed(0)}M`
-    return `$${n.toLocaleString()}`
+  const fmtMcap = (n: number | null, currency: string) => {
+    if (n == null) return '—'
+    const symbol = ({ USD: '$', IDR: 'Rp', EUR: '€', JPY: '¥', HKD: 'HK$' } as Record<string, string>)[currency] ?? `${currency} `
+    const abs = Math.abs(n)
+    if (abs >= 1e12) return `${symbol}${(n / 1e12).toFixed(2)}T`
+    if (abs >= 1e9) return `${symbol}${(n / 1e9).toFixed(1)}B`
+    if (abs >= 1e6) return `${symbol}${(n / 1e6).toFixed(0)}M`
+    return `${symbol}${n.toLocaleString()}`
   }
 
   return (
@@ -138,6 +127,8 @@ export default function ScreenerPage() {
         {/* Results Table */}
         {loading ? (
           <div className="text-text-dim text-xs p-8 text-center">Loading screener data...</div>
+        ) : error ? (
+          <div className="text-data-bear text-xs p-8 text-center">{error}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -171,13 +162,13 @@ export default function ScreenerPage() {
                     <td className="py-2 text-right font-mono text-text-muted">{s.exchange}</td>
                     <td className="py-2 text-right font-mono text-text-muted">{s.sector}</td>
                     <td className="py-2 text-right font-mono">{fmt(s.price)}</td>
-                    <td className={`py-2 text-right font-mono font-bold ${s.changePercent >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
-                      {s.changePercent >= 0 ? '+' : ''}{fmt(s.changePercent)}%
+                    <td className={`py-2 text-right font-mono font-bold ${s.changePercent == null ? 'text-text-muted' : s.changePercent >= 0 ? 'text-data-bull' : 'text-data-bear'}`}>
+                      {s.changePercent != null ? `${s.changePercent >= 0 ? '+' : ''}${fmt(s.changePercent)}%` : '—'}
                     </td>
-                    <td className="py-2 text-right font-mono">{fmtMcap(s.marketCap)}</td>
+                    <td className="py-2 text-right font-mono">{fmtMcap(s.marketCap, s.currency)}</td>
                     <td className="py-2 text-right font-mono">{fmt(s.pe, 1)}</td>
                     <td className="py-2 text-right font-mono">{s.dividend != null ? `${fmt(s.dividend)}%` : '—'}</td>
-                    <td className="py-2 text-right font-mono">{s.volume.toLocaleString()}</td>
+                    <td className="py-2 text-right font-mono">{s.volume?.toLocaleString() ?? '—'}</td>
                   </tr>
                 ))}
               </tbody>

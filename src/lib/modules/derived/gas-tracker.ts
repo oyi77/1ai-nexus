@@ -1,7 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-// Gas Tracker — real-time gas prices across all chains
-// ─────────────────────────────────────────────────────────────
-
 interface GasPrice {
   chain: string
   slow: number
@@ -11,66 +7,92 @@ interface GasPrice {
   congestion: 'low' | 'medium' | 'high' | 'extreme'
 }
 
-async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(8_000) })
+const EVM_RPC: Record<string, string> = {
+  Ethereum: 'https://ethereum-rpc.publicnode.com',
+  Arbitrum: 'https://arb1.arbitrum.io/rpc',
+  Base: 'https://mainnet.base.org',
+  Optimism: 'https://mainnet.optimism.io',
+}
+
+async function fetchJson(url: string, init?: RequestInit): Promise<unknown> {
+  const res = await fetch(url, { ...init, signal: AbortSignal.timeout(8_000) })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
 }
 
-export async function getGasPrices(): Promise<GasPrice[]> {
-  const prices: GasPrice[] = []
+function rpc<T>(url: string, method: string, params: unknown[]): Promise<T> {
+  return fetchJson(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+  }).then((payload) => {
+    const body = payload as { result?: T; error?: { message?: string } }
+    if (body.result === undefined) throw new Error(body.error?.message ?? `${method} unavailable`)
+    return body.result
+  })
+}
 
-  // Bitcoin fees from mempool.space
-  try {
-    const fees = await fetchJson('https://mempool.space/api/v1/fees/recommended') as Record<string, number>
-    const slow = Math.round(fees.minimumFee || fees.economyFee || 1)
-    const standard = Math.round(fees.hourFee || fees.halfHourFee || 5)
-    const fast = Math.round(fees.fastestFee || fees.halfHourFee || 10)
-    prices.push({
-      chain: 'Bitcoin',
-      slow, standard, fast,
-      unit: 'sat/vB',
-      congestion: fast > 50 ? 'high' : fast > 20 ? 'medium' : 'low',
-    })
-  } catch {
-    prices.push({ chain: 'Bitcoin', slow: 1, standard: 5, fast: 10, unit: 'sat/vB', congestion: 'low' })
-  }
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b)
+  return sorted.length === 0 ? 0 : sorted[Math.floor(sorted.length / 2)]
+}
 
-  // ETH gas — use a simple estimation since we don't have Etherscan key
-  // In production, this would use a free gas API
-  prices.push({
-    chain: 'Ethereum',
-    slow: 5, standard: 10, fast: 20,
+async function getEvmGas(chain: string, url: string): Promise<GasPrice> {
+  const history = await rpc<{
+    baseFeePerGas?: string[]
+    reward?: string[][]
+    gasUsedRatio?: number[]
+  }>(url, 'eth_feeHistory', [4, 'latest', [25, 50, 75]])
+  const baseFees = history.baseFeePerGas ?? []
+  const baseFee = baseFees.length > 0 ? parseInt(baseFees[baseFees.length - 1], 16) / 1e9 : NaN
+  if (!Number.isFinite(baseFee)) throw new Error(`${chain} fee history has no base fee`)
+  const rewards = history.reward ?? []
+  const priorities = [0, 1, 2].map(tier => median(rewards.map(block => parseInt(block[tier] ?? '0', 16) / 1e9).filter(Number.isFinite)))
+  const utilization = median(history.gasUsedRatio ?? [])
+  return {
+    chain,
+    slow: baseFee + priorities[0],
+    standard: baseFee + priorities[1],
+    fast: baseFee + priorities[2],
     unit: 'gwei',
-    congestion: 'medium',
-  })
-
-  // L2 chains — typically very low gas
-  for (const chain of ['Arbitrum', 'Base', 'Optimism']) {
-    prices.push({
-      chain,
-      slow: 0.01, standard: 0.05, fast: 0.1,
-      unit: 'gwei',
-      congestion: 'low',
-    })
+    congestion: utilization > 0.95 ? 'extreme' : utilization > 0.8 ? 'high' : utilization > 0.5 ? 'medium' : 'low',
   }
+}
 
-  // Solana
-  prices.push({
+async function getSolanaGas(): Promise<GasPrice> {
+  const fees = await rpc<Array<{ prioritizationFee?: number }>>('https://api.mainnet-beta.solana.com', 'getRecentPrioritizationFees', [])
+  const positiveFees = fees.map(item => item.prioritizationFee ?? 0).filter(fee => fee > 0)
+  const priority = median(positiveFees)
+  return {
     chain: 'Solana',
-    slow: 0.000005, standard: 0.00001, fast: 0.00005,
-    unit: 'SOL',
-    congestion: 'low',
-  })
+    slow: 0,
+    standard: priority,
+    fast: positiveFees.length > 0 ? Math.max(...positiveFees) : priority,
+    unit: 'lamports/CU',
+    congestion: positiveFees.length > fees.length * 0.8 ? 'high' : positiveFees.length > fees.length * 0.4 ? 'medium' : 'low',
+  }
+}
 
-  return prices
+export async function getGasPrices(): Promise<GasPrice[]> {
+  const requests: Array<Promise<GasPrice>> = Object.entries(EVM_RPC).map(([chain, url]) => getEvmGas(chain, url))
+  requests.push(getSolanaGas())
+  requests.push(fetchJson('https://mempool.space/api/v1/fees/recommended').then((payload) => {
+    const fees = payload as Record<string, number>
+    const fast = fees.fastestFee || fees.halfHourFee
+    if (!Number.isFinite(fast)) throw new Error('Bitcoin fee estimate unavailable')
+    return {
+      chain: 'Bitcoin',
+      slow: fees.minimumFee || fees.economyFee,
+      standard: fees.hourFee || fees.halfHourFee,
+      fast,
+      unit: 'sat/vB',
+      congestion: fast > 100 ? 'extreme' : fast > 50 ? 'high' : fast > 20 ? 'medium' : 'low',
+    }
+  }))
+  const results = await Promise.allSettled(requests)
+  return results.flatMap(result => result.status === 'fulfilled' ? [result.value] : [])
 }
 
 export async function getGasTrend(): Promise<{ chain: string; trend: 'rising' | 'falling' | 'stable' }[]> {
-  // In production, compare current vs 1h ago gas prices
-  return [
-    { chain: 'Ethereum', trend: 'stable' },
-    { chain: 'Bitcoin', trend: 'stable' },
-    { chain: 'Arbitrum', trend: 'stable' },
-  ]
+  return []
 }

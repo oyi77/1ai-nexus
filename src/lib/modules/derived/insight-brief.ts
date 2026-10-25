@@ -436,8 +436,8 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
           { metric: '10Y-3M spread', value: `${curve.spread3m}%`, source: 'FRED T10Y3M' },
           { metric: 'curve regime', value: curve.regime, source: 'MacroDataPoint' },
         ],
-        confidence: isBearish || isBullish ? 65 : 50,
-        unproven: false,
+        confidence: 50,
+        unproven: true,
       })
     }
 
@@ -461,8 +461,8 @@ export async function buildInsightBrief(): Promise<InsightBrief> {
           ...(credit.z != null ? [{ metric: 'spread z-score', value: `${credit.z}σ`, source: 'MacroDataPoint' }] : []),
           { metric: 'credit regime', value: credit.regime, source: 'MacroDataPoint' },
         ],
-        confidence: isStress || isCalm ? 62 : 50,
-        unproven: false,
+        confidence: 50,
+        unproven: true,
       })
     }
 

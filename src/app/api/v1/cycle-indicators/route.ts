@@ -24,16 +24,13 @@ export async function GET(request: Request) {
 
         // Persist to DB (fire-and-forget)
         const indicatorData = data as Record<string, unknown>
-        const indicators = indicatorData?.indicators as Record<string, { value: number; zone: string }> | undefined
+        const indicators = indicatorData?.indicators as Record<string, { value: number | null; zone: string }> | undefined
         if (indicators) {
           const now = new Date()
-          const snapshots = Object.entries(indicators).map(([key, ind]) => ({
-            indicator: key,
-            value: ind.value,
-            zone: ind.zone,
-            timestamp: now,
-          }))
-          prisma.cycleIndicatorSnapshot.createMany({ data: snapshots }).catch(() => {})
+          const snapshots = Object.entries(indicators)
+            .filter(([, ind]) => ind.value != null)
+            .map(([key, ind]) => ({ indicator: key, value: ind.value as number, zone: ind.zone, timestamp: now }))
+          if (snapshots.length > 0) prisma.cycleIndicatorSnapshot.createMany({ data: snapshots }).catch(() => {})
         }
 
         const resp = NextResponse.json({ data, error: null }, {
@@ -89,46 +86,30 @@ export async function GET(request: Request) {
 }
 
 async function fetchLatestFromDb() {
-  const indicators = ['mvrv', 'nupl', 'ssr', 'dominance']
-  const results: Record<string, unknown> = {}
+  const results: Record<string, unknown> = {
+    mvrv: {
+      name: 'MVRV Z-Score', value: null, zone: 'unavailable', raw: {},
+      description: 'Unavailable: realized-cap inputs are not supplied by CoinGecko.',
+    },
+    nupl: {
+      name: 'NUPL', value: null, zone: 'unavailable', raw: {},
+      description: 'Unavailable: holder-level realized cap is not supplied by CoinGecko.',
+    },
+  }
+  const descriptions: Record<string, string> = {
+    ssr: 'Stablecoin Supply Ratio. BTC market cap / stablecoin market cap. Low SSR = high buying pressure ready.',
+    dominance: 'Stablecoin market cap as % of total crypto market cap. Rising = risk-off sentiment.',
+  }
+  const names: Record<string, string> = { ssr: 'SSR', dominance: 'Stablecoin Dominance' }
   let latestTimestamp = new Date().toISOString()
 
-  for (const ind of indicators) {
-    const row = await prisma.cycleIndicatorSnapshot.findFirst({
-      where: { indicator: ind },
-      orderBy: { timestamp: 'desc' }
-    })
+  for (const ind of ['ssr', 'dominance']) {
+    const row = await prisma.cycleIndicatorSnapshot.findFirst({ where: { indicator: ind }, orderBy: { timestamp: 'desc' } })
     if (row) {
       latestTimestamp = row.timestamp.toISOString()
-      const descriptions: Record<string, string> = {
-        mvrv: 'Market Value to Realized Value Z-Score. Measures deviation of market cap from realized cap. >7 = extreme overvaluation.',
-        nupl: 'Net Unrealized Profit/Loss. Ratio of unrealized profit to market cap. >0.75 = euphoria zone.',
-        ssr: 'Stablecoin Supply Ratio. BTC market cap / stablecoin market cap. Low SSR = high buying pressure ready.',
-        dominance: 'Stablecoin market cap as % of total crypto market cap. Rising = risk-off sentiment.'
-      }
-      const names: Record<string, string> = {
-        mvrv: 'MVRV Z-Score',
-        nupl: 'NUPL',
-        ssr: 'SSR',
-        dominance: 'Stablecoin Dominance'
-      }
-      results[ind] = {
-        name: names[ind],
-        value: row.value,
-        zone: row.zone,
-        description: descriptions[ind] || '',
-        raw: {}
-      }
+      results[ind] = { name: names[ind], value: row.value, zone: row.zone, description: descriptions[ind], raw: {} }
     }
   }
 
-  if (Object.keys(results).length === 0) {
-    throw new Error("No historical data available in database.")
-  }
-
-  return {
-    indicators: results,
-    timestamp: latestTimestamp,
-    source: 'CoinGecko (historical cache)'
-  }
+  return { indicators: results, timestamp: latestTimestamp, source: 'CoinGecko (historical cache)' }
 }

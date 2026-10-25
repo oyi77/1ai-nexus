@@ -9,7 +9,7 @@ export interface ExchangeTicker {
   symbol: string
   price: number
   priceChange24h: number
-  volume24h: number
+  volume24h: number // quote-value turnover in USD/USDT, not base-asset units
   high24h: number
   low24h: number
 }
@@ -47,17 +47,17 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 export async function getBinanceTickers(limit = 20): Promise<ExchangeTicker[]> {
   try {
-    const data = await fetchJson<Array<{ symbol: string; lastPrice: string; priceChangePercent: string; volume: string; highPrice: string; lowPrice: string }>>(EXCHANGES.binance.ticker)
+    const data = await fetchJson<Array<{ symbol: string; lastPrice: string; priceChangePercent: string; volume: string; quoteVolume: string; highPrice: string; lowPrice: string }>>(EXCHANGES.binance.ticker)
     return data
       .filter(t => t.symbol.endsWith('USDT'))
-      .sort((a, b) => parseFloat(b.volume) - parseFloat(a.volume))
+      .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
       .slice(0, limit)
       .map(t => ({
         exchange: 'binance',
         symbol: t.symbol,
         price: parseFloat(t.lastPrice),
         priceChange24h: parseFloat(t.priceChangePercent),
-        volume24h: parseFloat(t.volume),
+        volume24h: parseFloat(t.quoteVolume),
         high24h: parseFloat(t.highPrice),
         low24h: parseFloat(t.lowPrice),
       }))
@@ -68,17 +68,17 @@ export async function getBinanceTickers(limit = 20): Promise<ExchangeTicker[]> {
 
 export async function getBybitTickers(limit = 20): Promise<ExchangeTicker[]> {
   try {
-    const data = await fetchJson<{ result: { list: Array<{ symbol: string; lastPrice: string; price24hPcnt: string; volume24h: string; highPrice24h: string; lowPrice24h: string }> } }>(EXCHANGES.bybit.ticker)
+    const data = await fetchJson<{ result: { list: Array<{ symbol: string; lastPrice: string; price24hPcnt: string; turnover24h: string; highPrice24h: string; lowPrice24h: string }> } }>(EXCHANGES.bybit.ticker)
     return data.result.list
       .filter(t => t.symbol.endsWith('USDT'))
-      .sort((a, b) => parseFloat(b.volume24h) - parseFloat(a.volume24h))
+      .sort((a, b) => parseFloat(b.turnover24h) - parseFloat(a.turnover24h))
       .slice(0, limit)
       .map(t => ({
         exchange: 'bybit',
         symbol: t.symbol,
         price: parseFloat(t.lastPrice),
         priceChange24h: parseFloat(t.price24hPcnt) * 100,
-        volume24h: parseFloat(t.volume24h),
+        volume24h: parseFloat(t.turnover24h),
         high24h: parseFloat(t.highPrice24h),
         low24h: parseFloat(t.lowPrice24h),
       }))
@@ -89,17 +89,17 @@ export async function getBybitTickers(limit = 20): Promise<ExchangeTicker[]> {
 
 export async function getOkxTickers(limit = 20): Promise<ExchangeTicker[]> {
   try {
-    const data = await fetchJson<{ data: Array<{ instId: string; last: string; sodUtc8: string; vol24h: string; high24h: string; low24h: string }> }>(EXCHANGES.okx.ticker)
+    const data = await fetchJson<{ data: Array<{ instId: string; last: string; sodUtc8: string; vol24h: string; volCcy24h: string; high24h: string; low24h: string }> }>(EXCHANGES.okx.ticker)
     return data.data
       .filter(t => t.instId.endsWith('-USDT-SWAP'))
-      .sort((a, b) => parseFloat(b.vol24h) - parseFloat(a.vol24h))
+      .sort((a, b) => parseFloat(b.volCcy24h) - parseFloat(a.volCcy24h))
       .slice(0, limit)
       .map(t => ({
         exchange: 'okx',
         symbol: t.instId.replace('-USDT-SWAP', 'USDT'),
         price: parseFloat(t.last),
         priceChange24h: ((parseFloat(t.last) - parseFloat(t.sodUtc8)) / parseFloat(t.sodUtc8)) * 100,
-        volume24h: parseFloat(t.vol24h),
+        volume24h: parseFloat(t.volCcy24h),
         high24h: parseFloat(t.high24h),
         low24h: parseFloat(t.low24h),
       }))

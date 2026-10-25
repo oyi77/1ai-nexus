@@ -27,9 +27,9 @@ function unwrapEnvelope(json: unknown): unknown {
     typeof json === 'object' &&
     !Array.isArray(json) &&
     'data' in json &&
-    'error' in json
+    json.data !== undefined
   ) {
-    return (json as { data: unknown }).data
+    return json.data
   }
   return json
 }
@@ -43,18 +43,24 @@ export function useLiveFetch<T>({
   const [data, setData] = useState<T>(initialData as T)
   const [status, setStatus] = useState<FetchStatus>('live')
   const mountedRef = useRef(true)
+  const hasDataRef = useRef(initialData != null)
 
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch(url)
+      if (!res.ok) throw new Error(`Request failed: HTTP ${res.status}`)
       const json = await res.json()
+      if (json !== null && typeof json === 'object' && !Array.isArray(json) && 'error' in json && json.error) {
+        throw new Error(String(json.error))
+      }
       const payload = unwrapEnvelope(json)
       if (mountedRef.current) {
+        hasDataRef.current = payload != null
         setData((transform ? transform(payload) : payload) as T)
         setStatus('live')
       }
     } catch {
-      if (mountedRef.current) setStatus('error')
+      if (mountedRef.current) setStatus(hasDataRef.current ? 'stale' : 'error')
     }
   }, [url, transform])
 

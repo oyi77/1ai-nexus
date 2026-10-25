@@ -34,6 +34,7 @@ function req(
   if (csrf) headers.set('x-csrf-token', csrf)
   if (bearer) headers.set('authorization', `Bearer ${bearer}`)
   if (fetchSite) headers.set('referer', ORIGIN + '/dashboard')
+  if (fetchSite === 'cross-site') headers.set('origin', 'https://example.com')
   return new NextRequest(`${ORIGIN}${path}`, { method, headers })
 }
 
@@ -60,9 +61,10 @@ describe('middleware route classification', () => {
       })
     }
 
-    it('does not require a credential for an allowlisted public route even cross-site', async () => {
+    it('allows widget requests and exposes the public response cross-origin', async () => {
       const res = await middleware(req('/api/v1/health', { fetchSite: 'cross-site' }))
       expect(res.status).not.toBe(401)
+      expect(res.headers.get('access-control-allow-origin')).toBe('*')
     })
   })
 

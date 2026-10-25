@@ -36,25 +36,25 @@ const ETF_ISSUERS = [
 ]
 
 export async function fetchETFFlows(): Promise<ETFFlow[]> {
-  // Fetch from public API that aggregates ETF flow data
-  // Using Farside Investors-style data or direct issuer disclosures
-  try {
-    const res = await fetch('https://raw.githubusercontent.com/nicfab/btcetf/main/data/flows.json', {
-      signal: AbortSignal.timeout(15_000),
-    })
-    if (!res.ok) return generateFallbackFlows()
-    const data = await res.json() as Array<{ date: string; total: number; issuers?: Record<string, number> }>
-    return parseFlowData(data)
-  } catch {
-    return generateFallbackFlows()
-  }
+  const res = await fetch('https://raw.githubusercontent.com/nicfab/btcetf/main/data/flows.json', {
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!res.ok) throw new Error(`ETF flow source returned ${res.status}`)
+  const data = await res.json() as Array<{ date: string; total: number; issuers?: Record<string, number> }>
+  if (!Array.isArray(data)) throw new Error('ETF flow source returned an invalid payload')
+  return parseFlowData(data)
 }
 
 function parseFlowData(data: Array<{ date: string; total: number; issuers?: Record<string, number> }>): ETFFlow[] {
   const flows: ETFFlow[] = []
   let cumulative = 0
 
-  for (const entry of data.slice(-30)) { // Last 30 days
+  const entries = data
+    .filter((entry) => Number.isFinite(entry.total) && Number.isFinite(Date.parse(entry.date)))
+    .sort((a, b) => Date.parse(a.date) - Date.parse(b.date))
+    .slice(-30)
+
+  for (const entry of entries) {
     cumulative += entry.total
     flows.push({
       issuer: 'Aggregate',
@@ -68,45 +68,13 @@ function parseFlowData(data: Array<{ date: string; total: number; issuers?: Reco
   return flows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 }
 
-function generateFallbackFlows(): ETFFlow[] {
-  // Generate synthetic flows based on known ETF structure
-  // This is a fallback when no live data source is available
-  const flows: ETFFlow[] = []
-  const now = new Date()
 
-  for (let d = 0; d < 30; d++) {
-    const date = new Date(now)
-    date.setDate(date.getDate() - d)
-    if (date.getDay() === 0 || date.getDay() === 6) continue // Skip weekends
-
-    const dateStr = date.toISOString().slice(0, 10)
-    // Use deterministic pseudo-random based on date for consistency
-    const seed = date.getTime() % 1000
-    const totalFlow = (seed - 500) * 100000 // ±$50M range
-
-    flows.push({
-      issuer: 'Aggregate',
-      asset: 'BTC',
-      netFlowUsd: totalFlow,
-      cumulativeFlowUsd: 0, // Will be computed
-      date: dateStr,
-    })
-  }
-
-  // Compute cumulative
-  let cumulative = 0
-  for (const flow of flows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())) {
-    cumulative += flow.netFlowUsd
-    flow.cumulativeFlowUsd = cumulative
-  }
-
-  return flows.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-}
 
 export async function fetchETFSummary() {
-  const flows = await fetchETFFlows()
+  const flows = await fetchETFFlows().catch(() => [])
+  if (flows.length === 0) return { flows, summary: null, issuers: ETF_ISSUERS }
   const totalFlow = flows.reduce((s, f) => s + f.netFlowUsd, 0)
-  const cumulativeFlow = flows.length > 0 ? flows[0].cumulativeFlowUsd : 0
+  const cumulativeFlow = flows[0].cumulativeFlowUsd
   const positiveDays = flows.filter(f => f.netFlowUsd > 0).length
   const negativeDays = flows.filter(f => f.netFlowUsd < 0).length
 
@@ -119,7 +87,7 @@ export async function fetchETFSummary() {
       negativeDays,
       dayCount: flows.length,
       trend: totalFlow > 0 ? 'inflow' : totalFlow < 0 ? 'outflow' : 'neutral',
-      avgDailyFlow: flows.length > 0 ? totalFlow / flows.length : 0,
+      avgDailyFlow: totalFlow / flows.length,
     },
     issuers: ETF_ISSUERS,
   }

@@ -116,7 +116,7 @@ export default function MarketPage() {
                     <SortableTh controls={tc} k="symbol" className="text-left py-2 px-3 font-mono">ASSET</SortableTh>
                     <SortableTh controls={tc} k="price" className="text-right py-2 px-3 font-mono">PRICE</SortableTh>
                     <SortableTh controls={tc} k="change" className="text-right py-2 px-3 font-mono">24H CHANGE</SortableTh>
-                    <th className="text-right py-2 px-3">SPARKLINE</th>
+
                   </tr>
                 </thead>
                 <tbody>
@@ -133,11 +133,7 @@ export default function MarketPage() {
                           {t.change}
                         </span>
                       </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <span className={`inline-block w-16 h-4 rounded ${t.positive ? 'bg-accent-green/20' : 'bg-accent-red/20'}`}>
-                          <span className={`block h-full w-3/4 rounded ${t.positive ? 'bg-accent-green/40' : 'bg-accent-red/40'}`} />
-                        </span>
-                      </td>
+
                     </tr>
                   ))}
                 </tbody>

@@ -49,23 +49,23 @@ export default function FinancialsPage() {
   const [selected, setSelected] = useState('AAPL')
   const [data, setData] = useState<FinancialData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-        setLoading(true)
-    fetch(`/api/v1/modules/fetch?module=yahoo-finance&action=quote&symbols=${selected}`)
-      .then(r => r.json())
+    setLoading(true)
+    setError(null)
+    fetch(`/api/v1/modules/fetch?module=yahoo-finance&action=fundamentals&symbols=${selected}`)
+      .then(r => { if (!r.ok) throw new Error('Financial data unavailable'); return r.json() })
       .then(d => {
         const q = d.data?.[0]
-        if (!q) { setLoading(false); return }
+        if (!q) { setData(null); setLoading(false); return }
 
-        const marketCap = q.marketCap ?? 0
-        const shares = q.sharesOutstanding ?? 1
+        const shares = q.sharesOutstanding ?? null
 
         setData({
           symbol: q.symbol,
           name: q.shortName ?? q.longName ?? q.symbol,
-          // Income Statement
           revenue: q.totalRevenue ?? null,
           revenueGrowth: q.revenueGrowth ?? null,
           grossProfit: q.grossProfits ?? null,
@@ -77,32 +77,28 @@ export default function FinancialsPage() {
           ebitda: q.ebitda ?? null,
           ebitdaMargin: q.ebitdaMargins ?? null,
           eps: q.trailingEps ?? null,
-          // Balance Sheet
           totalAssets: q.totalAssets ?? null,
-          totalLiabilities: null, // Not directly available
-          totalEquity: q.bookValue != null ? q.bookValue * shares : null,
+          totalLiabilities: q.totalLiabilities ?? null,
+          totalEquity: q.totalEquity ?? null,
           cash: q.totalCash ?? null,
           debt: q.totalDebt ?? null,
           debtToEquity: q.debtToEquity ?? null,
           currentRatio: q.currentRatio ?? null,
           bookValuePerShare: q.bookValue ?? null,
-          // Cash Flow
           operatingCashFlow: q.operatingCashflow ?? null,
-          capitalExpenditure: null, // Not directly available
+          capitalExpenditure: q.capitalExpenditure ?? null,
           freeCashFlow: q.freeCashflow ?? null,
-          fcfPerShare: q.freeCashflow != null && shares > 0 ? q.freeCashflow / shares : null,
-          // Returns
+          fcfPerShare: q.freeCashflow != null && shares != null && shares > 0 ? q.freeCashflow / shares : null,
           returnOnEquity: q.returnOnEquity ?? null,
           returnOnAssets: q.returnOnAssets ?? null,
           returnOnCapital: null, // Not directly available
-          // Per Share
           sharesOutstanding: shares,
-          marketCap,
+          marketCap: q.marketCap ?? null,
           enterpriseValue: q.enterpriseValue ?? null,
         })
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(() => { setData(null); setError('Financial data temporarily unavailable'); setLoading(false) })
   }, [selected])
 
   const fmt = (n: number | null, decimals = 2) => n != null ? n.toLocaleString(undefined, { maximumFractionDigits: decimals }) : '—'
@@ -145,6 +141,8 @@ export default function FinancialsPage() {
 
         {loading ? (
           <div className="text-text-dim text-xs p-8 text-center">Loading financial data...</div>
+        ) : error ? (
+          <div className="text-data-bear text-xs p-8 text-center">{error}</div>
         ) : data ? (
           <div className="grid grid-cols-12 gap-4">
             {/* Header */}
@@ -231,10 +229,10 @@ export default function FinancialsPage() {
                 <h4 className="text-xs text-accent-cyan mb-2">KEY RATIOS</h4>
                 <div className="space-y-2">
                   {[
-                    ['P/E', data.eps != null && data.eps > 0 ? fmt((data.marketCap ?? 0) / (data.netIncome ?? 1), 1) : '—'],
-                    ['P/B', data.bookValuePerShare != null && data.bookValuePerShare > 0 ? fmt((data.marketCap ?? 0) / ((data.bookValuePerShare ?? 1) * (data.sharesOutstanding ?? 1)), 1) : '—'],
-                    ['P/S', data.revenue != null && data.revenue > 0 ? fmt((data.marketCap ?? 0) / data.revenue, 2) : '—'],
-                    ['EV/EBITDA', data.ebitda != null && data.ebitda > 0 ? fmt((data.enterpriseValue ?? 0) / data.ebitda, 1) : '—'],
+                    ['P/E', data.marketCap != null && data.netIncome != null && data.netIncome > 0 ? fmt(data.marketCap / data.netIncome, 1) : '—'],
+                    ['P/B', data.marketCap != null && data.totalEquity != null && data.totalEquity > 0 ? fmt(data.marketCap / data.totalEquity, 1) : '—'],
+                    ['P/S', data.marketCap != null && data.revenue != null && data.revenue > 0 ? fmt(data.marketCap / data.revenue, 2) : '—'],
+                    ['EV/EBITDA', data.enterpriseValue != null && data.ebitda != null && data.ebitda > 0 ? fmt(data.enterpriseValue / data.ebitda, 1) : '—'],
                     ['FCF Yield', data.freeCashFlow != null && data.marketCap != null && data.marketCap > 0 ? pct(data.freeCashFlow / data.marketCap) : '—'],
                   ].map(([label, value]) => (
                     <div key={label} className="flex justify-between text-xs">

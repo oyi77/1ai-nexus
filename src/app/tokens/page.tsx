@@ -71,7 +71,7 @@ export default function TokensPage() {
               price: t.price as number,
               change24h: t.priceChange24h as number,
               change7d: 0,
-              volume: t.volume24h as number,
+              volume: (t.volume24h as number) * (t.price as number),
               marketCap: 0,
               holders: 0,
               riskScore: null,

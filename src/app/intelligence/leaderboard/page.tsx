@@ -37,8 +37,8 @@ export default function ConvictionLeaderboardPage() {
 
   useEffect(() => {
     fetch('/api/v1/conviction/accuracy')
-      .then(r => r.json())
-      .then(r => setData(r.data ?? null))
+      .then(r => { if (!r.ok) throw new Error(`Accuracy data unavailable (${r.status})`); return r.json() })
+      .then(r => { if (r.error) throw new Error(String(r.error)); setData(r.data ?? null) })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false))
   }, [])
@@ -129,6 +129,9 @@ export default function ConvictionLeaderboardPage() {
               </ul>
             </div>
           </>
+        )}
+        {!loading && !error && !data && (
+          <div className="text-zinc-400 text-center py-12">No conviction accuracy data available.</div>
         )}
       </div>
     </NexusLayout>

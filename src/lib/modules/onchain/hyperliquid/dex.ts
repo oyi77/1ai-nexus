@@ -51,27 +51,31 @@ export async function getHyperliquidMarkets(): Promise<HyperliquidMarket[]> {
   }
 
   try {
-    // allMids returns {coin: price} dict, not array
-    const mids = await fetchJson<Record<string, string>>('/info', { type: 'allMids' })
-    const meta = await fetchJson<HyperliquidMeta>('/info', { type: 'meta' })
+    const [meta, contexts] = await fetchJson<[HyperliquidMeta, Array<{
+      markPx: string
+      oraclePx: string
+      prevDayPx: string
+      dayNtlVlm: string
+      funding: string
+      openInterest: string
+    }>]>('/info', { type: 'metaAndAssetCtxs' })
 
-    const metaMap = new Map(meta.universe.map(m => [m.name, m]))
-
-    marketCache = Object.entries(mids).map(([coin, priceStr]) => {
-      const price = parseFloat(priceStr) || 0
-      const metaInfo = metaMap.get(coin)
+    marketCache = meta.universe.map((metaInfo, index) => {
+      const context = contexts[index]
+      const price = parseFloat(context?.markPx) || 0
+      const previousPrice = parseFloat(context?.prevDayPx) || 0
       return {
-        symbol: coin,
+        symbol: metaInfo.name,
         price,
         markPrice: price,
-        indexPrice: price,
-        priceChange24h: 0,
-        volume24h: 0,
-        openInterest: 0,
-        fundingRate: 0,
-        maxLeverage: metaInfo?.maxLeverage || 0,
+        indexPrice: parseFloat(context?.oraclePx) || price,
+        priceChange24h: previousPrice > 0 ? ((price - previousPrice) / previousPrice) * 100 : 0,
+        volume24h: parseFloat(context?.dayNtlVlm) || 0,
+        openInterest: parseFloat(context?.openInterest) || 0,
+        fundingRate: parseFloat(context?.funding) || 0,
+        maxLeverage: metaInfo.maxLeverage,
       }
-    }).sort((a, b) => b.price - a.price)
+    }).sort((a, b) => b.volume24h - a.volume24h)
 
     cacheTimestamp = now
     return marketCache
@@ -86,7 +90,7 @@ export async function getHyperliquidFundingRates(): Promise<Array<{ symbol: stri
   return markets.map(m => ({
     symbol: m.symbol,
     rate: m.fundingRate,
-    annualized: m.fundingRate * 3 * 365 * 100, // 8h funding → annualized %
+    annualized: m.fundingRate * 24 * 365 * 100, // hourly funding → annualized %
   }))
 }
 

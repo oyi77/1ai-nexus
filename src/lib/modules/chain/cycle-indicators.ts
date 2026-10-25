@@ -32,30 +32,19 @@ interface CoinGeckoBitcoin {
   }
 }
 
-interface CoinGeckoDeFi {
-  data: {
-    defi_market_cap: string
-    eth_market_cap: string
-    defi_to_eth: string
-    trading_volume_24h: string
-    defi_dominance: string
-    top_coin_name: string
-    defi_dominance_7d_percentage_change: string
-    stablecoin_market_cap: string
-  }
+interface CoinGeckoStablecoinMarket {
+  market_cap: number | null
 }
 
 export interface CycleIndicator {
   name: string
-  value: number
-  zone: ZoneType
+  value: number | null
+  zone: ZoneType | 'unavailable'
   description: string
   raw: {
     marketCap?: number
-    realizedCapProxy?: number
     btcMarketCap?: number
     stablecoinMarketCap?: number
-    stdDev?: number
   }
 }
 
@@ -80,20 +69,6 @@ export interface CycleIndicatorsResult {
 
 // ── Zone classification ──────────────────────────────────
 
-function classifyMvrvZone(zScore: number): ZoneType {
-  if (zScore > 7) return 'euphoria'
-  if (zScore > 2) return 'bull'
-  if (zScore >= 0) return 'neutral'
-  if (zScore >= -0.5) return 'accumulation'
-  return 'capitulation'
-}
-
-function classifyNuplZone(nupl: number): ZoneType {
-  if (nupl > 0.75) return 'euphoria'
-  if (nupl > 0.5) return 'bull'
-  if (nupl > 0) return 'hope'
-  return 'capitulation'
-}
 
 function classifySsrZone(ssr: number): ZoneType {
   if (ssr < 2) return 'bull'
@@ -126,63 +101,47 @@ async function coingeckoFetch<T>(url: string): Promise<T> {
 // ── Core computation ──────────────────────────────────────
 
 async function computeCycleIndicators(): Promise<CycleIndicatorsResult> {
-  const [globalData, btcData, defiData] = await Promise.all([
+  const [globalData, btcData, stablecoins] = await Promise.all([
     coingeckoFetch<CoinGeckoGlobal>(`${COINGECKO_BASE}/global`),
     coingeckoFetch<CoinGeckoBitcoin>(`${COINGECKO_BASE}/coins/bitcoin?localization=false&tickers=false&community_data=false&developer_data=false`),
-    coingeckoFetch<CoinGeckoDeFi>(`${COINGECKO_BASE}/global/decentralized_finance_defi`),
+    coingeckoFetch<CoinGeckoStablecoinMarket[]>(`${COINGECKO_BASE}/coins/markets?vs_currency=usd&category=stablecoins&order=market_cap_desc&per_page=250&page=1&sparkline=false`),
   ])
 
   const totalMarketCap = globalData.data.total_market_cap.usd
   const btcMarketCap = btcData.market_data.market_cap.usd
-  const fdv = btcData.market_data.fully_diluted_valuation.usd
-  const stablecoinMarketCap = parseFloat(defiData.data.stablecoin_market_cap) || 0
-
-  // Realized Cap Proxy = FDV as simplification
-  const realizedCapProxy = fdv
-
-  // MVRV Z-Score: (Market Cap - Realized Cap) / StdDev
-  // StdDev proxy: use 20% of market cap as historical volatility proxy
-  const stdDev = totalMarketCap * 0.2
-  const mvrvZScore = stdDev > 0 ? (totalMarketCap - realizedCapProxy) / stdDev : 0
-
-  // NUPL: 1 - (Realized Cap / Market Cap)
-  const nupl = totalMarketCap > 0 ? 1 - (realizedCapProxy / totalMarketCap) : 0
-
-  // SSR: BTC Market Cap / Total Stablecoin Market Cap
-  const ssr = stablecoinMarketCap > 0 ? btcMarketCap / stablecoinMarketCap : 0
-
-  // Stablecoin Dominance: Stablecoin mcap / Total crypto mcap
-  const dominance = totalMarketCap > 0 ? (stablecoinMarketCap / totalMarketCap) * 100 : 0
+  const stablecoinMarketCap = stablecoins.reduce((sum, coin) => sum + (coin.market_cap ?? 0), 0)
+  const ssr = stablecoinMarketCap > 0 ? btcMarketCap / stablecoinMarketCap : null
+  const dominance = stablecoinMarketCap > 0 && totalMarketCap > 0 ? (stablecoinMarketCap / totalMarketCap) * 100 : null
 
   return {
     indicators: {
       mvrv: {
         name: 'MVRV Z-Score',
-        value: Math.round(mvrvZScore * 100) / 100,
-        zone: classifyMvrvZone(mvrvZScore),
-        description: 'Market Value to Realized Value Z-Score. Measures deviation of market cap from realized cap. >7 = extreme overvaluation.',
-        raw: { marketCap: totalMarketCap, realizedCapProxy, stdDev },
+        value: null,
+        zone: 'unavailable',
+        description: 'Unavailable: CoinGecko does not provide the realized-cap and historical realized-cap volatility required for MVRV Z-Score.',
+        raw: { marketCap: btcMarketCap },
       },
       nupl: {
         name: 'NUPL',
-        value: Math.round(nupl * 1000) / 1000,
-        zone: classifyNuplZone(nupl),
-        description: 'Net Unrealized Profit/Loss. Ratio of unrealized profit to market cap. >0.75 = euphoria zone.',
-        raw: { marketCap: totalMarketCap, realizedCapProxy },
+        value: null,
+        zone: 'unavailable',
+        description: 'Unavailable: holder-level realized cap is required to calculate Net Unrealized Profit/Loss.',
+        raw: { marketCap: btcMarketCap },
       },
       ssr: {
         name: 'SSR',
-        value: Math.round(ssr * 100) / 100,
-        zone: classifySsrZone(ssr),
-        description: 'Stablecoin Supply Ratio. BTC market cap / stablecoin market cap. Low SSR = high buying pressure ready.',
-        raw: { btcMarketCap, stablecoinMarketCap },
+        value: ssr == null ? null : Math.round(ssr * 100) / 100,
+        zone: ssr == null ? 'unavailable' : classifySsrZone(ssr),
+        description: stablecoinMarketCap > 0 ? 'Stablecoin Supply Ratio. BTC market cap / stablecoin market cap. Low SSR = high buying pressure ready.' : 'Unavailable: stablecoin market cap could not be verified.',
+        raw: { btcMarketCap, ...(stablecoinMarketCap > 0 ? { stablecoinMarketCap } : {}) },
       },
       dominance: {
         name: 'Stablecoin Dominance',
-        value: Math.round(dominance * 100) / 100,
-        zone: classifyDominanceZone(dominance),
-        description: 'Stablecoin market cap as % of total crypto market cap. Rising = risk-off sentiment.',
-        raw: { stablecoinMarketCap, marketCap: totalMarketCap },
+        value: dominance == null ? null : Math.round(dominance * 100) / 100,
+        zone: dominance == null ? 'unavailable' : classifyDominanceZone(dominance),
+        description: dominance == null ? 'Unavailable: stablecoin market cap could not be verified.' : 'Stablecoin market cap as % of total crypto market cap. Rising = risk-off sentiment.',
+        raw: { marketCap: totalMarketCap, ...(stablecoinMarketCap > 0 ? { stablecoinMarketCap } : {}) },
       },
     },
     timestamp: new Date().toISOString(),

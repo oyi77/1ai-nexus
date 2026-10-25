@@ -6,8 +6,8 @@
  * Crypto-focused: shows 4-6 decimals for sub-$1 tokens.
  */
 export function formatPrice(price: number): string {
+  if (!Number.isFinite(price)) return '—'
   if (price === 0) return '0.00'
-  
   const abs = Math.abs(price)
   
   // Micro prices (< 0.0001): show up to 8 decimals (meme coins, etc.)
@@ -40,6 +40,7 @@ export function formatPriceUSD(price: number): string {
  * Format percentage with sign
  */
 export function formatPercent(value: number, decimals = 2): string {
+  if (!Number.isFinite(value)) return '—'
   const sign = value >= 0 ? '+' : ''
   return `${sign}${value.toFixed(decimals)}%`
 }
@@ -48,8 +49,10 @@ export function formatPercent(value: number, decimals = 2): string {
  * Format compact numbers (K, M, B)
  */
 export function formatCompact(n: number): string {
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  if (!Number.isFinite(n)) return '—'
+  const abs = Math.abs(n)
+  if (abs >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
+  if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+  if (abs >= 1_000) return `${(n / 1_000).toFixed(1)}K`
   return n.toString()
 }

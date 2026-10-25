@@ -56,7 +56,7 @@ export default function GasPage() {
                     <div key={j} className="text-center">
                       <div className="text-xs text-text-muted font-mono uppercase">{tier.label}</div>
                       <div className={`text-[16px] font-head font-bold tabular-nums ${tier.color}`}>
-                        {gas.unit === 'gwei' ? (tier.value ?? 0).toFixed(2) : tier.value}
+                        {!Number.isFinite(tier.value) ? '—' : gas.unit === 'gwei' ? tier.value.toFixed(2) : tier.value}
                       </div>
                       <div className="text-xs text-text-muted">{gas.unit}</div>
                     </div>
@@ -65,6 +65,11 @@ export default function GasPage() {
               </div>
             </Panel>
           ))}
+          {prices.length === 0 && (
+            <Panel title={status === 'error' ? 'Gas data unavailable' : 'No gas data available'} subtitle={status === 'error' ? 'Live chain sources could not be reached' : 'Waiting for live chain data'} liveStatus={status}>
+              <div className="p-6 text-center text-xs text-text-muted">{status === 'error' ? 'Unable to retrieve gas prices. No zero-value estimates are shown.' : 'No chains returned gas price data.'}</div>
+            </Panel>
+          )}
         </div>
       </div>
     </NexusLayout>

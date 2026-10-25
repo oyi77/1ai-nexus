@@ -234,7 +234,8 @@ export default function AlertsPage() {
   const [config, setConfig] = useState<Record<string, unknown>>({})
   const [channel, setChannel] = useState<Channel>('telegram')
   const [filterCategory, setFilterCategory] = useState<'all' | 'tradfi' | 'crypto'>('all')
-  const [, setLoading] = useState(true)
+  const [loading, setLoading] = useState(true)
+  const [unauthenticated, setUnauthenticated] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [evaluating, setEvaluating] = useState(false)
   const [evalSummary, setEvalSummary] = useState<{ evaluated: number; triggered: number; results: Array<{ id: string; type: string; triggered: boolean; message: string; fired: boolean; deliveryStatus: string; deliveryError?: string }> } | null>(null)
@@ -242,8 +243,15 @@ export default function AlertsPage() {
 
   useEffect(() => {
     fetch('/api/v1/alerts')
-      .then(r => r.json())
-      .then(d => { if (d.data) setAlerts(d.data); else setError(d.error ?? 'Failed to load alerts') })
+      .then(async r => {
+        if (r.status === 401) {
+          setUnauthenticated(true)
+          return
+        }
+        const d = await r.json()
+        if (d.data) setAlerts(d.data)
+        else setError(d.error ?? 'Failed to load alerts')
+      })
       .catch((e) => setError((e as Error).message))
       .finally(() => setLoading(false))
   }, [])
@@ -314,6 +322,19 @@ export default function AlertsPage() {
       setEvaluating(false)
     }
   }, [])
+  if (unauthenticated) {
+    return (
+      <NexusLayout>
+        <div className="max-w-3xl mx-auto p-6">
+          <div className="bg-bg-panel border border-border-dim rounded-lg p-8 text-center">
+            <h1 className="page-title">ALERT CENTER</h1>
+            <p className="text-sm text-text-secondary mt-3">Sign in to create and manage your alerts.</p>
+            <a href="/login" className="inline-block mt-4 px-4 py-2 bg-teal-vivid text-bg-base font-mono font-bold rounded">Sign In</a>
+          </div>
+        </div>
+      </NexusLayout>
+    )
+  }
 
   const loadPreset = (preset: typeof PRESETS[0]) => {
     setAlertType(preset.type)
@@ -336,7 +357,7 @@ export default function AlertsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <LiveDot status="live" label />
+            <LiveDot status={error ? 'error' : loading ? 'stale' : 'live'} label />
             {alerts.length > 0 && (
               <button onClick={evaluateAlerts}
                 className="px-3 py-1.5 text-xs bg-bg-elevated border border-border-dim text-text-primary rounded hover:border-border-active disabled:opacity-50"

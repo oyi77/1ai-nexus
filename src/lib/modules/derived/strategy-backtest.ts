@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { prisma } from '@/lib/db'
-import type { StrategyId, StrategyVerdict } from './strategy-evaluator'
+import type { StrategyId } from './strategy-evaluator'
 import {
   evaluateStrategiesFor,
   type StrategyIntakeResult,
