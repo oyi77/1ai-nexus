@@ -19,9 +19,11 @@ import { deliverSniperAlert } from './meme-sniper'
 import type { SniperScanDecision } from './sniper-scan'
 import { escapeSignalHtml, rejectionId } from './signal-tier'
 import { SNIPER_LIMITS } from './meme-sniper'
+import { classifyChange, readSniperAudit, type AuditEntry } from './sniper-audit'
 import { isReviewSeen as isReviewSeenDb, markReviewSeen as markReviewSeenDb } from '@/lib/modules/derived/db-seen-store'
 
 export const REVIEW_VOLMC_FLOOR = Number(process.env.SNIPER_REVIEW_VOLMC_FLOOR) || 0.5
+export const REVIEW_REREVIEW_THROTTLE_MS = 30 * 60_000
 
 function reviewSeenPath(): string {
   return process.env.SNIPER_REVIEW_SEEN_PATH || join(process.cwd(), 'data', 'sniper-review-seen.json')
@@ -255,6 +257,30 @@ export interface ReviewDigestResult {
 }
 
 /**
+ * Genuine state changes bypass throttling: a status flip, or a market-cap move
+ * that `classifyChange` still calls MATERIAL even when the rejection count
+ * moved too. Rejection-count churn alone is not.
+ */
+export function immediateRereviewContracts(
+  entries: AuditEntry[],
+  shown: SniperScanDecision[],
+): Set<string> {
+  const immediate = new Set<string>()
+  for (const d of shown) {
+    const trail = entries.filter((e) => e.contract === d.contract)
+    if (trail.length < 2) continue
+    const [current, previous] = trail
+    if (current.status !== previous.status) {
+      immediate.add(d.contract)
+      continue
+    }
+    const sameCounts = { ...current, rejectionCount: previous.rejectionCount }
+    if (classifyChange(previous, sameCounts) === 'MATERIAL') immediate.add(d.contract)
+  }
+  return immediate
+}
+
+/**
  * Push the digest to the review chat. Separate env from the sale channel:
  * SNIPER_REVIEW_CHAT_ID falls back to the operator's private chat, never
  * to the sale channel — a review digest must not leak into the product.
@@ -294,10 +320,11 @@ export async function pushReviewDigest(
       seen[d.contract] = Date.now()
     }
   }
-  // A contract whose verdict/failures/market materially changed is re-reviewed
-  // even inside the seen-TTL — that is the whole point of the audit trail.
+  // NEW and genuine state changes are immediate; other MATERIAL re-reviews
+  // share the existing seen timestamp and are limited to one per window.
   const force = opts.forceContracts ?? new Set<string>()
-  const fresh = selectFreshForReview(shown, seen, force)
+  const immediate = immediateRereviewContracts(readSniperAudit().entries, shown)
+  const fresh = selectFreshForReview(shown, seen, force, Date.now(), immediate)
   if (fresh.length === 0) return { candidates: picks.length, sent: false, skipped: 'all seen' }
   const reviewedTotal = decisions.length
   const reReviewCount = fresh.filter((d) => force.has(d.contract)).length
@@ -330,16 +357,23 @@ export async function pushReviewDigest(
 }
 
 /**
- * Which shown picks the digest actually sends: unseen contracts, plus any
- * contract the audit trail marked as materially changed (re-review inside
- * the seen-TTL). Pure so the rule is testable without Telegram.
+ * Unseen contracts always emit. Forced re-reviews wait out the throttle unless
+ * the audit classified a genuine state change (status flip or material market
+ * movement). Pure so the rule is testable without Telegram.
  */
 export function selectFreshForReview(
   shown: SniperScanDecision[],
   seen: Record<string, number>,
   force: Set<string> = new Set(),
+  now: number = Date.now(),
+  immediate: Set<string> = new Set(),
 ): SniperScanDecision[] {
-  return shown.filter((d) => force.has(d.contract) || seen[d.contract] === undefined)
+  return shown.filter(
+    (d) =>
+      seen[d.contract] === undefined ||
+      immediate.has(d.contract) ||
+      (force.has(d.contract) && now - seen[d.contract] >= REVIEW_REREVIEW_THROTTLE_MS),
+  )
 }
 
 /**

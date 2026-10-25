@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest'
 import {
   pickReviewCandidates,
   selectFreshForReview,
+  immediateRereviewContracts,
   REVIEW_VOLMC_FLOOR,
   assessReview,
   renderReviewDigestForTest,
@@ -12,6 +13,7 @@ import {
   volMcOrU,
 } from './sniper-review'
 import type { SniperScanDecision } from './sniper-scan'
+import { buildAuditEntries } from './sniper-audit'
 
 function decision(over: Partial<SniperScanDecision>): SniperScanDecision {
   return {
@@ -96,10 +98,46 @@ describe('selectFreshForReview (Phase 7 re-review rule)', () => {
     expect(selectFreshForReview(rows, { a: 1 }).map((d) => d.contract)).toEqual(['b'])
   })
 
-  it('re-opens a seen contract when force names it', () => {
+  it('throttles a forced MATERIAL re-review inside the window', () => {
+    const now = Date.now()
     const rows = [vol('a', 3)]
-    const out = selectFreshForReview(rows, { a: Date.now() }, new Set(['a']))
-    expect(out.map((d) => d.contract)).toEqual(['a'])
+    const seen = { a: now - 5 * 60_000 }
+    expect(selectFreshForReview(rows, seen, new Set(['a']), now)).toEqual([])
+  })
+
+  it('emits a NEW contract immediately', () => {
+    expect(selectFreshForReview([vol('new', 3)], {}, new Set(['new']))).toHaveLength(1)
+  })
+
+  it('emits a status flip immediately even inside the window', () => {
+    const now = Date.now()
+    const rows = [vol('a', 3)]
+    const seen = { a: now - 5 * 60_000 }
+    expect(selectFreshForReview(rows, seen, new Set(['a']), now, new Set(['a']))).toEqual(rows)
+  })
+
+  it('emits audit-proven status and market changes immediately', () => {
+    const previousDecision = decision({ contract: 'a', status: 'SIGNAL' })
+    const previous = buildAuditEntries({ decisions: [previousDecision] }, { entries: [], updatedAt: null })
+    const statusFlip = decision({ contract: 'a', status: 'REJECT' })
+    const current = buildAuditEntries({ decisions: [statusFlip] }, { entries: previous, updatedAt: null })
+    expect(immediateRereviewContracts([...current, ...previous], [statusFlip])).toEqual(new Set(['a']))
+
+    const movedMarket = decision({
+      contract: 'a',
+      status: 'SIGNAL',
+      rejections: ['one', 'two'],
+      market: { ...previousDecision.market, marketCapUsd: 100_000 },
+    })
+    const moved = buildAuditEntries({ decisions: [movedMarket] }, { entries: previous, updatedAt: null })
+    expect(immediateRereviewContracts([...moved, ...previous], [movedMarket])).toEqual(new Set(['a']))
+  })
+
+  it('allows a forced MATERIAL re-review after the window', () => {
+    const now = Date.now()
+    const rows = [vol('a', 3)]
+    const seen = { a: now - 31 * 60_000 }
+    expect(selectFreshForReview(rows, seen, new Set(['a']), now)).toEqual(rows)
   })
 })
 
