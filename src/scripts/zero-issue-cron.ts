@@ -117,7 +117,7 @@ async function runChecks() {
     ['/api/v1/saham/dual', 200],
     ['/api/v1/saham/ajaib?market=indices&index=IDX30', 200],
     ['/api/v1/saham/calendar', 200],
-    ['/api/v1/admin/integrations', 401],
+    ['/api/v1/admin/integrations', 403],
     ['/api/v1/fear-greed', 200],
   ]
   for (const [ep, expect] of smoke) {
