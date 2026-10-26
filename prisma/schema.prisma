@@ -960,6 +960,7 @@ model Payment {
 
   subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
+  @@unique([provider, externalId])
   @@index([subscriptionId])
   @@index([status])
   @@index([externalId])

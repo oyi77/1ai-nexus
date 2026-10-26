@@ -2,7 +2,7 @@ import path from "path";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // output: "standalone",
+  output: "standalone",
   outputFileTracingRoot: path.join(__dirname),
   serverExternalPackages: ['prisma', '@prisma/client', 'ioredis', 'jsonwebtoken', 'bcryptjs', 'stripe'],
   // Typechecking is enforced at build time — `npx tsc --noEmit` is clean across

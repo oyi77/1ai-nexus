@@ -107,19 +107,17 @@ const ALL_MARKETS = Array.from({ length: 500 }, (_, i) => {
 async function main() {
   console.log("Seeding NEXUS database...");
 
-  // Clean existing data
-  await prisma.predictionTrade.deleteMany();
-  await prisma.predictionMarket.deleteMany();
-  await prisma.transaction.deleteMany();
-  await prisma.tokenHolding.deleteMany();
-  await prisma.alert.deleteMany();
-  await prisma.smartMoneyWallet.deleteMany();
-  await prisma.nFTCollection.deleteMany();
-  await prisma.deFiProtocol.deleteMany();
-  await prisma.wallet.deleteMany();
-  await prisma.token.deleteMany();
-  await prisma.entity.deleteMany();
-  await prisma.user.deleteMany();
+  // Demo seed is fresh-install only. No force flag or cleanup path: an
+  // operator must choose a separate database instead of overwriting live data.
+  const [existingUsers, existingEntities] = await Promise.all([
+    prisma.user.count(),
+    prisma.entity.count(),
+  ]);
+  if (existingUsers > 0 || existingEntities > 0) {
+    throw new Error(
+      `Refusing to seed non-empty database (${existingUsers} users, ${existingEntities} entities).`,
+    );
+  }
 
   // Create entities
   console.log(`Creating ${ENTITIES.length} entities...`);

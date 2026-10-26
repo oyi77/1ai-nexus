@@ -198,6 +198,16 @@ const PUBLIC_ROUTES = new Set([
 /** Public routes with dynamic segments — matched by prefix. */
 const PUBLIC_PREFIXES = ['/api/v1/token/', '/api/v1/wallets/']
 
+/** Premium routes whose handlers validate durable plans and customer API keys. */
+const ROUTE_ENTITLEMENT_ROUTES = new Set([
+  '/api/v1/alpha-engine',
+  '/api/v1/backtest',
+  '/api/v1/launch-alpha',
+  '/api/v1/lead-lag',
+  '/api/v1/lrfg',
+  '/api/v1/opportunities',
+  '/api/v1/sfc',
+])
 /**
  * Routes that always require a session or API key.
  * Exact entries first, then prefixes for nested/dynamic paths.
@@ -215,14 +225,8 @@ const PROTECTED_ROUTES = new Set([
   '/api/v1/telegram/subscribe',
   '/api/v1/user/api-key',
   '/api/v1/watchlist',
-  // Premium derived signals
-  '/api/v1/alpha-engine',
-  '/api/v1/backtest',
-  '/api/v1/launch-alpha',
-  '/api/v1/lead-lag',
-  '/api/v1/lrfg',
-  '/api/v1/opportunities',
-  '/api/v1/sfc',
+  // Premium derived signals (handlers enforce durable plan + key tier)
+  ...ROUTE_ENTITLEMENT_ROUTES,
 ])
 
 const PROTECTED_PREFIXES = [
@@ -375,6 +379,12 @@ export async function middleware(request: NextRequest) {
     const hasApiKey = !!apiKey && API_KEYS.size > 0 && API_KEYS.has(apiKey)
 
     if (!session && !hasApiKey) {
+      // Customer keys are hashed in Postgres and cannot be validated in the
+      // edge middleware; those handlers gate on durable plan, expiry, key
+      // tier, and revocation instead.
+      if (ROUTE_ENTITLEMENT_ROUTES.has(pathname)) {
+        return addCorsHeaders(NextResponse.next(), request)
+      }
       return NextResponse.json(
         { data: null, error: 'Authentication required for this premium feature' },
         { status: 401 }
