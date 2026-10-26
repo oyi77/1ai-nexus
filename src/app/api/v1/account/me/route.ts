@@ -55,6 +55,8 @@ export async function GET(request: NextRequest) {
     const effPlan = effectivePlan(
       user.plan,
       subscription ? { plan: subscription.plan, status: subscription.status, endDate: subscription.endDate } : null,
+      new Date(),
+      user.planExpiresAt,
     )
     const plan = getPlanPricing(effPlan)
 

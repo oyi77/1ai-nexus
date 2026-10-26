@@ -8,19 +8,24 @@
 import { prisma } from '@/lib/db'
 import { logger } from '@/lib/logger'
 
-/** Effective plan: the subscription row is source of truth while active
- * and unexpired; User.plan is a display cache the sweeper keeps in sync.
- * Every gate MUST use this, never user.plan directly — legacy rows exist
- * where User.plan='free' but an active paid subscription is live. */
+/** Effective plan: a live paid subscription is authoritative. The User.plan
+ * cache counts only while planExpiresAt is in the future; a null expiry on a
+ * paid cache is not treated as an unlimited grant. Every gate MUST use this,
+ * never user.plan directly — legacy rows exist where User.plan='free' but an
+ * active paid subscription is live. */
 export function effectivePlan(
   userPlan: string,
   sub: { plan: string; status: string; endDate: Date | null } | null,
   now = new Date(),
+  userPlanExpiresAt: Date | null = null,
 ): string {
-  if (sub && sub.status === 'active' && sub.endDate && sub.endDate > now && sub.plan !== 'free') {
-    return sub.plan
+  if (sub && sub.plan !== 'free') {
+    // A subscription row is authoritative: only a live, unexpired paid row
+    // grants access. An expired/canceled row must never be overridden by the
+    // User.plan display cache.
+    return sub.status === 'active' && sub.endDate && sub.endDate > now ? sub.plan : 'free'
   }
-  return userPlan
+  return userPlan !== 'free' && (!userPlanExpiresAt || userPlanExpiresAt > now) ? userPlan : 'free'
 }
 
 export interface LifecycleResult {

@@ -545,16 +545,20 @@ export async function formatSniperScan(): Promise<string> {
     if (entries.length > 0) {
       lines.push('*Latest Evaluated Tokens:*')
       for (const e of entries.slice(0, 5)) {
-        const sym = String(e.symbol || 'UNKNOWN').replace(/[*_`[\]()]/g, '').toUpperCase()
-        const contract = String(e.contract || '')
+        const sym = String(e.ticker ?? 'UNKNOWN').replace(/[*_`[\]()]/g, '').toUpperCase()
+        const contract = String(e.contract ?? '')
         const shortAddr = contract.length > 8 ? `${contract.slice(0, 4)}...${contract.slice(-4)}` : contract || '?'
-        const status = String(e.status || 'UNKNOWN')
+        const status = String(e.status ?? 'UNKNOWN')
         const emoji = status === 'WATCHLIST' ? '🟢' : status === 'REJECT' ? '🔴' : '⚪'
-        const mc = typeof e.marketCapUsd === 'number' && e.marketCapUsd > 0 ? ` · ${fmtUsd(e.marketCapUsd)}` : ''
+        const market = e.market && typeof e.market === 'object' ? e.market as Record<string, unknown> : null
+        const marketCapUsd = market?.marketCapUsd
+        const mc = typeof marketCapUsd === 'number' && Number.isFinite(marketCapUsd) && marketCapUsd > 0
+          ? ` · ${fmtUsd(marketCapUsd)}`
+          : ''
         lines.push(`${emoji} *${sym}* (\`${shortAddr}\`) — ${status}${mc}`)
-        const reasons = Array.isArray(e.reasons) ? (e.reasons as string[]) : []
-        if (status === 'REJECT' && reasons.length) {
-          const reasonText = String(reasons[0]).replace(/[*_`[\]()]/g, '')
+        const rejections = Array.isArray(e.rejections) ? e.rejections : []
+        if (status === 'REJECT' && rejections.length) {
+          const reasonText = String(rejections[0]).replace(/[*_`[\]()]/g, '')
           lines.push(`   └ _${reasonText.slice(0, 50)}_`)
         }
       }

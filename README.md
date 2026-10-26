@@ -121,25 +121,31 @@ Design rules for this shell:
 
 ### Docker Compose (Recommended)
 
-One command starts everything — PostgreSQL, Redis, database seeding, Next.js app, WebSocket server, and blockchain indexer:
+One command starts the nine-service stack: PostgreSQL, Redis, ClickHouse, migration-only `db-init`, Next.js, WebSocket, indexer, MCP server, and re-verifier. Demo data is not seeded automatically.
 
 ```bash
-git clone https://github.com/oyi77/1ai-nexus.git
+git clone https://github.com/oyi77/1ai-nexus.git 1ai-tracker
 cd 1ai-tracker
-cp .env.example .env  # fill REQUIRED first — see docs/HANDOVER.md
+cp .env.example .env  # fill REQUIRED values; do not commit this file
+mkdir -p secrets
+for name in db_password redis_password clickhouse_password; do openssl rand -hex 32 > "secrets/$name.txt"; done
+chmod 600 secrets/*.txt
 docker compose up --build
 ```
 
-This boots 5 services:
+The `db-init` service only runs `prisma migrate deploy`; it never seeds demo data. The seed script is optional, synthetic, and fresh-empty-database-only: it aborts if users or entities already exist.
 
 | Service | Port | Description |
 |---------|------|-------------|
 | `postgres` | 5432 | PostgreSQL 16 database |
 | `redis` | 6379 | Redis Pub/Sub event bus |
+| `clickhouse` | 8123 | ClickHouse analytics database |
 | `db-init` | — | Runs once: `prisma migrate deploy` against Postgres |
 | `web` | 4400 | Next.js 16 application |
 | `ws` | 4401 | WebSocket sidecar (Socket.io) |
-| `indexer` | — | Multi-chain blockchain indexer |
+| `indexer` | 4409 | Multi-chain blockchain indexer health server |
+| `mcp-server` | 4402 | Model Context Protocol server |
+| `re-verifier` | — | Re-verifies reverse-engineered modules |
 
 Open [http://localhost:4400](http://localhost:4400) — sign up, then promote yourself to admin in psql (docs/HANDOVER.md §3).
 
@@ -149,19 +155,19 @@ Open [http://localhost:4400](http://localhost:4400) — sign up, then promote yo
 
 ```bash
 # Prerequisites: Node.js 20+, PostgreSQL 16, Redis 7
-brew services start postgresql@16
-docker-compose up -d redis
+docker compose up -d redis
 
-# Install and setup
-npm install
+npm ci  # stage vendor/1ai-payment-0.1.0.tgz first; see docs/HANDOVER.md §2
 npx prisma migrate deploy  # NEVER db:push on a migrated DB
-npm run db:seed
-
-# Run
-npm run dev          # Next.js on :4400
-cd ws-server && npm run dev  # WebSocket on :4401
-cd indexer && npm run dev    # Blockchain indexer
+# Optional demo data: only on a new empty development database, never production.
+# npm run db:seed
+# Run (in separate terminals):
+npm run dev                            # Next.js on :4400
+cd ws-server && npm ci && npm run dev  # WebSocket on :4401
+cd indexer && npm ci && npm run dev    # Blockchain indexer on :4409
 ```
+
+**Execution boundary:** this repository performs screening and research only. `SHADOW` and `PAPER` simulations, `paper-buy`, forward tests, and backtests use virtual balances; no live order or on-chain execution path exists here. `SNIPER_EXECUTE_ENABLED` is a legacy test-only input: setting it does not enable trading. See `vendor/PROVENANCE.json` for the exact `@1ai/payment` archive source, checksum, and lockfile staging contract.
 
 ---
 
@@ -181,12 +187,12 @@ cd indexer && npm run dev    # Blockchain indexer
 ### Step-by-Step Deployment
 
 ```bash
-git clone https://github.com/oyi77/1ai-nexus.git
+git clone https://github.com/oyi77/1ai-nexus.git 1ai-tracker
 cd 1ai-tracker
-cp .env.example .env
-sed -i "s/NEXTAUTH_SECRET=.*/NEXTAUTH_SECRET=$(openssl rand -hex 32)/" .env
-sed -i "s/POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 16)/" .env
-sed -i "s/NEXUS_API_KEYS=.*/NEXUS_API_KEYS=$(openssl rand -hex 32)/" .env
+cp .env.example .env  # fill REQUIRED values
+mkdir -p secrets
+for name in db_password redis_password clickhouse_password; do openssl rand -hex 32 > "secrets/$name.txt"; done
+chmod 600 secrets/*.txt
 docker compose up -d --build
 curl http://localhost:4400/api/v1/health
 ```
@@ -202,7 +208,8 @@ docker compose restart web
 ### Backup
 
 ```bash
-docker compose exec postgres pg_dump -U nexus nexus | gzip > backup_$(date +%Y%m%d).sql.gz  # restore: see docs/HANDOVER.md §5
+set -a; . ./.env; set +a
+bash scripts/backup-db.sh  # restore: isolated rehearsal in docs/HANDOVER.md §5
 ```
 
 ### Cost: ~$5/month (VPS only, all APIs free)
@@ -377,7 +384,7 @@ nexus/
 ├── prisma/
 │   ├── schema.prisma           # Database schema (12 models)
 │   └── seed.ts                 # Seed script (50 entities, 500 markets)
-└── docker-compose.yml          # Unified Docker Compose (5 services)
+└── docker-compose.yml          # Unified Docker Compose (9 services)
 ```
 
 ---
@@ -403,7 +410,7 @@ nexus/
 
 ## Configuration
 
-All configuration via environment variables. Zero required for local development with Docker Compose.
+All configuration is supplied via environment variables and Compose secrets files. Docker Compose requires `.env` (filled with the REQUIRED keys from `.env.example`) plus the three secret files (`secrets/db_password.txt`, `secrets/redis_password.txt`, `secrets/clickhouse_password.txt`).
 
 | Variable | Default | Description |
 |----------|---------|-------------|

@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // Sniper review digest unit tests (pure selection, no Telegram).
 // ─────────────────────────────────────────────────────────────
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   pickReviewCandidates,
   selectFreshForReview,
@@ -280,5 +280,72 @@ describe('pushReviewDigest skip reasons', () => {
     )
     expect((await pushReviewDigest([sent])).skipped).toBe('no near-miss: nothing was rejected')
     expect((await pushReviewDigest([])).skipped).toBe('no near-miss: nothing was rejected')
+  })
+
+  it('marks seen only for contracts in successfully sent parts when later parts fail', async () => {
+    const { mkdtempSync, readFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const tmpFile = join(mkdtempSync(join(tmpdir(), 'snip-rev-')), 'seen.json')
+
+    const oldChat = process.env.SNIPER_REVIEW_CHAT_ID
+    const oldSeen = process.env.SNIPER_REVIEW_SEEN_PATH
+    const oldDb = process.env.SNIPER_SEEN_DB
+    const oldToken = process.env.SNIPER_TELEGRAM_BOT_TOKEN
+    const origFetch = globalThis.fetch
+
+    process.env.SNIPER_REVIEW_CHAT_ID = '123456789'
+    process.env.SNIPER_REVIEW_SEEN_PATH = tmpFile
+    process.env.SNIPER_SEEN_DB = 'off'
+    process.env.SNIPER_TELEGRAM_BOT_TOKEN = '123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11'
+
+    // Generate 15 candidates so the digest splits into at least 2 messages
+    const flood = Array.from({ length: 15 }, (_, i) =>
+      decision({
+        contract: `flood_part_${i}`,
+        ticker: `FL_${i}`,
+        metrics: { ...decision({}).metrics, volMcRatio: 3 + i },
+      }),
+    )
+
+    let callCount = 0
+    globalThis.fetch = vi.fn(async () => {
+      callCount++
+      if (callCount === 1) {
+        return new Response(JSON.stringify({ ok: true, result: { message_id: 101 } }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+      return new Response(JSON.stringify({ ok: false, description: 'Bad Request: test failure' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      })
+    }) as typeof fetch
+
+    try {
+      const res = await pushReviewDigest(flood)
+      expect(res.sent).toBe(false)
+      expect(res.skipped).toBe('telegram rejected')
+      expect(callCount).toBe(2)
+
+      const seen = JSON.parse(readFileSync(tmpFile, 'utf8')) as Record<string, number>
+      expect(Object.keys(seen).length).toBeGreaterThan(0)
+      // Candidates sort by volMcRatio desc, so part 1 holds the highest (flood_part_14).
+      // Delivered part 1 marks its contracts seen; part 2 failed and its contracts must not be marked.
+      expect(seen['flood_part_14']).toBeDefined()
+      expect(seen['flood_part_0']).toBeUndefined()
+      expect(Object.keys(seen).every((k) => k.startsWith('flood_part_'))).toBe(true)
+    } finally {
+      globalThis.fetch = origFetch
+      if (oldChat) process.env.SNIPER_REVIEW_CHAT_ID = oldChat
+      else delete process.env.SNIPER_REVIEW_CHAT_ID
+      if (oldSeen) process.env.SNIPER_REVIEW_SEEN_PATH = oldSeen
+      else delete process.env.SNIPER_REVIEW_SEEN_PATH
+      if (oldDb) process.env.SNIPER_SEEN_DB = oldDb
+      else delete process.env.SNIPER_SEEN_DB
+      if (oldToken) process.env.SNIPER_TELEGRAM_BOT_TOKEN = oldToken
+      else delete process.env.SNIPER_TELEGRAM_BOT_TOKEN
+    }
   })
 })

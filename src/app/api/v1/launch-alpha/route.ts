@@ -6,12 +6,15 @@
 
 import { NextRequest } from 'next/server'
 import { apiSuccess, apiError } from '@/lib/api/response'
+import { denyUnlessFeature } from '@/lib/entitlements'
 import { ingestLaunchTokens, fetchLaunchAlpha, type LaunchAlphaToken } from '@/lib/modules/derived/launch-alpha-engine'
 import { cacheGet, cacheSet } from '@/lib/cache'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  const denied = await denyUnlessFeature(request, 'signals')
+  if (denied) return denied
   try {
     const sp = request.nextUrl.searchParams
     const chain = sp.get('chain') ?? undefined

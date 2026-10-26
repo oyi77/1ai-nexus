@@ -97,64 +97,87 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing userId/plan for paid order' }, { status: 400 })
     }
 
-    // Only process successful payments
+    // Only process successful payments. Replays are idempotent: the payment
+    // row is uniquely keyed by (provider, order_id), so a gateway retry can
+    // never create a second charge record or extend the subscription again.
     if (payload.status === 'paid' && userId && plan) {
       try {
-        // Upsert subscription
-        const startDate = new Date()
-        const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+        const replay = await prisma.$transaction(async (tx) => {
+          const existing = await tx.payment.findFirst({
+            where: { provider: payload.gateway, externalId: payload.order_id },
+            select: { id: true, status: true },
+          })
+          if (existing?.status === 'completed') return false
 
-        const subscription = await prisma.subscription.upsert({
-          where: { userId },
-          update: {
-            plan: plan as 'free' | 'pro' | 'enterprise',
-            status: 'active' as 'active' | 'canceled' | 'expired' | 'trial',
-            startDate,
-            endDate,
-            canceledAt: null,
-          },
-          create: {
-            userId,
-            plan: plan as 'free' | 'pro' | 'enterprise',
-            status: 'active' as 'active' | 'canceled' | 'expired' | 'trial',
-            startDate,
-            endDate,
-          },
-        })
+          const startDate = new Date()
+          const endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
 
-        // Update subscription tier fields so the account page reflects the
-        // paid plan. We deliberately do NOT touch user.role — role is
-        // authorization (admin etc.) and must not be clobbered by a payment.
-        await prisma.user.update({
-          where: { id: userId },
-          data: {
-            plan: plan as 'free' | 'pro' | 'enterprise',
-            planStartedAt: startDate,
-            planExpiresAt: endDate,
-          },
-        })
+          const subscription = await tx.subscription.upsert({
+            where: { userId },
+            update: {
+              plan: plan as 'free' | 'pro' | 'enterprise',
+              status: 'active' as 'active' | 'canceled' | 'expired' | 'trial',
+              startDate,
+              endDate,
+              canceledAt: null,
+            },
+            create: {
+              userId,
+              plan: plan as 'free' | 'pro' | 'enterprise',
+              status: 'active' as 'active' | 'canceled' | 'expired' | 'trial',
+              startDate,
+              endDate,
+            },
+          })
 
-        // Create Payment record
-        await prisma.payment.create({
-          data: {
-            subscriptionId: subscription.id,
+          // Update subscription tier fields so the account page reflects the
+          // paid plan. We deliberately do NOT touch user.role — role is
+          // authorization (admin etc.) and must not be clobbered by a payment.
+          await tx.user.update({
+            where: { id: userId },
+            data: {
+              plan: plan as 'free' | 'pro' | 'enterprise',
+              planStartedAt: startDate,
+              planExpiresAt: endDate,
+            },
+          })
+
+          const paymentData = {
             amount: payload.amount,
             currency: payload.currency,
-            status: 'completed',
-            provider: payload.gateway,
-            externalId: payload.order_id,
+            status: 'completed' as const,
             metadata: payload.metadata as unknown as Prisma.InputJsonValue,
-          },
-        })
+          }
+          if (existing) {
+            // failed -> paid is a state transition for the same order, not a
+            // new payment; retain the row identity and complete it.
+            await tx.payment.update({ where: { id: existing.id }, data: paymentData })
+          } else {
+            await tx.payment.create({
+              data: {
+                subscriptionId: subscription.id,
+                provider: payload.gateway,
+                externalId: payload.order_id,
+                ...paymentData,
+              },
+            })
+          }
 
-        console.log('Subscription activated:', {
-          userId,
-          plan,
-          subscriptionId: subscription.id,
-        })
+          return true
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
+
+        if (replay) {
+          console.log('Subscription activated:', { userId, plan, orderId: payload.order_id })
+        } else {
+          console.log('[PAYMENT] Ignoring replay for already-processed order:', payload.order_id)
+        }
       } catch (err) {
-        console.error('[PAYMENT] DB write failed for PAID webhook — retry needed:', err)
-        return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+        // P2002 = concurrent replay lost the (provider, externalId) race; the
+        // winner already applied the effect, so acknowledge without re-applying.
+        if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002')) {
+          console.error('[PAYMENT] DB write failed for PAID webhook — retry needed:', err)
+          return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+        }
       }
     } else if (payload.status === 'failed' || payload.status === 'expired') {
       if (!userId) {
@@ -164,17 +187,22 @@ export async function POST(request: Request) {
       if (userId) {
         const sub = await prisma.subscription.findUnique({ where: { userId } })
         if (sub) {
-          await prisma.payment.create({
-            data: {
-              subscriptionId: sub.id,
-              amount: payload.amount,
-              currency: payload.currency,
-              status: 'failed',
-              provider: payload.gateway,
-              externalId: payload.order_id,
-              metadata: payload.metadata as unknown as Prisma.InputJsonValue,
-            },
-          })
+          try {
+            await prisma.payment.create({
+              data: {
+                subscriptionId: sub.id,
+                amount: payload.amount,
+                currency: payload.currency,
+                status: 'failed',
+                provider: payload.gateway,
+                externalId: payload.order_id,
+                metadata: payload.metadata as unknown as Prisma.InputJsonValue,
+              },
+            })
+          } catch (err) {
+            // P2002 = this order already has a Payment row; a replay must be inert.
+            if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002')) throw err
+          }
         }
       }
 

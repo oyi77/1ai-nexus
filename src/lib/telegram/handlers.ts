@@ -3,6 +3,7 @@
 import { callTelegram, fetchApi, fmtUsd, keyboard, registeredChats, type TgMessage, type TgCallbackQuery } from './core'
 import { BACK_ROW, MAIN_MENU, MENU_MAP } from './menus'
 import { formatFearGreed, formatPrices, formatExchangeFlow, formatWhaleClusters, formatMempool, formatInsider, formatDerivatives, formatLiquidations, formatGas, formatSmartMoney, formatNews, formatWeather, formatStatus, formatTokens, formatSectors, formatMacro, formatStablecoins, formatTokenCheck, formatTopMeme, formatSniperScan } from './formatters'
+import { subscribeSignals, unsubscribeSignalsWithStatus } from './signal-publisher'
 
 export type DataHandler = () => Promise<string>
 
@@ -208,15 +209,15 @@ export async function handleMessage(msg: TgMessage): Promise<void> {
         // Non-fatal — linking is best-effort.
       }
     }
-    if (command === '/sub') {
-      const sub = await import('./signal-publisher')
-      sub.subscribeSignals(chatId)
-    }
+    const subscribed = command === '/sub' ? subscribeSignals(chatId) : false
+    const text = command !== '/sub'
+      ? '🔔 *NEXUS Intelligence Terminal*\n\nWelcome! Tap a button to explore:'
+      : subscribed
+        ? "🔔 *Signal Subscription Active*\n\nYou'll now receive high-confidence signals automatically as they're generated."
+        : '⚠️ *Signal Subscription Failed*\n\nSubscription storage is unavailable, so this chat was not subscribed.'
     await callTelegram('sendMessage', {
       chat_id: chatId,
-      text: command === '/sub'
-        ? '🔔 *Signal Subscription Active*\n\nYou\'ll now receive high-confidence signals automatically as they\'re generated.'
-        : '🔔 *NEXUS Intelligence Terminal*\n\nWelcome! Tap a button to explore:',
+      text,
       parse_mode: 'Markdown',
       reply_markup: MAIN_MENU,
     })
@@ -225,9 +226,15 @@ export async function handleMessage(msg: TgMessage): Promise<void> {
 
   if (command === '/stop') {
     registeredChats.delete(chatId)
+    const unsubscribe = unsubscribeSignalsWithStatus(chatId)
+    const signalText = !unsubscribe.persisted
+      ? ' Signal unsubscription could not be saved; storage is unavailable.'
+      : unsubscribe.wasSubscribed
+        ? ' Signal broadcasts stopped.'
+        : ' No signal subscription was active.'
     await callTelegram('sendMessage', {
       chat_id: chatId,
-      text: '🔕 Unregistered from alerts. Send /start to re-enable.',
+      text: `🔕 Unregistered from alerts.${signalText} Send /start to re-enable.`,
     })
     return
   }
@@ -321,15 +328,17 @@ export async function handleMessage(msg: TgMessage): Promise<void> {
 }
 
 export async function handleCallback(cb: TgCallbackQuery): Promise<void> {
-  if (!cb.data || !cb.message) return
-  const chatId = String(cb.message.chat.id)
-  const msgId = cb.message.message_id
-  const [action, param] = cb.data.split(':')
-
+  let acknowledgement = 'Unknown callback'
   try {
+    if (!cb.data || !cb.message) return
+    const chatId = String(cb.message.chat.id)
+    const msgId = cb.message.message_id
+    const [action, param] = cb.data.split(':')
+
     if (action === 'menu') {
       const menu = MENU_MAP[param]
       if (menu) {
+        acknowledgement = ''
         await callTelegram('editMessageText', {
           chat_id: chatId,
           message_id: msgId,
@@ -341,7 +350,7 @@ export async function handleCallback(cb: TgCallbackQuery): Promise<void> {
     } else if (action === 'data') {
       const handler = DATA_HANDLERS[param]
       if (handler) {
-        await callTelegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Loading...' })
+        acknowledgement = 'Loading...'
         const text = await handler()
         await callTelegram('editMessageText', {
           chat_id: chatId,
@@ -352,8 +361,9 @@ export async function handleCallback(cb: TgCallbackQuery): Promise<void> {
         })
       }
     } else if (action === 'act') {
+      acknowledgement = ''
       if (param === 'status') {
-        await callTelegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Loading status...' })
+        acknowledgement = 'Loading status...'
         const text = await formatStatus()
         await callTelegram('editMessageText', {
           chat_id: chatId,
@@ -371,7 +381,7 @@ export async function handleCallback(cb: TgCallbackQuery): Promise<void> {
           reply_markup: keyboard([BACK_ROW]),
         })
       } else if (param === 'rugcheck') {
-        await callTelegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Paste an address to audit.' })
+        acknowledgement = 'Paste an address to audit.'
         await callTelegram('sendMessage', {
           chat_id: chatId,
           text: '🛡 *RugCheck & Token Security*\n\nPaste any Solana (Base58) or EVM (0x...) token contract address directly into this chat to check safety.\n\nExample:\n• Solana: `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`\n• EVM: `0xdac17f958d2ee523a2206206994597c13d831ec7`\n\nOr use `/check <address>`',
@@ -393,27 +403,40 @@ export async function handleCallback(cb: TgCallbackQuery): Promise<void> {
           reply_markup: keyboard([[{ text: '🌐 Open Dashboard', url: 'https://tracker.aitradepulse.com/alerts' }], BACK_ROW]),
         })
       } else if (param === 'signal-sub') {
-        const sub = await import('./signal-publisher')
-        sub.subscribeSignals(chatId)
-        await callTelegram('answerCallbackQuery', { callback_query_id: cb.id, text: '✅ Subscribed!' })
+        const subscribed = subscribeSignals(chatId)
+        acknowledgement = subscribed ? '✅ Subscribed!' : 'Subscription storage unavailable'
         await callTelegram('sendMessage', {
           chat_id: chatId,
-          text: '🔔 *Signal Subscription Active*\n\nYou\'ll now receive high-confidence signals automatically as they\'re generated.',
+          text: subscribed
+            ? '🔔 *Signal Subscription Active*\n\nYou\'ll now receive high-confidence signals automatically as they\'re generated.'
+            : '⚠️ *Signal Subscription Failed*\n\nStorage is unavailable, so this chat was not subscribed.',
           parse_mode: 'Markdown',
         })
       } else if (param === 'signal-unsub') {
-        const sub = await import('./signal-publisher')
-        sub.unsubscribeSignals(chatId)
-        await callTelegram('answerCallbackQuery', { callback_query_id: cb.id, text: '🔕 Unsubscribed.' })
+        const unsubscribe = unsubscribeSignalsWithStatus(chatId)
+        acknowledgement = !unsubscribe.persisted
+          ? 'Unsubscription storage unavailable'
+          : unsubscribe.wasSubscribed ? '🔕 Unsubscribed.' : 'No active signal subscription'
         await callTelegram('sendMessage', {
           chat_id: chatId,
-          text: '🔕 *Signal Subscription Cancelled*\n\nYou will no longer receive automatic signal broadcasts.',
+          text: !unsubscribe.persisted
+            ? '⚠️ *Signal Unsubscription Failed*\n\nStorage is unavailable; your subscription could not be removed.'
+            : unsubscribe.wasSubscribed
+              ? '🔕 *Signal Subscription Cancelled*\n\nYou will no longer receive automatic signal broadcasts.'
+              : '🔕 *Signal Subscription*\n\nNo active signal subscription was found for this chat.',
           parse_mode: 'Markdown',
         })
+      } else {
+        acknowledgement = 'Unknown callback'
       }
     }
   } catch (err) {
     console.error('[Telegram] Callback error:', (err as Error).message)
-    await callTelegram('answerCallbackQuery', { callback_query_id: cb.id, text: 'Error loading data' }).catch(() => {})
+    acknowledgement = 'Error loading data'
+  } finally {
+    await callTelegram('answerCallbackQuery', {
+      callback_query_id: cb.id,
+      ...(acknowledgement ? { text: acknowledgement } : {}),
+    }).catch(() => {})
   }
 }

@@ -13,8 +13,12 @@
 import { runSniperScan, type SniperScanResult } from './sniper-scan'
 import { readSniperLog, type SniperLogEntry } from './sniper-log'
 import { evaluateSniper } from './meme-sniper'
-import { escapeHtml, type SniperPayload, type SniperDecision } from './meme-sniper-types'
+import { escapeHtml, type SniperDecision } from './meme-sniper-types'
 import { escapeSignalHtml } from './signal-tier'
+import { hydrateFromDexscreener } from './sniper-scan-discover'
+import { collectAudits } from './sniper-scan-core'
+import { toSniperPayload } from './sniper-source'
+import { splitTelegramHtml } from '@/lib/telegram/html-text'
 
 // ── Config ────────────────────────────────────────────────────
 
@@ -145,12 +149,16 @@ export interface CommandDeps {
   runScan: typeof runSniperScan
   readLog: typeof readSniperLog
   evalSniper: typeof evaluateSniper
+  hydrate: typeof hydrateFromDexscreener
+  audit: typeof collectAudits
 }
 
 const DEFAULT_COMMAND_DEPS: CommandDeps = {
   runScan: runSniperScan,
   readLog: readSniperLog,
   evalSniper: evaluateSniper,
+  hydrate: hydrateFromDexscreener,
+  audit: collectAudits,
 }
 
 /**
@@ -181,7 +189,15 @@ export async function handleCommand(
       return formatTopEntries(log.entries)
     }
     case 'check': {
-      const payload = payloadFromContract(command.contract)
+      const token = await deps.hydrate('solana', command.contract)
+      if (!token) {
+        return `🔴 <b>Sniper Check</b>\n\nVerdict unavailable\n\nContract: <code>${escapeHtml(command.contract)}</code>`
+      }
+      const audits = await deps.audit('solana', command.contract)
+      const { payload, auditsAccepted } = toSniperPayload(token, audits)
+      if (auditsAccepted.length === 0) {
+        return `🔴 <b>Sniper Check</b>\n\nAudit unavailable\n\nContract: <code>${escapeHtml(command.contract)}</code>`
+      }
       const decision = deps.evalSniper(payload)
       return formatCheckVerdict(decision, command.contract)
     }
@@ -200,66 +216,96 @@ export async function handleCommand(
 }
 
 /**
- * Build a minimal SniperPayload from just a contract address.
- *
- * Without live audit data (rugcheck/birdeye), every field is unproven
- * (null). The evaluator treats unproven as the safest reading — security
- * gates require proven-false, so a null mintable/freeze is NOT a pass.
- * This honestly reports "no audit data available" rather than fabricating
- * clean numbers.
+ * Process one batch of Telegram updates exactly once. Returns the next poll
+ * offset. An empty batch leaves `currentOffset` untouched — never 0.
  */
-function payloadFromContract(contract: string): SniperPayload {
-  return {
-    ticker: contract.slice(0, 8),
-    contract,
-    chain: 'solana',
-    ageMinutes: 0,
-    security: {
-      mintable: null,
-      freezeAuthority: null,
-      lpBurnedPercent: null,
-      lpLockedPercent: null,
-      honeypot: null,
-    },
-    distribution: {
-      devPercent: null,
-      sniperPercent: null,
-      bundlerPercent: null,
-      insiderPercent: null,
-      top10Percent: null,
-      clusterPercent: null,
-    },
-    momentum: {
-      marketCap: null,
-      volume5m: null,
-      top5AvgPnlPercent: null,
-    },
+export async function processTelegramUpdates(
+  token: string,
+  admin: string,
+  updates: TgUpdate[],
+  deps: CommandDeps = DEFAULT_COMMAND_DEPS,
+  sendAttempts: number = 2,
+  currentOffset: number = 0,
+): Promise<number> {
+  if (updates.length === 0) return currentOffset
+  let offset = currentOffset
+  for (const upd of updates) {
+    offset = upd.update_id + 1
+    const msg = upd.message
+    if (!msg || !msg.text) continue
+    const chatId = String(msg.chat.id)
+    const command = parseCommand(msg.text)
+    let response: string | null
+    try {
+      response = await handleCommand(command, chatId, admin, deps)
+    } catch (e) {
+      console.error(`[sniper-bot] command error (update ${upd.update_id}): ${e instanceof Error ? e.message : String(e)}`)
+      continue
+    }
+    if (response === null) continue
+    if (!(await sendWithRetries(token, chatId, response, sendAttempts))) {
+      console.error(`[sniper-bot] response undelivered after ${sendAttempts} attempts (update ${upd.update_id})`)
+    }
   }
+  return offset
 }
 
 // ── Telegram API helpers ──────────────────────────────────────
 
 async function sendMessage(token: string, chatId: string, text: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${TG_API}/bot${token}/sendMessage`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: chatId,
-        text: text.slice(0, 4096),
-        parse_mode: 'HTML',
-      }),
-      signal: AbortSignal.timeout(15_000),
-    })
-    if (!res.ok) {
-      const body = await res.text().catch(() => '')
-      console.error(`[sniper-bot] sendMessage failed: HTTP ${res.status} ${body.slice(0, 200)}`)
+  const chunks = splitTelegramHtml(text)
+  for (const chunk of chunks) {
+    try {
+      const res = await fetch(`${TG_API}/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: chunk,
+          parse_mode: 'HTML',
+        }),
+        signal: AbortSignal.timeout(15_000),
+      })
+      if (!res.ok) {
+        const body = await res.text().catch(() => '')
+        console.error(`[sniper-bot] sendMessage failed: HTTP ${res.status} ${body.slice(0, 200)}`)
+        return false
+      }
+    } catch (e) {
+      console.error(`[sniper-bot] sendMessage error: ${e instanceof Error ? e.message : String(e)}`)
       return false
     }
-    return true
-  } catch (e) {
-    console.error(`[sniper-bot] sendMessage error: ${e instanceof Error ? e.message : String(e)}`)
-    return false
+  }
+  return true
+}
+
+async function sendWithRetries(
+  token: string,
+  chatId: string,
+  text: string,
+  attempts: number = 2,
+): Promise<boolean> {
+  for (let i = 1; i <= attempts; i++) {
+    if (await sendMessage(token, chatId, text)) return true
+    if (i < attempts) {
+      const { promise, resolve } = Promise.withResolvers<void>()
+      setTimeout(resolve, 2000)
+      await promise
+    }
+  }
+  return false
+}
+
+async function resolveBotIdentity(token: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${TG_API}/bot${token}/getMe`, {
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as { ok?: boolean; result?: { username?: string } }
+    return data.ok && data.result?.username ? data.result.username : null
+  } catch {
+    return null
   }
 }
 
@@ -317,26 +363,15 @@ export async function startBotLoop(): Promise<void> {
   }
 
   console.log(`[sniper-bot] polling started (admin chat: ${admin})`)
+  console.log(`[sniper-bot] token identity: ${(await resolveBotIdentity(token)) ?? 'unverified'}`)
   let offset = 0
   let backoff = 1000
-
+  const SEND_ATTEMPTS = 2
   for (;;) {
     try {
       const updates = await getUpdates(token, offset)
       backoff = 1000 // reset on success
-
-      for (const upd of updates) {
-        offset = upd.update_id + 1
-        const msg = upd.message
-        if (!msg || !msg.text) continue
-
-        const chatId = String(msg.chat.id)
-        const command = parseCommand(msg.text)
-        const response = await handleCommand(command, chatId, admin)
-        if (response) {
-          await sendMessage(token, chatId, response)
-        }
-      }
+      offset = await processTelegramUpdates(token, admin, updates, DEFAULT_COMMAND_DEPS, SEND_ATTEMPTS, offset)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       console.error(`[sniper-bot] poll error: ${msg} — retrying in ${backoff}ms`)

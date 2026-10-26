@@ -4,10 +4,13 @@
 // ─────────────────────────────────────────────────────────────
 
 import { apiJson, apiError } from '@/lib/api/response'
+import { denyUnlessFeature } from '@/lib/entitlements'
 import { runBacktest, getBacktestResults, getBacktestStats, storeSignal } from '@/lib/modules/derived/backtest-engine'
 import { getAlphaSignals } from '@/lib/modules/derived/alpha-engine'
 
 export async function GET(request: Request) {
+  const denied = await denyUnlessFeature(request, 'signals')
+  if (denied) return denied
   const { searchParams } = new URL(request.url)
   const symbol = searchParams.get('symbol') ?? undefined
   const period = Math.min(90, Math.max(7, parseInt(searchParams.get('period') ?? '30') || 30))

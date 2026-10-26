@@ -33,6 +33,8 @@ import {
 } from '@/lib/modules/derived/paper-buy'
 import { loadOutcomeLog } from '@/lib/modules/derived/db-stores'
 import { deliverSniperAlert } from '@/lib/modules/derived/meme-sniper'
+import type { SignalOutcome } from '@/lib/modules/derived/sniper-outcomes'
+import { pathToFileURL } from 'node:url'
 
 const DEFAULT_NOTIONAL_USD = 100
 
@@ -56,9 +58,29 @@ function sendSummary(): boolean {
   return (process.env.PAPER_SEND_SUMMARY ?? 'true') === 'true'
 }
 
-async function main() {
-  const signals = (await loadOutcomeLog()).signals
-  const positions = buildPaperPositions(signals, notionalUsd())
+/** Injected I/O so the runner is testable without env, network or files. */
+export interface PaperCronDeps {
+  loadSignals: () => Promise<SignalOutcome[]>
+  deliver: (text: string, chatId: string) => Promise<boolean>
+  reviewChatId: () => string
+  notionalUsd: () => number
+  sendSummary: () => boolean
+}
+
+const DEFAULT_DEPS: PaperCronDeps = {
+  loadSignals: async () => (await loadOutcomeLog()).signals,
+  deliver: deliverSniperAlert,
+  reviewChatId,
+  notionalUsd,
+  sendSummary,
+}
+
+/** One paper-buy pass. An empty paper book has nothing to report, so it
+ * never reaches the review chat — a periodic "positions=0" push is noise.
+ * Returns the delivered text, or null when nothing was sent. */
+export async function runPaperBuyCron(deps: PaperCronDeps = DEFAULT_DEPS): Promise<string | null> {
+  const signals = await deps.loadSignals()
+  const positions = buildPaperPositions(signals, deps.notionalUsd())
   const summary = summarisePaperPositions(positions)
 
   console.log(
@@ -67,22 +89,30 @@ async function main() {
       `winRate=${summary.winRatePct === null ? 'n/a' : `${summary.winRatePct.toFixed(1)}%`}`,
   )
 
-  if (sendSummary()) {
-    const chat = reviewChatId()
-    if (chat) {
-      const text = renderPaperSummary(summary)
-      const sent = await deliverSniperAlert(text, chat)
-      console.log(`[paper-buy] summary ${sent ? 'sent' : 'rejected/unconfigured'} to review chat`)
-    } else {
-      console.log('[paper-buy] summary skipped (no review chat configured)')
-    }
+  if (positions.length === 0) {
+    console.log('[paper-buy] summary suppressed (empty paper book — no positions to report)')
+    return null
   }
 
-  process.exit(0)
+  if (!deps.sendSummary()) return null
+  const chat = deps.reviewChatId()
+  if (!chat) {
+    console.log('[paper-buy] summary skipped (no review chat configured)')
+    return null
+  }
+  const text = renderPaperSummary(summary)
+  const sent = await deps.deliver(text, chat)
+  console.log(`[paper-buy] summary ${sent ? 'sent' : 'rejected/unconfigured'} to review chat`)
+  return sent ? text : null
 }
 
-main().catch((e) => {
-  // Analysis cron: never fails the pipeline.
-  console.error('[paper-buy] error (non-fatal):', e)
-  process.exit(0)
-})
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  runPaperBuyCron().then(
+    () => undefined,
+    (e) => {
+      // Analysis cron: never fails the pipeline.
+      console.error('[paper-buy] error (non-fatal):', e)
+      process.exit(0)
+    },
+  )
+}

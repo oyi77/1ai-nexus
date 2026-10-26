@@ -7,7 +7,8 @@ export const MAIN_MENU = keyboard([
   [{ text: '💹 Trading', callback_data: 'menu:trading' }, { text: '🧠 Smart Money', callback_data: 'menu:smart' }],
   [{ text: '⛽ Gas & Network', callback_data: 'menu:network' }, { text: '📡 Signals', callback_data: 'menu:signals' }],
   [{ text: '📰 News & Macro', callback_data: 'menu:intel' }, { text: '🔔 Alerts', callback_data: 'menu:alerts' }],
-  [{ text: '📊 Bot Status', callback_data: 'act:status' }, { text: '❓ Help', callback_data: 'act:help' }],
+  [{ text: '🛡 Safety', callback_data: 'menu:safety' }, { text: '📊 Bot Status', callback_data: 'act:status' }],
+  [{ text: '❓ Help', callback_data: 'act:help' }],
 ])
 
 export const BACK_ROW: Button[] = [{ text: '🔙 Back', callback_data: 'menu:main' }]

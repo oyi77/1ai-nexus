@@ -133,10 +133,6 @@ describe('middleware route classification', () => {
       '/api/v1/watchlist',
       '/api/v1/payments/history',
       '/api/v1/telegram/broadcast',
-      '/api/v1/alpha-engine',
-      '/api/v1/sfc',
-      '/api/v1/opportunities',
-      '/api/v1/backtest',
       '/api/v1/signals/history',
       '/api/v1/paper-trades',
       '/api/v1/user/api-key',
@@ -149,6 +145,22 @@ describe('middleware route classification', () => {
         expect(res.status).toBe(401)
       })
     }
+    const entitlementRoutes = [
+      '/api/v1/alpha-engine',
+      '/api/v1/backtest',
+      '/api/v1/launch-alpha',
+      '/api/v1/lead-lag',
+      '/api/v1/lrfg',
+      '/api/v1/opportunities',
+      '/api/v1/sfc',
+    ]
+    for (const path of entitlementRoutes) {
+      it(`passes ${path} to its durable entitlement handler`, async () => {
+        const res = await middleware(req(path, { fetchSite: 'same-origin', csrf: 'anything' }))
+        expect(res.headers.get('x-middleware-next')).toBe('1')
+      })
+    }
+
 
     it('does not let a public prefix exempt an explicitly protected route', async () => {
       // `/api/v1/token/` is a public prefix; `/api/v1/signals/history` is protected.

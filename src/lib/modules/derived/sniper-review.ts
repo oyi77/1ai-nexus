@@ -335,7 +335,27 @@ export async function pushReviewDigest(
     `Kandidat: ${fresh.length} ditampilkan dari ${reviewedTotal} ditinjau` +
     (reReviewCount > 0 ? `\nEvaluasi ulang (perubahan material): ${reReviewCount}` : '')
   const blocks = fresh.map(tokenBlock)
-  const messages = splitBlocksIntoMessages(header, blocks)
+  // Map each rendered block back to its contract so a partial send only marks
+  // the contracts that were actually delivered. A failed chunk must not
+  // suppress later contracts forever.
+  const blockContracts = fresh.map((d) => d.contract)
+  const messagesWithContracts: { text: string; contracts: string[] }[] = []
+  let cur = header
+  let curContracts: string[] = []
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i]
+    if ((cur + '\n\n' + block).length > TG_LIMIT && cur !== header) {
+      messagesWithContracts.push({ text: cur, contracts: curContracts })
+      cur = header + ' (lanjutan)\n\n' + block
+      curContracts = [blockContracts[i]]
+    } else {
+      if (cur === header) curContracts = []
+      cur += '\n\n' + block
+      curContracts.push(blockContracts[i])
+    }
+  }
+  messagesWithContracts.push({ text: cur, contracts: curContracts })
+
 
   const chat =
     process.env.SNIPER_REVIEW_CHAT_ID ||
@@ -343,17 +363,19 @@ export async function pushReviewDigest(
     process.env.TELEGRAM_ADMIN_CHAT_ID ||
     ''
   if (!chat) return { candidates: fresh.length, sent: false, skipped: 'no review chat configured' }
-  for (const text of messages) {
+  for (const { text, contracts } of messagesWithContracts) {
     const ok = await deliverSniperAlert(text, chat)
     if (!ok) return { candidates: fresh.length, sent: false, skipped: 'telegram rejected' }
+    // Mark only the contracts delivered by this successful chunk.
+    const now = Date.now()
+    for (const c of contracts) {
+      seen[c] = now
+      await markReviewSeenDb(c)
+    }
+    markReviewSeen(seen)
   }
-  const now = Date.now()
-  for (const d of fresh) {
-    seen[d.contract] = now
-    await markReviewSeenDb(d.contract)
-  }
-  markReviewSeen(seen)
-  return { candidates: fresh.length, sent: true, skipped: null, messages: messages.length }
+  return { candidates: fresh.length, sent: true, skipped: null, messages: messagesWithContracts.length }
+
 }
 
 /**

@@ -67,26 +67,33 @@ All have sensible defaults using free public nodes. Override to use your own inf
 
 ### Docker Compose (Recommended)
 
-The `docker-compose.yml` defines 6 services:
+The `docker-compose.yml` defines 9 services:
 
 | Service | Port | Description |
 |---------|------|-------------|
 | `postgres` | 5432 | PostgreSQL 16 with health check |
 | `redis` | 6379 | Redis 7 with health check |
-| `db-init` | — | One-shot: schema push + seed (runs once, then exits) |
+| `clickhouse` | 8123 | ClickHouse analytics database |
+| `db-init` | — | One-shot: `prisma migrate deploy` only; no demo seed |
 | `web` | 4400 | Next.js 16 application |
 | `ws` | 4401 | WebSocket sidecar (Socket.IO) |
 | `indexer` | 4409 | Multi-chain blockchain indexer (health check HTTP) |
+| `mcp-server` | 4402 | Model Context Protocol server |
+| `re-verifier` | — | Re-verifies reverse-engineered modules |
 
 **Start**:
+
 
 ```bash
 # Copy and edit environment
 cp .env.example .env
-# Edit .env with production values
+# Create the three Compose secret files; keep them out of git:
+mkdir -p secrets
+for name in db_password redis_password clickhouse_password; do openssl rand -hex 32 > "secrets/$name.txt"; done
+chmod 600 secrets/*.txt
 
-# Build and start all services
-docker compose up -d
+# Build and start all services (db-init applies migrations, never seeds)
+docker compose up -d --build
 
 # View logs
 docker compose logs -f web
@@ -109,17 +116,20 @@ docker compose down -v
 ### Manual Deployment
 
 ```bash
-# Install dependencies
-npm install
+# Stage the vendored SDK at the exact path recorded in package-lock.json.
+mkdir -p ../1ai-payment/packages/sdk
+cp vendor/1ai-payment-0.1.0.tgz ../1ai-payment/packages/sdk/
+npm ci  # reproducible lockfile install; see vendor/PROVENANCE.json
 
 # Generate Prisma client
 npm run db:generate
 
-# Push schema to database
-npm run db:push
+# Apply committed migrations; never db:push on a migrated production DB.
+npx prisma migrate deploy
 
-# Seed database (idempotent)
-npm run db:seed
+# Optional synthetic demo data: fresh empty development DB only; not idempotent.
+# It aborts when User or Entity rows already exist. Compose never runs it.
+# npm run db:seed
 
 # Build
 npm run build
@@ -128,23 +138,23 @@ npm run build
 npx next start -p 4400
 
 # Start WebSocket server (separate terminal)
-cd ws-server && npm install && npm run build && node dist/server.js
+cd ws-server && npm ci && npm run build && node dist/server.js
 
 # Start indexer (separate terminal)
-cd indexer && npm install && npm run build && node dist/main.ts
+cd indexer && npm ci && npm run build && node dist/main.js
 ```
 
 ### Dockerfile
 
 The main Dockerfile uses a 3-stage multi-stage build:
 
-1. **deps** — `npm ci` to install dependencies
+1. **deps** — copies the vendored `@1ai/payment` archive to the lockfile's expected path, then `npm ci` verifies its sha512 integrity
 2. **builder** — `prisma generate` + `npm run build`
 3. **runner** — Copies standalone output, runs as non-root `nextjs` user
 
 ```bash
 docker build -t nexus-web .
-docker run -p 4400:3000 \
+docker run -p 4400:4400 \
   -e DATABASE_URL="postgresql://..." \
   -e REDIS_URL="redis://..." \
   -e NEXTAUTH_SECRET="..." \
@@ -514,15 +524,14 @@ docker compose port ws 4401
 # Regenerate Prisma client
 npx prisma generate
 
-# Push schema changes (non-destructive)
-npx prisma db push
+# Local development: create and apply a migration (never run migrate dev in production)
+npx prisma migrate dev --name describe_change
 
-# Check schema diff
-npx prisma db push --preview-feature
+# Staging and production deployment: apply committed migrations
+npx prisma migrate deploy
 
-# Nuclear option: reset database (DESTRUCTIVE)
-npx prisma db push --force-reset
-npm run db:seed
+# Never use `prisma db push` or `--force-reset` on migrated databases.
+# Recovery from corrupted state is a database restore into an empty instance (docs/HANDOVER.md §5), not `db:seed`.
 ```
 
 ## Rollback Procedure
@@ -552,46 +561,22 @@ docker compose up -d --build
 
 ### Database Rollback
 
-If a schema change caused issues:
+Use the isolated restore rehearsal and replacement-database procedure in `docs/HANDOVER.md` §5. The repository backups are plain SQL gzip files (`db-YYYYMMDD.sql.gz`), so `pg_restore` is not applicable. Restore only into a newly created empty database/instance, verify it there, and point a replacement deployment at it. Never use `prisma db push --force-reset` or `db:seed` as production rollback: the former destroys data and the latter is synthetic fresh-only demo data.
 
-```bash
-# 1. Stop services that write to DB
-docker compose stop web indexer
+### Demo Seed (not recovery)
 
-# 2. Restore from backup (if available)
-pg_restore -d nexus nexus_backup.dump
-
-# 3. Or force-push the previous schema
-git checkout <previous-commit> -- prisma/schema.prisma
-npx prisma db push --force-reset
-
-# 4. Re-seed
-npm run db:seed
-
-# 5. Restart services
-docker compose start web indexer
-```
-
-### Seed Recovery
-
-The seed script (`prisma/seed.ts`) is idempotent and can be re-run safely:
-
-```bash
-npm run db:seed
-```
-
-It populates 50 entities, 500 prediction markets, 10,000 trades, and associated wallets/tokens.
+`prisma/seed.ts` is a one-shot synthetic demo generator, not an idempotent recovery mechanism. It aborts if `User` or `Entity` is non-empty. Docker Compose does not run it. Run `npm run db:seed` only on a new empty development database.
 
 ## Maintenance
 
 ### Database Backups
 
 ```bash
-# Backup
-pg_dump -Fc -f nexus_backup.dump nexus
+# Backup (requires DATABASE_URL from .env or the environment)
+set -a; . ./.env; set +a
+bash scripts/backup-db.sh
 
-# Restore
-pg_restore -d nexus nexus_backup.dump
+# Restore into a newly created isolated database; see docs/HANDOVER.md §5.
 ```
 
 ### Redis Persistence
@@ -615,14 +600,13 @@ services:
 ### Updating Dependencies
 
 ```bash
-# Update all dependencies
-npm update
+# Reproducible installs: stage vendor per Manual Deployment, then:
+npm ci
 
-# Update specific package
-npm update next
-
-# Regenerate lock file
-rm package-lock.json && npm install
+# Deliberate dependency updates: update package.json + package-lock together.
+npm install next@<version>
+# Review and commit both manifests; never delete package-lock.json to regenerate it.
+# If the private SDK changes, replace its archive and update vendor/PROVENANCE.json from verified source and lock metadata.
 
 # Rebuild Docker images
 docker compose build --no-cache
@@ -862,6 +846,10 @@ than `CALL_FEED_MAX_AGE_MIN`** (default 180) in the same pass. The prune runs
 even when the artifact is empty — an upsert-only mirror grows without bound
 (measured: 2,721 rows spanning a week, every one past the read window) and a
 stalled harvester would otherwise freeze a week-old set in place.
+
+## Execution Boundary
+
+This repository is screening/research-only: `SHADOW`/`PAPER`, forward tests, and backtests use simulated balances. There is no live order or on-chain execution path. `SNIPER_EXECUTE_ENABLED` is only referenced by legacy tests/comments; setting it does not enable execution. Alerts and paper positions must not be represented as executed trades.
 
 ## Sniper Environment Variables
 

@@ -6,12 +6,15 @@
 
 import { NextRequest } from 'next/server'
 import { apiSuccess, apiError, cacheHeaders } from '@/lib/api/response'
+import { denyUnlessFeature } from '@/lib/entitlements'
 import { rankAndPersist, fetchOpportunities, type Opportunity } from '@/lib/modules/derived/opportunity-ranker'
 import { cacheGet, cacheSet } from '@/lib/cache'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
+  const denied = await denyUnlessFeature(request, 'signals')
+  if (denied) return denied
   try {
     const sp = request.nextUrl.searchParams
     const limit = Math.min(200, Math.max(1, parseInt(sp.get('limit') ?? '50', 10)))

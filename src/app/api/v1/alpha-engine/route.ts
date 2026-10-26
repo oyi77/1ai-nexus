@@ -5,9 +5,12 @@
 
 import { NextResponse } from 'next/server'
 import { apiJson } from '@/lib/api/response'
+import { denyUnlessFeature } from '@/lib/entitlements'
 import { getAlphaSignals } from '@/lib/modules/derived/alpha-engine'
 
-export async function GET() {
+export async function GET(request: Request) {
+  const denied = await denyUnlessFeature(request, 'signals')
+  if (denied) return denied
   try {
     const result = await getAlphaSignals()
     const resp = apiJson(result)

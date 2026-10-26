@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { splitTelegramHtml } from '@/lib/telegram/html-text';
 
 // ── Telegram delivery ─────────────────────────────────────────
 
@@ -173,8 +174,9 @@ export async function deliverSniperAlert(
     process.env.TELEGRAM_ALERT_CHAT_ID ||
     process.env.TELEGRAM_ADMIN_CHAT_ID ||
     ''
-  const truncated = text.length > 4096
-  const messageTextPrefix = (truncated ? text.slice(0, 4090) + '…' : text).slice(0, 80)
+  const chunks = splitTelegramHtml(text)
+  const truncated = chunks.length > 1
+  const messageTextPrefix = (chunks[0] ?? '').slice(0, 80)
   const contract = extractContractFromAlert(text)
   const logEntry = (ok: boolean, status: number | null, error: string | null, attemptCount: number): void => {
     const entry: SniperDeliveryLogEntry = {
@@ -229,49 +231,58 @@ export async function deliverSniperAlert(
     }
   }
 
-  // Telegram caps sendMessage text at 4096 chars — truncate there, never let
-  // a digest die on 400 simply for being one block too long.
-  const body = truncated ? text.slice(0, 4090) + '…' : text
-  for (let attempt = 1; attempt <= 2; attempt++) {
-    try {
-      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chat,
-          text: body,
-          parse_mode: 'HTML',
-          ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
-        }),
-        signal: AbortSignal.timeout(15_000),
-      })
-      if (res.ok) {
-        logEntry(true, res.status, null, attempt)
-        return true
-      }
-      const errBody = await res.text().catch(() => '')
-      console.error(`[sniper] telegram send failed: HTTP ${res.status} ${errBody.slice(0, 300)}`)
-      if (res.status === 400) {
+  // Telegram caps sendMessage text at 4096 chars. Send the whole digest as
+  // tag-safe parts (splitTelegramHtml re-opens inline markup per part) instead
+  // of truncating; the keyboard rides on the final part so it stays adjacent.
+  for (let i = 0; i < chunks.length; i++) {
+    const isLast = i === chunks.length - 1
+    const body = chunks[i]
+    let sent = false
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chat,
+            text: body,
+            parse_mode: 'HTML',
+            ...(isLast && replyMarkup ? { reply_markup: replyMarkup } : {}),
+          }),
+          signal: AbortSignal.timeout(15_000),
+        })
+        if (res.ok) {
+          sent = true
+          break
+        }
+        const errBody = await res.text().catch(() => '')
+        console.error(`[sniper] telegram send failed: HTTP ${res.status} ${errBody.slice(0, 300)}`)
+        if (res.status === 400) {
+          logEntry(false, res.status, errBody.slice(0, 300), attempt)
+          return false
+        }
+        if (res.status === 429) {
+          const ra = errBody.match(/"retry_after"\s*:\s*(\d+)/)
+          const wait = ra ? Math.min(Number(ra[1]), 30) : 5
+          if (attempt === 1) { await new Promise((r) => setTimeout(r, wait * 1000)); continue }
+        }
         logEntry(false, res.status, errBody.slice(0, 300), attempt)
         return false
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.error(`[sniper] telegram send error (part ${i + 1}/${chunks.length}, attempt ${attempt}/2): ${msg}`)
+        if (attempt === 2) {
+          logEntry(false, null, msg, attempt)
+          return false
+        }
+        await new Promise((r) => setTimeout(r, 3000))
       }
-      if (res.status === 429) {
-        const ra = errBody.match(/"retry_after"\s*:\s*(\d+)/)
-        const wait = ra ? Math.min(Number(ra[1]), 30) : 5
-        if (attempt === 1) { await new Promise((r) => setTimeout(r, wait * 1000)); continue }
-      }
-      logEntry(false, res.status, errBody.slice(0, 300), attempt)
+    }
+    if (!sent) {
+      logEntry(false, null, 'retries exhausted', 2)
       return false
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      console.error(`[sniper] telegram send error (attempt ${attempt}/2): ${msg}`)
-      if (attempt === 2) {
-        logEntry(false, null, msg, attempt)
-        return false
-      }
-      await new Promise((r) => setTimeout(r, 3000))
     }
   }
-  logEntry(false, null, 'retries exhausted', 2)
-  return false
+  logEntry(true, 200, null, 1)
+  return true
 }

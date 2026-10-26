@@ -72,11 +72,30 @@ describe('effectivePlan', () => {
     ).toBe('pro')
   })
 
-  it('falls back to user plan when subscription expired', async () => {
+  it('does not restore stale paid cache when subscription expired', async () => {
     const { effectivePlan } = await import('@/lib/subscription-lifecycle')
     expect(
-      effectivePlan('free', { plan: 'pro', status: 'expired', endDate: new Date('2026-08-01T00:00:00Z') }, new Date('2026-09-22T00:00:00Z')),
+      effectivePlan('pro', { plan: 'pro', status: 'expired', endDate: new Date('2026-08-01T00:00:00Z') }, new Date('2026-09-22T00:00:00Z')),
     ).toBe('free')
+  })
+
+  it('rejects cached paid plan after its expiry', async () => {
+    const { effectivePlan } = await import('@/lib/subscription-lifecycle')
+    expect(
+      effectivePlan('pro', null, new Date('2026-09-22T00:00:00Z'), new Date('2026-08-01T00:00:00Z')),
+    ).toBe('free')
+  })
+
+  it('accepts cached paid plan before its expiry', async () => {
+    const { effectivePlan } = await import('@/lib/subscription-lifecycle')
+    expect(
+      effectivePlan('pro', null, new Date('2026-09-22T00:00:00Z'), new Date('2026-10-22T00:00:00Z')),
+    ).toBe('pro')
+  })
+
+  it('preserves legacy paid users with no expiry when no subscription exists', async () => {
+    const { effectivePlan } = await import('@/lib/subscription-lifecycle')
+    expect(effectivePlan('pro', null, new Date('2026-09-22T00:00:00Z'))).toBe('pro')
   })
 
   it('ignores free subscriptions', async () => {

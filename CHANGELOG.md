@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased] - 2026-07-06
 
 ### Fixed
+- **Operator handover and vendored SDK**: documented fresh-only demo seed, isolated restore rehearsal, nine-service Compose secrets, SHADOW/PAPER-only execution boundary, and reproducible `@1ai/payment` archive source/checksum/lockfile staging.
 - **Price formatting**: Small decimal prices (e.g., 0.2345) no longer truncate to 2 decimals
   - Added `formatPriceUSD()` utility in `src/lib/format.ts` with adaptive decimal precision
   - Applied to `ai-signals/page.tsx` and `alpha-engine/page.tsx`

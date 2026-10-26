@@ -3,13 +3,19 @@ import { createHmac } from 'crypto'
 import { POST } from '@/app/api/v1/webhooks/payment/route'
 import { prisma } from '@/lib/db'
 
-vi.mock('@/lib/db', () => ({
-  prisma: {
+vi.mock('@/lib/db', () => {
+  const tx = {
     subscription: { upsert: vi.fn(), findUnique: vi.fn() },
     user: { update: vi.fn() },
-    payment: { create: vi.fn() },
-  },
-}))
+    payment: { create: vi.fn(), update: vi.fn(), upsert: vi.fn(), findFirst: vi.fn() },
+  }
+  return {
+    prisma: {
+      ...tx,
+      $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)),
+    },
+  }
+})
 
 const mockBody = (overrides = {}) => JSON.stringify({
   order_id: 'ord_123',
@@ -120,6 +126,23 @@ describe('POST /api/v1/webhooks/payment', () => {
     expect(prisma.payment.create).not.toHaveBeenCalled()
   })
 
+  it('is inert when a failed order delivery is replayed', async () => {
+    const { Prisma } = await import('@prisma/client')
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue({ id: 'sub-1', userId: 'user-1' } as never)
+    vi.mocked(prisma.payment.create)
+      .mockResolvedValueOnce({ id: 'pay-failed' } as never)
+      .mockRejectedValueOnce(new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' }))
+
+    const body = mockBody({ status: 'failed' })
+    const first = await POST(signedRequest(body))
+    const second = await POST(signedRequest(body))
+
+    expect(first.status).toBe(200)
+    expect(second.status).toBe(200)
+    expect(prisma.payment.create).toHaveBeenCalledTimes(2)
+  })
+
+
   it('returns 503 when webhook secret is missing', async () => {
     delete process.env.ONEAI_PAYMENT_WEBHOOK_SECRET
     const body = mockBody()
@@ -167,5 +190,47 @@ describe('POST /api/v1/webhooks/payment', () => {
     expect(response.status).toBe(400)
     expect(prisma.subscription.upsert).not.toHaveBeenCalled()
     expect(prisma.payment.create).not.toHaveBeenCalled()
+  })
+
+  it('applies a paid order once when the first delivery is replayed', async () => {
+    vi.mocked(prisma.payment.findFirst)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'pay-1', status: 'completed' } as never)
+    vi.mocked(prisma.subscription.upsert).mockResolvedValue({ id: 'sub-1', userId: 'user-1' } as never)
+    vi.mocked(prisma.payment.create).mockResolvedValue({ id: 'pay-1' } as never)
+
+    const body = mockBody()
+    const first = await POST(signedRequest(body))
+    const second = await POST(signedRequest(body))
+
+    expect(first.status).toBe(200)
+    expect(second.status).toBe(200)
+    expect(prisma.subscription.upsert).toHaveBeenCalledTimes(1)
+    expect(prisma.user.update).toHaveBeenCalledTimes(1)
+    expect(prisma.payment.create).toHaveBeenCalledTimes(1)
+    expect(prisma.payment.update).not.toHaveBeenCalled()
+  })
+
+  it('completes a failed order row on a later paid callback without creating a second payment', async () => {
+    vi.mocked(prisma.payment.findFirst).mockResolvedValue({ id: 'pay-failed', status: 'failed' } as never)
+    vi.mocked(prisma.subscription.upsert).mockResolvedValue({ id: 'sub-1', userId: 'user-1' } as never)
+    vi.mocked(prisma.payment.update).mockResolvedValue({ id: 'pay-failed' } as never)
+
+    const response = await POST(signedRequest(mockBody()))
+
+    expect(response.status).toBe(200)
+    expect(prisma.subscription.upsert).toHaveBeenCalled()
+    expect(prisma.payment.update).toHaveBeenCalledWith({
+      where: { id: 'pay-failed' },
+      data: expect.objectContaining({ status: 'completed' }),
+    })
+    expect(prisma.payment.create).not.toHaveBeenCalled()
+  })
+
+  it('rejects an amount that does not match the plan price before any write', async () => {
+    const response = await POST(signedRequest(mockBody({ amount: 1 })))
+
+    expect(response.status).toBe(400)
+    expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 })

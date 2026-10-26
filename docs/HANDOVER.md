@@ -20,7 +20,10 @@ cp .env.example .env
 # NEXTAUTH_SECRET, NEXT_PUBLIC_APP_URL, SECRETS_MASTER_KEY,
 # ONEAI_PAYMENT_API_KEY/BASE_URL/WEBHOOK_SECRET
 openssl rand -hex 32  # use for JWT_SECRET / NEXTAUTH_SECRET / SECRETS_MASTER_KEY
-npm install
+# The lockfile expects the private SDK archive at this exact sibling path.
+mkdir -p ../1ai-payment/packages/sdk
+cp vendor/1ai-payment-0.1.0.tgz ../1ai-payment/packages/sdk/
+npm ci  # verifies the lockfile sha512; see vendor/PROVENANCE.json
 npx prisma migrate deploy   # NEVER db:push on a migrated DB — ledger drift
 npm run build
 pm2 start ecosystem.config.js --only 1ai-tracker-web
@@ -28,6 +31,10 @@ curl -s localhost:4400/api/v1/health | head -c 200
 ```
 
 Check: health returns 200 with `{ data: { status: "ok" } }`.
+
+`db-init` in Docker Compose also only applies migrations. Do not run `npm run db:seed` against handover or production data: it generates synthetic demo data and aborts unless both `User` and `Entity` tables are empty.
+
+**Execution safety:** this repository is screening/research-only: `SHADOW`/`PAPER` and backtests are simulated. It has no live order or on-chain execution path; `SNIPER_EXECUTE_ENABLED` cannot enable trading.
 
 ## 3. Admin bootstrap
 
@@ -49,12 +56,21 @@ Check: health returns 200 with `{ data: { status: "ok" } }`.
 ## 5. Backup & restore (do this BEFORE you need it)
 
 ```bash
-# Backup (daily cron recommended):
-docker compose exec postgres pg_dump -U nexus nexus | gzip > backup_$(date +%Y%m%d).sql.gz
-# Restore to a fresh DB:
-gunzip -c backup_YYYYMMDD.sql.gz | docker compose exec -T postgres psql -U nexus nexus
-# Verify:
-npx prisma validate && curl -s localhost:4400/api/v1/health
+# Backup (daily cron recommended). .env supplies DATABASE_URL:
+set -a; . ./.env; set +a
+bash scripts/backup-db.sh  # writes backups/db-YYYYMMDD.sql.gz and gzip-tests it
+
+# Restore only into a newly created scratch DB, as a role allowed to create/drop databases:
+BACKUP=backups/db-YYYYMMDD.sql.gz
+RESTORE_DB="nexus-restore-$(date +%s)"
+createdb --maintenance-db=postgres "$RESTORE_DB"
+gunzip -c "$BACKUP" | psql -X -v ON_ERROR_STOP=1 -d "$RESTORE_DB"
+psql -Atqc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';" -d "$RESTORE_DB"
+# Compare that table count with a separately restored known-good dump; then remove the scratch DB:
+dropdb --maintenance-db=postgres "$RESTORE_DB"
+
+# Do not pipe a dump into an existing populated database. `prisma validate` checks schema syntax, not restored data.
+# Rehearsed in this worktree: db-20261025.sql.gz restored 87 tables into a scratch DB with no ERROR lines; live nexus was untouched.
 ```
 
 Also back up `.env` (SECRETS_MASTER_KEY is unrecoverable — losing it

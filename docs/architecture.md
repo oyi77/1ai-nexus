@@ -367,7 +367,7 @@ Error responses:
 ├── prisma/
 │   ├── schema.prisma            # Database schema (14 models)
 │   └── seed.ts                  # Seed script (50 entities, 500 markets)
-├── docker-compose.yml           # Unified Docker Compose (6 services)
+├── docker-compose.yml           # Unified Docker Compose (9 services)
 └── Dockerfile                   # Multi-stage build (deps → builder → runner)
 ```
 
@@ -377,7 +377,7 @@ Error responses:
 
 - **Domain**: `tracker.aitradepulse.com`
 - **Tunnel**: Cloudflare Tunnel routes traffic to the Docker Compose stack.
-- **Services**: `postgres` (5432), `redis` (6379), `web` (4400), `ws` (4401), `indexer` (4409 health), `db-init` (one-shot seed).
+- **Services**: `postgres` (5432), `redis` (6379), `clickhouse` (8123), `web` (4400), `ws` (4401), `indexer` (4409 health), `mcp-server` (4402), `db-init` (migration-only, one-shot), `re-verifier`.
 
 ### Docker Compose
 
@@ -385,4 +385,4 @@ Error responses:
 docker compose up -d
 ```
 
-The `db-init` service runs schema push + seed once, then exits. All application services depend on it completing successfully.
+The `db-init` service runs `prisma migrate deploy` once, then exits; it never runs the synthetic demo seed. Web and indexer depend on it completing successfully. See `ops.md` for required Compose secret files and `HANDOVER.md` for fresh-only demo seeding and isolated backup restores.

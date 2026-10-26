@@ -13,6 +13,7 @@ vi.mock('@/lib/jwt', () => ({
 vi.mock('@/lib/db', () => ({
   prisma: {
     user: { findUnique: vi.fn() },
+    subscription: { findUnique: vi.fn() },
     userApiKey: { create: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
   },
 }))
@@ -48,8 +49,9 @@ describe('POST /api/v1/keys', () => {
       userId: 'user-1', email: 'test@example.com', role: 'pro', plan: 'pro',
     })
     vi.mocked(prisma.user.findUnique).mockResolvedValue({
-      id: 'user-1', email: 'test@example.com', role: 'pro', plan: 'pro',
+      id: 'user-1', email: 'test@example.com', role: 'user', plan: 'pro', planExpiresAt: new Date(Date.now() + 86_400_000),
     } as never)
+    vi.mocked(prisma.subscription.findUnique).mockResolvedValue(null)
     vi.mocked(generateApiKey).mockResolvedValue({
       id: 'key-abc123', key: 'nexus_x', name: 'binance', tier: 'pro',
       createdAt: new Date().toISOString(), lastUsedAt: null, requestCount: 0,

@@ -9,6 +9,10 @@ Open-source crypto whale tracker and on-chain intelligence platform. Real-time b
 - **Frameworks**: Next.js 16 (App Router), Prisma 6 ORM
 - **Key Libraries**: react 19, viem, wagmi, socket.io-client, recharts, d3, zustand, zod, ioredis, shadcn/ui, tailwindcss 4, framer-motion, lightweight-charts
 
+## Quick Start
+
+See `README.md` for required secrets and the nine-service Docker stack. For local development, stage `vendor/1ai-payment-0.1.0.tgz` at `../1ai-payment/packages/sdk/`, run `npm ci`, then `npx prisma migrate deploy`. `npm run db:seed` is optional synthetic demo data for a fresh empty development database only; it is neither idempotent nor production recovery. Runtime is screening/research-only (`SHADOW`/`PAPER`), with no live execution path.
+
 ## Entry Points
 - **Web App**: `src/app/` → Next.js 16 on port 4400
 - **Indexer**: `indexer/main.ts` → multi-chain blockchain indexer sidecar
@@ -70,10 +74,16 @@ Indexer subscribes to blockchain WebSocket feeds → decodes transactions → pu
 docker compose up --build
 
 # Local dev
-npm install && npm run db:push && npm run db:seed
+mkdir -p ../1ai-payment/packages/sdk
+cp vendor/1ai-payment-0.1.0.tgz ../1ai-payment/packages/sdk/  # exact lockfile path
+npm ci
+npx prisma migrate deploy                      # NEVER db:push on a migrated DB
+# Optional synthetic demo data: fresh empty development DB only.
+# npm run db:seed
 npm run dev                                    # Next.js on :4400
-cd ws-server && npm run dev                    # WebSocket on :4401
-cd indexer && npm run dev                      # Blockchain indexer
+# Sidecars in separate terminals:
+cd ws-server && npm ci && npm run dev           # WebSocket on :4401
+cd indexer && npm ci && npm run dev             # Blockchain indexer on :4409
 
 # Testing & linting
 npm run test                                   # vitest

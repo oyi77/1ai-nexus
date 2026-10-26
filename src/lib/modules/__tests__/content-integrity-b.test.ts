@@ -6,7 +6,7 @@ import { fetchStakingQueue } from '@/lib/modules/chain/ethereum/staking-queue'
 vi.mock('@/lib/db', () => ({ prisma: {} }))
 
 import { describe, expect, it } from 'vitest'
-import { fmtPercent, fmtUsd } from '@/app/exchange-flow/page'
+import { fmtPercent, fmtUsd } from '@/app/exchange-flow/format'
 import { aggregateChains } from '@/app/sectors/content'
 
 describe('sector chain aggregation', () => {

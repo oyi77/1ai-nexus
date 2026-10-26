@@ -342,7 +342,7 @@ async function discoverCallFeed(limit: number): Promise<SniperEnrichedToken[]> {
  * Live market row for one contract, or null when no pair is listed.
  * Picks the deepest pair (most 5m flow) so thin fake pools never win.
  */
-async function hydrateFromDexscreener(chain: string, contract: string): Promise<SniperEnrichedToken | null> {
+export async function hydrateFromDexscreener(chain: string, contract: string): Promise<SniperEnrichedToken | null> {
   try {
     const raw = await dexGet<{ pairs?: DexPair[] }>(`/latest/dex/tokens/${contract}`)
     const pairs = (raw.pairs ?? []).filter((p) => (p.chainId ?? '') === chain || !chain)
@@ -360,7 +360,7 @@ async function hydrateFromDexscreener(chain: string, contract: string): Promise<
       volume24h: best.volume?.h24 ?? 0,
       marketCap: best.marketCap ?? best.fdv ?? 0,
       liquidity: best.liquidity?.usd ?? 0,
-      createdAt: best.pairCreatedAt ?? Date.now(),
+      createdAt: best.pairCreatedAt ?? null,
       riskLevel: 0,
       holders: 0,
       top10HolderPercent: 0,

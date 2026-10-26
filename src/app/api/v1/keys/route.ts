@@ -1,8 +1,8 @@
 import { type NextRequest } from 'next/server'
 import { apiJson } from '@/lib/api/response'
 import { generateApiKey, listUserKeys, revokeApiKey, TIER_CONFIG } from '@/lib/api-keys'
+import { getUserEntitlement } from '@/lib/entitlements'
 import { verifyToken } from '@/lib/jwt'
-import { prisma } from '@/lib/db'
 import { awardXp } from '@/lib/gamification'
 
 export const dynamic = 'force-dynamic'
@@ -46,14 +46,12 @@ export async function POST(request: NextRequest) {
     // Security: NEVER trust the client-requested tier. Derive it server-side
     // from the user's actual plan in DB so a free user cannot mint an
     // 'enterprise' key (rateLimit 10000 / all features) by POSTing tier.
-    const dbUser = await prisma.user.findUnique({
-      where: { id: user.userId },
-      select: { plan: true },
-    })
-    const plan = dbUser?.plan ?? 'free'
-    const tier = (['free', 'pro', 'enterprise'] as const).includes(plan)
-      ? plan
-      : 'free'
+    // Security: NEVER trust the client-requested tier. Derive it server-side
+    // from the user's effective plan (live subscription or unexpired cache),
+    // so an expired paid user cannot mint a paid key and a free user cannot
+    // mint an 'enterprise' key by POSTing tier.
+    const entitlement = await getUserEntitlement(user.userId)
+    const tier = entitlement?.plan ?? 'free'
 
     // A paid user picks their key tier; a free user is always 'free'.
     const keyTier = tier !== 'free' && body.tier === 'enterprise' ? 'enterprise' : tier

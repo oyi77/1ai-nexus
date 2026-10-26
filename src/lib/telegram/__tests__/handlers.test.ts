@@ -5,6 +5,11 @@ import { handleMessage, handleCallback, formatHelpText } from '../handlers'
 import { formatTokenCheck, formatTopMeme, formatSniperScan } from '../formatters'
 import { auditRugcheckToken } from '@/lib/modules/meme/rugcheck'
 import type { MemeRiskAudit } from '@/lib/modules/meme/types'
+vi.mock('../signal-publisher', () => ({
+  subscribeSignals: vi.fn(() => true),
+  unsubscribeSignalsWithStatus: vi.fn(() => ({ persisted: true, wasSubscribed: true })),
+}))
+
 
 vi.mock('../core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../core')>()

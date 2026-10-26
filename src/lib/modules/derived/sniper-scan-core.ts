@@ -57,7 +57,7 @@ import { discoverCombined } from './sniper-scan-discover'
 const STALE_AFTER_MINUTES = Number(process.env.SNIPER_STALE_AFTER_MINUTES) || 120
 
 /** Per-contract audit fan-out — every source isolated. */
-async function collectAudits(chain: string, contract: string): Promise<MemeRiskAudit[]> {
+export async function collectAudits(chain: string, contract: string): Promise<MemeRiskAudit[]> {
   const results = await Promise.allSettled([
     auditRugcheckToken(chain, contract),
     auditBirdeyeToken(chain, contract),

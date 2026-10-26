@@ -17,11 +17,11 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-nexus-redis-pass} --requirepass_file /run/secrets/redis_password
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$(cat /run/secrets/redis_password)\""]
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-nexus-redis-pass}", "ping"]
+      test: ["CMD-SHELL", "test \"$$(redis-cli --no-auth-warning -a \"$$(cat /run/secrets/redis_password)\" ping)\" = PONG"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -47,10 +47,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["sh", "-c", "npx prisma migrate deploy && npm run db:seed"]
-    environment:
-      - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus
-      - DB_PASSWORD_FILE=/run/secrets/db_password
+      target: builder
+    command: ["sh", "-c", "export DATABASE_URL=\"postgresql://nexus:$$(cat /run/secrets/db_password)@postgres:5432/nexus\"; exec npx prisma migrate deploy"]
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,14 +61,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    command: ["sh", "-c", "export DATABASE_URL=\"postgresql://nexus:$$(cat /run/secrets/db_password)@postgres:5432/nexus\" REDIS_URL=\"redis://:$$(cat /run/secrets/redis_password)@redis:6379\"; exec node server.js"]
+    env_file:
+      - .env
     ports:
       - "4400:4400"
     environment:
-      - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-nexus-redis-pass}@redis:6379
       - USE_BATCH_INDEXER=1
-      - DB_PASSWORD_FILE=/run/secrets/db_password
-      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
     depends_on:
       db-init:
         condition: service_completed_successfully
@@ -81,13 +80,13 @@ services:
   ws:
     build:
       context: ./ws-server
+    command: ["sh", "-c", "export REDIS_URL=\"redis://:$$(cat /run/secrets/redis_password)@redis:6379\"; exec npm start"]
+    env_file:
+      - .env
     ports:
       - "4401:4401"
     environment:
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-nexus-redis-pass}@redis:6379
       - WS_PORT=4401
-      - NEXUS_API_KEYS=${NEXUS_API_KEYS:-}
-      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
     depends_on:
       redis:
         condition: service_healthy
@@ -97,17 +96,15 @@ services:
   indexer:
     build:
       context: ./indexer
+    command: ["sh", "-c", "export DATABASE_URL=\"postgresql://nexus:$$(cat /run/secrets/db_password)@postgres:5432/nexus\" REDIS_URL=\"redis://:$$(cat /run/secrets/redis_password)@redis:6379\" CLICKHOUSE_PASSWORD=\"$$(cat /run/secrets/clickhouse_password)\"; exec npm start"]
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-nexus-redis-pass}@redis:6379
       - CLICKHOUSE_URL=http://clickhouse:8123
       - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD_FILE=/run/secrets/clickhouse_password
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - HEALTH_PORT=4409
       - USE_BATCH_INDEXER=1
-      - DB_PASSWORD_FILE=/run/secrets/db_password
-      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
     depends_on:
       db-init:
         condition: service_completed_successfully
@@ -125,6 +122,8 @@ services:
     build:
       context: ./mcp-server
       dockerfile: Dockerfile
+    env_file:
+      - .env
     ports:
       - "4402:4402"
     environment:
@@ -139,12 +138,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["npx", "tsx", "scripts/verify-re-modules.ts"]
-    environment:
-      - DATABASE_URL=postgresql://nexus:${POSTGRES_PASSWORD}@postgres:5432/nexus
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-nexus-redis-pass}@redis:6379
-      - DB_PASSWORD_FILE=/run/secrets/db_password
-      - REDIS_PASSWORD_FILE=/run/secrets/redis_password
+      target: builder
+    command: ["sh", "-c", "export DATABASE_URL=\"postgresql://nexus:$$(cat /run/secrets/db_password)@postgres:5432/nexus\" REDIS_URL=\"redis://:$$(cat /run/secrets/redis_password)@redis:6379\"; exec npx tsx scripts/verify-re-modules.ts"]
+    env_file:
+      - .env
     depends_on:
       postgres:
         condition: service_healthy

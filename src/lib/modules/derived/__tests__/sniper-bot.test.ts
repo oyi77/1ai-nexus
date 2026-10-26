@@ -140,6 +140,16 @@ describe('handleCommand', () => {
       runScan: vi.fn().mockResolvedValue(scanRes),
       readLog: vi.fn().mockReturnValue({ entries: [], updatedAt: null, lastScan: null }),
       evalSniper: vi.fn().mockReturnValue(decision()),
+      audit: vi.fn().mockResolvedValue([]),
+      hydrate: vi.fn().mockResolvedValue({
+        contract: VALID_CA,
+        chain: 'solana',
+        symbol: 'TEST',
+        marketCap: 1000,
+        liquidity: 5000,
+        volume5m: 2500,
+        createdAt: Date.now() - 1_000_000,
+      }),
       ...over,
     }
   }
@@ -176,17 +186,78 @@ describe('handleCommand', () => {
     expect(reply).toContain('TEST')
   })
 
-  it('dispatches /check through the evaluator', async () => {
-    const d = deps({
-      evalSniper: vi.fn().mockReturnValue(
-        decision({ status: 'REJECT', rationale: 'insufficient liquidity', rejections: ['liquidity below 5k'] }),
-      ),
+  it('dispatches /check through audit + evaluator (market hydrated first)', async () => {
+    const hydrate = vi.fn().mockResolvedValue({
+      contract: VALID_CA,
+      chain: 'solana',
+      symbol: 'TEST',
+      marketCap: 1000,
+      liquidity: 5000,
+      volume5m: 2500,
+      createdAt: Date.now() - 1_000_000,
     })
+    const audit = vi.fn().mockResolvedValue([
+      {
+        id: `solana:${VALID_CA}`,
+        name: 'Test token',
+        platform: 'rugcheck',
+        contract: VALID_CA,
+        symbol: 'TEST',
+        riskLevel: 0,
+        riskLabel: 'safe',
+        buyTax: 0,
+        sellTax: 0,
+        top10HolderPercent: 0.2,
+        lpLockedPercent: 0.5,
+        canFreeze: false,
+        canMint: false,
+        isHoneypot: false,
+        riskCounts: { high: 0, middle: 0, low: 0 },
+        auditedAt: Date.now(),
+      },
+    ])
+    const evalSniper = vi.fn().mockReturnValue(
+      decision({ status: 'REJECT', rationale: 'insufficient liquidity', rejections: ['liquidity below 5k'] }),
+    )
+    const d = deps({ hydrate, audit, evalSniper })
     const reply = await handleCommand({ cmd: 'check', contract: VALID_CA }, 'operator', 'operator', d)
+    // Market hydrates first; only when a row is found does the audit fan-out fire.
+    expect(d.hydrate).toHaveBeenCalledWith('solana', VALID_CA)
+    expect(d.audit).toHaveBeenCalledWith('solana', VALID_CA)
     expect(d.evalSniper).toHaveBeenCalledTimes(1)
+    // evalSniper received a payload built by toSniperPayload from the hydrated
+    // row + accepted audits — NOT the all-null payloadFromContract stub.
+    const payload = evalSniper.mock.calls[0][0]
+    expect(payload.contract).toBe(VALID_CA)
+    expect(payload.momentum.marketCap).not.toBeNull()
     expect(reply).toContain('Sniper Check')
     expect(reply).toContain('REJECT')
     expect(reply).toContain('insufficient liquidity')
+  })
+
+  it('reports no verdict when the market row is absent (no audit performed)', async () => {
+    const d = deps({ hydrate: vi.fn().mockResolvedValue(null) })
+    const reply = await handleCommand({ cmd: 'check', contract: VALID_CA }, 'operator', 'operator', d)
+    expect(d.audit).not.toHaveBeenCalled()
+    expect(d.evalSniper).not.toHaveBeenCalled()
+    expect(reply).toContain('Verdict unavailable')
+    expect(reply).toContain(VALID_CA)
+  })
+  it('reports no verdict when every audit is unavailable', async () => {
+    const d = deps()
+    const reply = await handleCommand({ cmd: 'check', contract: VALID_CA }, 'operator', 'operator', d)
+    expect(d.evalSniper).not.toHaveBeenCalled()
+    expect(reply).toContain('Audit unavailable')
+    expect(reply).toContain(VALID_CA)
+  })
+
+  it('reports no verdict when no audit matches the contract', async () => {
+    const d = deps({
+      audit: vi.fn().mockResolvedValue([{ contract: 'different-contract', symbol: 'TEST' }]),
+    })
+    const reply = await handleCommand({ cmd: 'check', contract: VALID_CA }, 'operator', 'operator', d)
+    expect(d.evalSniper).not.toHaveBeenCalled()
+    expect(reply).toContain('Audit unavailable')
   })
 
   it('returns the help menu for an unknown command', async () => {
@@ -297,5 +368,138 @@ describe('formatCheckVerdict', () => {
     const text = formatCheckVerdict(decision({ rationale: '<script>alert(1)</script>' }), VALID_CA)
     expect(text).toContain('&lt;script&gt;')
     expect(text).not.toContain('<script>')
+  })
+})
+
+
+// ── Polling (execute-once + offset + chunking) ─────────────────
+
+describe('processTelegramUpdates', () => {
+  const commandDeps = (over: Partial<CommandDeps> = {}): CommandDeps =>
+    ({
+      runScan: vi.fn(async () => ({ scanned: 0, screened: 0, delivered: 0, rejected: 0, watchlisted: 0, errors: [], decisions: [] })),
+      readLog: vi.fn(() => ({ entries: [] })),
+      evalSniper: vi.fn(),
+      hydrate: vi.fn(async () => null),
+      audit: vi.fn(async () => []),
+      ...over,
+    }) as unknown as CommandDeps
+
+  function stubFetch(
+    handler: (url: string, init?: { body?: string }) => Promise<Response>,
+  ): () => void {
+    const original = globalThis.fetch
+    globalThis.fetch = handler as unknown as typeof globalThis.fetch
+    return () => {
+      globalThis.fetch = original
+    }
+  }
+
+  it('empty batch preserves caller offset (never resets to 0)', async () => {
+    const { processTelegramUpdates } = await import('../sniper-bot')
+    expect(await processTelegramUpdates('tok', '111', [], commandDeps(), 2, 42)).toBe(42)
+  })
+
+  it('advances offset per handled update and executes each command once', async () => {
+    const { processTelegramUpdates } = await import('../sniper-bot')
+    const runScan = vi.fn(async () => ({ scanned: 0, screened: 0, delivered: 0, rejected: 0, watchlisted: 0, errors: [], decisions: [] }))
+    const restore = stubFetch(async () => ({ ok: true }) as unknown as Response)
+    try {
+      const next = await processTelegramUpdates(
+        'tok',
+        '111',
+        [
+          { update_id: 7, message: { chat: { id: 111 }, text: '/scan' } },
+          { update_id: 8, message: { chat: { id: 111 }, text: '/scan' } },
+        ],
+        commandDeps({ runScan: runScan as unknown as CommandDeps['runScan'] }),
+        2,
+        5,
+      )
+      expect(next).toBe(9)
+      expect(runScan).toHaveBeenCalledTimes(2)
+    } finally {
+      restore()
+    }
+  })
+
+  it('retries only the cached reply after a send failure (no command re-run)', async () => {
+    const { processTelegramUpdates } = await import('../sniper-bot')
+    const runScan = vi.fn(async () => ({ scanned: 0, screened: 0, delivered: 0, rejected: 0, watchlisted: 0, errors: [], decisions: [] }))
+    let attempt = 0
+    const restore = stubFetch(async () => {
+      attempt++
+      if (attempt === 1) {
+        return { ok: false, status: 500, text: async () => 'err' } as unknown as Response
+      }
+      return { ok: true } as unknown as Response
+    })
+    try {
+      const next = await processTelegramUpdates(
+        'tok',
+        '111',
+        [{ update_id: 3, message: { chat: { id: 111 }, text: '/scan' } }],
+        commandDeps({ runScan: runScan as unknown as CommandDeps['runScan'] }),
+        2,
+        0,
+      )
+      expect(attempt).toBe(2)
+      expect(runScan).toHaveBeenCalledTimes(1)
+      expect(next).toBe(4)
+    } finally {
+      restore()
+    }
+  })
+
+  it('never sends a chunk above the Telegram limit', async () => {
+    const { processTelegramUpdates } = await import('../sniper-bot')
+    const sent: string[] = []
+    const restore = stubFetch(async (_url, init) => {
+      sent.push(JSON.parse(String(init?.body)).text as string)
+      return { ok: true } as unknown as Response
+    })
+    try {
+      await processTelegramUpdates(
+        'tok',
+        '111',
+        [{ update_id: 1, message: { chat: { id: 111 }, text: '/scan' } }],
+        commandDeps(),
+        2,
+        0,
+      )
+    } finally {
+      restore()
+    }
+    expect(sent.length).toBeGreaterThanOrEqual(1)
+    for (const chunk of sent) expect(chunk.length).toBeLessThanOrEqual(4096)
+  })
+
+  it('a thrown command does not abort the batch', async () => {
+    const { processTelegramUpdates } = await import('../sniper-bot')
+    const restore = stubFetch(async () => ({ ok: true }) as unknown as Response)
+    const readLog = vi.fn(() => ({ entries: [] }))
+    const runScan = vi.fn(async () => {
+      throw new Error('boom')
+    })
+    try {
+      const next = await processTelegramUpdates(
+        'tok',
+        '111',
+        [
+          { update_id: 11, message: { chat: { id: 111 }, text: '/scan' } },
+          { update_id: 12, message: { chat: { id: 111 }, text: '/top' } },
+        ],
+        commandDeps({
+          runScan: runScan as unknown as CommandDeps['runScan'],
+          readLog: readLog as unknown as CommandDeps['readLog'],
+        }),
+        2,
+        0,
+      )
+      expect(next).toBe(13)
+      expect(readLog).toHaveBeenCalledTimes(1)
+    } finally {
+      restore()
+    }
   })
 })

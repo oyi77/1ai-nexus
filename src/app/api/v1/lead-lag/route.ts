@@ -8,6 +8,7 @@
 
 import { NextRequest } from 'next/server'
 import { apiSuccess, apiError } from '@/lib/api/response'
+import { denyUnlessFeature } from '@/lib/entitlements'
 import { computeAndStoreLeadLag, fetchLeadLag } from '@/lib/modules/derived/lead-lag-engine'
 import type { LeadLagMatrix } from '@prisma/client'
 import { cacheGet, cacheSet } from '@/lib/cache'
@@ -26,6 +27,8 @@ async function safeCompute(asset: string): Promise<void> {
 }
 
 export async function GET(request: NextRequest) {
+  const denied = await denyUnlessFeature(request, 'signals')
+  if (denied) return denied
   try {
     const asset = request.nextUrl.searchParams.get('asset')
     if (asset) {

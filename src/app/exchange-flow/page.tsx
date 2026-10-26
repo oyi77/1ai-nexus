@@ -38,7 +38,7 @@ interface FlowPayload {
   whaleEvents: WhaleEvent[]
   sparkHistory: number[]
 }
-export function fmtUsd(n: number | null | undefined): string {
+function fmtUsd(n: number | null | undefined): string {
   if (!Number.isFinite(n)) return '—'
   const value = n as number
   if (Math.abs(value) >= 1e9) return `$${(value / 1e9).toFixed(2)}B`
@@ -47,7 +47,7 @@ export function fmtUsd(n: number | null | undefined): string {
   return `$${value.toFixed(0)}`
 }
 
-export function fmtPercent(n: number | null | undefined): string {
+function fmtPercent(n: number | null | undefined): string {
   return Number.isFinite(n) ? `${(n as number) >= 0 ? '+' : ''}${(n as number).toFixed(2)}%` : '—'
 }
 export default function ExchangeFlowPage() {
