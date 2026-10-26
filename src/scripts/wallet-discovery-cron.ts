@@ -112,6 +112,7 @@ async function main(): Promise<void> {
   const lock = acquireRunLock(LOCK_PATH, LOCK_STALE_MS)
   if (!lock.acquired) {
     console.log('[wallet-discovery] another pass holds the lock — skipping')
+    void recordPipelineRun('wallet-discovery', true, 'lock-not-acquired (skipped)')
     return
   }
   try {
@@ -194,6 +195,7 @@ async function runDiscovery(dry: boolean, filters: Partial<DiscoveryFilters>): P
     // future edit ever lets one through this line makes the failure loud.
     console.error(`[wallet-discovery] INVARIANT VIOLATION: ${bots} bot wallet(s) reached persistence`)
   }
+  void recordPipelineRun('wallet-discovery', true, `discovered=${result.discovered.length} persisted=${written} refused=${result.refusals.length}`)
 }
 
 main()

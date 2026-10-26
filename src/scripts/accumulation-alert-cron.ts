@@ -340,7 +340,6 @@ async function main() {
 
     }
   }
-
   if (sent > 0) writeState(state)
 
   console.log(
@@ -348,8 +347,8 @@ async function main() {
       `suppressed=${suppressed} strategy_refused=${strategyRefused} delivery_failures=${deliveryFailures}`,
   )
 
-  const ok = deliveryFailures === 0 // ok only if all deliveries succeeded
-  void recordPipelineRun('accumulation-alert', ok, `sent=${sent} suppressed=${suppressed} failures=${deliveryFailures}`)
+  const ok = deliveryFailures === 0
+  await recordPipelineRun('accumulation-alert', ok, `sent=${sent} suppressed=${suppressed} failures=${deliveryFailures}`)
   process.exit(0)
 }
 

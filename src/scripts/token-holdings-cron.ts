@@ -35,6 +35,7 @@ async function main(): Promise<void> {
   // the whole cron is a no-op unless the literal "true".
   if (process.env.TOKEN_HOLDINGS_ENABLED !== 'true') {
     console.log("[token-holdings] disabled (TOKEN_HOLDINGS_ENABLED != 'true')")
+    await recordPipelineRun('token-holdings', true, 'disabled')
     return
   }
 
@@ -64,14 +65,13 @@ async function main(): Promise<void> {
       console.log(`[token-holdings]   ... and ${result.errors.length - 10} more`)
     }
   }
-
   console.log(
     `[token-holdings] done: tokens=${result.tokensScanned} ` +
       `upserted=${result.holdingsUpserted} skipped=${result.holdersSkipped} ` +
       `errors=${result.errors.length}`,
   )
+  await recordPipelineRun('token-holdings', result.errors.length === 0, `tokens=${result.tokensScanned} upserted=${result.holdingsUpserted} errors=${result.errors.length}`)
 }
-
 main()
   .catch((err) => {
     console.error('[token-holdings] FATAL:', err)
