@@ -15,6 +15,7 @@ async function fetchFearGreed(params: FetchParams): Promise<unknown> {
   const limit = (params.limit as number) ?? 30
   const res = await fetch(`${BASE}/?limit=${limit}&format=json`, {
     headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
   })
   if (!res.ok) throw new Error(`Fear&Greed ${res.status}`)
   const json = await res.json() as { data: Array<{ value: string; value_classification: string; timestamp: string }> }

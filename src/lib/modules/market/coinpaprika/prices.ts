@@ -12,7 +12,10 @@ import { cachedFetch } from '../../fetch-with-cache'
 const BASE = 'https://api.coinpaprika.com/v1'
 
 async function cpFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { headers: { Accept: 'application/json' } })
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
+  })
   if (!res.ok) throw new Error(`CoinPaprika ${res.status}: ${path}`)
   return res.json() as Promise<T>
 }

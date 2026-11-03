@@ -12,7 +12,10 @@ import { cachedFetch } from '../../fetch-with-cache'
 const BASE = 'https://api.dexscreener.com'
 
 async function dsFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { headers: { Accept: 'application/json' } })
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
+  })
   if (!res.ok) throw new Error(`DexScreener ${res.status}: ${path}`)
   return res.json() as Promise<T>
 }

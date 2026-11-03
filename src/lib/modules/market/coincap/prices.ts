@@ -12,7 +12,10 @@ import { cachedFetch } from '../../fetch-with-cache'
 const BASE = 'https://api.coincap.io/v2'
 
 async function ccFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { headers: { Accept: 'application/json' } })
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
+  })
   if (!res.ok) throw new Error(`CoinCap ${res.status}: ${path}`)
   const json = await res.json() as { data: T }
   return json.data

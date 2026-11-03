@@ -12,7 +12,10 @@ import { cachedFetch } from '../../fetch-with-cache'
 const BASE = 'https://api.bybit.com/v5'
 
 async function bybitFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { headers: { Accept: 'application/json' } })
+  const res = await fetch(`${BASE}${path}`, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
+  })
   if (!res.ok) throw new Error(`Bybit ${res.status}: ${path}`)
   const json = await res.json() as { retCode: number; result: T; retMsg: string }
   if (json.retCode !== 0) throw new Error(`Bybit error: ${json.retMsg}`)

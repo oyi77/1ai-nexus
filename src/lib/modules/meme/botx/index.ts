@@ -10,6 +10,8 @@ import { getCredentialManager } from '../_auth/credential-manager'
 const BOTX_HOST = 'https://api-data-v1.dbotx.com'
 const DISCOVERY_CHAINS = ['solana', 'bsc'] as const
 
+const BOTX_TIMEOUT_MS = 15_000
+
 function toNum(v: unknown, fallback = 0): number {
   const n = Number(v)
   return Number.isFinite(n) ? n : fallback
@@ -77,6 +79,7 @@ async function botxGet<T>(path: string, params: Record<string, string> = {}): Pr
         'x-api-key': key,
         'Accept': 'application/json',
       },
+      signal: AbortSignal.timeout(BOTX_TIMEOUT_MS),
     })
     if (!res.ok) throw new Error(`BotX HTTP ${res.status}: ${await res.text()}`)
     return res.json() as Promise<T>

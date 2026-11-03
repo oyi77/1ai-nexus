@@ -16,6 +16,7 @@ async function hlPost<T>(body: Record<string, unknown>): Promise<T> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15_000),
   })
   if (!res.ok) throw new Error(`Hyperliquid ${res.status}`)
   return res.json() as Promise<T>

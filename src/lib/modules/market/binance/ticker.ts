@@ -13,7 +13,10 @@ const SPOT_BASE = 'https://api.binance.com/api/v3'
 const FUTURES_BASE = 'https://fapi.binance.com'
 
 async function bnFetch<T>(url: string): Promise<T> {
-  const res = await fetch(url, { headers: { Accept: 'application/json' } })
+  const res = await fetch(url, {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(15_000),
+  })
   if (!res.ok) throw new Error(`Binance ${res.status}: ${url}`)
   return res.json() as Promise<T>
 }
