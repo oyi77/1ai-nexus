@@ -38,8 +38,7 @@ export const SOL_MINT = 'So11111111111111111111111111111111111111112';
 export const USDC_MINT = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v';
 
 const DEFAULT_TIMEOUT_MS = 8_000;
-const MIN_DELAY_MS = 250;
-
+const MIN_DELAY_MS = 2_000; // 30 calls/minute public tier
 export type OhlcvTimeframe = 'minute' | 'hour' | 'day';
 
 export interface OhlcvBar {

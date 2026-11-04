@@ -22,6 +22,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import 'dotenv/config'
+import { prisma } from '@/lib/db'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { observeSignalOutcomes, buildCloseNotifications } from '@/lib/modules/derived/meme-price-observer'
@@ -92,6 +93,42 @@ function strongestByContract(entries: SniperLogEntryLike[]): Map<string, string 
 function fmtHorizonPct(value: number | null): string {
   return value === null ? 'n/a' : `${value.toFixed(1)}%`
 }
+const FETCH_TIMEOUT_MS = 8_000
+
+async function fetchTokenUsdForWatch(contract: string): Promise<number | null> {
+  const res = await fetch(`https://lite-api.jup.ag/price/v3?ids=${encodeURIComponent(contract)}`, {
+    headers: { 'User-Agent': 'nexus/1.0' },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  })
+  if (!res.ok) return null
+  const json = (await res.json()) as Record<string, { usdPrice?: unknown }>
+  const price = json[contract]?.usdPrice
+  if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) return null
+  return price
+}
+
+async function checkWatchPositions() {
+  const open = await prisma.memePosition.findMany({ where: { status: 'OPEN' }, take: 25 })
+  let hits = 0
+  for (const pos of open) {
+    try {
+      const price = await fetchTokenUsdForWatch(pos.mint)
+      if (price === null) continue
+      if (pos.targetPrice !== null && price >= pos.targetPrice) {
+        await prisma.memePosition.update({ where: { id: pos.id }, data: { status: 'HIT_TARGET' } })
+        const chat = resolveReviewChatId()
+        if (chat) await deliverSniperAlert(`🎯 TP HIT: ${pos.mint.slice(0, 8)} at $${price} (entry $${pos.entryPrice})`, chat)
+        hits++
+      } else if (pos.stopLoss !== null && price <= pos.stopLoss) {
+        await prisma.memePosition.update({ where: { id: pos.id }, data: { status: 'HIT_STOP' } })
+        const chat = resolveReviewChatId()
+        if (chat) await deliverSniperAlert(`🛑 SL HIT: ${pos.mint.slice(0, 8)} at $${price} (entry $${pos.entryPrice})`, chat)
+        hits++
+      }
+    } catch { continue }
+  }
+  console.log(`[meme-price-observer] watchPositions checked=${open.length} hits=${hits}`)
+}
 
 async function main() {
   const before = await loadOutcomeLog()
@@ -99,6 +136,7 @@ async function main() {
   console.log(
     `[meme-price-observer] checked=${result.checked} closed=${result.closed} updated=${result.updated} errors=${result.errors.length}`,
   )
+  await checkWatchPositions()
 
   const signals = (await loadOutcomeLog()).signals
   const scored = signals.filter((s) => isClosedVerdict(s.verdict))

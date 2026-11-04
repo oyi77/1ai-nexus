@@ -91,13 +91,55 @@ export function MemeLeaderboardPageContent() {
     return [...(memeColumns as unknown as Column<Record<string, unknown>>[]), why];
   }, [explanations]);
 
+ const flowSummary = useMemo(() => {
+   const counts = new Map<string, { count: number; topTokens: string[] }>()
+   Object.entries(explanations ?? {}).forEach(([id, ex]) => {
+     if (!ex.flowSignal) return
+     const flow = ex.flowSignal
+     counts.set(flow.code, {
+       count: (counts.get(flow.code)?.count ?? 0) + 1,
+       topTokens: [...(counts.get(flow.code)?.topTokens ?? []), id],
+     })
+   })
+   return Array.from(counts.entries()).map(([code, agg]) => ({
+     code,
+     label: explanations?.[agg.topTokens[0]]?.flowSignal?.label ?? code,
+     count: agg.count,
+     tokens: agg.topTokens.slice(0, 5),
+   })).sort((a, b) => b.count - a.count)
+ }, [explanations])
+
   return (
     <div className="space-y-4">
-      <Panel
-        title="Meme Leaderboard"
-        subtitle={`Ranked meme-token discovery · ${meta ? meta.total : 0} tokens${
-          platformError ? ` · ${platformError}` : ""
-        }`}
+    <Panel title="Flow Intelligence" subtitle="Aggregated smart-money flow signals">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        {flowSummary.length === 0 ? (
+          <p className="text-xs text-text-muted col-span-full">No flow signals detected in current selection.</p>
+        ) : (
+          flowSummary.map((f) => (
+            <div key={f.code} className="flex flex-col gap-1 p-2 rounded border border-border-subtle bg-bg-raised">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-text-primary uppercase">{f.label}</span>
+                <span className="text-[10px] font-mono text-emerald-400">{f.count} tokens</span>
+              </div>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {f.tokens.map((t) => (
+                  <span key={t} className="text-[9px] font-mono px-1 rounded bg-slate-900 border border-border-subtle text-text-secondary">
+                    {t.slice(0, 4)}...
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </Panel>
+
+    <Panel
+      title="Meme Leaderboard"
+      subtitle={`Ranked meme-token discovery · ${meta ? meta.total : 0} tokens${
+        platformError ? ` · ${platformError}` : ""
+      }`}
         liveStatus={status}
         onRefresh={fetchData}
       >

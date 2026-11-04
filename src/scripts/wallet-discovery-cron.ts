@@ -112,7 +112,7 @@ async function main(): Promise<void> {
   const lock = acquireRunLock(LOCK_PATH, LOCK_STALE_MS)
   if (!lock.acquired) {
     console.log('[wallet-discovery] another pass holds the lock — skipping')
-    void recordPipelineRun('wallet-discovery', true, 'lock-not-acquired (skipped)')
+    await recordPipelineRun('wallet-discovery', true, 'lock-not-acquired (skipped)')
     return
   }
   try {
@@ -195,13 +195,13 @@ async function runDiscovery(dry: boolean, filters: Partial<DiscoveryFilters>): P
     // future edit ever lets one through this line makes the failure loud.
     console.error(`[wallet-discovery] INVARIANT VIOLATION: ${bots} bot wallet(s) reached persistence`)
   }
-  void recordPipelineRun('wallet-discovery', true, `discovered=${result.discovered.length} persisted=${written} refused=${result.refusals.length}`)
+  await recordPipelineRun('wallet-discovery', true, `discovered=${result.discovered.length} persisted=${written} refused=${result.refusals.length}`)
 }
 
 main()
   .then(() => process.exit(0))
-  .catch((err) => {
+  .catch(async (err) => {
     console.error('[wallet-discovery] FATAL:', err instanceof Error ? err.message : String(err))
-    void recordPipelineRun('wallet-discovery', false, `FATAL: ${err instanceof Error ? err.message : String(err)}`)
+    await recordPipelineRun('wallet-discovery', false, `FATAL: ${err instanceof Error ? err.message : String(err)}`)
     process.exit(1)
   })

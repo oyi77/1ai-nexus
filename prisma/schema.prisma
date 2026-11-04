@@ -1369,6 +1369,22 @@ model SniperSignalOutcome {
   @@index([status, alertedAt(sort: Desc)])
   @@index([alertedAt(sort: Desc)])
 }
+
+model MemePosition {
+  id            String   @id @default(cuid())
+  userId        String
+  walletAddress String
+  mint          String
+  entryPrice    Float
+  targetPrice   Float?
+  stopLoss      Float?
+  status        String   @default("OPEN") // OPEN | HIT_TARGET | HIT_STOP | CLOSED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId, status])
+  @@index([walletAddress])
+}
 // Unified TTL seen/dedup store for every scanner namespace (review, scan,
 // ticker, confluence, accumulation, kolscan). Primary store; the JSON files
 // under data/ remain as crash-safe dual-write backups only.

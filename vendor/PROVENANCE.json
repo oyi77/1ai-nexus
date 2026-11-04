@@ -1,0 +1,37 @@
+{
+  "package": {
+    "name": "@1ai/payment",
+    "version": "0.1.0",
+    "license": "UNLICENSED"
+  },
+  "archive": {
+    "path": "vendor/1ai-payment-0.1.0.tgz",
+    "sha256": "04d0b828a95c7360b0944fff534f0082011fc525b9783103a6635efc540c2579",
+    "integrity": "sha512-8nDyAREGwS0SjUIyCESQHr0DhztibLGkS8pjOqW8s9u8Jmd2jnswzBNBjjkdWlzoJ0wLf2tZw4JtidngMihe/A=="
+  },
+  "source": {
+    "repository": "https://github.com/oyi77/1ai-payment.git",
+    "commit": "2d04be4f5ebee104e8e1414dbcc322bbdb16a63c",
+    "packagePath": "packages/sdk",
+    "byteMatchedFiles": [
+      "package.json",
+      "tsconfig.json",
+      "src/index.ts",
+      "tests/index.test.ts"
+    ]
+  },
+  "install": {
+    "manifestSpec": "file:../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",
+    "lockfile": "package-lock.json",
+    "lockEntry": "packages[node_modules/@1ai/payment]",
+    "requiredStagingPath": "../1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz",
+    "dockerStagingPath": "/1ai-payment/packages/sdk/1ai-payment-0.1.0.tgz"
+  },
+  "verification": {
+    "runtime": "Node.js v22.22.3, npm 10.9.8",
+    "cleanInstall": "npm ci passed from a clean temporary staging directory (run in this worktree during provenance verification)",
+    "pinnedCommitVerified": "2d04be4f5ebee104e8e1414dbcc322bbdb16a63c verified via cmp -s on package.json, tsconfig.json, src/index.ts, tests/index.test.ts against git show 2d04be4:packages/sdk/<file> (0 diffs across all 4)",
+    "upstreamDriftObserved": "../1ai-payment HEAD is 130789c1ab7f261387670e2ec0ddc98e239b67cb (packages/sdk/src/index.ts and tests/index.test.ts drifted post-2d04be4; archive remains locked to 2d04be4 integrity)",
+    "sourceComparison": "The 4 source files extracted from vendor/1ai-payment-0.1.0.tgz bit-for-bit match git show 2d04be4:packages/sdk/<file>; dist was packaged in archive and not independently rebuilt"
+  }
+}
