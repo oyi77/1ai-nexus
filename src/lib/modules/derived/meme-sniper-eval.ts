@@ -298,17 +298,46 @@ function momentumBreaches(p: SniperPayload, stage: SniperStage): { breaches: str
   const required = stage === 'new-pair' ? L.newPairVolMcRatio : L.postBondingVolMcRatio
   const mc = p.momentum.marketCap
   const vol = p.momentum.volume5m
+
   if (!isPct(mc) || mc <= 0) {
     return { breaches: ['Market cap is zero/unknown — ratio uncomputable'], ratio: null }
   }
   if (!isPct(vol) || vol < 0) {
     return { breaches: ['Volume unknown — momentum uncomputable'], ratio: null }
   }
+
   const ratio = vol / mc
   const breaches: string[] = []
+
   if (ratio < required) {
     breaches.push(`Dead momentum: 5m vol/mcap ${ratio.toFixed(2)}x < required ${required}x`)
   }
+
+  // ── aitrader demo gates ──
+  if (p.buyTaxPct != null && p.buyTaxPct > L.maxBuyTaxPercent) {
+    breaches.push(`Buy tax too high: ${p.buyTaxPct}% > ${L.maxBuyTaxPercent}%`)
+  }
+  if (p.sellTaxPct != null && p.sellTaxPct > L.maxSellTaxPercent) {
+    breaches.push(`Sell tax too high: ${p.sellTaxPct}% > ${L.maxSellTaxPercent}%`)
+  }
+
+  const buy = p.buyCount
+  const sell = p.sellCount
+  if (buy != null && sell != null && buy + sell > 0) {
+    const ratioPercent = (buy / (buy + sell)) * 100
+    if (ratioPercent < L.buyRatioRejectPercent) {
+      breaches.push(`Sell pressure dominated (buy ratio ${ratioPercent.toFixed(0)}% < ${L.buyRatioRejectPercent}%)`)
+    }
+  }
+
+  const up5 = p.priceChange5mPct
+  const up1h = p.priceChange1hPct
+  if (up5 != null && up1h != null) {
+    if (up1h <= L.momentumRejectChg1hPercent && up5 <= L.momentumRejectChg5mPercent) {
+      breaches.push(`Momentum fading (5m ${up5}% / 1h ${up1h}%) → reject (aitrader-like)`)
+    }
+  }
+
   return { breaches, ratio }
 }
 

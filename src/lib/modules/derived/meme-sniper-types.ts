@@ -75,6 +75,14 @@ export interface SniperPayload {
     top5AvgPnlPercent?: number | null
     narrative?: string
   }
+
+  // ── aitrader demo screening inputs ──
+  priceChange5mPct?: number | null
+  priceChange1hPct?: number | null
+  buyCount?: number | null
+  sellCount?: number | null
+  buyTaxPct?: number | null
+  sellTaxPct?: number | null
 }
 
 // Screening verdicts only. There is deliberately no EXECUTE member:
@@ -98,6 +106,11 @@ export interface SniperMetrics {
   clusterPercent: number | null
   avgPnlPercent: number | null
   pnlAssessment: PnlAssessment
+  // ── aitrader demo screening inputs ──
+  priceChange5mPct?: number | null
+  priceChange1hPct?: number | null
+  buyCount?: number | null
+  sellCount?: number | null
 }
 
 export interface SniperDecision {
@@ -125,6 +138,15 @@ export const SNIPER_LIMITS = {
   postBondingVolMcRatio: 4,
   dumpRiskPnlPercent: 150,
   accumulationPnlPercent: 50,
+  // aitrader demo thresholds (0..1 fractions in demo source, scaled to 0..100 percent here)
+  maxBuyTaxPercent: 10,
+  maxSellTaxPercent: 10,
+  maxRugRatioPercent: 60,
+  momentumRejectChg1hPercent: -12,
+  momentumRejectChg5mPercent: -6,
+  buyRatioPassPercent: 50,
+  buyRatioRejectPercent: 42,
+  minSmartMoneyConfluenceCount: 1,
 } as const;
 
 /**
@@ -134,8 +156,7 @@ export const SNIPER_LIMITS = {
  * open a stray entity the way it does under legacy Markdown.
  */
 export function escapeHtml(s: string | null | undefined): string {
-  if (typeof s !== 'string') return ''
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /** The profile that judges this stage by default — the operator's own criteria. */
@@ -149,17 +170,14 @@ export function profileForStage(stage: SniperStage): CriteriaProfileId {
  * or only breached <=2 non-critical rules without honeypot/freeze/mint risk.
  */
 export function isNearMissCandidate(entry: {
-  status: string
-  metrics?: { volMcRatio?: number | null } | null
-  rejections?: string[] | null
+  volMcRatio: number | null
+  rejections: string[]
+  warnings: string[]
 }): boolean {
-  if (entry.status !== 'REJECT') return false
-  const rejections = entry.rejections ?? []
-  const isCritical = rejections.some((r) =>
-    /honeypot|freeze authority enabled|mint authority enabled/i.test(r),
-  )
-  if (isCritical) return false
-  const ratio = entry.metrics?.volMcRatio
-  if (ratio != null && Number.isFinite(ratio) && ratio >= 0.5) return true
-  return rejections.length > 0 && rejections.length <= 2
+  const isMomentum = entry.volMcRatio !== null && entry.volMcRatio >= 0.5
+  const criticalBreaches = entry.rejections.filter((r) => !r.startsWith('['))
+  const isNearMiss =
+    isMomentum ||
+    (criticalBreaches.length <= 2 && !entry.rejections.some((r) => /honeypot|mint|freeze/i.test(r)))
+  return isNearMiss
 }

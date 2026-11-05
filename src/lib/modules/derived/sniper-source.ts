@@ -289,13 +289,19 @@ export function toSniperPayload(
       clusterPercent: sec.clusterPercent ?? undefined,
       topWallets: sec.topWallets,
     },
-    momentum: {
-      marketCap: token.marketCap,
-      volume5m: token.volume5m ?? null,
-      top5AvgPnlPercent: sec.top5AvgPnlPercent, // GMGN holders endpoint (null = neutral, never faked)
-      narrative: token.narrative ?? undefined,
-    },
-  }
-
+  momentum: {
+    marketCap: token.marketCap,
+    volume5m: token.volume5m ?? null,
+    top5AvgPnlPercent: sec.top5AvgPnlPercent, // GMGN holders endpoint (null = neutral, never faked)
+    narrative: token.narrative ?? undefined,
+    priceChange5mPct: token.priceChange5mPct ?? null,
+    priceChange1hPct: token.priceChange1hPct ?? null,
+  },
+  buyCount: token.buyCount24h ?? null,
+  sellCount: token.sellCount24h ?? null,
+  buyTaxPct: token.buyTaxPct ?? null,
+  sellTaxPct: token.sellTaxPct ?? null,
+  warnings: identity.warnings,
+  auditsAccepted: identity.accepted,
   return { payload, warnings: identity.warnings, auditsAccepted: identity.accepted }
 }
