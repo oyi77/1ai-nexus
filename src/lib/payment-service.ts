@@ -33,7 +33,13 @@ export class PaymentService {
     if (!apiKey || apiKey === '') {
       throw new Error('Payment service API key is required');
     }
-    this.client = new OneAIPayment({ apiKey, baseUrl: baseUrl || 'http://localhost:3100' });
+    // Production default is the shared aggregator. A localhost default here
+    // silently sent live checkout traffic to a dead local service when the
+    // env var was missing, so fail toward the real endpoint instead.
+    this.client = new OneAIPayment({
+      apiKey,
+      baseUrl: baseUrl || 'https://pay.berkahkarya.org',
+    });
   }
 
   async createSubscriptionPayment(params: CreatePaymentParams): Promise<PaymentOrder> {
